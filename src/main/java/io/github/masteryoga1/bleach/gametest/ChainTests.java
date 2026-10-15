@@ -135,6 +135,21 @@ public final class ChainTests {
     }
 
     @GameTest(template = "empty")
+    public static void chainlessPlusGetsAChain(GameTestHelper helper) {
+        SoulData data = new SoulData();
+        SoulLogic.initialize(data);
+        data.setState(SoulState.PLUS);
+        helper.assertTrue(SoulLogic.ensureChain(data), "a Plus without a chain was not given one");
+        helper.assertTrue(data.chainMaxTicks() == SoulLogic.chainLifeTicks() && data.chainTicks() == data.chainMaxTicks(),
+                "the repaired chain was " + data.chainTicks() + " of " + data.chainMaxTicks());
+        helper.assertFalse(SoulLogic.ensureChain(data), "a Plus with a chain got another");
+        SoulData human = new SoulData();
+        SoulLogic.initialize(human);
+        helper.assertFalse(SoulLogic.ensureChain(human), "a Human was given a chain");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void encroachmentDamageTypeLoads(GameTestHelper helper) {
         DamageSource source = ChainEvents.encroachment(helper.getLevel());
         helper.assertTrue(source.typeHolder().is(ChainEvents.ENCROACHMENT), "wrong damage type");

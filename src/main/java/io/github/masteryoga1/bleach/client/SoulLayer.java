@@ -18,9 +18,12 @@ import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.AbstractSkullBlock;
 import net.minecraft.world.level.block.SkullBlock;
 
 /**
@@ -53,7 +56,7 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
         SoulAppearance look = ClientSouls.appearance(player);
         if (look.state() == SoulState.PLUS && look.chainFraction() > 0.0F) {
             renderChain(poseStack, buffer, packedLight, player, look.chainFraction());
-        } else if (look.state() == SoulState.HOLLOW) {
+        } else if (look.state() == SoulState.HOLLOW && !wearsSkull(player)) {
             renderMask(poseStack, buffer, packedLight);
         }
     }
@@ -64,8 +67,10 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
         int pieces = Mth.clamp(Mth.ceil(fraction * MAX_CHAIN_PIECES), 1, MAX_CHAIN_PIECES);
         poseStack.pushPose();
         getParentModel().body.translateAndRotate(poseStack);
+        // In front of the chest, or of the chestplate when one is worn.
+        float front = player.getItemBySlot(EquipmentSlot.CHEST).isEmpty() ? -0.17F : -0.21F;
+        poseStack.translate(0.0F, 0.3F, front);
         // Model space is upside down; turn it back so the sprites hang the right way up.
-        poseStack.translate(0.0F, 0.3F, -0.17F);
         poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
         for (int i = 0; i < pieces; i++) {
             poseStack.pushPose();
@@ -76,6 +81,12 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
             poseStack.popPose();
         }
         poseStack.popPose();
+    }
+
+    /** A worn mob or player head would sit exactly where the mask goes. */
+    private static boolean wearsSkull(AbstractClientPlayer player) {
+        return player.getItemBySlot(EquipmentSlot.HEAD).getItem() instanceof BlockItem item
+                && item.getBlock() instanceof AbstractSkullBlock;
     }
 
     /** A skull over the face, placed the way vanilla places a worn skull. */

@@ -49,6 +49,14 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
+        // Starts the real client, plays through a short scripted check and quits (see ClientSmokeTest).
+        // CI runs it under a virtual display to catch crashes in the mod's client code.
+        clientSmokeTest {
+            client()
+            gameDirectory = project.file('run/smoketest')
+            systemProperty 'bleach.smokeTest', 'true'
+        }
+
         data {
             data()
             gameDirectory = project.file('run/data')

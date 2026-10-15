@@ -43,12 +43,14 @@
 
   "message.bleach.stat_level_up": "%s reached level %s",
   "message.bleach.became_plus": "Your body is gone. You linger where you fell, a Plus bound to this world by your Chain of Fate.",
+  "message.bleach.became_plus.elsewhere": "Your body is gone, and you could not stay where you fell. You wake as a Plus, bound to this world by your Chain of Fate.",
   "message.bleach.encroachment_begins": "The links of your Chain of Fate have begun to eat each other. Encroachment has set in.",
   "message.bleach.encroachment_pang": "Your chain gnaws at your chest",
   "message.bleach.hollowfied": "Your Chain of Fate is gone. A hole opens in your chest and a mask forms over your face. You have become a Hollow.",
   "message.bleach.reiatsu_released": "You release your reiatsu",
   "message.bleach.reiatsu_sealed": "You hold your reiatsu in",
   "message.bleach.reiatsu_too_weak": "You do not have enough reiryoku to release",
+  "message.bleach.reiatsu_settling": "Your reiatsu is still settling",
   "message.bleach.reiatsu_exhausted": "Your reiatsu gives out",
 
   "death.attack.bleach.encroachment": "%1$s was consumed by Encroachment",

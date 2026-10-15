@@ -13,9 +13,9 @@ Step 2 of the plan is in progress. So far:
 - Every player has a soul: a soul state (starting as a living Human), a reiryoku pool that regenerates (twice as fast while meditating or sleeping), and the Zankensoki stats, which level up by use.
 - Reiryoku grows by beating hostile creatures, surviving close calls (including a Totem of Undying save) and levelling stats.
 - A spiritually aware Human who dies comes back where they fell as a Plus, with a Chain of Fate hanging from their chest. The chain wears away over an hour of play. In its last quarter Encroachment sets in, with pangs of pain and blindness, and when it runs out the player becomes a Hollow, with a mask (a placeholder skull for now) and a burst of reiryoku. Konsō, which saves a Plus, comes with the Shinigami path.
-- Players below the awareness threshold (30 maximum reiryoku by default) cannot see Pluses, Hollows or other spirits, and their hits pass straight through them.
+- Players below the awareness threshold (30 maximum reiryoku by default) cannot see Pluses, Hollows or other spirits, and their hits, arrows and potions pass straight through them.
 - Reiatsu difference: hits from someone with far less spiritual pressure than you do much less damage.
-- Press **R** to release your reiatsu. It drains reiryoku and weighs down much weaker creatures and players nearby with Slowness and Mining Fatigue (and Weakness for the far weaker), and the weakest mobs run. Running dry ends it and exhausts you.
+- Press **R** to release your reiatsu. It drains reiryoku and weighs down much weaker creatures and players nearby with Slowness and Mining Fatigue (and Weakness for the far weaker), and creatures far below you run. Running dry ends it and exhausts you. It spares your mount, your pets and players you can't hurt (PvP off, or a team without friendly fire).
 - A reiryoku bar beside the hotbar (outlined while reiatsu is released, with a chain gauge beside it for a Plus), and a soul screen on **K**. Both keys can be rebound under the Bleach category.
 - A Bleach advancement tab, `/bleach` admin commands and a per-world server config (`serverconfig/bleach-server.toml`).
 
@@ -51,7 +51,7 @@ You need JDK 21.
 ./gradlew runGameTestServer # run the automated game tests on a headless server
 ```
 
-Every pull request is built on GitHub Actions, which also runs the game tests. The built jar can be downloaded from the run's **Artifacts** section.
+Every pull request is built on GitHub Actions, which also runs the game tests and a client smoke test (`./gradlew runClientSmokeTest`: it starts the game, makes a world, plays through becoming a Plus and a Hollow, and quits). The built jar can be downloaded from the run's **Artifacts** section.
 
 ## Versions
 

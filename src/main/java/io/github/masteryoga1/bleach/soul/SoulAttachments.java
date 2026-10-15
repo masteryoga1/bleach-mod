@@ -21,6 +21,10 @@ public final class SoulAttachments {
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());
 
+    /** Server side only: until when a creature is fleeing released reiatsu, and from where. Never saved. */
+    public static final Supplier<AttachmentType<Fright>> FRIGHT = ATTACHMENT_TYPES.register("fright",
+            () -> AttachmentType.builder(() -> Fright.NONE).build());
+
     private SoulAttachments() {
     }
 }

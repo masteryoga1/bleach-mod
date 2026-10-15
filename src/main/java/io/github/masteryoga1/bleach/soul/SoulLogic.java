@@ -197,6 +197,19 @@ public final class SoulLogic {
         return BleachConfig.get(BleachConfig.CHAIN_OF_FATE_MINUTES) * 60 * 20;
     }
 
+    /**
+     * Gives a Plus without a chain a fresh one. Saves from before every Plus had a chain can hold one.
+     *
+     * @return whether a chain was added
+     */
+    public static boolean ensureChain(SoulData data) {
+        if (data.state() != SoulState.PLUS || data.chainMaxTicks() > 0) {
+            return false;
+        }
+        data.startChain(chainLifeTicks());
+        return true;
+    }
+
     /** Whether the Plus's chain is in its last stretch, where the links eat each other. */
     public static boolean isEncroaching(SoulData data) {
         return data.state() == SoulState.PLUS && data.chainMaxTicks() > 0
@@ -323,10 +336,11 @@ public final class SoulLogic {
             return 0;
         }
         int level = ratio >= minRatio * 4 ? 3 : ratio >= minRatio * 2 ? 2 : 1;
-        target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, PRESSURE_EFFECT_TICKS, level - 1, true, false));
-        target.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN, PRESSURE_EFFECT_TICKS, level - 1, true, false));
+        // Ambient and without particles, but with an icon so a player knows why they feel heavy.
+        target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, PRESSURE_EFFECT_TICKS, level - 1, true, false, true));
+        target.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN, PRESSURE_EFFECT_TICKS, level - 1, true, false, true));
         if (level >= 3) {
-            target.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, PRESSURE_EFFECT_TICKS, 0, true, false));
+            target.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, PRESSURE_EFFECT_TICKS, 0, true, false, true));
         }
         return level;
     }

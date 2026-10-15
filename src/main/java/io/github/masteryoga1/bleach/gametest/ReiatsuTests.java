@@ -2,6 +2,8 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.soul.Fright;
+import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -17,6 +19,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -66,6 +69,22 @@ public final class ReiatsuTests {
         helper.assertTrue(slow != null && slow.getAmplifier() == 2, "level 3 should be Slowness III");
         helper.assertTrue(pig.hasEffect(MobEffects.DIG_SLOWDOWN), "no Mining Fatigue under pressure");
         helper.assertTrue(pig.hasEffect(MobEffects.WEAKNESS), "level 3 should weaken");
+        helper.assertTrue(slow.showIcon() && !slow.isVisible(), "pressure should show an icon but no particles");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void frightenedCreaturesRun(GameTestHelper helper) {
+        Zombie zombie = helper.spawn(EntityType.ZOMBIE, 1, 1, 1);
+        helper.assertTrue(zombie.goalSelector.getAvailableGoals().stream()
+                        .filter(goal -> goal.getGoal() instanceof ReiatsuFleeGoal).count() == 1,
+                "a zombie should get exactly one reiatsu flee goal");
+        helper.assertFalse(ReiatsuFleeGoal.isFrightened(zombie), "a new zombie is already frightened");
+        long now = helper.getLevel().getGameTime();
+        zombie.setData(SoulAttachments.FRIGHT, new Fright(now + 30, zombie.position().add(1.0, 0.0, 0.0)));
+        helper.assertTrue(ReiatsuFleeGoal.isFrightened(zombie), "the fright did not take");
+        zombie.setData(SoulAttachments.FRIGHT, new Fright(now - 1, zombie.position()));
+        helper.assertFalse(ReiatsuFleeGoal.isFrightened(zombie), "the fright did not wear off");
         helper.succeed();
     }
 
@@ -107,6 +126,12 @@ public final class ReiatsuTests {
         Player creative = helper.makeMockPlayer(GameType.CREATIVE);
         creative.setData(SoulAttachments.SOUL, soul(SoulState.HUMAN, 10.0F));
         helper.assertFalse(SpiritEvents.passesThrough(creative, spirit), "creative mode should touch anything");
+
+        helper.assertFalse(spirit.addEffect(new MobEffectInstance(MobEffects.POISON, 100), unaware),
+                "an unaware player's potion reached a spirit");
+        helper.assertFalse(spirit.hasEffect(MobEffects.POISON), "the spirit was poisoned anyway");
+        helper.assertTrue(spirit.addEffect(new MobEffectInstance(MobEffects.POISON, 100), aware),
+                "an aware player's potion did not reach the spirit");
 
         float health = spirit.getHealth();
         spirit.hurt(unaware.damageSources().playerAttack(unaware), 5.0F);

@@ -11,12 +11,12 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.PathfinderMob;
-import net.minecraft.world.entity.ai.util.DefaultRandomPos;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import org.joml.Vector3f;
@@ -24,6 +24,12 @@ import org.joml.Vector3f;
 /** Reiatsu as a force: weak attackers barely scratch a strong soul, and released reiatsu crushes the weak. */
 public final class ReiatsuEvents {
     private static final int PULSE_INTERVAL_TICKS = 10;
+    /** How long a soul must wait after holding its reiatsu in before releasing it again. */
+    public static final int RELEASE_COOLDOWN_TICKS = 40;
+    /** Presses closer together than this are ignored, so a held or repeated key cannot spam the toggle. */
+    private static final int MIN_TOGGLE_INTERVAL_TICKS = 5;
+    /** How long one pulse keeps a creature running. */
+    private static final int FRIGHT_TICKS = 30;
     private static final DustParticleOptions REIATSU_PARTICLE =
             new DustParticleOptions(new Vector3f(0.56F, 0.85F, 1.0F), 1.5F);
 
@@ -34,6 +40,15 @@ public final class ReiatsuEvents {
         // After Zanjutsu and Hakuda have strengthened the hit.
         bus.addListener(EventPriority.LOW, ReiatsuEvents::onIncomingDamage);
         bus.addListener(ReiatsuEvents::onPlayerTick);
+        bus.addListener(ReiatsuEvents::onEntityJoin);
+    }
+
+    /** Every creature that walks by pathfinding can be frightened into running. */
+    private static void onEntityJoin(EntityJoinLevelEvent event) {
+        if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob
+                && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
+            mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
+        }
     }
 
     /** Reiatsu difference: a soul whose reiatsu dwarfs its attacker's shrugs off most of the hit. */
@@ -59,11 +74,11 @@ public final class ReiatsuEvents {
             return;
         }
         if (!player.isAlive() || player.isSpectator()) {
-            data.setReiatsuReleased(false);
+            seal(player, data);
             return;
         }
         if (!SoulLogic.drain(player, data, SoulLogic.releaseDrainPerTick(data))) {
-            data.setReiatsuReleased(false);
+            seal(player, data);
             player.displayClientMessage(Component.translatable("message.bleach.reiatsu_exhausted")
                     .withStyle(ChatFormatting.GRAY), true);
             return;
@@ -79,16 +94,16 @@ public final class ReiatsuEvents {
         double radiusSqr = radius * radius;
         List<LivingEntity> nearby = player.level().getEntitiesOfClass(LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
-                entity -> entity != player && entity.isAlive() && entity.distanceToSqr(player) <= radiusSqr
-                        && !(entity instanceof Player other && (other.isCreative() || other.isSpectator())));
+                entity -> entity.isAlive() && entity.distanceToSqr(player) <= radiusSqr && isAffected(player, entity));
         boolean crushedSomeone = false;
+        long until = player.level().getGameTime() + FRIGHT_TICKS;
         for (LivingEntity target : nearby) {
             int weight = SoulLogic.applyPressure(target, data.maxReiryoku());
             if (weight > 0) {
                 crushedSomeone = true;
             }
             if (weight >= 2 && target instanceof PathfinderMob mob) {
-                flee(mob, player);
+                frighten(mob, player, until);
             }
         }
         if (crushedSomeone) {
@@ -98,34 +113,74 @@ public final class ReiatsuEvents {
                 12, 0.6, 0.9, 0.6, 0.02);
     }
 
-    private static void flee(PathfinderMob mob, ServerPlayer from) {
+    /**
+     * Who the aura reaches: not the releaser, what they ride or carry, or their own pets; not players
+     * in creative or spectator mode; and not players they could not hurt (PvP off, or a team with
+     * friendly fire off).
+     */
+    private static boolean isAffected(ServerPlayer releaser, LivingEntity entity) {
+        if (entity.getRootVehicle() == releaser.getRootVehicle()) {
+            return false;
+        }
+        if (entity instanceof OwnableEntity pet && releaser.getUUID().equals(pet.getOwnerUUID())) {
+            return false;
+        }
+        if (entity instanceof Player other) {
+            return !other.isCreative() && !other.isSpectator() && releaser.canHarmPlayer(other);
+        }
+        return true;
+    }
+
+    /** The creature drops its grudge against the releaser and runs (see {@link ReiatsuFleeGoal}). */
+    private static void frighten(PathfinderMob mob, ServerPlayer from, long until) {
         if (mob.getTarget() == from) {
             mob.setTarget(null);
         }
-        Vec3 away = DefaultRandomPos.getPosAway(mob, 10, 5, from.position());
-        if (away != null) {
-            mob.getNavigation().moveTo(away.x, away.y, away.z, 1.4);
-        }
+        mob.setData(SoulAttachments.FRIGHT, new Fright(until, from.position()));
     }
 
-    /** Called when the player presses the release key. The server decides whether it can happen. */
+    /**
+     * Called when the player presses the release key. The server decides whether it can happen.
+     * Releasing costs a second's worth of reiryoku up front and pulses at once, and after holding it
+     * in the soul must wait {@link #RELEASE_COOLDOWN_TICKS} to release again, so flicking the aura on
+     * and off is never cheaper than holding it.
+     */
     public static void toggleRelease(ServerPlayer player) {
         SoulData data = SoulLogic.get(player);
+        int sinceLastChange = player.tickCount - data.lastReleaseChangeTick;
+        if (sinceLastChange < MIN_TOGGLE_INTERVAL_TICKS) {
+            return;
+        }
         if (data.isReiatsuReleased()) {
-            data.setReiatsuReleased(false);
+            seal(player, data);
             player.displayClientMessage(Component.translatable("message.bleach.reiatsu_sealed")
                     .withStyle(ChatFormatting.GRAY), true);
             return;
         }
-        if (!player.isAlive() || player.isSpectator() || !SoulLogic.canRelease(data)) {
+        if (sinceLastChange < RELEASE_COOLDOWN_TICKS) {
+            player.displayClientMessage(Component.translatable("message.bleach.reiatsu_settling")
+                    .withStyle(ChatFormatting.GRAY), true);
+            return;
+        }
+        float cost = SoulLogic.releaseDrainPerTick(data) * 20.0F;
+        if (!player.isAlive() || player.isSpectator() || !SoulLogic.canRelease(data)
+                || data.reiryoku() - cost < 0.5F) {
             player.displayClientMessage(Component.translatable("message.bleach.reiatsu_too_weak")
                     .withStyle(ChatFormatting.GRAY), true);
             return;
         }
+        data.setReiryoku(data.reiryoku() - cost);
         data.setReiatsuReleased(true);
+        data.lastReleaseChangeTick = player.tickCount;
         player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
                 SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 1.0F, 0.6F);
         player.displayClientMessage(Component.translatable("message.bleach.reiatsu_released")
                 .withStyle(ChatFormatting.AQUA), true);
+        pulse(player, data);
+    }
+
+    private static void seal(ServerPlayer player, SoulData data) {
+        data.setReiatsuReleased(false);
+        data.lastReleaseChangeTick = player.tickCount;
     }
 }

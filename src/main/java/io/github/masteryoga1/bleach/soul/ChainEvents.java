@@ -14,11 +14,15 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RespawnAnchorBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
@@ -38,8 +42,6 @@ public final class ChainEvents {
     private static final int PANG_INTERVAL_TICKS = 600;
     private static final double SHINIGAMI_RANGE = 16.0;
     private static final float LOW_HEALTH_FRACTION = 0.3F;
-    /** How far below a mid-air death the return looks for ground. */
-    private static final int MAX_DROP = 32;
 
     private ChainEvents() {
     }
@@ -54,8 +56,11 @@ public final class ChainEvents {
             return;
         }
         SoulData data = SoulLogic.get(player);
-        if (data.state() != SoulState.PLUS || data.chainMaxTicks() <= 0
-                || player.isCreative() || player.isSpectator()) {
+        if (data.state() != SoulState.PLUS) {
+            return;
+        }
+        SoulLogic.ensureChain(data);
+        if (player.isCreative() || player.isSpectator()) {
             return;
         }
 
@@ -138,44 +143,91 @@ public final class ChainEvents {
         data.becamePlus = false;
         Vec3 diedAt = data.diedAt;
         data.diedAt = null;
-        player.getLastDeathLocation().ifPresent(location -> returnToDeathPoint(player, location, diedAt));
+        ServerLevel respawnLevel = player.serverLevel();
+        boolean usedAnchor = respawnedAtAnchor(player);
+        boolean returned = player.getLastDeathLocation()
+                .map(location -> returnToDeathPoint(player, location, diedAt))
+                .orElse(false);
+        if (returned && usedAnchor) {
+            refundAnchorCharge(respawnLevel, player.getRespawnPosition());
+        }
         player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
                 SoundEvents.SOUL_ESCAPE, SoundSource.PLAYERS, 1.0F, 1.0F);
-        player.sendSystemMessage(Component.translatable("message.bleach.became_plus")
+        player.sendSystemMessage(Component.translatable(returned
+                        ? "message.bleach.became_plus" : "message.bleach.became_plus.elsewhere")
                 .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
     }
 
     /**
      * Moves the player to where they died, settled onto the ground below so a death in mid-air does
-     * not end in a long fall. Leaves them at their respawn point if that spot is in a wall, in a
-     * liquid or fire, or over the void.
+     * not end in a long fall.
+     *
+     * @return false, leaving them at their respawn point, if that spot is in a wall, a liquid or
+     *         something harmful, outside the world border, or over the void
      */
-    private static void returnToDeathPoint(ServerPlayer player, GlobalPos location, @Nullable Vec3 exact) {
+    private static boolean returnToDeathPoint(ServerPlayer player, GlobalPos location, @Nullable Vec3 exact) {
         ServerLevel level = player.server.getLevel(location.dimension());
         if (level == null) {
-            return;
+            return false;
         }
         Vec3 target = exact != null ? exact : Vec3.atBottomCenterOf(location.pos());
         if (target.y < level.getMinBuildHeight() || target.y >= level.getMaxBuildHeight()) {
-            return;
+            return false;
         }
         AABB box = player.getDimensions(Pose.STANDING).makeBoundingBox(target);
+        // The spot may have unloaded while the player sat on the death screen, and collision checks
+        // treat unloaded chunks as empty, so load it first.
+        for (int chunkX = Mth.floor(box.minX) >> 4; chunkX <= Mth.floor(box.maxX) >> 4; chunkX++) {
+            for (int chunkZ = Mth.floor(box.minZ) >> 4; chunkZ <= Mth.floor(box.maxZ) >> 4; chunkZ++) {
+                level.getChunk(chunkX, chunkZ);
+            }
+        }
         if (!level.noCollision(player, box)) {
-            return;
+            return false;
         }
-        int dropped = 0;
-        while (dropped < MAX_DROP && level.noCollision(player, box.move(0.0, -1.0, 0.0))) {
+        while (level.noCollision(player, box.move(0.0, -1.0, 0.0))) {
             box = box.move(0.0, -1.0, 0.0);
-            dropped++;
+            if (box.minY < level.getMinBuildHeight()) {
+                return false;
+            }
         }
-        if (dropped >= MAX_DROP || box.minY < level.getMinBuildHeight()) {
-            return;
-        }
-        BlockPos feet = BlockPos.containing(target.x, box.minY, target.z);
-        if (!level.getFluidState(feet).isEmpty() || !level.getFluidState(feet.above()).isEmpty()
-                || level.getBlockState(feet).is(BlockTags.FIRE)) {
-            return;
+        if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, box)) {
+            return false;
         }
         player.teleportTo(level, target.x, box.minY, target.z, player.getYRot(), player.getXRot());
+        return true;
+    }
+
+    /** Whether the spot would hurt or trap whoever stands in it: fire, powder snow, wither roses and the like. */
+    private static boolean isHarmful(ServerLevel level, AABB box) {
+        boolean inside = BlockPos.betweenClosedStream(box).anyMatch(pos -> isHarmful(level.getBlockState(pos)));
+        BlockState below = level.getBlockState(BlockPos.containing(box.getCenter().x, box.minY - 0.5, box.getCenter().z));
+        return inside || isHarmful(below) || below.is(Blocks.MAGMA_BLOCK);
+    }
+
+    private static boolean isHarmful(BlockState state) {
+        return state.is(BlockTags.FIRE) || state.is(BlockTags.CAMPFIRES) || state.is(Blocks.POWDER_SNOW)
+                || state.is(Blocks.WITHER_ROSE) || state.is(Blocks.SWEET_BERRY_BUSH) || state.is(Blocks.CACTUS);
+    }
+
+    /** Whether vanilla respawned the player at a respawn anchor, which spends one of its charges. */
+    private static boolean respawnedAtAnchor(ServerPlayer player) {
+        BlockPos anchor = player.getRespawnPosition();
+        return anchor != null && !player.isRespawnForced()
+                && player.level().dimension() == player.getRespawnDimension()
+                && player.level().getBlockState(anchor).getBlock() instanceof RespawnAnchorBlock
+                && player.position().closerThan(Vec3.atCenterOf(anchor), 3.0);
+    }
+
+    /** The Plus never used the anchor it would have respawned at, so it gets back the charge. */
+    private static void refundAnchorCharge(ServerLevel level, @Nullable BlockPos anchor) {
+        if (anchor == null) {
+            return;
+        }
+        BlockState state = level.getBlockState(anchor);
+        if (state.getBlock() instanceof RespawnAnchorBlock
+                && state.getValue(RespawnAnchorBlock.CHARGE) < RespawnAnchorBlock.MAX_CHARGES) {
+            level.setBlock(anchor, state.setValue(RespawnAnchorBlock.CHARGE, state.getValue(RespawnAnchorBlock.CHARGE) + 1), 3);
+        }
     }
 }

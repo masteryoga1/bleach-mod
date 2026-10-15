@@ -70,6 +70,10 @@ public final class SoulData {
     boolean wasEncroaching;
     /** What players tracking this one were last told, so it is only re-sent when it changes. */
     SoulAppearance lastSentAppearance;
+    /** Tick of the last release or seal, for the release cooldown. */
+    int lastReleaseChangeTick = -1000;
+    /** Fire ticks from just before an unaware player's hit passed through, to undo what the hit set alight. */
+    int fireBeforeIgnoredHit = -1;
 
     public SoulData() {
     }

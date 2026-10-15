@@ -33,12 +33,18 @@ public final class BleachClient {
     public static final KeyMapping REIATSU_RELEASE_KEY = new KeyMapping("key.bleach.reiatsu_release",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, KEY_CATEGORY);
 
+    /** Whether the release key was down last tick, so holding it (and key repeat) toggles only once. */
+    private static boolean releaseKeyWasDown;
+
     public BleachClient(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(BleachClient::registerGuiLayers);
         modEventBus.addListener(BleachClient::registerKeyMappings);
         modEventBus.addListener(BleachClient::addLayers);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(BleachClient::onRenderLiving);
+        if (ClientSmokeTest.isEnabled()) {
+            NeoForge.EVENT_BUS.addListener(ClientSmokeTest::onClientTick);
+        }
     }
 
     private static void registerGuiLayers(RegisterGuiLayersEvent event) {
@@ -67,16 +73,20 @@ public final class BleachClient {
                 minecraft.setScreen(new SoulStatsScreen());
             }
         }
+        boolean pressed = false;
         while (REIATSU_RELEASE_KEY.consumeClick()) {
-            if (minecraft.player != null && minecraft.getConnection() != null) {
-                BleachNetwork.requestReiatsuToggle();
-            }
+            pressed = true;
         }
+        if (pressed && !releaseKeyWasDown && minecraft.player != null && minecraft.getConnection() != null) {
+            BleachNetwork.requestReiatsuToggle();
+        }
+        releaseKeyWasDown = REIATSU_RELEASE_KEY.isDown();
     }
 
     /**
-     * The spiritually unaware cannot see spirits. Cancelling skips the body, its layers and its name
-     * tag; the shadow still shows, which needs a mixin to hide and is left for later.
+     * The spiritually unaware cannot see spirits. The mixins under {@code mixin.client} skip hidden
+     * spirits entirely (body, name tag, shadow, fire, hitbox) and let the crosshair pass through
+     * them; this is a fallback for renderers that draw entities without asking first.
      */
     private static void onRenderLiving(RenderLivingEvent.Pre<?, ?> event) {
         if (ClientSouls.isHiddenFromViewer(event.getEntity())) {
