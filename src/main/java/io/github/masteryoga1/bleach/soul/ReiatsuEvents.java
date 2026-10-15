@@ -19,6 +19,7 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import org.joml.Vector3f;
@@ -43,6 +44,7 @@ public final class ReiatsuEvents {
         bus.addListener(EventPriority.LOW, ReiatsuEvents::onIncomingDamage);
         bus.addListener(ReiatsuEvents::onPlayerTick);
         bus.addListener(ReiatsuEvents::onEntityJoin);
+        bus.addListener(ReiatsuEvents::onChangeTarget);
     }
 
     /** Every creature that walks by pathfinding can be frightened into running. */
@@ -50,6 +52,18 @@ public final class ReiatsuEvents {
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob
                 && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
             mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
+        }
+    }
+
+    /**
+     * A creature running from released reiatsu does not pick a new target. Brains would otherwise pick
+     * one straight back each tick and flicker between fighting and idling (see {@link ReiatsuFleeGoal}).
+     */
+    private static void onChangeTarget(LivingChangeTargetEvent event) {
+        if (event.getTargetType() == LivingChangeTargetEvent.LivingTargetType.BEHAVIOR_TARGET
+                && event.getNewAboutToBeSetTarget() != null
+                && event.getEntity() instanceof PathfinderMob mob && ReiatsuFleeGoal.isFleeing(mob)) {
+            event.setCanceled(true);
         }
     }
 

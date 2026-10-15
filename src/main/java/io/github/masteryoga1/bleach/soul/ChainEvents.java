@@ -22,6 +22,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.level.BlockCollisions;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RespawnAnchorBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -195,21 +196,41 @@ public final class ChainEvents {
         }
         // The drop above moves in whole blocks; settle the rest of the way onto what the feet will rest on.
         box = box.move(Entity.collideBoundingBox(player, new Vec3(0.0, -1.0, 0.0), box, level, List.of()));
-        if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, box)) {
+        if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, player, box)) {
             return false;
         }
         player.teleportTo(level, target.x, box.minY, target.z, player.getYRot(), player.getXRot());
         return true;
     }
 
-    /** Whether the spot would hurt or trap whoever stands in it: fire, powder snow, wither roses and the like. */
-    private static boolean isHarmful(ServerLevel level, AABB box) {
-        boolean inside = BlockPos.betweenClosedStream(box).anyMatch(pos -> isHarmful(level.getBlockState(pos)));
-        AABB underfoot = new AABB(box.minX, box.minY - 0.5, box.minZ, box.maxX, box.minY - 0.5, box.maxZ);
-        return inside || BlockPos.betweenClosedStream(underfoot).anyMatch(pos -> {
-            BlockState below = level.getBlockState(pos);
-            return isHarmful(below) || below.is(Blocks.MAGMA_BLOCK);
-        });
+    /**
+     * Whether the spot would hurt or trap whoever stands in it: fire, powder snow, wither roses and the
+     * like where the body would be, or magma underfoot.
+     */
+    private static boolean isHarmful(ServerLevel level, ServerPlayer player, AABB box) {
+        // Shrunk a hair, as vanilla does, so blocks the box only touches from outside do not count.
+        if (BlockPos.betweenClosedStream(box.deflate(1.0E-7)).anyMatch(pos -> isHarmful(level.getBlockState(pos)))) {
+            return true;
+        }
+        // Underfoot only magma hurts, and only through the block vanilla would treat as the support:
+        // the colliding block whose centre is nearest the feet (Entity.checkSupportingBlock, measured
+        // from the spot instead of where the player is now), or what lies right under it, so magma
+        // under a carpet counts too.
+        Vec3 feet = new Vec3(box.getCenter().x, box.minY, box.getCenter().z);
+        AABB sole = new AABB(box.minX, box.minY - 1.0E-6, box.minZ, box.maxX, box.minY, box.maxZ);
+        BlockCollisions<BlockPos> under = new BlockCollisions<>(level, player, sole, false, (pos, shape) -> pos.immutable());
+        BlockPos support = null;
+        double nearest = Double.MAX_VALUE;
+        while (under.hasNext()) {
+            BlockPos pos = under.next();
+            double distance = pos.distToCenterSqr(feet);
+            if (distance < nearest || distance == nearest && (support == null || support.compareTo(pos) < 0)) {
+                support = pos;
+                nearest = distance;
+            }
+        }
+        return support != null
+                && level.getBlockState(support.atY(Mth.floor(box.minY - 0.2))).is(Blocks.MAGMA_BLOCK);
     }
 
     private static boolean isHarmful(BlockState state) {

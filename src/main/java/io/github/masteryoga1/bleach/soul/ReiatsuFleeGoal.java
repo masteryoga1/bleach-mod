@@ -7,6 +7,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.ai.util.DefaultRandomPos;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
@@ -33,11 +34,17 @@ public final class ReiatsuFleeGoal extends Goal {
                 && mob.getData(SoulAttachments.FRIGHT).until() > mob.level().getGameTime();
     }
 
+    /** Whether the creature is running from released reiatsu right now, not just frightened and cornered. */
+    public static boolean isFleeing(PathfinderMob mob) {
+        return mob.goalSelector.getAvailableGoals().stream()
+                .anyMatch(goal -> goal.isRunning() && goal.getGoal() instanceof ReiatsuFleeGoal);
+    }
+
     /**
      * Piglins, hoglins, villagers and other creatures moved by a brain walk to the brain's walk target
      * after the goals have run, so the flight becomes that walk target, and whatever they were
-     * attacking is forgotten while they run. A brain ignores memories it does not use, so this leaves
-     * creatures moved by goals alone.
+     * attacking is forgotten while they run (and they pick no new target, see ReiatsuEvents). A brain
+     * ignores memories it does not use, so this leaves creatures moved by goals alone.
      */
     public static void steerBrain(Brain<?> brain, WalkTarget flight) {
         brain.eraseMemory(MemoryModuleType.ATTACK_TARGET);
@@ -67,6 +74,10 @@ public final class ReiatsuFleeGoal extends Goal {
     public void start() {
         mob.getNavigation().moveTo(path, SPEED);
         steerBrain(mob.getBrain(), flight);
+        // The swell goal this replaces may have lit the fuse again since the creature was frightened.
+        if (mob instanceof Creeper creeper && !creeper.isIgnited()) {
+            creeper.setSwellDir(-1);
+        }
     }
 
     @Override
