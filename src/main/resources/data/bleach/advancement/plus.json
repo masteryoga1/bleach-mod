@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:chain"
+    },
+    "title": {
+      "translate": "advancements.bleach.plus.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.plus.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "plus": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "plus"
+      }
+    }
+  }
+}

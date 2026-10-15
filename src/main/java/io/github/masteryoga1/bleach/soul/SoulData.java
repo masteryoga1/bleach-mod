@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Everything the mod knows about one soul: its state, its spiritual energy, its stats and which
@@ -15,6 +16,8 @@ import net.minecraft.util.StringRepresentable;
  */
 public final class SoulData {
     private static final long NEVER = Long.MIN_VALUE / 2;
+    /** No hit has passed through since the last tick. Fire ticks never reach this, burning or not. */
+    static final int NO_FIRE_RECORDED = Integer.MAX_VALUE;
 
     // Saved data is read leniently: a stat, power or state name this version does not know (renamed,
     // removed, or from a newer version) is dropped instead of making NeoForge discard the whole soul.
@@ -30,7 +33,10 @@ public final class SoulData {
             STAT_MAP_CODEC.optionalFieldOf("stat_levels", Map.of()).forGetter(data -> data.levels),
             STAT_MAP_CODEC.optionalFieldOf("stat_xp", Map.of()).forGetter(data -> data.xp),
             PATH_MAP_CODEC.optionalFieldOf("path_tiers", Map.of()).forGetter(data -> data.tiers),
-            Codec.LONG.optionalFieldOf("last_close_call", NEVER).forGetter(SoulData::lastCloseCallTime)
+            Codec.LONG.optionalFieldOf("last_close_call", NEVER).forGetter(SoulData::lastCloseCallTime),
+            Codec.INT.optionalFieldOf("chain_ticks", 0).forGetter(SoulData::chainTicks),
+            Codec.INT.optionalFieldOf("chain_max_ticks", 0).forGetter(SoulData::chainMaxTicks),
+            Codec.BOOL.optionalFieldOf("reiatsu_released", false).forGetter(SoulData::isReiatsuReleased)
     ).apply(instance, SoulData::new));
 
     private SoulState state = SoulState.HUMAN;
@@ -42,6 +48,11 @@ public final class SoulData {
     private final EnumMap<PowerPath, Integer> tiers = new EnumMap<>(PowerPath.class);
     /** Game time of the last close call that grew reiryoku, so relogging or dying does not skip the cooldown. */
     private long lastCloseCallTime = NEVER;
+    /** Ticks left on a Plus's Chain of Fate, and what it started at. */
+    private int chainTicks;
+    private int chainMaxTicks;
+    /** Whether the soul is flooding the area with its reiatsu (the pressure aura). */
+    private boolean reiatsuReleased;
 
     // Server-side bookkeeping. Not saved or synced; it starts over when the player logs in or respawns.
     private boolean dirty = true;
@@ -52,13 +63,26 @@ public final class SoulData {
     int meditationTicks;
     int meditationGrants;
     int lastCombatXpTick = -1000;
+    float chainErosion;
+    int encroachmentTicks;
+    /** Set on the respawned copy when this death turned a Human into a Plus, with where it happened. */
+    boolean becamePlus;
+    Vec3 diedAt;
+    boolean nearShinigami;
+    boolean wasEncroaching;
+    /** What players tracking this one were last told, so it is only re-sent when it changes. */
+    SoulAppearance lastSentAppearance;
+    /** Tick of the last release or seal, for the release cooldown. */
+    int lastReleaseChangeTick = -1000;
+    /** Fire ticks from just before an unaware player's hit passed through, to undo what the hit set alight. */
+    int fireBeforeIgnoredHit = NO_FIRE_RECORDED;
 
     public SoulData() {
     }
 
     private SoulData(SoulState state, boolean initialized, float reiryoku, float maxReiryoku,
                      Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers,
-                     long lastCloseCallTime) {
+                     long lastCloseCallTime, int chainTicks, int chainMaxTicks, boolean reiatsuReleased) {
         this.state = state;
         this.initialized = initialized;
         this.maxReiryoku = Math.max(0.0F, maxReiryoku);
@@ -67,6 +91,9 @@ public final class SoulData {
         this.xp.putAll(xp);
         this.tiers.putAll(tiers);
         this.lastCloseCallTime = lastCloseCallTime;
+        this.chainMaxTicks = Math.max(0, chainMaxTicks);
+        this.chainTicks = Mth.clamp(chainTicks, 0, this.chainMaxTicks);
+        this.reiatsuReleased = reiatsuReleased;
     }
 
     /** A map keyed by enum name that skips names it does not recognise when reading. */
@@ -200,6 +227,53 @@ public final class SoulData {
         lastCloseCallTime = gameTime;
     }
 
+    public int chainTicks() {
+        return chainTicks;
+    }
+
+    public int chainMaxTicks() {
+        return chainMaxTicks;
+    }
+
+    /** Remaining Chain of Fate as a fraction of its starting length, from 0 to 1. */
+    public float chainFraction() {
+        return chainMaxTicks <= 0 ? 0.0F : (float) chainTicks / chainMaxTicks;
+    }
+
+    /** Gives the soul a new chain, full length. */
+    public void startChain(int ticks) {
+        chainMaxTicks = Math.max(1, ticks);
+        chainTicks = chainMaxTicks;
+        chainErosion = 0.0F;
+        markDirty();
+    }
+
+    public void setChainTicks(int ticks) {
+        int clamped = Mth.clamp(ticks, 0, chainMaxTicks);
+        if (clamped != chainTicks) {
+            chainTicks = clamped;
+            markDirty();
+        }
+    }
+
+    public void clearChain() {
+        chainTicks = 0;
+        chainMaxTicks = 0;
+        chainErosion = 0.0F;
+        markDirty();
+    }
+
+    public boolean isReiatsuReleased() {
+        return reiatsuReleased;
+    }
+
+    public void setReiatsuReleased(boolean released) {
+        if (released != reiatsuReleased) {
+            reiatsuReleased = released;
+            markDirty();
+        }
+    }
+
     /** Whether the client's copy is out of date. */
     public boolean isDirty() {
         return dirty;
@@ -215,6 +289,7 @@ public final class SoulData {
 
     /** A copy of the saved data, without the server-side bookkeeping. */
     public SoulData copy() {
-        return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime);
+        return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime,
+                chainTicks, chainMaxTicks, reiatsuReleased);
     }
 }

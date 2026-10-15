@@ -1,0 +1,21 @@
+{
+  "display": {
+    "icon": {
+      "id": "bleach:asauchi"
+    },
+    "title": {
+      "translate": "advancements.bleach.root.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.root.description"
+    },
+    "background": "minecraft:textures/gui/advancements/backgrounds/stone.png",
+    "show_toast": false,
+    "announce_to_chat": false
+  },
+  "criteria": {
+    "tick": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}

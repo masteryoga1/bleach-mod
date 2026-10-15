@@ -4,12 +4,14 @@ import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.StringUtil;
 import net.minecraft.world.entity.player.Player;
 
 /** The soul screen: state, reiryoku, stats with training progress, awakened powers and what comes next. */
@@ -20,6 +22,8 @@ public final class SoulStatsScreen extends Screen {
     private static final int GREY = 0xA0A0A0;
     private static final int GOLD = 0xFFD27F;
     private static final int REIRYOKU = 0x8FD8FF;
+    private static final int ENCROACHING = 0xFF5555;
+    private static final float TICKS_PER_SECOND = 20.0F;
     private static final int XP_BACKGROUND = 0xFF303030;
     private static final int XP_FILL = 0xFF6FBF4F;
 
@@ -52,7 +56,25 @@ public final class SoulStatsScreen extends Screen {
         y += LINE;
         graphics.drawString(font, Component.translatable("screen.bleach.soul.reiryoku",
                 (int) Math.floor(data.reiryoku()), (int) Math.floor(data.maxReiryoku())), left, y, REIRYOKU);
-        y += LINE + 6;
+        y += LINE;
+        if (data.state() == SoulState.PLUS && data.chainMaxTicks() > 0) {
+            boolean encroaching = SoulLogic.isEncroaching(data);
+            graphics.drawString(font, Component.translatable(encroaching
+                            ? "screen.bleach.soul.chain.encroaching" : "screen.bleach.soul.chain",
+                    StringUtil.formatTickDuration(data.chainTicks(), TICKS_PER_SECOND)),
+                    left, y, encroaching ? ENCROACHING : WHITE);
+            y += LINE;
+        }
+        if (SoulLogic.isAware(data)) {
+            Component release = data.isReiatsuReleased()
+                    ? Component.translatable("screen.bleach.soul.reiatsu.released",
+                            BleachClient.REIATSU_RELEASE_KEY.getTranslatedKeyMessage())
+                    : Component.translatable("screen.bleach.soul.reiatsu.sealed",
+                            BleachClient.REIATSU_RELEASE_KEY.getTranslatedKeyMessage());
+            graphics.drawString(font, release, left, y, GREY);
+            y += LINE;
+        }
+        y += 6;
 
         graphics.drawString(font, Component.translatable("screen.bleach.soul.stats"), left, y, GOLD);
         y += LINE;

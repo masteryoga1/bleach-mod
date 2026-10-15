@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:plus",
+  "display": {
+    "icon": {
+      "id": "minecraft:chain"
+    },
+    "title": {
+      "translate": "advancements.bleach.encroachment.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.encroachment.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "encroachment": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "encroachment"
+      }
+    }
+  }
+}

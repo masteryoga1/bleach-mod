@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import net.minecraft.core.registries.Registries;
@@ -29,6 +30,7 @@ public final class SoulEvents {
     public static final TagKey<Item> ZANJUTSU_WEAPONS = TagKey.create(Registries.ITEM, BleachMod.id("zanjutsu_weapons"));
 
     private static final int SYNC_INTERVAL_TICKS = 5;
+    private static final int MILESTONE_CHECK_TICKS = 20;
     private static final int COMBAT_XP_COOLDOWN_TICKS = 10;
     private static final int SPRINT_TICKS_PER_XP = 20;
     private static final int MEDITATION_TICKS_PER_XP = 100;
@@ -50,6 +52,9 @@ public final class SoulEvents {
         bus.addListener(SoulEvents::onRespawn);
         bus.addListener(SoulEvents::onChangedDimension);
         bus.addListener(SoulEvents::onClone);
+        SpiritEvents.register(bus);
+        ChainEvents.register(bus);
+        ReiatsuEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -74,7 +79,10 @@ public final class SoulEvents {
         data.hasLastPosition = true;
 
         boolean meditating = player.isCrouching() && player.onGround() && movedSqr < 1.0E-4;
-        SoulLogic.regenTick(data, meditating || player.isSleeping());
+        // Releasing reiatsu pours it out; it does not refill until the release ends and the reiatsu settles.
+        if (!data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data)) {
+            SoulLogic.regenTick(data, meditating || player.isSleeping());
+        }
 
         if (meditating) {
             if (data.meditationGrants < MEDITATION_GRANTS_PER_SESSION
@@ -95,6 +103,9 @@ public final class SoulEvents {
             }
         }
 
+        if (player.tickCount % MILESTONE_CHECK_TICKS == 0) {
+            Milestones.check(player, data);
+        }
         if (data.isDirty() && player.tickCount % SYNC_INTERVAL_TICKS == 0) {
             BleachNetwork.syncSoul(player, data);
         }
@@ -200,6 +211,8 @@ public final class SoulEvents {
 
     private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            // A release does not outlast the session.
+            SoulLogic.get(player).setReiatsuReleased(false);
             refresh(player);
         }
     }
@@ -226,13 +239,14 @@ public final class SoulEvents {
         BleachNetwork.syncSoul(player, data);
     }
 
-    /** The soul survives death; the player comes back with part of their reiryoku. */
+    /** The soul survives death, changed by it: see {@link SoulLogic#afterDeath}. */
     private static void onClone(PlayerEvent.Clone event) {
-        if (!event.isWasDeath()) {
-            return;
+        if (event.isWasDeath()) {
+            SoulData next = SoulLogic.afterDeath(SoulLogic.get(event.getOriginal()));
+            if (next.becamePlus) {
+                next.diedAt = event.getOriginal().position();
+            }
+            event.getEntity().setData(SoulAttachments.SOUL, next);
         }
-        SoulData copy = SoulLogic.get(event.getOriginal()).copy();
-        copy.setReiryoku(copy.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
-        event.getEntity().setData(SoulAttachments.SOUL, copy);
     }
 }

@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach;
 
 import com.mojang.logging.LogUtils;
+import io.github.masteryoga1.bleach.advancement.BleachTriggers;
 import io.github.masteryoga1.bleach.command.BleachCommand;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
@@ -25,6 +26,7 @@ public final class BleachMod {
         ModItems.ITEMS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
         SoulAttachments.ATTACHMENT_TYPES.register(modEventBus);
+        BleachTriggers.TRIGGERS.register(modEventBus);
         modContainer.registerConfig(ModConfig.Type.SERVER, BleachConfig.SPEC);
         modEventBus.addListener(BleachNetwork::register);
 

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:encroachment",
+  "display": {
+    "icon": {
+      "id": "minecraft:skeleton_skull"
+    },
+    "title": {
+      "translate": "advancements.bleach.hollow.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.hollow.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "hollow": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "hollow"
+      }
+    }
+  }
+}
