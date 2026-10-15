@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
+import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -47,9 +48,9 @@ public final class ReiatsuEvents {
         bus.addListener(ReiatsuEvents::onChangeTarget);
     }
 
-    /** Every creature that walks by pathfinding can be frightened into running. */
+    /** Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC. */
     private static void onEntityJoin(EntityJoinLevelEvent event) {
-        if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob
+        if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob && !(mob instanceof ShinigamiNpc)
                 && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
             mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
         }

@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -34,8 +35,9 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * Death and the Chain of Fate: an aware Human who dies lingers as a Plus where they fell, their
- * chain wears away, Encroachment sets in near the end, and a Plus whose chain runs out becomes a
- * Hollow. Konsō, which sends a Plus on before that, arrives with the Shinigami path.
+ * chain wears away (more slowly with a Shinigami nearby), Encroachment sets in near the end, and a
+ * Plus whose chain runs out becomes a Hollow. Konsō, from a Shinigami, sends a Plus on before that
+ * (see {@link ShinigamiEvents#konso}).
  */
 public final class ChainEvents {
     public static final ResourceKey<DamageType> ENCROACHMENT =
@@ -98,15 +100,16 @@ public final class ChainEvents {
         }
     }
 
+    /** Whether a Shinigami, a Substitute or a Shinigami NPC is close enough to slow the chain. */
     private static boolean shinigamiNearby(ServerPlayer player) {
         double rangeSqr = SHINIGAMI_RANGE * SHINIGAMI_RANGE;
         for (ServerPlayer other : player.serverLevel().players()) {
-            if (other != player && other.distanceToSqr(player) <= rangeSqr && SoulLogic.hasSoul(other)
-                    && SoulLogic.get(other).state() == SoulState.SHINIGAMI) {
+            if (other != player && other.distanceToSqr(player) <= rangeSqr && ShinigamiLogic.slowsErosion(other)) {
                 return true;
             }
         }
-        return false;
+        return !player.serverLevel().getEntitiesOfClass(ShinigamiNpc.class, player.getBoundingBox().inflate(SHINIGAMI_RANGE),
+                npc -> npc.distanceToSqr(player) <= rangeSqr && ShinigamiLogic.slowsErosion(npc)).isEmpty();
     }
 
     /** The links eat each other: a moment of blindness and a little pain that never kills. */

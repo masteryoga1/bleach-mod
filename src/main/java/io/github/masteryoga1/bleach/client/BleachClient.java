@@ -2,13 +2,17 @@ package io.github.masteryoga1.bleach.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModMenus;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.resources.PlayerSkin;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -43,6 +47,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachClient::registerKeyMappings);
         modEventBus.addListener(BleachClient::addLayers);
         modEventBus.addListener(BleachClient::registerScreens);
+        modEventBus.addListener(BleachClient::registerRenderers);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(BleachClient::onRenderLiving);
         if (ClientSmokeTest.isEnabled()) {
@@ -61,6 +66,16 @@ public final class BleachClient {
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.TAILORING.get(), TailoringScreen::new);
+    }
+
+    /** The NPCs wear two of the game's default player skins until the mod has its own. */
+    private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        ResourceLocation instructor = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/kai.png");
+        ResourceLocation wounded = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/noor.png");
+        event.registerEntityRenderer(ModEntities.ACADEMY_INSTRUCTOR.get(),
+                context -> new ShinigamiNpcRenderer<AcademyInstructor>(context, instructor));
+        event.registerEntityRenderer(ModEntities.WOUNDED_SHINIGAMI.get(),
+                context -> new ShinigamiNpcRenderer<WoundedShinigami>(context, wounded));
     }
 
     /** Adds the chain and mask layer and the sheathed blade to both player models (wide and slim arms). */

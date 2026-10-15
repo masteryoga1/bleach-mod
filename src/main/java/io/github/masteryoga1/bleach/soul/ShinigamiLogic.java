@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -132,6 +134,14 @@ public final class ShinigamiLogic {
     }
 
     // ---- Konsō ----
+
+    /** Whether this creature's presence slows a nearby Plus's chain: a living Shinigami NPC, or a player with Shinigami power. */
+    public static boolean slowsErosion(Entity entity) {
+        if (entity instanceof ShinigamiNpc npc) {
+            return npc.isAlive();
+        }
+        return entity instanceof Player player && SoulLogic.hasSoul(player) && hasShinigamiPower(SoulLogic.get(player));
+    }
 
     /** Anyone with a Shinigami's power can send a Plus on, unless they gave that power away. */
     public static boolean canPerformKonso(SoulData data, long now) {
