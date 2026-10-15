@@ -9,6 +9,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.effect.MobEffects;
@@ -38,6 +39,7 @@ public final class SoulTests {
         data.setLevel(Stat.ZANJUTSU, 3);
         data.addXp(Stat.ZANJUTSU, 7, 50);
         data.setTier(PowerPath.SHINIGAMI, 1);
+        data.setLastCloseCallTime(1234L);
 
         Tag saved = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
         SoulData loaded = SoulData.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
@@ -50,6 +52,34 @@ public final class SoulTests {
         helper.assertTrue(loaded.xp(Stat.ZANJUTSU) == 7, "Zanjutsu XP was " + loaded.xp(Stat.ZANJUTSU));
         helper.assertTrue(loaded.tier(PowerPath.SHINIGAMI) == 1, "Shinigami tier was " + loaded.tier(PowerPath.SHINIGAMI));
         helper.assertTrue(loaded.level(Stat.HOHO) == 0, "untrained Hohō should stay at 0");
+        helper.assertTrue(loaded.lastCloseCallTime() == 1234L, "close-call cooldown was " + loaded.lastCloseCallTime());
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void unknownNamesDoNotWipeTheSoul(GameTestHelper helper) {
+        // A save written by a different version, with a state, a stat and a power this version lacks.
+        CompoundTag saved = new CompoundTag();
+        saved.putString("state", "visored");
+        saved.putBoolean("initialized", true);
+        saved.putFloat("max_reiryoku", 50.0F);
+        saved.putFloat("reiryoku", 20.0F);
+        CompoundTag levels = new CompoundTag();
+        levels.putInt("zanjutsu", 4);
+        levels.putInt("flight", 9);
+        saved.put("stat_levels", levels);
+        CompoundTag tiers = new CompoundTag();
+        tiers.putInt("quincy", 2);
+        tiers.putInt("bount", 1);
+        saved.put("path_tiers", tiers);
+
+        SoulData loaded = SoulData.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
+        helper.assertTrue(loaded.state() == SoulState.HUMAN, "an unknown state should fall back to Human");
+        helper.assertTrue(loaded.isInitialized(), "initialized flag was lost");
+        helper.assertTrue(Math.abs(loaded.maxReiryoku() - 50.0F) < EPSILON, "max reiryoku was " + loaded.maxReiryoku());
+        helper.assertTrue(Math.abs(loaded.reiryoku() - 20.0F) < EPSILON, "reiryoku was " + loaded.reiryoku());
+        helper.assertTrue(loaded.level(Stat.ZANJUTSU) == 4, "Zanjutsu level was " + loaded.level(Stat.ZANJUTSU));
+        helper.assertTrue(loaded.tier(PowerPath.QUINCY) == 2, "Quincy tier was " + loaded.tier(PowerPath.QUINCY));
         helper.succeed();
     }
 

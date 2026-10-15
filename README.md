@@ -10,8 +10,8 @@ The roadmap lives in [docs/FEATURES.md](docs/FEATURES.md).
 
 Step 2 of the plan is in progress. So far:
 
-- Every player has a soul: a soul state (starting as a living Human), a reiryoku pool that regenerates (twice as fast while meditating or sleeping) and causes exhaustion when it runs dry, and the Zankensoki stats, which level up by use.
-- Reiryoku grows by beating hostile creatures, surviving close calls and levelling stats.
+- Every player has a soul: a soul state (starting as a living Human), a reiryoku pool that regenerates (twice as fast while meditating or sleeping), and the Zankensoki stats, which level up by use. Running reiryoku dry causes exhaustion, though nothing spends it until the pressure aura and techniques arrive.
+- Reiryoku grows by beating hostile creatures, surviving close calls (including a Totem of Undying save) and levelling stats.
 - A reiryoku bar beside the hotbar, and a soul screen on **K** (rebindable under the Bleach category).
 - `/bleach` admin commands and a per-world server config (`serverconfig/bleach-server.toml`).
 
@@ -19,11 +19,11 @@ How each stat trains:
 
 | Stat | Trained by | Effect |
 |---|---|---|
-| Zanjutsu | hitting with a sword | +3% sword damage per level |
-| Hakuda | hitting with an empty hand | +0.25 unarmed damage per level |
+| Zanjutsu | landing sword hits | +3% sword damage per level |
+| Hakuda | landing unarmed hits | +0.25 unarmed damage per level |
 | Hohō | sprinting | +1% movement speed per level |
 | Kidō | casting kidō (coming in step 4) | none yet |
-| Reiatsu Control | meditating (crouching still) | +2% reiryoku regeneration per level |
+| Reiatsu Control | meditating (crouching still), up to a minute at a time | +2% reiryoku regeneration per level |
 
 Admin commands (permission level 2):
 

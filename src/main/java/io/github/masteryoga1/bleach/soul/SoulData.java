@@ -3,8 +3,10 @@ package io.github.masteryoga1.bleach.soul;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.util.Mth;
+import net.minecraft.util.StringRepresentable;
 
 /**
  * Everything the mod knows about one soul: its state, its spiritual energy, its stats and which
@@ -12,18 +14,23 @@ import net.minecraft.util.Mth;
  * with the player and sent to their client so the HUD and stats screen can show it.
  */
 public final class SoulData {
-    private static final Codec<Map<Stat, Integer>> STAT_MAP_CODEC = Codec.unboundedMap(Stat.CODEC, Codec.INT);
+    private static final long NEVER = Long.MIN_VALUE / 2;
+
+    // Saved data is read leniently: a stat, power or state name this version does not know (renamed,
+    // removed, or from a newer version) is dropped instead of making NeoForge discard the whole soul.
+    private static final Codec<Map<Stat, Integer>> STAT_MAP_CODEC = enumKeyedMap(Stat.class, Stat.values());
     private static final Codec<Map<PowerPath, Integer>> PATH_MAP_CODEC =
-            Codec.unboundedMap(PowerPath.CODEC, Codec.INT);
+            enumKeyedMap(PowerPath.class, PowerPath.values());
 
     public static final Codec<SoulData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            SoulState.CODEC.optionalFieldOf("state", SoulState.HUMAN).forGetter(SoulData::state),
+            SoulState.CODEC.lenientOptionalFieldOf("state", SoulState.HUMAN).forGetter(SoulData::state),
             Codec.BOOL.optionalFieldOf("initialized", false).forGetter(SoulData::isInitialized),
             Codec.FLOAT.optionalFieldOf("reiryoku", 0.0F).forGetter(SoulData::reiryoku),
             Codec.FLOAT.optionalFieldOf("max_reiryoku", 0.0F).forGetter(SoulData::maxReiryoku),
             STAT_MAP_CODEC.optionalFieldOf("stat_levels", Map.of()).forGetter(data -> data.levels),
             STAT_MAP_CODEC.optionalFieldOf("stat_xp", Map.of()).forGetter(data -> data.xp),
-            PATH_MAP_CODEC.optionalFieldOf("path_tiers", Map.of()).forGetter(data -> data.tiers)
+            PATH_MAP_CODEC.optionalFieldOf("path_tiers", Map.of()).forGetter(data -> data.tiers),
+            Codec.LONG.optionalFieldOf("last_close_call", NEVER).forGetter(SoulData::lastCloseCallTime)
     ).apply(instance, SoulData::new));
 
     private SoulState state = SoulState.HUMAN;
@@ -33,6 +40,8 @@ public final class SoulData {
     private final EnumMap<Stat, Integer> levels = new EnumMap<>(Stat.class);
     private final EnumMap<Stat, Integer> xp = new EnumMap<>(Stat.class);
     private final EnumMap<PowerPath, Integer> tiers = new EnumMap<>(PowerPath.class);
+    /** Game time of the last close call that grew reiryoku, so relogging or dying does not skip the cooldown. */
+    private long lastCloseCallTime = NEVER;
 
     // Server-side bookkeeping. Not saved or synced; it starts over when the player logs in or respawns.
     private boolean dirty = true;
@@ -41,14 +50,15 @@ public final class SoulData {
     boolean hasLastPosition;
     int sprintTicks;
     int meditationTicks;
+    int meditationGrants;
     int lastCombatXpTick = -1000;
-    long lastCloseCallTime = Long.MIN_VALUE / 2;
 
     public SoulData() {
     }
 
     private SoulData(SoulState state, boolean initialized, float reiryoku, float maxReiryoku,
-                     Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers) {
+                     Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers,
+                     long lastCloseCallTime) {
         this.state = state;
         this.initialized = initialized;
         this.maxReiryoku = Math.max(0.0F, maxReiryoku);
@@ -56,6 +66,28 @@ public final class SoulData {
         this.levels.putAll(levels);
         this.xp.putAll(xp);
         this.tiers.putAll(tiers);
+        this.lastCloseCallTime = lastCloseCallTime;
+    }
+
+    /** A map keyed by enum name that skips names it does not recognise when reading. */
+    private static <E extends Enum<E> & StringRepresentable> Codec<Map<E, Integer>> enumKeyedMap(
+            Class<E> type, E[] values) {
+        return Codec.unboundedMap(Codec.STRING, Codec.INT).xmap(
+                raw -> {
+                    EnumMap<E, Integer> map = new EnumMap<>(type);
+                    for (E value : values) {
+                        Integer amount = raw.get(value.getSerializedName());
+                        if (amount != null) {
+                            map.put(value, amount);
+                        }
+                    }
+                    return map;
+                },
+                map -> {
+                    Map<String, Integer> raw = new LinkedHashMap<>();
+                    map.forEach((key, amount) -> raw.put(key.getSerializedName(), amount));
+                    return raw;
+                });
     }
 
     /** XP needed to go from {@code level} to the next level. */
@@ -160,6 +192,14 @@ public final class SoulData {
         markDirty();
     }
 
+    public long lastCloseCallTime() {
+        return lastCloseCallTime;
+    }
+
+    public void setLastCloseCallTime(long gameTime) {
+        lastCloseCallTime = gameTime;
+    }
+
     /** Whether the client's copy is out of date. */
     public boolean isDirty() {
         return dirty;
@@ -175,6 +215,6 @@ public final class SoulData {
 
     /** A copy of the saved data, without the server-side bookkeeping. */
     public SoulData copy() {
-        return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers);
+        return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime);
     }
 }

@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import net.minecraft.client.AttackIndicatorStatus;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -13,8 +14,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
 
 /**
- * The reiryoku bar: a thin vertical gauge beside the hotbar, on the side away from the offhand
- * slot. Placeholder look until real art exists.
+ * The reiryoku bar: a thin vertical gauge just right of the hotbar, moved further out when the
+ * offhand slot or the hotbar attack indicator is on that side. Placeholder look until real art exists.
  */
 public final class ReiryokuHud {
     public static final ResourceLocation ID = BleachMod.id("reiryoku");
@@ -39,8 +40,14 @@ public final class ReiryokuHud {
             return;
         }
 
-        // Vanilla puts the offhand slot on the right of the hotbar for left-handed players.
-        int offset = player.getMainArm() == HumanoidArm.LEFT ? 36 : 6;
+        // Vanilla draws the offhand slot on the right for left-handed players, and otherwise puts the
+        // hotbar attack indicator (when that option is on) on the right.
+        int offset = 6;
+        if (player.getMainArm() == HumanoidArm.LEFT) {
+            offset += 30;
+        } else if (minecraft.options.attackIndicator().get() == AttackIndicatorStatus.HOTBAR) {
+            offset += 20;
+        }
         int x = graphics.guiWidth() / 2 + 91 + offset;
         int y = graphics.guiHeight() - HEIGHT;
         graphics.fill(x, y, x + WIDTH, y + HEIGHT, BACKGROUND);

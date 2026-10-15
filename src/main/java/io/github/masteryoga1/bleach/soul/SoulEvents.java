@@ -9,15 +9,17 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingUseTotemEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
@@ -30,6 +32,8 @@ public final class SoulEvents {
     private static final int COMBAT_XP_COOLDOWN_TICKS = 10;
     private static final int SPRINT_TICKS_PER_XP = 20;
     private static final int MEDITATION_TICKS_PER_XP = 100;
+    /** Meditation stops training after this many XP grants (one minute) until the player moves again. */
+    private static final int MEDITATION_GRANTS_PER_SESSION = 12;
     private static final float CLOSE_CALL_HEALTH_FRACTION = 0.3F;
 
     private SoulEvents() {
@@ -39,6 +43,8 @@ public final class SoulEvents {
         bus.addListener(SoulEvents::onPlayerTick);
         bus.addListener(SoulEvents::onIncomingDamage);
         bus.addListener(SoulEvents::onDamageTaken);
+        // Lowest priority, and skipped if cancelled, so it only counts totems that really save the player.
+        bus.addListener(EventPriority.LOWEST, SoulEvents::onTotemUsed);
         bus.addListener(SoulEvents::onDeath);
         bus.addListener(SoulEvents::onLoggedIn);
         bus.addListener(SoulEvents::onRespawn);
@@ -71,12 +77,15 @@ public final class SoulEvents {
         SoulLogic.regenTick(data, meditating || player.isSleeping());
 
         if (meditating) {
-            if (++data.meditationTicks >= MEDITATION_TICKS_PER_XP) {
+            if (data.meditationGrants < MEDITATION_GRANTS_PER_SESSION
+                    && ++data.meditationTicks >= MEDITATION_TICKS_PER_XP) {
                 data.meditationTicks = 0;
+                data.meditationGrants++;
                 SoulLogic.addStatXp(player, data, Stat.REIATSU_CONTROL, 1);
             }
         } else {
             data.meditationTicks = 0;
+            data.meditationGrants = 0;
         }
 
         if (player.isSprinting() && player.onGround() && movedSqr > 0.01) {
@@ -91,57 +100,88 @@ public final class SoulEvents {
         }
     }
 
-    /** Zanjutsu and Hakuda: stronger melee hits, and training from landing them. */
+    /** Zanjutsu and Hakuda make melee hits stronger. Training happens once a hit lands, in {@link #onDamageTaken}. */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
-        DamageSource source = event.getSource();
-        if (!(source.getEntity() instanceof ServerPlayer attacker)
-                || source.getDirectEntity() != attacker
-                || !source.is(DamageTypes.PLAYER_ATTACK)) {
+        ServerPlayer attacker = meleeAttacker(event.getSource());
+        Stat stat = attacker == null ? null : meleeStat(attacker.getMainHandItem());
+        if (stat == null) {
             return;
         }
         SoulData data = SoulLogic.get(attacker);
-        ItemStack weapon = attacker.getMainHandItem();
-        Stat trained;
-        if (weapon.isEmpty()) {
+        if (stat == Stat.HAKUDA) {
             event.setAmount(event.getAmount() + SoulLogic.hakudaBonus(data));
-            trained = Stat.HAKUDA;
-        } else if (isZanjutsuWeapon(weapon)) {
-            event.setAmount(event.getAmount() * SoulLogic.zanjutsuMultiplier(data));
-            trained = Stat.ZANJUTSU;
         } else {
-            return;
+            event.setAmount(event.getAmount() * SoulLogic.zanjutsuMultiplier(data));
         }
+    }
 
-        LivingEntity victim = event.getEntity();
-        if (victim instanceof ArmorStand) {
-            return;
+    /** The player behind a direct melee hit, or null for anything else (arrows, magic, mobs). */
+    private static ServerPlayer meleeAttacker(DamageSource source) {
+        if (source.getEntity() instanceof ServerPlayer attacker
+                && source.getDirectEntity() == attacker
+                && source.is(DamageTypes.PLAYER_ATTACK)) {
+            return attacker;
         }
-        // One XP per swing at most, so spam-clicking through invulnerability frames does not train faster.
-        if (attacker.tickCount - data.lastCombatXpTick >= COMBAT_XP_COOLDOWN_TICKS) {
-            data.lastCombatXpTick = attacker.tickCount;
-            SoulLogic.addStatXp(attacker, data, trained, 1);
+        return null;
+    }
+
+    /** The stat a melee hit with this item uses: Hakuda bare-handed, Zanjutsu with a sword, else null. */
+    private static Stat meleeStat(ItemStack weapon) {
+        if (weapon.isEmpty()) {
+            return Stat.HAKUDA;
         }
+        return isZanjutsuWeapon(weapon) ? Stat.ZANJUTSU : null;
     }
 
     public static boolean isZanjutsuWeapon(ItemStack stack) {
         return stack.getItem() instanceof SwordItem || stack.is(ZANJUTSU_WEAPONS);
     }
 
-    /** Surviving a close call in a fight grows reiryoku. */
+    /** Fires only for hits that got past shields and invulnerability frames. */
     private static void onDamageTaken(LivingDamageEvent.Post event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)
-                || !player.isAlive()
-                || event.getNewDamage() <= 0.0F
-                || !(event.getSource().getEntity() instanceof LivingEntity attacker)
-                || attacker == player
-                || player.getHealth() >= player.getMaxHealth() * CLOSE_CALL_HEALTH_FRACTION) {
+        trainFromLandedHit(event);
+        if (event.getEntity() instanceof ServerPlayer player
+                && player.isAlive()
+                && event.getNewDamage() > 0.0F
+                && player.getHealth() < player.getMaxHealth() * CLOSE_CALL_HEALTH_FRACTION) {
+            closeCall(player, event.getSource());
+        }
+    }
+
+    private static void trainFromLandedHit(LivingDamageEvent.Post event) {
+        ServerPlayer attacker = meleeAttacker(event.getSource());
+        Stat stat = attacker == null ? null : meleeStat(attacker.getMainHandItem());
+        // Damage soaked by absorption hearts still counts as a hit that landed.
+        boolean landed = event.getNewDamage() > 0.0F
+                || event.getReduction(DamageContainer.Reduction.ABSORPTION) > 0.0F;
+        if (stat == null || !landed || event.getEntity() == attacker) {
+            return;
+        }
+        SoulData data = SoulLogic.get(attacker);
+        // One XP per swing at most, so sweeping several mobs or spam-clicking does not train faster.
+        if (attacker.tickCount - data.lastCombatXpTick >= COMBAT_XP_COOLDOWN_TICKS) {
+            data.lastCombatXpTick = attacker.tickCount;
+            SoulLogic.addStatXp(attacker, data, stat, 1);
+        }
+    }
+
+    /** A Totem of Undying saving you in a fight is the closest call there is. */
+    private static void onTotemUsed(LivingUseTotemEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            closeCall(player, event.getSource());
+        }
+    }
+
+    /** Surviving a close call against another creature grows reiryoku, at most once per cooldown. */
+    private static void closeCall(ServerPlayer player, DamageSource source) {
+        if (!(source.getEntity() instanceof LivingEntity attacker) || attacker == player) {
             return;
         }
         SoulData data = SoulLogic.get(player);
         long now = player.level().getGameTime();
         long cooldown = BleachConfig.get(BleachConfig.CLOSE_CALL_COOLDOWN_SECONDS) * 20L;
-        if (now - data.lastCloseCallTime >= cooldown) {
-            data.lastCloseCallTime = now;
+        if (now - data.lastCloseCallTime() >= cooldown) {
+            data.setLastCloseCallTime(now);
             SoulLogic.grow(data, BleachConfig.get(BleachConfig.CLOSE_CALL_GROWTH));
         }
     }
