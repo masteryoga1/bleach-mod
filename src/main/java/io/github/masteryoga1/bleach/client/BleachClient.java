@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.registry.ModMenus;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -17,6 +18,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
@@ -40,6 +42,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachClient::registerGuiLayers);
         modEventBus.addListener(BleachClient::registerKeyMappings);
         modEventBus.addListener(BleachClient::addLayers);
+        modEventBus.addListener(BleachClient::registerScreens);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(BleachClient::onRenderLiving);
         if (ClientSmokeTest.isEnabled()) {
@@ -56,12 +59,18 @@ public final class BleachClient {
         event.register(REIATSU_RELEASE_KEY);
     }
 
-    /** Adds the chain and mask layer to both player models (wide and slim arms). */
+    private static void registerScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenus.TAILORING.get(), TailoringScreen::new);
+    }
+
+    /** Adds the chain and mask layer and the sheathed blade to both player models (wide and slim arms). */
     private static void addLayers(EntityRenderersEvent.AddLayers event) {
         for (PlayerSkin.Model skin : event.getSkins()) {
             EntityRenderer<? extends Player> renderer = event.getSkin(skin);
             if (renderer instanceof PlayerRenderer playerRenderer) {
                 playerRenderer.addLayer(new SoulLayer(playerRenderer, event.getEntityModels()));
+                playerRenderer.addLayer(new SayaLayer<>(playerRenderer,
+                        player -> ClientSouls.appearance(player).bladeSheathed()));
             }
         }
     }

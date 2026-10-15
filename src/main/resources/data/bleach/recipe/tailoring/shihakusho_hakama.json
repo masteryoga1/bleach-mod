@@ -1,0 +1,10 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:black_wool"
+  },
+  "cloth_count": 4,
+  "result": {
+    "id": "bleach:shihakusho_hakama"
+  }
+}

@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.advancement;
 
+import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -59,6 +60,9 @@ public final class Milestones {
         }
         if (ShinigamiLogic.isSubstitute(data)) {
             trigger.trigger(player, SUBSTITUTE);
+        }
+        if (ShihakushoItem.isFullSet(player)) {
+            trigger.trigger(player, SHIHAKUSHO);
         }
     }
 

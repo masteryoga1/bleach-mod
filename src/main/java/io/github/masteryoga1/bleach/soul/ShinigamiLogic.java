@@ -1,12 +1,16 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.item.ShihakushoItem;
+import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * The rules of the Shinigami path: the Academy and its exams, Konsō, the Substitute route, Shunpo
@@ -253,9 +257,15 @@ public final class ShinigamiLogic {
 
     // ---- Regeneration ----
 
-    /** How fast this soul regenerates compared with normal: slower while its power is lent. */
+    /**
+     * How fast this soul regenerates compared with normal: faster in the full Shihakushō for those
+     * it suits, slower while its power is lent.
+     */
     public static double regenMultiplier(LivingEntity entity, SoulData data, long now) {
         double multiplier = 1.0;
+        if (garbBonusApplies(data) && ShihakushoItem.isFullSet(entity)) {
+            multiplier *= 1.0 + BleachConfig.get(BleachConfig.SHIHAKUSHO_SET_REGEN_BONUS);
+        }
         if (isPowerLent(data, now)) {
             multiplier *= BleachConfig.get(BleachConfig.LENT_REGEN_MULTIPLIER);
         }
@@ -333,5 +343,24 @@ public final class ShinigamiLogic {
     /** The block height reishi footing hardens at for feet at {@code feetY}: the block just under them. */
     public static int footingAnchor(double feetY) {
         return Mth.floor(feetY) - 1;
+    }
+
+    // ---- The sheath ----
+
+    /**
+     * Whether a player carries a zanpakutō on their hotbar without holding it, so it is drawn
+     * sheathed at their hip.
+     */
+    public static boolean hasSheathedBlade(LivingEntity entity) {
+        if (!(entity instanceof Player player)
+                || player.getMainHandItem().is(BleachTags.ZANPAKUTO) || player.getOffhandItem().is(BleachTags.ZANPAKUTO)) {
+            return false;
+        }
+        for (int slot = 0; slot < Inventory.getSelectionSize(); slot++) {
+            if (player.getInventory().getItem(slot).is(BleachTags.ZANPAKUTO)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

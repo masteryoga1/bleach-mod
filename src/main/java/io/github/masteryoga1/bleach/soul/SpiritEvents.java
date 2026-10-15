@@ -98,20 +98,20 @@ public final class SpiritEvents {
     private static void onStartTracking(PlayerEvent.StartTracking event) {
         if (event.getEntity() instanceof ServerPlayer viewer && event.getTarget() instanceof ServerPlayer target
                 && SoulLogic.hasSoul(target)) {
-            BleachNetwork.sendAppearance(viewer, target, SoulLogic.get(target));
+            BleachNetwork.sendAppearance(viewer, target, SoulAppearance.of(target, SoulLogic.get(target)));
         }
     }
 
-    /** Tells trackers when this player's appearance changes: state, chain length or released reiatsu. */
+    /** Tells trackers when this player's appearance changes: state, chain length, released reiatsu or sheathed blade. */
     private static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !SoulLogic.hasSoul(player)) {
             return;
         }
         SoulData data = SoulLogic.get(player);
-        SoulAppearance appearance = SoulAppearance.of(data);
+        SoulAppearance appearance = SoulAppearance.of(player, data);
         if (!appearance.equals(data.lastSentAppearance)) {
             data.lastSentAppearance = appearance;
-            BleachNetwork.broadcastAppearance(player, data);
+            BleachNetwork.broadcastAppearance(player, appearance);
         }
     }
 }

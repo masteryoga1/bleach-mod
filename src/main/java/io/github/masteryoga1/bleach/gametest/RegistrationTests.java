@@ -1,12 +1,15 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import java.util.List;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Tiers;
+import net.minecraft.world.level.storage.loot.LootTable;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -29,6 +32,24 @@ public final class RegistrationTests {
         if (stack.getMaxDamage() != Tiers.IRON.getUses()) {
             helper.fail("Asauchi should have iron durability but has " + stack.getMaxDamage());
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void garbAndTailoringAreRegistered(GameTestHelper helper) {
+        for (String name : List.of("shihakusho_kosode", "shihakusho_hakama", "waraji", "tailoring_table")) {
+            helper.assertTrue(BuiltInRegistries.ITEM.containsKey(BleachMod.id(name)), "bleach:" + name + " is not an item");
+        }
+        helper.assertTrue(BuiltInRegistries.BLOCK.containsKey(BleachMod.id("tailoring_table")), "the Tailoring Table is not a block");
+        helper.assertTrue(BuiltInRegistries.MENU.containsKey(BleachMod.id("tailoring")), "the tailoring menu is not registered");
+        helper.assertTrue(BuiltInRegistries.RECIPE_TYPE.containsKey(BleachMod.id("tailoring")), "the tailoring recipe type is not registered");
+        helper.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.containsKey(BleachMod.id("tailoring")),
+                "the tailoring recipe serializer is not registered");
+        helper.assertTrue(BuiltInRegistries.ARMOR_MATERIAL.containsKey(BleachMod.id("shihakusho")),
+                "the Shihakushō armour material is not registered");
+        LootTable drops = helper.getLevel().getServer().reloadableRegistries()
+                .getLootTable(ModBlocks.TAILORING_TABLE.get().getLootTable());
+        helper.assertTrue(drops != LootTable.EMPTY, "the Tailoring Table has no loot table");
         helper.succeed();
     }
 

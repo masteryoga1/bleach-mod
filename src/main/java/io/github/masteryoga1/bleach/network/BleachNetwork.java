@@ -30,14 +30,13 @@ public final class BleachNetwork {
     }
 
     /** Tells everyone tracking this player how their soul looks now. */
-    public static void broadcastAppearance(ServerPlayer player, SoulData data) {
-        PacketDistributor.sendToPlayersTrackingEntity(player,
-                new SoulAppearancePayload(player.getId(), SoulAppearance.of(data)));
+    public static void broadcastAppearance(ServerPlayer player, SoulAppearance appearance) {
+        PacketDistributor.sendToPlayersTrackingEntity(player, new SoulAppearancePayload(player.getId(), appearance));
     }
 
     /** Tells one player how another player's soul looks, when they start seeing them. */
-    public static void sendAppearance(ServerPlayer viewer, Entity target, SoulData data) {
-        PacketDistributor.sendToPlayer(viewer, new SoulAppearancePayload(target.getId(), SoulAppearance.of(data)));
+    public static void sendAppearance(ServerPlayer viewer, Entity target, SoulAppearance appearance) {
+        PacketDistributor.sendToPlayer(viewer, new SoulAppearancePayload(target.getId(), appearance));
     }
 
     /** Asks the server to toggle the reiatsu release. */

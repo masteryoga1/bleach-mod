@@ -45,6 +45,10 @@ jobs:
           sys.exit(bad)
           EOF
 
+      # The placeholder textures are drawn by a script; this fails if someone edits one but not the other.
+      - name: Check the placeholder textures
+        run: python3 -I tools/art/make_placeholders.py --check
+
       # Client classes only exist on the client; common code that imports one crashes a dedicated server.
       - name: Check that client classes stay in client packages
         run: |

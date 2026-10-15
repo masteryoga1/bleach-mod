@@ -1,6 +1,13 @@
 {
   "itemGroup.bleach": "Bleach",
   "item.bleach.asauchi": "Asauchi",
+  "item.bleach.shihakusho_kosode": "Shihakushō Kosode",
+  "item.bleach.shihakusho_hakama": "Shihakushō Hakama",
+  "item.bleach.waraji": "Waraji and Tabi",
+  "block.bleach.tailoring_table": "Tailoring Table",
+  "container.bleach.tailoring": "Tailoring Table",
+  "tooltip.bleach.shihakusho_set": "Full Shihakushō: +%s%% reiryoku regeneration for Shinigami and Academy students",
+  "tooltip.bleach.tailoring.needs": "%s × %s",
 
   "soul_state.bleach.human": "Human",
   "soul_state.bleach.plus": "Plus",
