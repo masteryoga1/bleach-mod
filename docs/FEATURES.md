@@ -15,20 +15,20 @@ Tick an item when it lands in a merged pull request. Reorder, cut or add items f
 
 The foundations every path builds on: what a player's soul is, their spiritual energy, and how the game shows it.
 
-- [ ] **Soul state** [Canon+KD]: every player starts as a living, spiritually aware Human. Their data records a soul state (Human, Plus, Shinigami, Hollow, Arrancar) plus separate power tiers for Shinigami, Hollow, Quincy and Fullbring, so hybrids like Visored and Substitute Shinigami fit later.
+- [x] **Soul state** [Canon+KD]: every player starts as a living, spiritually aware Human. Their data records a soul state (Human, Plus, Shinigami, Hollow, Arrancar) plus separate power tiers for Shinigami, Hollow, Quincy and Fullbring, so hybrids like Visored and Substitute Shinigami fit later.
 - [ ] **Spiritual awareness** [Canon+KD]: players below a reiryoku threshold cannot see or hit spirits. Hollows, Pluses and spirit-form players are hidden from them, with a faint shimmer and distant Hollow screams just below the threshold.
-- [ ] **Reiryoku and reiatsu** [Canon+KD]: one spiritual-energy pool that regenerates over time, faster in reishi-dense places and while resting. Running dry causes exhaustion (Slowness and Weakness) and ends any release.
-- [ ] **Energy bar on the HUD** [Canon+KD]: a reiryoku bar beside the hotbar, plus slots for a chain timer, mask timer or Quincy reishi when those exist. Hidden for unaware Humans.
-- [ ] **Zankensoki stats** [Canon]: Zanjutsu (swordplay), Hakuda (unarmed), Hohō (speed) and Kidō, plus Reiatsu Control, all levelled by use. Stats map onto vanilla attributes (attack damage, movement speed and so on) instead of KD's nine invented stats.
+- [x] **Reiryoku and reiatsu** [Canon+KD]: one spiritual-energy pool that regenerates over time, faster in reishi-dense places and while resting. Running dry causes exhaustion (Slowness and Weakness) and ends any release. *Exhaustion works, but nothing spends reiryoku until the pressure aura and techniques arrive. Reishi-dense places arrive with Soul Society, and ending a release arrives with Shikai.*
+- [x] **Energy bar on the HUD** [Canon+KD]: a reiryoku bar beside the hotbar, plus slots for a chain timer, mask timer or Quincy reishi when those exist. Hidden for unaware Humans. *The extra timer slots arrive with the features that use them.*
+- [x] **Zankensoki stats** [Canon]: Zanjutsu (swordplay), Hakuda (unarmed), Hohō (speed) and Kidō, plus Reiatsu Control, all levelled by use. Stats map onto vanilla attributes (attack damage, movement speed and so on) instead of KD's nine invented stats. *Kidō trains once kidō exists in step 4.*
 - [ ] **Death into a Plus** [Canon+KD]: an aware Human who dies comes back as a Plus at the death point, with a Chain of Fate on their chest.
 - [ ] **Chain of Fate and Encroachment** [Canon+KD]: the chain shortens over time, and near the end its links eat each other. A Konsō before it runs out saves the soul; if it runs out, the hole and mask form and the player becomes a Hollow.
 - [ ] **Reiatsu difference** [Canon]: attacks from someone with far lower spiritual pressure do much less damage, like Kenpachi shrugging off weak blows. This replaces KD's full-armour damage shield.
 - [ ] **Reiatsu pressure aura** [Canon]: a toggle that floods the area with your reiatsu, slowing and frightening much weaker players and mobs while draining your energy.
-- [ ] **Stats screen** [Canon+KD]: shows soul state, stats, reiryoku, zanpakutō name and release state, and what comes next on your path.
-- [ ] **Keybinds** [KD]: separate, rebindable keys for Release, Seal, movement technique, two technique slots, Devour and the stats screen, in a Bleach category. No overloaded vanilla keys.
-- [ ] **`/bleach` admin commands** [KD]: one command to set soul state, reiryoku, stats and zanpakutō for testing and servers.
-- [ ] **Server config** [KD]: energy caps, regen and growth rates, path toggles, mob griefing and spawn rates.
-- [ ] **Reiryoku growth** [Canon+KD]: reiryoku grows by fighting spiritual beings, surviving close calls and training.
+- [ ] **Stats screen** [Canon+KD]: shows soul state, stats, reiryoku, zanpakutō name and release state, and what comes next on your path. *So far: soul state, reiryoku, stats, awakened powers and the next step. Zanpakutō name and release state arrive in step 3.*
+- [ ] **Keybinds** [KD]: separate, rebindable keys for Release, Seal, movement technique, two technique slots, Devour and the stats screen, in a Bleach category. No overloaded vanilla keys. *So far: the stats screen on K. The other keys arrive with their features.*
+- [x] **`/bleach` admin commands** [KD]: one command to set soul state, reiryoku, stats and zanpakutō for testing and servers. *Setting the zanpakutō arrives in step 3.*
+- [ ] **Server config** [KD]: energy caps, regen and growth rates, path toggles, mob griefing and spawn rates. *So far: reiryoku caps, regen, growth and stat rates. The other settings arrive with their features.*
+- [x] **Reiryoku growth** [Canon+KD]: reiryoku grows by fighting spiritual beings, surviving close calls and training. *Until Hollows exist, any hostile mob counts as a spiritual being.*
 - [ ] **Bleach equipment slots** [Canon+KD] *(optional)*: extra slots for a sheath, haori or badge, cloak and glove, through Curios or a small custom menu.
 - [ ] **Advancement tree** [KD]: an advancement for each step of each path, so players can see the route.
 
