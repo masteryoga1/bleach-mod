@@ -79,8 +79,8 @@ public final class SoulEvents {
         data.hasLastPosition = true;
 
         boolean meditating = player.isCrouching() && player.onGround() && movedSqr < 1.0E-4;
-        // Releasing reiatsu pours it out; it does not refill until the release ends.
-        if (!data.isReiatsuReleased()) {
+        // Releasing reiatsu pours it out; it does not refill until the release ends and the reiatsu settles.
+        if (!data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data)) {
             SoulLogic.regenTick(data, meditating || player.isSleeping());
         }
 

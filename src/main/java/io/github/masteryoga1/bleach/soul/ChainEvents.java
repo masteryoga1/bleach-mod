@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -19,6 +20,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RespawnAnchorBlock;
@@ -191,6 +193,8 @@ public final class ChainEvents {
                 return false;
             }
         }
+        // The drop above moves in whole blocks; settle the rest of the way onto what the feet will rest on.
+        box = box.move(Entity.collideBoundingBox(player, new Vec3(0.0, -1.0, 0.0), box, level, List.of()));
         if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, box)) {
             return false;
         }
@@ -201,8 +205,11 @@ public final class ChainEvents {
     /** Whether the spot would hurt or trap whoever stands in it: fire, powder snow, wither roses and the like. */
     private static boolean isHarmful(ServerLevel level, AABB box) {
         boolean inside = BlockPos.betweenClosedStream(box).anyMatch(pos -> isHarmful(level.getBlockState(pos)));
-        BlockState below = level.getBlockState(BlockPos.containing(box.getCenter().x, box.minY - 0.5, box.getCenter().z));
-        return inside || isHarmful(below) || below.is(Blocks.MAGMA_BLOCK);
+        AABB underfoot = new AABB(box.minX, box.minY - 0.5, box.minZ, box.maxX, box.minY - 0.5, box.maxZ);
+        return inside || BlockPos.betweenClosedStream(underfoot).anyMatch(pos -> {
+            BlockState below = level.getBlockState(pos);
+            return isHarmful(below) || below.is(Blocks.MAGMA_BLOCK);
+        });
     }
 
     private static boolean isHarmful(BlockState state) {

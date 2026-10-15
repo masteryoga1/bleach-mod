@@ -2,7 +2,10 @@ package io.github.masteryoga1.bleach.soul;
 
 import java.util.EnumSet;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.ai.util.DefaultRandomPos;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
@@ -16,6 +19,8 @@ public final class ReiatsuFleeGoal extends Goal {
 
     private final PathfinderMob mob;
     private Path path;
+    /** Where the creature is running, as a walk target for creatures moved by a brain. */
+    private WalkTarget flight;
 
     public ReiatsuFleeGoal(PathfinderMob mob) {
         this.mob = mob;
@@ -28,6 +33,19 @@ public final class ReiatsuFleeGoal extends Goal {
                 && mob.getData(SoulAttachments.FRIGHT).until() > mob.level().getGameTime();
     }
 
+    /**
+     * Piglins, hoglins, villagers and other creatures moved by a brain walk to the brain's walk target
+     * after the goals have run, so the flight becomes that walk target, and whatever they were
+     * attacking is forgotten while they run. A brain ignores memories it does not use, so this leaves
+     * creatures moved by goals alone.
+     */
+    public static void steerBrain(Brain<?> brain, WalkTarget flight) {
+        brain.eraseMemory(MemoryModuleType.ATTACK_TARGET);
+        if (!brain.isMemoryValue(MemoryModuleType.WALK_TARGET, flight)) {
+            brain.setMemory(MemoryModuleType.WALK_TARGET, flight);
+        }
+    }
+
     @Override
     public boolean canUse() {
         if (!isFrightened(mob)) {
@@ -38,17 +56,37 @@ public final class ReiatsuFleeGoal extends Goal {
             return false;
         }
         path = mob.getNavigation().createPath(away.x, away.y, away.z, 0);
-        return path != null;
+        if (path == null) {
+            return false;
+        }
+        flight = new WalkTarget(away, (float) SPEED, 0);
+        return true;
     }
 
     @Override
     public void start() {
         mob.getNavigation().moveTo(path, SPEED);
+        steerBrain(mob.getBrain(), flight);
+    }
+
+    @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
+    }
+
+    @Override
+    public void tick() {
+        steerBrain(mob.getBrain(), flight);
     }
 
     @Override
     public void stop() {
+        Brain<?> brain = mob.getBrain();
+        if (flight != null && brain.isMemoryValue(MemoryModuleType.WALK_TARGET, flight)) {
+            brain.eraseMemory(MemoryModuleType.WALK_TARGET);
+        }
         path = null;
+        flight = null;
     }
 
     @Override

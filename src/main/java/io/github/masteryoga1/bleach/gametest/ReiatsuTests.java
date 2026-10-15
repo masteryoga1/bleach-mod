@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.gametest;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.soul.Fright;
+import io.github.masteryoga1.bleach.soul.ReiatsuEvents;
 import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -17,10 +18,17 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.AreaEffectCloud;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.monster.hoglin.Hoglin;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -89,6 +97,47 @@ public final class ReiatsuTests {
     }
 
     @GameTest(template = "empty")
+    public static void frightenedCreaturesDropTheirGrudge(GameTestHelper helper) {
+        Player releaser = soulPlayer(helper, SoulState.HUMAN, 400.0F);
+        long until = helper.getLevel().getGameTime() + 30;
+
+        Hoglin hoglin = helper.spawnWithNoFreeWill(EntityType.HOGLIN, 1, 1, 1);
+        hoglin.getBrain().setMemory(MemoryModuleType.ATTACK_TARGET, releaser);
+        ReiatsuEvents.frighten(hoglin, releaser, until);
+        helper.assertFalse(hoglin.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET),
+                "a hoglin kept attacking whoever frightened it");
+        helper.assertTrue(ReiatsuFleeGoal.isFrightened(hoglin), "the hoglin was not frightened");
+
+        WalkTarget flight = new WalkTarget(hoglin.position().add(8.0, 0.0, 0.0), 1.4F, 0);
+        hoglin.getBrain().setMemory(MemoryModuleType.ATTACK_TARGET, releaser);
+        ReiatsuFleeGoal.steerBrain(hoglin.getBrain(), flight);
+        helper.assertFalse(hoglin.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET),
+                "a running hoglin still had a target");
+        helper.assertTrue(hoglin.getBrain().isMemoryValue(MemoryModuleType.WALK_TARGET, flight),
+                "the hoglin's brain was not told to run");
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, 1, 1, 2);
+        ReiatsuFleeGoal.steerBrain(zombie.getBrain(), flight);
+        helper.assertFalse(zombie.getBrain().hasMemoryValue(MemoryModuleType.WALK_TARGET),
+                "steering touched a creature moved by goals");
+
+        Creeper hissing = helper.spawnWithNoFreeWill(EntityType.CREEPER, 2, 1, 1);
+        hissing.setSwellDir(1);
+        ReiatsuEvents.frighten(hissing, releaser, until);
+        Creeper lit = helper.spawnWithNoFreeWill(EntityType.CREEPER, 2, 1, 2);
+        lit.ignite();
+        lit.setSwellDir(1);
+        ReiatsuEvents.frighten(lit, releaser, until);
+        boolean defused = hissing.getSwellDir() < 0;
+        boolean stillLit = lit.getSwellDir() > 0;
+        // Gone before the lit one can blow up beside the other tests.
+        hissing.discard();
+        lit.discard();
+        helper.assertTrue(defused, "a frightened creeper kept its fuse lit");
+        helper.assertTrue(stillLit, "a creeper lit with flint and steel was put out");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void releaseNeedsReiryokuAndGrowsTheAura(GameTestHelper helper) {
         SoulData data = new SoulData();
         SoulLogic.initialize(data);
@@ -139,6 +188,32 @@ public final class ReiatsuTests {
         spirit.hurt(aware.damageSources().playerAttack(aware), 5.0F);
         helper.assertTrue(spirit.getHealth() < health, "an aware player's hit did not land");
         helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void instantPotionsSkipOnlySpirits(GameTestHelper helper) {
+        Player unaware = soulPlayer(helper, SoulState.HUMAN, 10.0F);
+        Player aware = soulPlayer(helper, SoulState.HUMAN, 40.0F);
+        Player spirit = soulPlayer(helper, SoulState.PLUS, 40.0F);
+        helper.assertTrue(SpiritEvents.potionPassesThrough(unaware, spirit), "an unaware player's potion reached a spirit");
+        helper.assertFalse(SpiritEvents.potionPassesThrough(aware, spirit), "an aware player's potion missed a spirit");
+        helper.assertFalse(SpiritEvents.potionPassesThrough(null, spirit), "a potion nobody threw missed a spirit");
+        helper.assertFalse(SpiritEvents.potionPassesThrough(spirit, spirit), "a spirit's own potion missed it");
+
+        // The same cloud still heals the living, so the spirit check does not block healing outright.
+        Pig pig = helper.spawnWithNoFreeWill(EntityType.PIG, 1, 1, 1);
+        pig.setHealth(2.0F);
+        AreaEffectCloud cloud = new AreaEffectCloud(helper.getLevel(), pig.getX(), pig.getY(), pig.getZ());
+        cloud.setOwner(unaware);
+        cloud.setPotionContents(new PotionContents(Potions.HEALING));
+        cloud.setRadius(2.0F);
+        cloud.setWaitTime(0);
+        cloud.setDuration(60);
+        helper.getLevel().addFreshEntity(cloud);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(pig.getHealth() > 2.0F, "an unaware player's healing cloud did not heal a pig");
+            cloud.discard();
+        });
     }
 
     private static SoulData soul(SoulState state, float maxReiryoku) {

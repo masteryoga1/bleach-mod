@@ -13,6 +13,8 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
@@ -29,7 +31,7 @@ public final class ReiatsuEvents {
     /** Presses closer together than this are ignored, so a held or repeated key cannot spam the toggle. */
     private static final int MIN_TOGGLE_INTERVAL_TICKS = 5;
     /** How long one pulse keeps a creature running. */
-    private static final int FRIGHT_TICKS = 30;
+    private static final int FRIGHT_TICKS = SoulLogic.PRESSURE_EFFECT_TICKS;
     private static final DustParticleOptions REIATSU_PARTICLE =
             new DustParticleOptions(new Vector3f(0.56F, 0.85F, 1.0F), 1.5F);
 
@@ -132,18 +134,36 @@ public final class ReiatsuEvents {
     }
 
     /** The creature drops its grudge against the releaser and runs (see {@link ReiatsuFleeGoal}). */
-    private static void frighten(PathfinderMob mob, ServerPlayer from, long until) {
+    public static void frighten(PathfinderMob mob, LivingEntity from, long until) {
         if (mob.getTarget() == from) {
             mob.setTarget(null);
+        }
+        // Creatures moved by a brain keep their target there instead.
+        if (mob.getBrain().isMemoryValue(MemoryModuleType.ATTACK_TARGET, from)) {
+            mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
+        }
+        // A hissing creeper lets its fuse die down, as when its target gets away; one lit with flint
+        // and steel still blows.
+        if (mob instanceof Creeper creeper && !creeper.isIgnited()) {
+            creeper.setSwellDir(-1);
         }
         mob.setData(SoulAttachments.FRIGHT, new Fright(until, from.position()));
     }
 
     /**
+     * Whether the soul's reiatsu is still settling after a release or seal. While it settles, the
+     * reiatsu cannot be released again and reiryoku does not refill.
+     */
+    public static boolean isSettling(Player player, SoulData data) {
+        return player.tickCount - data.lastReleaseChangeTick < RELEASE_COOLDOWN_TICKS;
+    }
+
+    /**
      * Called when the player presses the release key. The server decides whether it can happen.
-     * Releasing costs a second's worth of reiryoku up front and pulses at once, and after holding it
-     * in the soul must wait {@link #RELEASE_COOLDOWN_TICKS} to release again, so flicking the aura on
-     * and off is never cheaper than holding it.
+     * Releasing costs as much reiryoku up front as one pulse's weight lasts and pulses at once, and
+     * after holding it in the soul's reiatsu settles for {@link #RELEASE_COOLDOWN_TICKS}, with no
+     * refilling and no new release (see {@link #isSettling}), so flicking the aura on and off is never
+     * cheaper than holding it.
      */
     public static void toggleRelease(ServerPlayer player) {
         SoulData data = SoulLogic.get(player);
@@ -157,12 +177,12 @@ public final class ReiatsuEvents {
                     .withStyle(ChatFormatting.GRAY), true);
             return;
         }
-        if (sinceLastChange < RELEASE_COOLDOWN_TICKS) {
+        if (isSettling(player, data)) {
             player.displayClientMessage(Component.translatable("message.bleach.reiatsu_settling")
                     .withStyle(ChatFormatting.GRAY), true);
             return;
         }
-        float cost = SoulLogic.releaseDrainPerTick(data) * 20.0F;
+        float cost = SoulLogic.releaseDrainPerTick(data) * SoulLogic.PRESSURE_EFFECT_TICKS;
         if (!player.isAlive() || player.isSpectator() || !SoulLogic.canRelease(data)
                 || data.reiryoku() - cost < 0.5F) {
             player.displayClientMessage(Component.translatable("message.bleach.reiatsu_too_weak")

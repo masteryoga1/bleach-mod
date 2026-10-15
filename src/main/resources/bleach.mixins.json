@@ -3,6 +3,10 @@
   "minVersion": "0.8",
   "package": "io.github.masteryoga1.bleach.mixin",
   "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AreaEffectCloudMixin",
+    "ThrownPotionMixin"
+  ],
   "client": [
     "client.EntityRenderDispatcherMixin",
     "client.GameRendererMixin"

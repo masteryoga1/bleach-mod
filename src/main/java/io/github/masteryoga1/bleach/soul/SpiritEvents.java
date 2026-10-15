@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import javax.annotation.Nullable;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.AreaEffectCloud;
 import net.minecraft.world.entity.Entity;
@@ -53,10 +54,20 @@ public final class SpiritEvents {
                 && passesThrough(attacker, target)) {
             event.setCanceled(true);
             // A sweep still runs Fire Aspect after the hit fails; remember the fire to undo it next tick.
+            // Keep the lowest, in case an earlier hit this tick already set the spirit alight.
             if (target instanceof Player && SoulLogic.hasSoul(target)) {
-                SoulLogic.get(target).fireBeforeIgnoredHit = target.getRemainingFireTicks();
+                SoulData data = SoulLogic.get(target);
+                data.fireBeforeIgnoredHit = Math.min(data.fireBeforeIgnoredHit, target.getRemainingFireTicks());
             }
         }
+    }
+
+    /**
+     * Whether a potion thrown or left behind by this owner passes straight through the target. Instant
+     * Health and Harming are kept off spirits by mixins on splash potions and lingering clouds.
+     */
+    public static boolean potionPassesThrough(@Nullable Entity owner, LivingEntity target) {
+        return owner instanceof Player player && player != target && passesThrough(player, target);
     }
 
     /** Splash and lingering potions from the unaware pass through spirits too. */
@@ -67,7 +78,7 @@ public final class SpiritEvents {
         } else if (source instanceof AreaEffectCloud cloud && cloud.getOwner() != null) {
             source = cloud.getOwner();
         }
-        if (source instanceof Player player && player != event.getEntity() && passesThrough(player, event.getEntity())) {
+        if (potionPassesThrough(source, event.getEntity())) {
             event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
         }
     }
@@ -75,11 +86,11 @@ public final class SpiritEvents {
     private static void onPlayerTickPre(PlayerTickEvent.Pre event) {
         if (event.getEntity() instanceof ServerPlayer player && SoulLogic.hasSoul(player)) {
             SoulData data = SoulLogic.get(player);
-            if (data.fireBeforeIgnoredHit >= 0) {
+            if (data.fireBeforeIgnoredHit != SoulData.NO_FIRE_RECORDED) {
                 if (player.getRemainingFireTicks() > data.fireBeforeIgnoredHit) {
                     player.setRemainingFireTicks(data.fireBeforeIgnoredHit);
                 }
-                data.fireBeforeIgnoredHit = -1;
+                data.fireBeforeIgnoredHit = SoulData.NO_FIRE_RECORDED;
             }
         }
     }

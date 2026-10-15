@@ -16,6 +16,8 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class SoulData {
     private static final long NEVER = Long.MIN_VALUE / 2;
+    /** No hit has passed through since the last tick. Fire ticks never reach this, burning or not. */
+    static final int NO_FIRE_RECORDED = Integer.MAX_VALUE;
 
     // Saved data is read leniently: a stat, power or state name this version does not know (renamed,
     // removed, or from a newer version) is dropped instead of making NeoForge discard the whole soul.
@@ -73,7 +75,7 @@ public final class SoulData {
     /** Tick of the last release or seal, for the release cooldown. */
     int lastReleaseChangeTick = -1000;
     /** Fire ticks from just before an unaware player's hit passed through, to undo what the hit set alight. */
-    int fireBeforeIgnoredHit = -1;
+    int fireBeforeIgnoredHit = NO_FIRE_RECORDED;
 
     public SoulData() {
     }
