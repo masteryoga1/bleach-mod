@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
@@ -37,6 +38,8 @@ public final class SoulEvents {
     private static final int MEDITATION_TICKS_PER_XP = 100;
     /** Meditation stops training after this many XP grants (one minute) until the player moves again. */
     private static final int MEDITATION_GRANTS_PER_SESSION = 12;
+    /** A Plus who meditates this long is reminded which way the Academy lies, once per sitting. */
+    private static final int ACADEMY_REMINDER_TICKS = 40;
     private static final float CLOSE_CALL_HEALTH_FRACTION = 0.3F;
 
     private SoulEvents() {
@@ -87,6 +90,9 @@ public final class SoulEvents {
         }
 
         if (meditating) {
+            if (++data.meditatingFor == ACADEMY_REMINDER_TICKS) {
+                AcademyLocator.remind(player, data);
+            }
             if (data.meditationGrants < MEDITATION_GRANTS_PER_SESSION
                     && ++data.meditationTicks >= MEDITATION_TICKS_PER_XP) {
                 data.meditationTicks = 0;
@@ -96,6 +102,7 @@ public final class SoulEvents {
         } else {
             data.meditationTicks = 0;
             data.meditationGrants = 0;
+            data.meditatingFor = 0;
         }
 
         if (player.isSprinting() && player.onGround() && movedSqr > 0.01) {

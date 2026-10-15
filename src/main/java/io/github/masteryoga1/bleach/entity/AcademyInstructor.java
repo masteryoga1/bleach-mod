@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 
@@ -44,6 +45,15 @@ public final class AcademyInstructor extends ShinigamiNpc {
     @Override
     protected boolean sendsOn() {
         return false;
+    }
+
+    /** Data without an "Invulnerable" entry, such as a structure's, keeps him invulnerable. */
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        if (!tag.contains("Invulnerable")) {
+            setInvulnerable(true);
+        }
     }
 
     @Override

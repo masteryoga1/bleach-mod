@@ -14,16 +14,24 @@ import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.Consumer;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentUtils;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 /**
@@ -38,6 +46,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach tier &lt;players&gt; &lt;path&gt; &lt;tier&gt;
  * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
+ * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
  * </pre>
  */
 public final class BleachCommand {
@@ -89,7 +98,9 @@ public final class BleachCommand {
                                         .executes(BleachCommand::setChain))))
                 .then(Commands.literal("reset")
                         .then(Commands.argument("players", EntityArgument.players())
-                                .executes(BleachCommand::reset))));
+                                .executes(BleachCommand::reset)))
+                .then(Commands.literal("academy")
+                        .executes(context -> academy(context.getSource()))));
     }
 
     private static int info(CommandSourceStack source, ServerPlayer player) {
@@ -124,6 +135,27 @@ public final class BleachCommand {
                 line.accept(Component.translatable("commands.bleach.info.tier", path.displayName(), data.tier(path)));
             }
         }
+        return 1;
+    }
+
+    /** Reports the nearest Academy, like {@code /locate}, searching from the source or, outside the Overworld, from spawn. */
+    private static int academy(CommandSourceStack source) {
+        ServerLevel overworld = source.getServer().overworld();
+        BlockPos from = source.getLevel().dimension() == Level.OVERWORLD
+                ? BlockPos.containing(source.getPosition()) : overworld.getSharedSpawnPos();
+        BlockPos academy = AcademyLocator.nearest(overworld, from);
+        if (academy == null) {
+            source.sendFailure(Component.translatable("commands.bleach.academy.none"));
+            return 0;
+        }
+        Component coordinates = ComponentUtils.wrapInSquareBrackets(
+                        Component.translatable("chat.coordinates", academy.getX(), "~", academy.getZ()))
+                .withStyle(style -> style.withColor(ChatFormatting.GREEN)
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                                "/execute in minecraft:overworld run tp @s " + academy.getX() + " ~ " + academy.getZ()))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Component.translatable("chat.coordinates.tooltip"))));
+        source.sendSuccess(() -> Component.translatable("commands.bleach.academy.success", coordinates), false);
         return 1;
     }
 

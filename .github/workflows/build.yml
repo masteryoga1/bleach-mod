@@ -49,6 +49,10 @@ jobs:
       - name: Check the placeholder textures
         run: python3 -I tools/art/make_placeholders.py --check
 
+      # Structure templates are built by a script too.
+      - name: Check the structure templates
+        run: python3 -I tools/structures/make_structures.py --check
+
       # Client classes only exist on the client; common code that imports one crashes a dedicated server.
       - name: Check that client classes stay in client packages
         run: |

@@ -66,6 +66,8 @@ public final class SoulData {
     int sprintTicks;
     int meditationTicks;
     int meditationGrants;
+    /** Ticks spent meditating without a break, for the Academy reminder. */
+    int meditatingFor;
     int lastCombatXpTick = -1000;
     float chainErosion;
     int encroachmentTicks;

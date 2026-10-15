@@ -8,6 +8,8 @@ import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
+import io.github.masteryoga1.bleach.registry.BleachTags;
+import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.PowerPath;
@@ -19,14 +21,28 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.world.AcademySites;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -243,6 +259,79 @@ public final class AcademyTests {
         helper.assertFalse(ShinigamiLogic.slowsErosion(visitor(helper, awareHuman())), "a Human slows the chain");
         helper.assertTrue(ShinigamiNpc.EXAMINED_ARTS.size() == 4 && ShinigamiNpc.EXAMINED_ARTS.contains(Stat.KIDO),
                 "the exams do not cover the four Zankensoki");
+        helper.succeed();
+    }
+
+    @GameTest(template = "academy/academy")
+    public static void academyTemplateHoldsTheInstructor(GameTestHelper helper) {
+        helper.succeedWhen(() -> {
+            helper.assertEntityPresent(ModEntities.ACADEMY_INSTRUCTOR.get());
+            AcademyInstructor instructor = helper.getEntities(ModEntities.ACADEMY_INSTRUCTOR.get()).get(0);
+            helper.assertFalse(instructor.isInWall(), "the instructor is stuck in a wall");
+            helper.assertTrue(instructor.isInvulnerable(), "the Academy's instructor can be hurt");
+            int[] tables = {0};
+            helper.forEveryBlockInStructure(pos -> {
+                if (helper.getBlockState(pos).is(ModBlocks.TAILORING_TABLE.get())) {
+                    tables[0]++;
+                }
+            });
+            helper.assertTrue(tables[0] == 1, "the Academy has " + tables[0] + " Tailoring Tables");
+            // Blocks that need support survived placement: hanging and standing lanterns, both door halves.
+            helper.assertBlockPresent(Blocks.LANTERN, 4, 4, 10);
+            helper.assertBlockPresent(Blocks.LANTERN, 3, 1, 3);
+            helper.assertBlockPresent(Blocks.BAMBOO_DOOR, 7, 1, 7);
+            helper.assertBlockPresent(Blocks.BAMBOO_DOOR, 7, 2, 7);
+            helper.assertEntityNotPresent(EntityType.FALLING_BLOCK);
+        });
+    }
+
+    @GameTest(template = "empty")
+    public static void academyWorldgenIsRegistered(GameTestHelper helper) {
+        RegistryAccess access = helper.getLevel().registryAccess();
+        helper.assertTrue(access.registryOrThrow(Registries.STRUCTURE).containsKey(BleachMod.id("academy")),
+                "the Academy structure did not load");
+        helper.assertTrue(access.registryOrThrow(Registries.STRUCTURE_SET).containsKey(BleachMod.id("academy")),
+                "the Academy structure set did not load");
+        helper.assertTrue(access.registryOrThrow(Registries.TEMPLATE_POOL).containsKey(BleachMod.id("academy/start")),
+                "the Academy template pool did not load");
+        TagKey<Biome> biomes = TagKey.create(Registries.BIOME, BleachMod.id("has_structure/academy"));
+        helper.assertTrue(access.registryOrThrow(Registries.BIOME).getTag(biomes).map(set -> set.size() > 0).orElse(false),
+                "the Academy can generate in no biome");
+        helper.assertTrue(access.registryOrThrow(Registries.STRUCTURE).getTag(BleachTags.ACADEMY)
+                        .map(set -> set.size() == 1).orElse(false), "the Academy structure tag is wrong");
+        helper.assertTrue(helper.getLevel().getStructureManager().get(BleachMod.id("academy/academy")).isPresent(),
+                "the Academy template did not load");
+        helper.succeed();
+    }
+
+    /** Far from the other tests, so building it disturbs nothing. */
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void guaranteedAcademyIsPlaced(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos corner = AcademySites.placeAt(level, new ChunkPos(1000, 1000));
+        helper.assertTrue(corner != null, "the Academy could not be built");
+        helper.assertTrue(corner.getX() == 16000 && corner.getZ() == 16000, "the Academy reports its place as " + corner);
+        AABB around = new AABB(corner).inflate(32.0, 0.0, 32.0).setMinY(level.getMinBuildHeight()).setMaxY(level.getMaxBuildHeight());
+        List<AcademyInstructor> instructors = level.getEntitiesOfClass(AcademyInstructor.class, around);
+        helper.assertTrue(instructors.size() == 1, "the built Academy has " + instructors.size() + " instructors");
+        BlockPos at = instructors.get(0).blockPosition();
+        helper.assertTrue(BlockPos.betweenClosedStream(at.offset(-8, -2, -8), at.offset(8, 2, 8))
+                        .anyMatch(pos -> level.getBlockState(pos).is(ModBlocks.TAILORING_TABLE.get())),
+                "the built Academy has no Tailoring Table near the instructor");
+        instructors.forEach(instructor -> instructor.discard());
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void academySitesSurviveSaving(GameTestHelper helper) {
+        HolderLookup.Provider registries = helper.getLevel().registryAccess();
+        AcademySites empty = AcademySites.load(new CompoundTag(), registries);
+        helper.assertTrue(empty.guaranteed().isEmpty(), "a new world remembers an Academy");
+        CompoundTag tag = new CompoundTag();
+        BlockPos site = new BlockPos(160, 0, -96);
+        tag.put("guaranteed", NbtUtils.writeBlockPos(site));
+        AcademySites loaded = AcademySites.load(AcademySites.load(tag, registries).save(new CompoundTag(), registries), registries);
+        helper.assertTrue(loaded.guaranteed().equals(Optional.of(site)), "the guaranteed Academy moved to " + loaded.guaranteed());
         helper.succeed();
     }
 }

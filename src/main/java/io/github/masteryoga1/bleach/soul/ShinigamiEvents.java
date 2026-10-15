@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -145,6 +146,9 @@ public final class ShinigamiEvents {
         konsoEffects(plus);
         plus.sendSystemMessage(Component.translatable("message.bleach.konso.received")
                 .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        if (sendOn && BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY) && plus instanceof ServerPlayer soul) {
+            AcademyLocator.sendTo(soul);
+        }
         if (performer instanceof Player player && SoulLogic.hasSoul(player)) {
             ShinigamiLogic.rewardKonso(SoulLogic.get(player), player.level().getGameTime());
             player.displayClientMessage(Component.translatable("message.bleach.konso.performed", plus.getDisplayName()), true);
