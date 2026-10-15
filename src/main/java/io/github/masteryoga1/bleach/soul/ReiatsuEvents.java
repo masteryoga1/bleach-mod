@@ -196,6 +196,11 @@ public final class ReiatsuEvents {
                     .withStyle(ChatFormatting.GRAY), true);
             return;
         }
+        if (ShinigamiLogic.isPowerLent(data, player.level().getGameTime())) {
+            player.displayClientMessage(Component.translatable("message.bleach.power_lent")
+                    .withStyle(ChatFormatting.GRAY), true);
+            return;
+        }
         float cost = SoulLogic.releaseDrainPerTick(data) * SoulLogic.PRESSURE_EFFECT_TICKS;
         if (!player.isAlive() || player.isSpectator() || !SoulLogic.canRelease(data)
                 || data.reiryoku() - cost < 0.5F) {

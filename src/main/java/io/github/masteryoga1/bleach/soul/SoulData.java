@@ -36,7 +36,9 @@ public final class SoulData {
             Codec.LONG.optionalFieldOf("last_close_call", NEVER).forGetter(SoulData::lastCloseCallTime),
             Codec.INT.optionalFieldOf("chain_ticks", 0).forGetter(SoulData::chainTicks),
             Codec.INT.optionalFieldOf("chain_max_ticks", 0).forGetter(SoulData::chainMaxTicks),
-            Codec.BOOL.optionalFieldOf("reiatsu_released", false).forGetter(SoulData::isReiatsuReleased)
+            Codec.BOOL.optionalFieldOf("reiatsu_released", false).forGetter(SoulData::isReiatsuReleased),
+            ShinigamiProgress.CODEC.lenientOptionalFieldOf("shinigami", ShinigamiProgress.NONE)
+                    .forGetter(SoulData::shinigami)
     ).apply(instance, SoulData::new));
 
     private SoulState state = SoulState.HUMAN;
@@ -53,6 +55,8 @@ public final class SoulData {
     private int chainMaxTicks;
     /** Whether the soul is flooding the area with its reiatsu (the pressure aura). */
     private boolean reiatsuReleased;
+    /** The Academy, the Asauchi, Konsō and power given or taken: see {@link ShinigamiLogic}. */
+    private ShinigamiProgress shinigami = ShinigamiProgress.NONE;
 
     // Server-side bookkeeping. Not saved or synced; it starts over when the player logs in or respawns.
     private boolean dirty = true;
@@ -76,13 +80,16 @@ public final class SoulData {
     int lastReleaseChangeTick = -1000;
     /** Fire ticks from just before an unaware player's hit passed through, to undo what the hit set alight. */
     int fireBeforeIgnoredHit = NO_FIRE_RECORDED;
+    /** Set on the respawned copy when this death turned a Substitute into a Shinigami. */
+    boolean becameShinigami;
 
     public SoulData() {
     }
 
     private SoulData(SoulState state, boolean initialized, float reiryoku, float maxReiryoku,
                      Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers,
-                     long lastCloseCallTime, int chainTicks, int chainMaxTicks, boolean reiatsuReleased) {
+                     long lastCloseCallTime, int chainTicks, int chainMaxTicks, boolean reiatsuReleased,
+                     ShinigamiProgress shinigami) {
         this.state = state;
         this.initialized = initialized;
         this.maxReiryoku = Math.max(0.0F, maxReiryoku);
@@ -94,6 +101,7 @@ public final class SoulData {
         this.chainMaxTicks = Math.max(0, chainMaxTicks);
         this.chainTicks = Mth.clamp(chainTicks, 0, this.chainMaxTicks);
         this.reiatsuReleased = reiatsuReleased;
+        this.shinigami = shinigami;
     }
 
     /** A map keyed by enum name that skips names it does not recognise when reading. */
@@ -274,6 +282,17 @@ public final class SoulData {
         }
     }
 
+    public ShinigamiProgress shinigami() {
+        return shinigami;
+    }
+
+    public void setShinigami(ShinigamiProgress progress) {
+        if (!progress.equals(shinigami)) {
+            shinigami = progress;
+            markDirty();
+        }
+    }
+
     /** Whether the client's copy is out of date. */
     public boolean isDirty() {
         return dirty;
@@ -290,6 +309,6 @@ public final class SoulData {
     /** A copy of the saved data, without the server-side bookkeeping. */
     public SoulData copy() {
         return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime,
-                chainTicks, chainMaxTicks, reiatsuReleased);
+                chainTicks, chainMaxTicks, reiatsuReleased, shinigami);
     }
 }

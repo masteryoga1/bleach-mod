@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.advancement;
 
+import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.Stat;
@@ -15,7 +16,21 @@ public final class Milestones {
     public static final String CRUSHING_PRESSURE = "crushing_pressure";
     /** Down to the last links of the Chain of Fate. */
     public static final String ENCROACHMENT = "encroachment";
-    // Each soul state is also a milestone under its own name: "plus", "hollow" and so on.
+    /** Studying at the Academy. */
+    public static final String ENROLLED = "enrolled";
+    /** A living Human holding a Shinigami's power. */
+    public static final String SUBSTITUTE = "substitute";
+    /** Wearing the full Shihakushō. */
+    public static final String SHIHAKUSHO = "shihakusho";
+    /** Passed the Academy's exams. Granted when it happens, as are the three below. */
+    public static final String GRADUATED = "graduated";
+    /** Sent a Plus on. */
+    public static final String KONSO = "konso";
+    /** Flash stepped. */
+    public static final String SHUNPO = "shunpo";
+    /** Stood on hardened reishi in mid-air. */
+    public static final String REISHI_FOOTING = "reishi_footing";
+    // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
     private static final float RISING_REIATSU_AMOUNT = 100.0F;
@@ -38,6 +53,12 @@ public final class Milestones {
         }
         if (SoulLogic.isEncroaching(data)) {
             trigger.trigger(player, ENCROACHMENT);
+        }
+        if (ShinigamiLogic.isStudent(data)) {
+            trigger.trigger(player, ENROLLED);
+        }
+        if (ShinigamiLogic.isSubstitute(data)) {
+            trigger.trigger(player, SUBSTITUTE);
         }
     }
 

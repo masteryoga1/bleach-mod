@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -9,10 +10,12 @@ import io.github.masteryoga1.bleach.soul.Stat;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.StringUtil;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 
 /** The soul screen: state, reiryoku, stats with training progress, awakened powers and what comes next. */
 public final class SoulStatsScreen extends Screen {
@@ -51,8 +54,9 @@ public final class SoulStatsScreen extends Screen {
 
         graphics.drawCenteredString(font, title, width / 2, y, WHITE);
         y += LINE + 6;
-        graphics.drawString(font, Component.translatable("screen.bleach.soul.state", data.state().displayName()),
-                left, y, WHITE);
+        String stateKey = ShinigamiLogic.isSubstitute(data) ? "screen.bleach.soul.state.substitute"
+                : ShinigamiLogic.isStudent(data) ? "screen.bleach.soul.state.student" : "screen.bleach.soul.state";
+        graphics.drawString(font, Component.translatable(stateKey, data.state().displayName()), left, y, WHITE);
         y += LINE;
         graphics.drawString(font, Component.translatable("screen.bleach.soul.reiryoku",
                 (int) Math.floor(data.reiryoku()), (int) Math.floor(data.maxReiryoku())), left, y, REIRYOKU);
@@ -110,8 +114,25 @@ public final class SoulStatsScreen extends Screen {
         }
         y += 6;
 
-        Component next = Component.translatable("screen.bleach.soul.next." + data.state().getSerializedName());
-        graphics.drawWordWrap(font, next, left, y, PANEL_WIDTH, GREY);
+        graphics.drawWordWrap(font, nextStep(player, data), left, y, PANEL_WIDTH, GREY);
+    }
+
+    /**
+     * What this soul can do next. A Plus in the Overworld who was told where the Academy is gets its
+     * direction too.
+     */
+    private static Component nextStep(Player player, SoulData data) {
+        String key = ShinigamiLogic.nextStepKey(data, player.level().getGameTime());
+        if (key.equals("plus") && data.shinigami().academyPos().isPresent()
+                && player.level().dimension() == Level.OVERWORLD) {
+            BlockPos academy = data.shinigami().academyPos().get();
+            double dx = academy.getX() + 0.5 - player.getX();
+            double dz = academy.getZ() + 0.5 - player.getZ();
+            return Component.translatable("screen.bleach.soul.next.plus.academy",
+                    Component.translatable(ShinigamiLogic.compassKey(dx, dz)),
+                    ShinigamiLogic.roundedDistance(Math.sqrt(dx * dx + dz * dz)));
+        }
+        return Component.translatable("screen.bleach.soul.next." + key);
     }
 
     @Override

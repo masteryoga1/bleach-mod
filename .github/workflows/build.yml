@@ -22,6 +22,37 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # A malformed or duplicated key in a JSON file is otherwise skipped quietly by the game.
+      - name: Check the JSON resources
+        run: |
+          python3 -I - <<'EOF'
+          import json, pathlib, sys
+          def hook(pairs):
+              seen = set()
+              for key, _ in pairs:
+                  if key in seen:
+                      raise ValueError(f"duplicate key {key!r}")
+                  seen.add(key)
+              return dict(pairs)
+          bad = 0
+          for path in sorted(pathlib.Path("src/main/resources").rglob("*")):
+              if path.suffix in (".json", ".mcmeta"):
+                  try:
+                      json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=hook)
+                  except Exception as error:
+                      print(f"{path}: {error}")
+                      bad = 1
+          sys.exit(bad)
+          EOF
+
+      # Client classes only exist on the client; common code that imports one crashes a dedicated server.
+      - name: Check that client classes stay in client packages
+        run: |
+          if grep -rlE "import (net\.minecraft\.client|com\.mojang\.blaze3d|net\.neoforged\.neoforge\.client)" src/main/java --include=*.java | grep -v "/client/"; then
+            echo "These files outside a client package import client-only classes"
+            exit 1
+          fi
+
       - name: Build the mod jar
         run: ./gradlew build --stacktrace
 

@@ -7,6 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
@@ -30,7 +31,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  *
  * <pre>
  * /bleach info [player]
- * /bleach soul &lt;players&gt; &lt;state&gt;
+ * /bleach soul &lt;players&gt; &lt;state&gt;      (a Shinigami also gets their first tier)
+ * /bleach enroll &lt;players&gt;           (Rukongai souls only)
  * /bleach reiryoku &lt;players&gt; &lt;max&gt; [current]
  * /bleach stat &lt;players&gt; &lt;stat&gt; &lt;level&gt;
  * /bleach tier &lt;players&gt; &lt;path&gt; &lt;tier&gt;
@@ -59,6 +61,9 @@ public final class BleachCommand {
                                 .then(Commands.argument("state", StringArgumentType.word())
                                         .suggests(STATES)
                                         .executes(BleachCommand::setState))))
+                .then(Commands.literal("enroll")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(BleachCommand::enroll)))
                 .then(Commands.literal("reiryoku")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .then(Commands.argument("max", FloatArgumentType.floatArg(0.0F))
@@ -101,6 +106,14 @@ public final class BleachCommand {
         if (data.isReiatsuReleased()) {
             line.accept(Component.translatable("commands.bleach.info.released"));
         }
+        if (ShinigamiLogic.isStudent(data)) {
+            line.accept(Component.translatable("commands.bleach.info.enrolled"));
+        }
+        long now = player.level().getGameTime();
+        if (ShinigamiLogic.isPowerLent(data, now)) {
+            line.accept(Component.translatable("commands.bleach.info.power_lent",
+                    (data.shinigami().powerLentUntil() - now) / 20));
+        }
         for (Stat stat : Stat.values()) {
             int level = data.level(stat);
             line.accept(Component.translatable("commands.bleach.info.stat", stat.displayName(), level,
@@ -128,6 +141,24 @@ public final class BleachCommand {
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.soul.success",
                 state.displayName(), players.size()), true);
         return players.size();
+    }
+
+    private static int enroll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int enrolled = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            if (data.state() == SoulState.RUKONGAI) {
+                ShinigamiLogic.enroll(data);
+                enrolled++;
+            }
+        }
+        if (enrolled == 0) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.enroll.not_soul"));
+            return 0;
+        }
+        int count = enrolled;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.enroll.success", count), true);
+        return count;
     }
 
     /** Sets maximum reiryoku and either refills it ({@code current < 0}) or sets the current amount too. */

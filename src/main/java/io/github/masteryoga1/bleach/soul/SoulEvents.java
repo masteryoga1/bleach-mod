@@ -11,6 +11,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
@@ -55,6 +56,7 @@ public final class SoulEvents {
         SpiritEvents.register(bus);
         ChainEvents.register(bus);
         ReiatsuEvents.register(bus);
+        ShinigamiEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -79,9 +81,9 @@ public final class SoulEvents {
         data.hasLastPosition = true;
 
         boolean meditating = player.isCrouching() && player.onGround() && movedSqr < 1.0E-4;
-        // Releasing reiatsu pours it out; it does not refill until the release ends and the reiatsu settles.
-        if (!data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data)) {
-            SoulLogic.regenTick(data, meditating || player.isSleeping());
+        if (mayRegenerate(player, data)) {
+            SoulLogic.regenTick(data, meditating || player.isSleeping(),
+                    ShinigamiLogic.regenMultiplier(player, data, player.level().getGameTime()));
         }
 
         if (meditating) {
@@ -109,6 +111,14 @@ public final class SoulEvents {
         if (data.isDirty() && player.tickCount % SYNC_INTERVAL_TICKS == 0) {
             BleachNetwork.syncSoul(player, data);
         }
+    }
+
+    /**
+     * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
+     * the release ends and the reiatsu settles.
+     */
+    public static boolean mayRegenerate(Player player, SoulData data) {
+        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data);
     }
 
     /** Zanjutsu and Hakuda make melee hits stronger. Training happens once a hit lands, in {@link #onDamageTaken}. */
