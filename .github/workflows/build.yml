@@ -20,13 +20,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Build the mod jar
         run: ./gradlew build --stacktrace
 
       - name: Upload the mod jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bleach-mod-jar
           path: build/libs/*.jar
@@ -44,7 +44,7 @@ jobs:
 
       - name: Upload the game test log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gametest-log
           path: |
