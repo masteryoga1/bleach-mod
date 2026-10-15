@@ -21,8 +21,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Finding the Academy: the nearest one that generated, or the one this world was guaranteed (see
  * {@link AcademySites}). A Plus senses which way it lies, and Konsō can send a soul there. The search
- * is slow, so it runs only when a soul becomes a Plus, on Konsō, and by command, and its answer is
- * kept in the soul's {@code academy_pos}.
+ * is slow, so it runs only when a soul becomes a Plus, when Konsō is offered or performed, and by
+ * command, and its answer is kept in the soul's {@code academy_pos}.
  */
 public final class AcademyLocator {
     /** The spots tried around an Academy's corner when sending a soul there, the corner first. */
@@ -99,6 +99,26 @@ public final class AcademyLocator {
     }
 
     /**
+     * The Academy this soul would be sent to: the one it was last told about, or else the nearest,
+     * which it then remembers. Slow when the soul knows of none yet.
+     */
+    @Nullable
+    public static BlockPos academyFor(ServerPlayer player) {
+        SoulData data = SoulLogic.get(player);
+        Optional<BlockPos> known = data.shinigami().academyPos();
+        if (known.isPresent()) {
+            return known.get();
+        }
+        ServerLevel overworld = player.server.overworld();
+        BlockPos from = player.level().dimension() == Level.OVERWORLD ? player.blockPosition() : overworld.getSharedSpawnPos();
+        BlockPos academy = nearest(overworld, from);
+        if (academy != null) {
+            data.setShinigami(data.shinigami().withAcademyPos(Optional.of(academy)));
+        }
+        return academy;
+    }
+
+    /**
      * Sends a soul that has just passed on to the gates of the Academy, landing on safe ground beside
      * its corner.
      *
@@ -106,14 +126,8 @@ public final class AcademyLocator {
      */
     public static boolean sendTo(ServerPlayer player) {
         ServerLevel overworld = player.server.overworld();
-        SoulData data = SoulLogic.get(player);
-        BlockPos target = data.shinigami().academyPos().orElse(null);
-        if (target == null) {
-            BlockPos from = player.level().dimension() == Level.OVERWORLD ? player.blockPosition() : overworld.getSharedSpawnPos();
-            target = nearest(overworld, from);
-        }
+        BlockPos target = academyFor(player);
         if (target != null) {
-            data.setShinigami(data.shinigami().withAcademyPos(Optional.of(target)));
             for (int[] offset : LANDING_OFFSETS) {
                 int x = target.getX() + offset[0];
                 int z = target.getZ() + offset[1];

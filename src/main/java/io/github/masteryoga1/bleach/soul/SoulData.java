@@ -5,6 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.phys.Vec3;
@@ -84,6 +85,13 @@ public final class SoulData {
     int fireBeforeIgnoredHit = NO_FIRE_RECORDED;
     /** Set on the respawned copy when this death turned a Substitute into a Shinigami. */
     boolean becameShinigami;
+    /** What another player has offered this soul and is waiting on it to accept. */
+    SoulOffer pendingOffer;
+    /** The Human this Shinigami used their blade on once, asking to lend them power, and when. */
+    UUID powerConfirmTarget;
+    long powerConfirmAt = NEVER;
+    /** Game time of this soul's last offer, so offers cannot be spammed. */
+    long lastOfferAt = NEVER;
 
     public SoulData() {
     }

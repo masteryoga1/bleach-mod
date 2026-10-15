@@ -19,6 +19,7 @@ import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulOffer;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.world.AcademySites;
@@ -35,6 +36,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.player.Player;
@@ -241,6 +243,55 @@ public final class AcademyTests {
     }
 
     @GameTest(template = "empty")
+    public static void playerTransferMakesASubstitute(GameTestHelper helper) {
+        Player shinigami = visitor(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 200.0F));
+        Player human = visitor(helper, awareHuman());
+        Player bystander = visitor(helper, awareHuman());
+        SoulData giver = SoulLogic.get(shinigami);
+        SoulData data = SoulLogic.get(human);
+        helper.assertTrue(ShinigamiEvents.offer(shinigami, human, SoulOffer.Kind.POWER), "the offer was not made");
+        SoulOffer offer = ShinigamiEvents.pendingOffer(human);
+        helper.assertTrue(offer != null && offer.kind() == SoulOffer.Kind.POWER, "the Human was not offered power");
+        helper.assertFalse(ShinigamiEvents.offer(shinigami, bystander, SoulOffer.Kind.POWER), "a second offer came at once");
+        helper.assertFalse(ShinigamiEvents.accept(human, bystander), "an offer was accepted from someone who never made it");
+        helper.assertTrue(ShinigamiEvents.accept(human, shinigami), "accepting found no offer");
+
+        helper.assertTrue(ShinigamiLogic.isSubstitute(data), "taking a Shinigami's power did not make a Substitute");
+        helper.assertTrue(human.getInventory().countItem(ModItems.ASAUCHI.get()) == 1, "no blade formed in their hands");
+        helper.assertTrue(ShinigamiLogic.isPowerLent(giver, helper.getLevel().getGameTime()), "the giver's power is not lent");
+        float kept = (float) (200.0 * (1.0 - BleachConfig.get(BleachConfig.TRANSFER_FRACTION)));
+        helper.assertTrue(Math.abs(giver.maxReiryoku() - kept) < EPSILON && giver.reiryoku() == 0.0F,
+                "the giver kept " + giver.reiryoku() + " of " + giver.maxReiryoku() + " reiryoku");
+        helper.assertTrue(shinigami.hasEffect(MobEffects.WEAKNESS), "the giver was not left drained");
+        helper.assertTrue(ShinigamiEvents.pendingOffer(human) == null, "the offer still stands");
+        helper.assertFalse(ShinigamiEvents.accept(human, shinigami), "the offer was accepted twice");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void playerKonsoRewardsThePerformer(GameTestHelper helper) {
+        Player shinigami = visitor(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 200.0F));
+        Player plus = visitor(helper, ShinigamiTests.soul(SoulState.PLUS, 40.0F));
+        SoulData performer = SoulLogic.get(shinigami);
+        float before = performer.maxReiryoku();
+        helper.assertTrue(ShinigamiEvents.offer(shinigami, plus, SoulOffer.Kind.KONSO), "the offer was not made");
+        helper.assertTrue(ShinigamiEvents.accept(plus, shinigami), "accepting found no offer");
+        SoulData data = SoulLogic.get(plus);
+        helper.assertTrue(data.state() == SoulState.RUKONGAI, "accepting Konsō left a " + data.state());
+        helper.assertTrue(Math.abs(performer.maxReiryoku() - before - BleachConfig.get(BleachConfig.KONSO_GROWTH)) < EPSILON,
+                "Konsō grew the performer's reiryoku from " + before + " to " + performer.maxReiryoku());
+
+        Player lent = visitor(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 200.0F));
+        Player another = visitor(helper, ShinigamiTests.soul(SoulState.PLUS, 40.0F));
+        SoulData lentData = SoulLogic.get(lent);
+        lentData.setShinigami(lentData.shinigami().withPowerLentUntil(helper.getLevel().getGameTime() + TICKS_PER_MINUTE));
+        helper.assertTrue(ShinigamiEvents.offer(lent, another, SoulOffer.Kind.KONSO), "the offer was not made");
+        helper.assertTrue(ShinigamiEvents.accept(another, lent), "accepting found no offer");
+        helper.assertTrue(SoulLogic.get(another).state() == SoulState.PLUS, "a Shinigami whose power is lent performed Konsō");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void woundedShinigamiLeavesInTime(GameTestHelper helper) {
         WoundedShinigami wounded = helper.spawn(ModEntities.WOUNDED_SHINIGAMI.get(), 1, 1, 1);
         wounded.setLifetime(5);
@@ -276,11 +327,12 @@ public final class AcademyTests {
                 }
             });
             helper.assertTrue(tables[0] == 1, "the Academy has " + tables[0] + " Tailoring Tables");
-            // Blocks that need support survived placement: hanging and standing lanterns, both door halves.
-            helper.assertBlockPresent(Blocks.LANTERN, 4, 4, 10);
-            helper.assertBlockPresent(Blocks.LANTERN, 3, 1, 3);
-            helper.assertBlockPresent(Blocks.BAMBOO_DOOR, 7, 1, 7);
+            // Blocks that need support survived placement: hanging and standing lanterns, both door
+            // halves. Test positions sit one above the template's, which starts above the structure block.
+            helper.assertBlockPresent(Blocks.LANTERN, 4, 5, 10);
+            helper.assertBlockPresent(Blocks.LANTERN, 3, 2, 3);
             helper.assertBlockPresent(Blocks.BAMBOO_DOOR, 7, 2, 7);
+            helper.assertBlockPresent(Blocks.BAMBOO_DOOR, 7, 3, 7);
             helper.assertEntityNotPresent(EntityType.FALLING_BLOCK);
         });
     }
