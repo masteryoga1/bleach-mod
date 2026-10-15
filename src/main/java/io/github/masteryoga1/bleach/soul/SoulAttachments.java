@@ -17,6 +17,10 @@ public final class SoulAttachments {
     public static final Supplier<AttachmentType<SoulData>> SOUL = ATTACHMENT_TYPES.register("soul",
             () -> AttachmentType.builder(() -> new SoulData()).serialize(SoulData.CODEC).build());
 
+    /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
+    public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
+            () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());
+
     private SoulAttachments() {
     }
 }

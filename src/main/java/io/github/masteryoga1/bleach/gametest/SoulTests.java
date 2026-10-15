@@ -40,6 +40,9 @@ public final class SoulTests {
         data.addXp(Stat.ZANJUTSU, 7, 50);
         data.setTier(PowerPath.SHINIGAMI, 1);
         data.setLastCloseCallTime(1234L);
+        data.startChain(1000);
+        data.setChainTicks(400);
+        data.setReiatsuReleased(true);
 
         Tag saved = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
         SoulData loaded = SoulData.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
@@ -53,6 +56,9 @@ public final class SoulTests {
         helper.assertTrue(loaded.tier(PowerPath.SHINIGAMI) == 1, "Shinigami tier was " + loaded.tier(PowerPath.SHINIGAMI));
         helper.assertTrue(loaded.level(Stat.HOHO) == 0, "untrained Hohō should stay at 0");
         helper.assertTrue(loaded.lastCloseCallTime() == 1234L, "close-call cooldown was " + loaded.lastCloseCallTime());
+        helper.assertTrue(loaded.chainMaxTicks() == 1000 && loaded.chainTicks() == 400,
+                "chain was " + loaded.chainTicks() + " of " + loaded.chainMaxTicks());
+        helper.assertTrue(loaded.isReiatsuReleased(), "released reiatsu was lost");
         helper.succeed();
     }
 

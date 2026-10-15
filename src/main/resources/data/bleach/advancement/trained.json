@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:iron_sword"
+    },
+    "title": {
+      "translate": "advancements.bleach.trained.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.trained.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "trained": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "trained"
+      }
+    }
+  }
+}

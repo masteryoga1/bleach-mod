@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:trained",
+  "display": {
+    "icon": {
+      "id": "minecraft:experience_bottle"
+    },
+    "title": {
+      "translate": "advancements.bleach.rising_reiatsu.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.rising_reiatsu.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "rising_reiatsu": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "rising_reiatsu"
+      }
+    }
+  }
+}

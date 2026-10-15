@@ -27,6 +27,24 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue HOHO_SPEED_PER_LEVEL;
     public static final ModConfigSpec.DoubleValue REIATSU_CONTROL_REGEN_PER_LEVEL;
 
+    public static final ModConfigSpec.BooleanValue DEATH_INTO_PLUS;
+    public static final ModConfigSpec.BooleanValue ALWAYS_BECOME_PLUS;
+    public static final ModConfigSpec.IntValue PLUS_DEATH_CHAIN_COST_SECONDS;
+
+    public static final ModConfigSpec.IntValue CHAIN_OF_FATE_MINUTES;
+    public static final ModConfigSpec.DoubleValue LOW_HEALTH_EROSION_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue NEAR_SHINIGAMI_EROSION_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue ENCROACHMENT_FRACTION;
+    public static final ModConfigSpec.BooleanValue HOLLOWFICATION;
+    public static final ModConfigSpec.DoubleValue HOLLOWFICATION_GROWTH;
+
+    public static final ModConfigSpec.DoubleValue REIATSU_DIFFERENCE_RATIO;
+    public static final ModConfigSpec.DoubleValue REIATSU_DIFFERENCE_MIN_DAMAGE;
+    public static final ModConfigSpec.DoubleValue PRESSURE_DRAIN_FRACTION_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue PRESSURE_MIN_RATIO;
+    public static final ModConfigSpec.DoubleValue PRESSURE_BASE_RADIUS;
+    public static final ModConfigSpec.DoubleValue PRESSURE_MAX_RADIUS;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -84,6 +102,60 @@ public final class BleachConfig {
                 .defineInRange("reiatsu_control_regen_per_level", 0.02, 0.0, 10.0);
         builder.pop();
 
+        builder.push("death");
+        DEATH_INTO_PLUS = builder
+                .comment("Whether a spiritually aware Human who dies comes back as a Plus at the place they died.")
+                .define("death_into_plus", true);
+        ALWAYS_BECOME_PLUS = builder
+                .comment("Whether every Human who dies becomes a Plus, aware or not.")
+                .define("always_become_plus", false);
+        PLUS_DEATH_CHAIN_COST_SECONDS = builder
+                .comment("Seconds of Chain of Fate a Plus loses each time it dies.")
+                .defineInRange("plus_death_chain_cost_seconds", 300, 0, 86_400);
+        builder.pop();
+
+        builder.push("chain_of_fate");
+        CHAIN_OF_FATE_MINUTES = builder
+                .comment("How long a new Plus's Chain of Fate lasts, in minutes of play.")
+                .defineInRange("chain_of_fate_minutes", 60, 1, 10_080);
+        LOW_HEALTH_EROSION_MULTIPLIER = builder
+                .comment("How much faster the chain erodes while the Plus is below 30% health.")
+                .defineInRange("low_health_erosion_multiplier", 2.0, 1.0, 100.0);
+        NEAR_SHINIGAMI_EROSION_MULTIPLIER = builder
+                .comment("Erosion speed while a Shinigami is within 16 blocks (0.5 = half speed).")
+                .defineInRange("near_shinigami_erosion_multiplier", 0.5, 0.0, 1.0);
+        ENCROACHMENT_FRACTION = builder
+                .comment("Share of the chain left when Encroachment starts: the links eat each other, causing pain and brief blindness.")
+                .defineInRange("encroachment_fraction", 0.25, 0.0, 1.0);
+        HOLLOWFICATION = builder
+                .comment("Whether a Plus whose chain runs out becomes a Hollow. If false the chain stops at its last link.")
+                .define("hollowfication", true);
+        HOLLOWFICATION_GROWTH = builder
+                .comment("Maximum reiryoku gained on becoming a Hollow.")
+                .defineInRange("hollowfication_growth", 50.0, 0.0, 100_000.0);
+        builder.pop();
+
+        builder.push("reiatsu");
+        REIATSU_DIFFERENCE_RATIO = builder
+                .comment("How many times stronger a soul's reiatsu must be than its attacker's before hits are weakened.")
+                .defineInRange("difference_ratio", 3.0, 1.0, 1_000.0);
+        REIATSU_DIFFERENCE_MIN_DAMAGE = builder
+                .comment("The smallest share of damage a much weaker attacker still deals.")
+                .defineInRange("difference_min_damage", 0.1, 0.0, 1.0);
+        PRESSURE_DRAIN_FRACTION_PER_SECOND = builder
+                .comment("Share of maximum reiryoku the pressure aura drains each second.")
+                .defineInRange("pressure_drain_fraction_per_second", 0.05, 0.0, 1.0);
+        PRESSURE_MIN_RATIO = builder
+                .comment("How many times stronger you must be for your pressure aura to affect someone.")
+                .defineInRange("pressure_min_ratio", 2.0, 1.0, 1_000.0);
+        PRESSURE_BASE_RADIUS = builder
+                .comment("Pressure aura radius in blocks before reiatsu is added.")
+                .defineInRange("pressure_base_radius", 6.0, 1.0, 64.0);
+        PRESSURE_MAX_RADIUS = builder
+                .comment("Largest pressure aura radius in blocks.")
+                .defineInRange("pressure_max_radius", 24.0, 1.0, 128.0);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -97,6 +169,11 @@ public final class BleachConfig {
 
     /** The configured value, or its default when no world is loaded. */
     public static int get(ModConfigSpec.IntValue value) {
+        return SPEC.isLoaded() ? value.get() : value.getDefault();
+    }
+
+    /** The configured value, or its default when no world is loaded. */
+    public static boolean get(ModConfigSpec.BooleanValue value) {
         return SPEC.isLoaded() ? value.get() : value.getDefault();
     }
 }

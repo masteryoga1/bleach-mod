@@ -34,6 +34,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach reiryoku &lt;players&gt; &lt;max&gt; [current]
  * /bleach stat &lt;players&gt; &lt;stat&gt; &lt;level&gt;
  * /bleach tier &lt;players&gt; &lt;path&gt; &lt;tier&gt;
+ * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
  * </pre>
  */
@@ -77,6 +78,10 @@ public final class BleachCommand {
                                         .suggests(PATHS)
                                         .then(Commands.argument("tier", IntegerArgumentType.integer(0, 100))
                                                 .executes(BleachCommand::setTier)))))
+                .then(Commands.literal("chain")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.argument("seconds", IntegerArgumentType.integer(1))
+                                        .executes(BleachCommand::setChain))))
                 .then(Commands.literal("reset")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .executes(BleachCommand::reset))));
@@ -89,6 +94,13 @@ public final class BleachCommand {
         line.accept(Component.translatable("commands.bleach.info.state", data.state().displayName()));
         line.accept(Component.translatable("commands.bleach.info.reiryoku",
                 format(data.reiryoku()), format(data.maxReiryoku())));
+        if (data.chainMaxTicks() > 0) {
+            line.accept(Component.translatable("commands.bleach.info.chain",
+                    data.chainTicks() / 20, data.chainMaxTicks() / 20));
+        }
+        if (data.isReiatsuReleased()) {
+            line.accept(Component.translatable("commands.bleach.info.released"));
+        }
         for (Stat stat : Stat.values()) {
             int level = data.level(stat);
             line.accept(Component.translatable("commands.bleach.info.stat", stat.displayName(), level,
@@ -111,7 +123,7 @@ public final class BleachCommand {
         }
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
         for (ServerPlayer player : players) {
-            SoulLogic.get(player).setState(state);
+            SoulLogic.changeState(SoulLogic.get(player), state);
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.soul.success",
                 state.displayName(), players.size()), true);
@@ -170,6 +182,33 @@ public final class BleachCommand {
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.tier.success",
                 path.displayName(), tier, players.size()), true);
         return players.size();
+    }
+
+    /** Sets how long a Plus's Chain of Fate has left, lengthening the whole chain if needed. */
+    private static int setChain(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int seconds = IntegerArgumentType.getInteger(context, "seconds");
+        int ticks = (int) Math.min(Integer.MAX_VALUE, seconds * 20L);
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            if (data.state() != SoulState.PLUS) {
+                continue;
+            }
+            if (ticks > data.chainMaxTicks()) {
+                data.startChain(ticks);
+            } else {
+                data.setChainTicks(ticks);
+            }
+            changed++;
+        }
+        if (changed == 0) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.chain.not_plus"));
+            return 0;
+        }
+        int count = changed;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.chain.success",
+                seconds, count), true);
+        return count;
     }
 
     private static int reset(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {

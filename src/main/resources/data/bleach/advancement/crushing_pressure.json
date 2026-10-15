@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:rising_reiatsu",
+  "display": {
+    "icon": {
+      "id": "minecraft:anvil"
+    },
+    "title": {
+      "translate": "advancements.bleach.crushing_pressure.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.crushing_pressure.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "crushing_pressure": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "crushing_pressure"
+      }
+    }
+  }
+}
