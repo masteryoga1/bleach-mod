@@ -17,6 +17,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Reishi footing: a trained soul hardens the spirit particles under their feet and stands on the
@@ -103,18 +104,19 @@ public final class ReishiFooting {
     }
 
     /**
-     * Footing straight after a flash step that ended in the air: the soul lands on reishi where it
-     * arrived. Pays the upfront cost like {@link #activate}.
+     * Footing straight after a flash step that ends in the air: the soul is moved to where the step
+     * ends and lands on reishi there. Pays the upfront cost like {@link #activate}.
      *
-     * @return false if the soul may not stand there or cannot pay
+     * @return false, leaving the soul where it is and charging nothing, if it may not stand there or cannot pay
      */
-    public static boolean startAfterDash(ServerPlayer player, SoulData data) {
+    public static boolean startAfterDash(ServerPlayer player, SoulData data, Vec3 end) {
         FootingState footing = player.getData(SoulAttachments.FOOTING);
-        int anchor = ShinigamiLogic.footingAnchor(player.getY());
+        int anchor = ShinigamiLogic.footingAnchor(end.y);
         if (!mayStand(player, data, player.level().getGameTime()) || player.serverLevel().isOutsideBuildHeight(anchor)
                 || !footing.active && !SoulLogic.trySpend(player, data, ShinigamiLogic.footingDrainPerTick(data) * 20.0F)) {
             return false;
         }
+        player.teleportTo(end.x, end.y, end.z);
         start(player, footing, anchor);
         sendState(player, footing);
         return true;

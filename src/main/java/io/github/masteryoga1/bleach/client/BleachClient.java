@@ -40,6 +40,9 @@ public final class BleachClient {
     public static final KeyMapping REIATSU_RELEASE_KEY = new KeyMapping("key.bleach.reiatsu_release",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, KEY_CATEGORY);
 
+    public static final KeyMapping FLASH_STEP_KEY = new KeyMapping("key.bleach.flash_step",
+            KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, KEY_CATEGORY);
+
     /** Whether the release key was down last tick, so holding it (and key repeat) toggles only once. */
     private static boolean releaseKeyWasDown;
 
@@ -66,6 +69,7 @@ public final class BleachClient {
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(SOUL_SCREEN_KEY);
         event.register(REIATSU_RELEASE_KEY);
+        event.register(FLASH_STEP_KEY);
         event.register(ReishiFootingClient.REISHI_FOOTING_KEY);
     }
 
@@ -110,6 +114,15 @@ public final class BleachClient {
             BleachNetwork.requestReiatsuToggle();
         }
         releaseKeyWasDown = REIATSU_RELEASE_KEY.isDown();
+
+        // One flash step per press: the server keeps the cooldown, so extra presses just do nothing.
+        boolean flashStep = false;
+        while (FLASH_STEP_KEY.consumeClick()) {
+            flashStep = true;
+        }
+        if (flashStep && minecraft.player != null && minecraft.screen == null && minecraft.getConnection() != null) {
+            BleachNetwork.requestFlashStep(minecraft.player.input.forwardImpulse, minecraft.player.input.leftImpulse);
+        }
     }
 
     /**

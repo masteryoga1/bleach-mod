@@ -92,6 +92,8 @@ public final class SoulData {
     long powerConfirmAt = NEVER;
     /** Game time of this soul's last offer, so offers cannot be spammed. */
     long lastOfferAt = NEVER;
+    /** Game time of this soul's last flash step, for the cooldown. */
+    long lastFlashStepAt = NEVER;
 
     public SoulData() {
     }

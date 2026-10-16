@@ -36,6 +36,7 @@
   "key.bleach.soul_screen": "Soul and Stats",
   "key.bleach.reiatsu_release": "Release Reiatsu",
   "key.bleach.reishi_footing": "Reishi Footing",
+  "key.bleach.flash_step": "Flash Step",
 
   "screen.bleach.soul": "Soul",
   "screen.bleach.soul.state": "Soul state: %s",
@@ -124,6 +125,10 @@
   "message.bleach.power.returned": "Your power has returned",
   "message.bleach.reishi_footing.too_weak": "Your reiryoku is too faint to harden the reishi underfoot",
   "message.bleach.reishi_footing.exhausted": "The reishi under your feet scatters",
+  "message.bleach.flash_step.untrained": "You have not learned Shunpo",
+  "message.bleach.flash_step.too_weak": "You do not have enough reiryoku to flash step",
+  "message.bleach.flash_step.blocked": "There is no room to flash step",
+  "message.bleach.flash_step.weighed_down": "You are weighed down too heavily",
   "message.bleach.academy_sensed": "You feel the reiatsu of Shinigami %s, about %s blocks away.",
   "message.bleach.academy_sensed.elsewhere": "You feel the reiatsu of Shinigami, far away in the Overworld.",
   "message.bleach.academy_direction": "The Academy lies %s, about %s blocks away",

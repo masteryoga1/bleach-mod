@@ -29,7 +29,8 @@ public final class BleachNetwork {
                 .playToClient(ReishiFootingStatePayload.TYPE, ReishiFootingStatePayload.STREAM_CODEC,
                         ReishiFootingStatePayload::handle)
                 .playToServer(NpcActionPayload.TYPE, NpcActionPayload.STREAM_CODEC, NpcActionPayload::handle)
-                .playToServer(ReishiFootingPayload.TYPE, ReishiFootingPayload.STREAM_CODEC, ReishiFootingPayload::handle);
+                .playToServer(ReishiFootingPayload.TYPE, ReishiFootingPayload.STREAM_CODEC, ReishiFootingPayload::handle)
+                .playToServer(FlashStepPayload.TYPE, FlashStepPayload.STREAM_CODEC, FlashStepPayload::handle);
     }
 
     /** Sends a player their own soul data and marks it as up to date. */
@@ -62,6 +63,11 @@ public final class BleachNetwork {
     /** Tells a player whether their reishi footing holds, and at what height. */
     public static void sendFooting(ServerPlayer player, boolean active, int anchorY) {
         PacketDistributor.sendToPlayer(player, new ReishiFootingStatePayload(active, anchorY));
+    }
+
+    /** Asks the server for a flash step, steering this way. */
+    public static void requestFlashStep(float forward, float left) {
+        PacketDistributor.sendToServer(new FlashStepPayload(forward, left));
     }
 
     /** Asks the server for reishi footing. */

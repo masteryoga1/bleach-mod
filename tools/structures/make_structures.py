@@ -215,8 +215,16 @@ def academy():
     return t
 
 
+def lane():
+    """A game-test lane for flash steps: 12 long (+X), 3 wide, a stone floor and room above."""
+    t = Template(12, 4, 3)
+    t.fill(0, 0, 0, 11, 0, 2, "minecraft:stone")
+    return t
+
+
 TEMPLATES = {
     "academy/academy.nbt": academy,
+    "lane.nbt": lane,
 }
 
 
