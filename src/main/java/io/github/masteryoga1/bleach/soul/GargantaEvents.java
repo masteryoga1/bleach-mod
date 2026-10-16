@@ -23,7 +23,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
@@ -143,12 +142,13 @@ public final class GargantaEvents {
                 : BleachConfig.get(BleachConfig.MAX_NEARBY_HOLLOWS) - hollowsNear(level, player.position());
         int count = HollowLogic.groupSize(kind, reiatsu, room, level.getRandom().nextDouble());
         EntityType<? extends Hollow> type = ModEntities.hollowType(kind);
-        Vec3 landing = SpawnSpots.openGround(level, player, type, SPOT_MIN_DISTANCE, SPOT_MAX_DISTANCE, SPOT_TRIES,
-                SPOT_MAX_RISE);
+        // Room for the biggest Hollow of the kind, as each rolls its size only as it drops.
+        Vec3 landing = SpawnSpots.openGround(level, player, type, kind.scaleMax, SPOT_MIN_DISTANCE, SPOT_MAX_DISTANCE,
+                SPOT_TRIES, SPOT_MAX_RISE);
         if (landing == null) {
             return false;
         }
-        Vec3 at = landing.add(0.0, SpawnSpots.clearAbove(level, type, landing, RIFT_MAX_HEIGHT), 0.0);
+        Vec3 at = landing.add(0.0, SpawnSpots.clearAbove(level, type, kind.scaleMax, landing, RIFT_MAX_HEIGHT), 0.0);
         float size = kind == HollowKind.FISHBONE_D ? FIRST_HOLLOW_SIZE : ARRIVAL_SIZE;
         GargantaRift rift = GargantaRift.arrival(level, at, now, Collections.nCopies(count, kind), player, size);
         if (!level.addFreshEntity(rift)) {
@@ -171,11 +171,12 @@ public final class GargantaEvents {
      */
     public static boolean startFirstHollow(ServerPlayer player, SoulData data, long now, boolean woundedAlreadyHere) {
         ServerLevel level = player.serverLevel();
-        if (firstHollowHunting(level, data)) {
+        if (firstHollowOf(player, data) != null) {
             return false;
         }
         EntityType<FishboneD> type = ModEntities.FISHBONE_D.get();
-        Vec3 landing = SpawnSpots.openGround(level, player, type, SPOT_MIN_DISTANCE, SPOT_MAX_DISTANCE, SPOT_TRIES,
+        float scale = HollowKind.FISHBONE_D.scaleMax;
+        Vec3 landing = SpawnSpots.openGround(level, player, type, scale, SPOT_MIN_DISTANCE, SPOT_MAX_DISTANCE, SPOT_TRIES,
                 SPOT_MAX_RISE);
         if (landing == null) {
             return false;
@@ -191,7 +192,7 @@ public final class GargantaEvents {
             message = "message.bleach.first_hollow.coming";
             openAt = now + HollowLogic.FIRST_HOLLOW_DELAY;
         }
-        Vec3 at = landing.add(0.0, SpawnSpots.clearAbove(level, type, landing, RIFT_MAX_HEIGHT), 0.0);
+        Vec3 at = landing.add(0.0, SpawnSpots.clearAbove(level, type, scale, landing, RIFT_MAX_HEIGHT), 0.0);
         GargantaRift rift = GargantaRift.arrival(level, at, openAt, List.of(HollowKind.FISHBONE_D), player,
                 FIRST_HOLLOW_SIZE);
         if (!level.addFreshEntity(rift)) {
@@ -204,17 +205,29 @@ public final class GargantaEvents {
         return true;
     }
 
-    /** Whether the Fishbone D that landed for this soul is still out there; forgets it if not. */
-    private static boolean firstHollowHunting(ServerLevel level, SoulData data) {
-        if (data.firstHollowId == null) {
-            return false;
+    /**
+     * The Fishbone D hunting this soul as its first Hollow, if one is alive in the soul's world and not
+     * leaving: the one it remembers, or else one within reach that has it as its quarry, since the
+     * soul forgets it on respawning or relogging. Remembers the one found, or forgets a stale one.
+     */
+    @Nullable
+    public static FishboneD firstHollowOf(ServerPlayer quarry, SoulData data) {
+        ServerLevel level = quarry.serverLevel();
+        FishboneD found = null;
+        if (data.firstHollowId != null && level.getEntity(data.firstHollowId) instanceof FishboneD fishbone
+                && hunts(fishbone, quarry)) {
+            found = fishbone;
+        } else {
+            List<FishboneD> near = level.getEntitiesOfClass(FishboneD.class,
+                    quarry.getBoundingBox().inflate(FishboneD.QUARRY_RANGE), fishbone -> hunts(fishbone, quarry));
+            found = near.isEmpty() ? null : near.get(0);
         }
-        Entity fishbone = level.getEntity(data.firstHollowId);
-        if (fishbone != null && fishbone.isAlive()) {
-            return true;
-        }
-        data.firstHollowId = null;
-        return false;
+        data.firstHollowId = found != null ? found.getUUID() : null;
+        return found;
+    }
+
+    private static boolean hunts(FishboneD fishbone, ServerPlayer quarry) {
+        return fishbone.isAlive() && !fishbone.isDeparting() && quarry.getUUID().equals(fishbone.quarry());
     }
 
     /** Whether a wounded Shinigami may stumble in ahead of the first Hollow: she must have someone to give her power to. */

@@ -16,12 +16,13 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * @param slain               Hollows this soul has destroyed without purifying them
  * @param sentOn              Pluses, players or not, this soul has sent on with Konsō
  * @param maskHinted          whether this soul has been told to aim for the mask
+ * @param lastPlayerKillGrowthAt when killing a Hollow or Arrancar player last grew this soul's reiryoku
  */
 public record HuntRecord(int awareSincePlayTicks, boolean firstHollowDone, long lastArrivalAt,
-                         int purified, int slain, int sentOn, boolean maskHinted) {
+                         int purified, int slain, int sentOn, boolean maskHinted, long lastPlayerKillGrowthAt) {
     public static final long NEVER = ShinigamiProgress.NEVER;
 
-    public static final HuntRecord NONE = new HuntRecord(-1, false, NEVER, 0, 0, 0, false);
+    public static final HuntRecord NONE = new HuntRecord(-1, false, NEVER, 0, 0, 0, false, NEVER);
 
     // Every field is read leniently, so one bad value falls back to its default on its own.
     public static final Codec<HuntRecord> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -31,34 +32,47 @@ public record HuntRecord(int awareSincePlayTicks, boolean firstHollowDone, long 
             Codec.INT.lenientOptionalFieldOf("purified", 0).forGetter(HuntRecord::purified),
             Codec.INT.lenientOptionalFieldOf("slain", 0).forGetter(HuntRecord::slain),
             Codec.INT.lenientOptionalFieldOf("sent_on", 0).forGetter(HuntRecord::sentOn),
-            Codec.BOOL.lenientOptionalFieldOf("mask_hinted", false).forGetter(HuntRecord::maskHinted)
+            Codec.BOOL.lenientOptionalFieldOf("mask_hinted", false).forGetter(HuntRecord::maskHinted),
+            Codec.LONG.lenientOptionalFieldOf("last_player_kill_growth_at", NEVER).forGetter(HuntRecord::lastPlayerKillGrowthAt)
     ).apply(instance, HuntRecord::new));
 
     public HuntRecord withAwareSincePlayTicks(int value) {
-        return new HuntRecord(value, firstHollowDone, lastArrivalAt, purified, slain, sentOn, maskHinted);
+        return new HuntRecord(value, firstHollowDone, lastArrivalAt, purified, slain, sentOn, maskHinted,
+                lastPlayerKillGrowthAt);
     }
 
     public HuntRecord withFirstHollowDone(boolean value) {
-        return new HuntRecord(awareSincePlayTicks, value, lastArrivalAt, purified, slain, sentOn, maskHinted);
+        return new HuntRecord(awareSincePlayTicks, value, lastArrivalAt, purified, slain, sentOn, maskHinted,
+                lastPlayerKillGrowthAt);
     }
 
     public HuntRecord withLastArrivalAt(long value) {
-        return new HuntRecord(awareSincePlayTicks, firstHollowDone, value, purified, slain, sentOn, maskHinted);
+        return new HuntRecord(awareSincePlayTicks, firstHollowDone, value, purified, slain, sentOn, maskHinted,
+                lastPlayerKillGrowthAt);
     }
 
     public HuntRecord withPurified(int value) {
-        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, value, slain, sentOn, maskHinted);
+        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, value, slain, sentOn, maskHinted,
+                lastPlayerKillGrowthAt);
     }
 
     public HuntRecord withSlain(int value) {
-        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, purified, value, sentOn, maskHinted);
+        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, purified, value, sentOn, maskHinted,
+                lastPlayerKillGrowthAt);
     }
 
     public HuntRecord withSentOn(int value) {
-        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, purified, slain, value, maskHinted);
+        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, purified, slain, value, maskHinted,
+                lastPlayerKillGrowthAt);
     }
 
     public HuntRecord withMaskHinted(boolean value) {
-        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, purified, slain, sentOn, value);
+        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, purified, slain, sentOn, value,
+                lastPlayerKillGrowthAt);
+    }
+
+    public HuntRecord withLastPlayerKillGrowthAt(long value) {
+        return new HuntRecord(awareSincePlayTicks, firstHollowDone, lastArrivalAt, purified, slain, sentOn, maskHinted,
+                value);
     }
 }

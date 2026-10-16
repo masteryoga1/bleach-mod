@@ -126,22 +126,22 @@ public final class ClientSmokeTest {
                 "a blow to the mask did not crack it")) {
             shot(minecraft, "mask");
         }
-        if (expectWithin(minecraft, 720, 760, () -> soul.hunt().purified() >= 1,
+        if (expectWithin(minecraft, 740, 780, () -> soul.hunt().purified() >= 1,
                 "the Asauchi kill did not purify the Hollow")) {
             shot(minecraft, "purify");
         }
         // The Plus summoned at tick 561 stands within 4 blocks too, so this follows the Plus that was sent on.
-        expectWithin(minecraft, 785, 830,
+        expectWithin(minecraft, 815, 860,
                 () -> subject instanceof PlusSpirit sent && sent.isRemoved() && soul.hunt().sentOn() >= 1,
                 "Konsō did not send the Plus on");
-        if (expectWithin(minecraft, 842, 900, () -> openRift(minecraft) != null,
+        if (expectWithin(minecraft, 872, 930, () -> openRift(minecraft) != null,
                 "the Garganta never opened on the client")) {
             GargantaRift rift = openRift(minecraft);
             if (rift != null) {
                 look(minecraft, rift.position().add(0.0, 2.0, 0.0));
             }
         }
-        if (expectWithin(minecraft, 910, 950,
+        if (expectWithin(minecraft, 940, 980,
                 () -> nearest(minecraft, SpiderHollow.class, 6.0,
                         spider -> spider.isAlive() && isSpiderHollow(spider) && ClientSouls.isHiddenFromViewer(spider)) != null
                         && SpiritShimmer.emitted() > 0,
@@ -253,7 +253,8 @@ public final class ClientSmokeTest {
                 command(minecraft, "summon bleach:plus ~-2 ~ ~-3 " + STILL);
             }
             case 600 -> shot(minecraft, "hollows");
-            case 645 -> command(minecraft, "summon bleach:spider_hollow ~ ~ ~-2.5 " + STILL);
+            // Each thing summoned gets twenty ticks or more to reach the client before it is looked for.
+            case 625 -> command(minecraft, "summon bleach:spider_hollow ~ ~ ~-2.5 " + STILL);
             case 650 -> aimAtMask(minecraft, "the Spider Hollow in front of the player never reached the client");
             // Slot 0 is empty, so this is a bare hand.
             case 654 -> {
@@ -262,18 +263,18 @@ public final class ClientSmokeTest {
                 }
             }
             case 705 -> command(minecraft, "kill @e[type=bleach:spider_hollow,distance=..4]");
-            case 710 -> command(minecraft, "summon bleach:spider_hollow ~ ~ ~-2.5 {NoAI:1b,Rotation:[0f,0f],Health:1f}");
+            case 706 -> command(minecraft, "summon bleach:spider_hollow ~ ~ ~-2.5 {NoAI:1b,Rotation:[0f,0f],Health:1f}");
             // The Asauchi, put in the last hotbar slot at tick 262.
-            case 712 -> player.getInventory().selected = 8;
-            case 714 -> aimAtMask(minecraft, "the weakened Spider Hollow never reached the client");
-            case 716 -> {
+            case 708 -> player.getInventory().selected = 8;
+            case 730 -> aimAtMask(minecraft, "the weakened Spider Hollow never reached the client");
+            case 732 -> {
                 if (subject != null) {
                     minecraft.gameMode.attack(player, subject);
                 }
             }
-            case 770 -> command(minecraft, "summon bleach:plus ~ ~ ~-2 " + STILL);
-            case 775 -> minecraft.options.keyShift.setDown(true);
-            case 778 -> {
+            case 785 -> command(minecraft, "summon bleach:plus ~ ~ ~-2 " + STILL);
+            case 805 -> minecraft.options.keyShift.setDown(true);
+            case 810 -> {
                 subject = nearest(minecraft, PlusSpirit.class, 3.0, plus -> plus.isAlive() && !plus.isDeparting());
                 expect(minecraft, subject != null, "the Plus in front of the player never reached the client");
                 if (subject != null) {
@@ -281,16 +282,16 @@ public final class ClientSmokeTest {
                 }
             }
             // The interaction carries the sneak with it, so the server sees Konsō.
-            case 780 -> {
+            case 812 -> {
                 if (subject != null) {
                     minecraft.gameMode.interact(player, subject, InteractionHand.MAIN_HAND);
                 }
             }
-            case 786 -> minecraft.options.keyShift.setDown(false);
-            case 840 -> command(minecraft, "bleach garganta @s spider");
-            case 885 -> shot(minecraft, "garganta");
-            case 902 -> command(minecraft, "kill @e[type=#bleach:hollows]");
-            case 905 -> {
+            case 818 -> minecraft.options.keyShift.setDown(false);
+            case 870 -> command(minecraft, "bleach garganta @s spider");
+            case 915 -> shot(minecraft, "garganta");
+            case 932 -> command(minecraft, "kill @e[type=#bleach:hollows]");
+            case 935 -> {
                 // Just below the threshold with no power awakened. The Hollow state at tick 180 left a Hollow tier.
                 command(minecraft, "bleach soul @s human");
                 command(minecraft, "bleach tier @s shinigami 0");
@@ -298,12 +299,12 @@ public final class ClientSmokeTest {
                 command(minecraft, "bleach reiryoku @s 22 22");
                 command(minecraft, "summon bleach:spider_hollow ~ ~ ~-3 {NoAI:1b}");
             }
-            case 955 -> {
+            case 985 -> {
                 command(minecraft, "kill @e[type=#bleach:hollows]");
                 command(minecraft, "kill @e[type=bleach:plus]");
                 command(minecraft, "difficulty peaceful");
             }
-            case 980 -> {
+            case 1010 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();

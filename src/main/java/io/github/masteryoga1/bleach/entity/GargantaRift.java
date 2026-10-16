@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
+import io.github.masteryoga1.bleach.soul.SpawnSpots;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -213,7 +214,7 @@ public class GargantaRift extends Entity {
             if (hollow == null) {
                 continue;
             }
-            Vec3 at = dropSpot(server, type);
+            Vec3 at = dropSpot(server, type, kind.scaleMax);
             float yaw = target != null
                     ? (float) (Mth.atan2(target.getZ() - at.z, target.getX() - at.x) * Mth.RAD_TO_DEG) - 90.0F
                     : random.nextFloat() * 360.0F;
@@ -246,11 +247,14 @@ public class GargantaRift extends Entity {
         pending.clear();
     }
 
-    /** A spot within {@link #DROP_JITTER} of the middle with room for the Hollow, or the middle itself. */
-    private Vec3 dropSpot(ServerLevel server, EntityType<?> type) {
+    /**
+     * A spot within {@link #DROP_JITTER} of the middle with room for the Hollow at its biggest, or the
+     * middle itself, which the Garganta checked when it opened.
+     */
+    private Vec3 dropSpot(ServerLevel server, EntityType<?> type, float scale) {
         double x = getX() + (random.nextDouble() * 2.0 - 1.0) * DROP_JITTER;
         double z = getZ() + (random.nextDouble() * 2.0 - 1.0) * DROP_JITTER;
-        return server.noCollision(type.getSpawnAABB(x, getY(), z)) ? new Vec3(x, getY(), z) : position();
+        return server.noCollision(SpawnSpots.box(type, scale, x, getY(), z)) ? new Vec3(x, getY(), z) : position();
     }
 
     /** The drawn tear is bigger than the hitbox when the tear is large, so it is culled by what is drawn. */

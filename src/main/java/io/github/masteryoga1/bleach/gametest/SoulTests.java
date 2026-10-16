@@ -82,7 +82,7 @@ public final class SoulTests {
     public static void huntRecordSurvivesSaving(GameTestHelper helper) {
         SoulData data = new SoulData();
         data.markInitialized();
-        HuntRecord hunt = new HuntRecord(1234, true, 99L, 3, 4, 5, true);
+        HuntRecord hunt = new HuntRecord(1234, true, 99L, 3, 4, 5, true, 77L);
         data.setHunt(hunt);
 
         Tag saved = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();

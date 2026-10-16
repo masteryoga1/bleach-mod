@@ -310,6 +310,15 @@ public final class HollowLogic {
         return purified ? growth * BleachConfig.get(BleachConfig.PURIFICATION_GROWTH_MULTIPLIER) : growth;
     }
 
+    /**
+     * Whether killing a Hollow or Arrancar player may grow this soul's reiryoku now: the victim comes
+     * back as they were, so only once in a while.
+     */
+    public static boolean playerKillGrows(HuntRecord hunt, long now) {
+        return now - hunt.lastPlayerKillGrowthAt()
+                >= (long) BleachConfig.get(BleachConfig.PLAYER_KILL_GROWTH_COOLDOWN_MINUTES) * TICKS_PER_MINUTE;
+    }
+
     /** Zanjutsu or Hakuda XP for a landed hit: more on a Hollow, more still on its mask. */
     public static int hitXp(boolean onHollow, boolean onMask) {
         if (!onHollow) {

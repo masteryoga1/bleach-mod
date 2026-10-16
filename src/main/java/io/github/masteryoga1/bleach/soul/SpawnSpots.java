@@ -31,6 +31,13 @@ public final class SpawnSpots {
     @Nullable
     public static Vec3 openGround(ServerLevel level, Entity around, EntityType<?> type,
                                   double minDistance, double maxDistance, int tries, int maxRise) {
+        return openGround(level, around, type, 1.0F, minDistance, maxDistance, tries, maxRise);
+    }
+
+    /** As {@link #openGround(ServerLevel, Entity, EntityType, double, double, int, int)}, with room for the creature at this size. */
+    @Nullable
+    public static Vec3 openGround(ServerLevel level, Entity around, EntityType<?> type, float scale,
+                                  double minDistance, double maxDistance, int tries, int maxRise) {
         RandomSource random = around.getRandom();
         for (int i = 0; i < tries; i++) {
             double angle = random.nextDouble() * 2.0 * Math.PI;
@@ -47,7 +54,7 @@ public final class SpawnSpots {
                     || Math.abs(pos.getY() - around.getY()) > maxRise) {
                 continue;
             }
-            AABB box = type.getSpawnAABB(x + 0.5, pos.getY(), z + 0.5);
+            AABB box = box(type, scale, x + 0.5, pos.getY(), z + 0.5);
             if (level.noCollision(box) && !level.containsAnyLiquid(box)) {
                 return new Vec3(x + 0.5, pos.getY(), z + 0.5);
             }
@@ -56,18 +63,23 @@ public final class SpawnSpots {
     }
 
     /**
-     * How many blocks above the landing spot are clear for this creature to drop from, up to
-     * {@code wanted}: where a rift can open over it.
+     * How many blocks above the landing spot are clear for this creature, at this size, to drop from,
+     * up to {@code wanted}: where a rift can open over it.
      */
-    public static int clearAbove(ServerLevel level, EntityType<?> type, Vec3 landing, int wanted) {
+    public static int clearAbove(ServerLevel level, EntityType<?> type, float scale, Vec3 landing, int wanted) {
         int clear = 0;
         for (int rise = 1; rise <= wanted; rise++) {
-            AABB box = type.getSpawnAABB(landing.x, landing.y + rise, landing.z);
+            AABB box = box(type, scale, landing.x, landing.y + rise, landing.z);
             if (!level.noCollision(box) || level.containsAnyLiquid(box)) {
                 break;
             }
             clear = rise;
         }
         return clear;
+    }
+
+    /** The box this creature takes up at this size, standing at this bottom centre. */
+    public static AABB box(EntityType<?> type, float scale, double x, double y, double z) {
+        return type.getDimensions().scale(scale).makeBoundingBox(x, y, z);
     }
 }

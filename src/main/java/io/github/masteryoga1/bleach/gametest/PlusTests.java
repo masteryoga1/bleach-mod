@@ -25,6 +25,8 @@ import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.monster.ZombieVillager;
 import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerData;
+import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
@@ -156,8 +158,9 @@ public final class PlusTests {
     public static void deadVillagersLeavePluses(GameTestHelper helper) {
         Villager villager = helper.spawnWithNoFreeWill(EntityType.VILLAGER, 8, 2, 8);
         villager.setCustomName(Component.literal("Bob"));
+        // Not what a Plus would be by default, so a Plus that only looks like one cannot pass.
+        villager.setVillagerData(new VillagerData(VillagerType.SNOW, VillagerProfession.FARMER, 2));
         Vec3 where = villager.position();
-        VillagerType type = villager.getVillagerData().getType();
         villager.kill();
         helper.succeedWhen(() -> {
             List<PlusSpirit> pluses = plusesNear(helper, where, 3.0);
@@ -166,7 +169,10 @@ public final class PlusTests {
             helper.assertTrue(plus.isPersistenceRequired(), "a villager's Plus may despawn");
             Component name = plus.getCustomName();
             helper.assertTrue(name != null && name.getString().equals("Bob"), "the villager's Plus is called " + name);
-            helper.assertTrue(plus.getVillagerData().getType() == type, "the villager's Plus does not look like it");
+            VillagerData look = plus.getVillagerData();
+            helper.assertTrue(look.getType() == VillagerType.SNOW && look.getProfession() == VillagerProfession.FARMER
+                    && look.getLevel() == 2, "the villager's Plus looks like " + look.getType() + " "
+                    + look.getProfession() + " " + look.getLevel());
             helper.assertTrue(plus.hasRestriction(), "the villager's Plus is not kept near its home");
             plus.discard();
         });
@@ -209,17 +215,21 @@ public final class PlusTests {
         });
     }
 
-    @GameTest(template = "empty")
+    @GameTest(template = "field")
     public static void plusesFleeHollows(GameTestHelper helper) {
-        PlusSpirit plus = helper.spawn(ModEntities.PLUS.get(), 1, 1, 1);
-        helper.runAfterDelay(1, () -> {
-            helper.assertTrue(plus.goalSelector.getAvailableGoals().stream().anyMatch(goal -> goal.getGoal() instanceof AvoidEntityGoal),
-                    "a Plus does not run from Hollows");
-            long flee = plus.goalSelector.getAvailableGoals().stream()
-                    .filter(goal -> goal.getGoal() instanceof ReiatsuFleeGoal).count();
-            helper.assertTrue(flee == 1, "a Plus has " + flee + " reiatsu flee goals, not 1");
+        PlusSpirit plus = helper.spawn(ModEntities.PLUS.get(), new Vec3(8.5, 2.0, 8.5));
+        SpiderHollow spider = helper.spawnWithNoFreeWill(ModEntities.SPIDER_HOLLOW.get(), new Vec3(8.5, 2.0, 5.5));
+        long flee = plus.goalSelector.getAvailableGoals().stream()
+                .filter(goal -> goal.getGoal() instanceof ReiatsuFleeGoal).count();
+        helper.assertTrue(flee == 1, "a Plus has " + flee + " reiatsu flee goals, not 1");
+        double start = plus.distanceTo(spider);
+        // With no Hollow player about, the only thing a Plus can be running from is the Hollow.
+        helper.succeedWhen(() -> {
+            helper.assertTrue(plus.goalSelector.getRunningGoals().anyMatch(goal -> goal.getGoal() instanceof AvoidEntityGoal),
+                    "a Plus is not running from a Hollow");
+            helper.assertTrue(plus.distanceTo(spider) > start + 1.0, "a Plus running from a Hollow got no further from it");
             plus.discard();
-            helper.succeed();
+            spider.discard();
         });
     }
 

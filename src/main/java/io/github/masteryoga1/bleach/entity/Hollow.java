@@ -320,7 +320,10 @@ public abstract class Hollow extends Monster {
         return hurt;
     }
 
-    /** A bite: on a landed one, the kind's effect, for longer on Hard and not at all on Easy. */
+    /**
+     * A bite: on a landed one, the kind's effect, for longer on Hard and not at all on Easy. On a
+     * spirit it gives off no swirls, which the unaware would see where nothing stands.
+     */
     @Override
     public boolean doHurtTarget(Entity target) {
         lastAttackTick = tickCount;
@@ -331,7 +334,8 @@ public abstract class Hollow extends Monster {
         if (onHit != null && target instanceof LivingEntity living) {
             int seconds = HollowLogic.onHitSeconds(kind(), level().getDifficulty());
             if (seconds > 0) {
-                living.addEffect(new MobEffectInstance(onHit.effect(), seconds * 20, onHit.amplifier()), this);
+                living.addEffect(new MobEffectInstance(onHit.effect(), seconds * 20, onHit.amplifier(), false,
+                        !SoulLogic.isSpirit(living), true), this);
             }
         }
         return true;
@@ -486,7 +490,9 @@ public abstract class Hollow extends Monster {
     protected void tickDeath() {
         ServerLevel server = level() instanceof ServerLevel serverLevel && !isRemoved() ? serverLevel : null;
         if (isPurifying()) {
+            // No red flash from the killing blow, so the white of the dissolve shows from the start.
             deathTime = 0;
+            hurtTime = 0;
             dissolveTicks++;
             if (server == null) {
                 return;
@@ -614,6 +620,15 @@ public abstract class Hollow extends Monster {
     protected void doPush(Entity entity) {
         if (SpiritSenses.bodiesTouch(this, entity)) {
             super.doPush(entity);
+        }
+    }
+
+    /** Only the aware see it splash into water. The sound goes through {@link #playSound}. */
+    @Override
+    protected void doWaterSplashEffect() {
+        if (level() instanceof ServerLevel server) {
+            super.doWaterSplashEffect();
+            SpiritSenses.splash(server, this);
         }
     }
 

@@ -48,10 +48,11 @@ public final class HollowEvents {
     /**
      * A blow or arrow that meets the mask before the body hits twice as hard. A fresh one also cracks
      * the mask, stops the Hollow healing and makes it reel. The event fires before the invulnerability
-     * check, so a hit inside the invulnerability frames gets the damage but none of the rest.
+     * check, so a hit inside the invulnerability frames gets the damage but none of the rest. What does
+     * no harm, such as a snowball, does nothing to the mask.
      */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
-        if (!(event.getEntity() instanceof Hollow hollow) || hollow.level().isClientSide()
+        if (!(event.getEntity() instanceof Hollow hollow) || hollow.level().isClientSide() || event.getAmount() <= 0.0F
                 || !HollowMask.struck(hollow, event.getSource())) {
             return;
         }
@@ -179,7 +180,10 @@ public final class HollowEvents {
         killer.giveExperiencePoints(hollow.kind().xp);
     }
 
-    /** A Hollow or Arrancar player killed by another player is worth as much as a Hollow of their reiatsu. */
+    /**
+     * A Hollow or Arrancar player killed by another player is worth as much as a Hollow of their
+     * reiatsu, but grows the killer's reiryoku only once in a while: they come back as they were.
+     */
     private static void onHollowPlayerDeath(Player victim, DamageSource source) {
         if (!(source.getEntity() instanceof Player killer) || killer == victim
                 || !SoulLogic.hasSoul(killer) || !SoulLogic.hasSoul(victim)) {
@@ -190,9 +194,13 @@ public final class HollowEvents {
             return;
         }
         SoulData data = SoulLogic.get(killer);
-        boolean purified = HollowLogic.purifies(source, data, killer.level().getGameTime());
-        SoulLogic.grow(data, HollowLogic.killGrowth(victimData.maxReiryoku(), data.maxReiryoku(), purified));
+        long now = killer.level().getGameTime();
+        boolean purified = HollowLogic.purifies(source, data, now);
         HuntRecord hunt = data.hunt();
+        if (HollowLogic.playerKillGrows(hunt, now)) {
+            SoulLogic.grow(data, HollowLogic.killGrowth(victimData.maxReiryoku(), data.maxReiryoku(), purified));
+            hunt = hunt.withLastPlayerKillGrowthAt(now);
+        }
         data.setHunt(purified ? hunt.withPurified(hunt.purified() + 1) : hunt.withSlain(hunt.slain() + 1));
     }
 
@@ -211,8 +219,10 @@ public final class HollowEvents {
         if (fishbone.getUUID().equals(data.firstHollowId)) {
             data.firstHollowId = null;
         }
+        // A quarry that died to it already had its first Hollow settled, and has only come back since.
+        boolean settled = data.hunt().firstHollowDone();
         data.setHunt(data.hunt().withFirstHollowDone(true));
-        if (quarry.isAlive()) {
+        if (!settled && quarry.isAlive()) {
             quarry.sendSystemMessage(Component.translatable("message.bleach.first_hollow.survived")
                     .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
             Milestones.grant(quarry, Milestones.FIRST_HOLLOW);
@@ -220,20 +230,21 @@ public final class HollowEvents {
     }
 
     /**
-     * The quarry died while Fishbone D hunted it: the first Hollow is over all the same (in canon, the
-     * way a soul becomes a Plus), and Fishbone D slips away soon after, without a word.
+     * The quarry died while Fishbone D hunted it, within its reach: the first Hollow is over all the
+     * same (in canon, the way a soul becomes a Plus), and Fishbone D slips away soon after, without a
+     * word. One that lost its quarry, or had already gone, settles nothing; it comes back.
      */
     private static void endFirstHollowFor(ServerPlayer quarry) {
         if (!SoulLogic.hasSoul(quarry)) {
             return;
         }
         SoulData data = SoulLogic.get(quarry);
-        if (data.firstHollowId == null) {
+        FishboneD fishbone = GargantaEvents.firstHollowOf(quarry, data);
+        double range = FishboneD.QUARRY_RANGE;
+        if (fishbone == null || fishbone.distanceToSqr(quarry) > range * range) {
             return;
         }
-        if (quarry.serverLevel().getEntity(data.firstHollowId) instanceof FishboneD fishbone) {
-            fishbone.cutShort(QUARRY_DEATH_LINGER_TICKS);
-        }
+        fishbone.cutShort(QUARRY_DEATH_LINGER_TICKS);
         data.firstHollowId = null;
         data.setHunt(data.hunt().withFirstHollowDone(true));
     }

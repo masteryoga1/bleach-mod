@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -89,6 +90,18 @@ public final class SpiritSenses {
                 level.sendParticles(player, options, true, x, y, z, count, dx, dy, dz, speed);
             }
         }
+    }
+
+    /**
+     * The spray of a spirit splashing into water, as vanilla's but for those who can see spirits only;
+     * everyone else would see water thrown up by nothing.
+     */
+    public static void splash(ServerLevel level, Entity spirit) {
+        double width = spirit.getBbWidth();
+        int count = 1 + (int) (width * 20.0);
+        double y = Math.floor(spirit.getY()) + 1.0;
+        particles(level, ParticleTypes.BUBBLE, spirit.getX(), y, spirit.getZ(), count, width * 0.5, 0.0, width * 0.5, 0.2);
+        particles(level, ParticleTypes.SPLASH, spirit.getX(), y, spirit.getZ(), count, width * 0.5, 0.0, width * 0.5, 0.2);
     }
 
     /** The players within range who can see spirits, nearest or not, in no particular order. */

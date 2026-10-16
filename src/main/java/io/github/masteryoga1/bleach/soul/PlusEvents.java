@@ -245,8 +245,8 @@ public final class PlusEvents {
      * A Plus whose chain ran out becomes a Hollow where it stands, its mask forming over its face,
      * screaming. Aware souls nearby are told, and Denreishinki in range beep.
      *
-     * @return false, leaving the Plus as it is, on Peaceful or if the Hollow could not be added; the
-     *         Plus tries again later
+     * @return false, leaving the Plus as it is, on Peaceful, if there is no room where it stands for
+     *         the Hollow it would become, or if the Hollow could not be added; the Plus tries again later
      */
     public static boolean hollowfy(ServerLevel level, PlusSpirit plus) {
         if (!HollowLogic.mayHollowfy(level.getDifficulty())) {
@@ -262,6 +262,10 @@ public final class PlusEvents {
         hollow.setYBodyRot(plus.yBodyRot);
         EventHooks.finalizeMobSpawn(hollow, level, level.getCurrentDifficultyAt(plus.blockPosition()),
                 MobSpawnType.CONVERSION, null);
+        // The size it rolled is in its dimensions already, though its box only follows on its first tick.
+        if (!level.noCollision(hollow, hollow.getDimensions(hollow.getPose()).makeBoundingBox(hollow.position()))) {
+            return false;
+        }
         hollow.setFromPlus(true);
         hollow.setFormerVillager(plus.getVillagerData());
         hollow.startMaskForming();

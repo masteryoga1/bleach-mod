@@ -474,6 +474,15 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
         }
     }
 
+    /** Only the aware see it splash into water. The sound goes through {@link #playSound}. */
+    @Override
+    protected void doWaterSplashEffect() {
+        if (level() instanceof ServerLevel server) {
+            super.doWaterSplashEffect();
+            SpiritSenses.splash(server, this);
+        }
+    }
+
     @Override
     public boolean isSteppingCarefully() {
         return true;

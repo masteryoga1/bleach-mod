@@ -47,6 +47,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.npc.Villager;
@@ -231,6 +232,24 @@ public final class HollowTests {
         spider.hurt(helper.getLevel().damageSources().mobAttack(golem), 5.0F);
         helper.assertTrue(spider.getHealth() == full, "an iron golem's blow took a Hollow to " + spider.getHealth());
         helper.succeed();
+    }
+
+    /**
+     * An iron golem left to itself looks past a Hollow standing next to it to the zombie further off.
+     * Were the Hollow only refused as a target, the golem would pick it again and again instead.
+     */
+    @GameTest(template = "field")
+    public static void golemsLookPastHollows(GameTestHelper helper) {
+        IronGolem golem = helper.spawn(EntityType.IRON_GOLEM, new Vec3(3.5, 2.0, 3.5));
+        SpiderHollow spider = helper.spawnWithNoFreeWill(ModEntities.SPIDER_HOLLOW.get(), new Vec3(6.5, 2.0, 3.5));
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(3.5, 2.0, 12.5));
+        helper.assertFalse(TargetingConditions.forCombat().test(golem, spider), "an iron golem can pick out a Hollow");
+        helper.succeedWhen(() -> {
+            helper.assertTrue(golem.getTarget() == zombie, "an iron golem with a Hollow beside it never went for the zombie");
+            golem.discard();
+            spider.discard();
+            zombie.discard();
+        });
     }
 
     @GameTest(template = "field")

@@ -5,8 +5,10 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.level.Level;
 
 /**
- * A six-legged insect Hollow that hunts Pluses before anyone else, fast enough to run one down, and
- * comes more often where Pluses are. Its bite slows. It climbs and leaps as a Spider Hollow does.
+ * A six-legged insect Hollow that goes for Pluses before most souls (only one of far greater reiatsu
+ * outweighs a Plus; see {@link io.github.masteryoga1.bleach.soul.HollowLogic#preyScore}), fast enough
+ * to run one down, and comes more often where Pluses are. Its bite slows. It climbs and leaps as a
+ * Spider Hollow does.
  */
 public class Hexapodus extends SpiderHollow {
     public Hexapodus(EntityType<? extends Hexapodus> type, Level level) {

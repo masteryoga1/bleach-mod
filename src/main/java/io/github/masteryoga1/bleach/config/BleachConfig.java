@@ -20,6 +20,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue MUNDANE_KILL_GROWTH_PER_MAX_HEALTH;
     public static final ModConfigSpec.DoubleValue SPIRIT_KILL_GROWTH_PER_REIATSU;
     public static final ModConfigSpec.DoubleValue PURIFICATION_GROWTH_MULTIPLIER;
+    public static final ModConfigSpec.IntValue PLAYER_KILL_GROWTH_COOLDOWN_MINUTES;
     public static final ModConfigSpec.DoubleValue CLOSE_CALL_GROWTH;
     public static final ModConfigSpec.IntValue CLOSE_CALL_COOLDOWN_SECONDS;
     public static final ModConfigSpec.DoubleValue LEVEL_UP_GROWTH;
@@ -163,6 +164,9 @@ public final class BleachConfig {
         PURIFICATION_GROWTH_MULTIPLIER = builder
                 .comment("Extra growth for purifying a Hollow with a zanpakutō.")
                 .defineInRange("purification_growth_multiplier", 1.5, 1.0, 100.0);
+        PLAYER_KILL_GROWTH_COOLDOWN_MINUTES = builder
+                .comment("Minutes before killing another Hollow or Arrancar player can grow your reiryoku again.")
+                .defineInRange("player_kill_growth_cooldown_minutes", 10, 0, 1_440);
         CLOSE_CALL_GROWTH = builder
                 .comment("Maximum reiryoku gained for surviving a hit that leaves you below 30% health.")
                 .defineInRange("close_call_growth", 0.25, 0.0, 1_000.0);
