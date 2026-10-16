@@ -219,7 +219,8 @@ public final class HollowEvents {
         if (fishbone.getUUID().equals(data.firstHollowId)) {
             data.firstHollowId = null;
         }
-        // A quarry that died to it already had its first Hollow settled, and has only come back since.
+        // A quarry whose first Hollow was already settled (it died to this one, or it was settled before) is
+        // told nothing, as when one retreats.
         boolean settled = data.hunt().firstHollowDone();
         data.setHunt(data.hunt().withFirstHollowDone(true));
         if (!settled && quarry.isAlive()) {

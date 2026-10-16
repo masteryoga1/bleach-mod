@@ -50,6 +50,7 @@ import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.monster.warden.Warden;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Arrow;
@@ -250,6 +251,24 @@ public final class HollowTests {
             spider.discard();
             zombie.discard();
         });
+    }
+
+    /** A Warden picks out what to sniff, grow angry at and roar at through its own check, not TargetingConditions. */
+    @GameTest(template = "empty")
+    public static void wardensSenseNoHollows(GameTestHelper helper) {
+        Warden warden = helper.spawn(EntityType.WARDEN, 1, 1, 1);
+        SpiderHollow spider = helper.spawnWithNoFreeWill(ModEntities.SPIDER_HOLLOW.get(), 1, 1, 1);
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, 1, 1, 1);
+        helper.assertFalse(warden.canTargetEntity(spider), "a Warden can sense a Hollow");
+        helper.assertTrue(warden.canTargetEntity(zombie), "a Warden cannot sense a zombie");
+        warden.increaseAngerAt(spider, 100, false);
+        helper.assertTrue(warden.getEntityAngryAt().isEmpty(), "a Warden grew angry at a Hollow");
+        warden.increaseAngerAt(zombie, 100, false);
+        helper.assertTrue(warden.getEntityAngryAt().orElse(null) == zombie, "a Warden did not grow angry at a zombie");
+        warden.discard();
+        spider.discard();
+        zombie.discard();
+        helper.succeed();
     }
 
     @GameTest(template = "field")

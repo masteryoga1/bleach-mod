@@ -6,7 +6,8 @@
   "mixins": [
     "AreaEffectCloudMixin",
     "TargetingConditionsMixin",
-    "ThrownPotionMixin"
+    "ThrownPotionMixin",
+    "WardenMixin"
   ],
   "client": [
     "client.EntityRenderDispatcherMixin",

@@ -120,7 +120,7 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, 450, 500, () -> instructorsNear(minecraft, 64.0).size() >= 2,
                 "the placed Academy's instructor never reached the client");
-        expectWithin(minecraft, 565, 640, () -> summonedSeen(minecraft),
+        expectWithin(minecraft, 565, 620, () -> summonedSeen(minecraft),
                 "the summoned Hollows and Plus never reached the client");
         if (expectWithin(minecraft, 660, 700, () -> subject instanceof Hollow hollow && hollow.isMaskCracked(),
                 "a blow to the mask did not crack it")) {

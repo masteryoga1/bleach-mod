@@ -106,8 +106,8 @@ public final class SpiritEvents {
 
     /**
      * A mundane creature never takes a spirit mob as its target: an iron golem walks straight past a
-     * Hollow. Its target goals never find one (see the mixin on TargetingConditions); this catches the
-     * rest, such as a direct setTarget.
+     * Hollow. Its target goals never find one (see the mixin on TargetingConditions) and a Warden never
+     * grows angry at one (see the mixin on Warden); this catches the rest, such as a direct setTarget.
      */
     private static void onChangeTarget(LivingChangeTargetEvent event) {
         if (blindToSpirit(event.getEntity(), event.getNewAboutToBeSetTarget())) {
