@@ -87,7 +87,7 @@ public final class SoulData {
     boolean becameShinigami;
     /** What another player has offered this soul and is waiting on it to accept. */
     SoulOffer pendingOffer;
-    /** The Human this Shinigami used their blade on once, asking to lend them power, and when. */
+    /** The Human this Shinigami is using their blade on, asking to lend them power, and when they last did. */
     UUID powerConfirmTarget;
     long powerConfirmAt = NEVER;
     /** Game time of this soul's last offer, so offers cannot be spammed. */

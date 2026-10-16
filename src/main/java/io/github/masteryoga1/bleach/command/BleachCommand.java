@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -181,6 +182,7 @@ public final class BleachCommand {
             SoulData data = SoulLogic.get(player);
             if (data.state() == SoulState.RUKONGAI) {
                 ShinigamiLogic.enroll(data);
+                Milestones.check(player, data);
                 enrolled++;
             }
         }

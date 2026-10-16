@@ -14,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -73,27 +74,42 @@ public final class ReishiFootingClient {
     }
 
     /**
-     * Before the local player moves: while footing holds (or is about to), a fall stops at the
-     * footing's top until a plate is there to land on. Once one is, the plate itself holds the player.
-     * Like the server, sinking below the footing while not sneaking moves it down to the new height.
+     * Before the local player moves: for a moment after footing is asked for, moves or is stood on, a
+     * fall stops at the footing's top until a plate is there to land on. Once one is, the plate
+     * itself holds the player. The hold lapses on its own, so a player over real ground with no
+     * plates under them still lands. Like the server, sinking below the footing while not sneaking
+     * moves it down to the new height.
      */
     static void onPlayerTickPre(PlayerTickEvent.Pre event) {
         if (!(event.getEntity() instanceof LocalPlayer player) || !player.hasData(SoulAttachments.FOOTING)) {
             return;
         }
         FootingState footing = player.getData(SoulAttachments.FOOTING);
-        boolean predicted = player.tickCount <= footing.clampUntilTick;
-        if (!footing.active && !predicted || player.isShiftKeyDown()) {
+        if (!footing.active && player.tickCount > footing.clampUntilTick || player.isShiftKeyDown() || player.onClimbable()) {
             return;
         }
         if (footing.active && player.getY() < footing.anchorY + ReishiFooting.SUNK) {
             footing.anchorY = ShinigamiLogic.footingAnchor(player.getY());
+            footing.clampUntilTick = player.tickCount + ReishiFootingStatePayload.CLAMP_TICKS;
+        }
+        if (footing.active && plateUnder(player, footing.anchorY)) {
+            // Standing on the plates: hold on for a moment past their edge, while the next ones arrive.
+            footing.clampUntilTick = player.tickCount + ReishiFootingStatePayload.CLAMP_TICKS;
+            return;
         }
         Vec3 motion = player.getDeltaMovement();
         double top = footing.anchorY + 1.0;
-        if (motion.y < 0.0 && player.getY() >= top - 1.0E-4 && !plateUnder(player, footing.anchorY)) {
+        if (player.tickCount <= footing.clampUntilTick && motion.y < 0.0 && player.getY() >= top - 1.0E-4
+                && !groundHolds(player, top)) {
             player.setDeltaMovement(motion.x, Math.max(motion.y, top - player.getY()), motion.z);
         }
+    }
+
+    /** Whether real blocks would stop the fall at or above the footing's top anyway, so it needs no hold. */
+    private static boolean groundHolds(LocalPlayer player, double top) {
+        AABB box = player.getBoundingBox();
+        // With no entity, the plates are not solid.
+        return !player.level().noCollision((Entity) null, box.expandTowards(0.0, top - box.minY - 1.0E-3, 0.0));
     }
 
     private static boolean plateUnder(LocalPlayer player, int anchorY) {

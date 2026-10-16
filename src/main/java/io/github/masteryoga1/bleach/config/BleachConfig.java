@@ -218,7 +218,7 @@ public final class BleachConfig {
                 .comment("Minutes before the Academy hands the same soul another Asauchi.")
                 .defineInRange("asauchi_reissue_minutes", 10, 0, 1_440);
         ACADEMY_LOCATE_RADIUS_CHUNKS = builder
-                .comment("How far, in chunks, to search for an Academy building. 0 never searches.")
+                .comment("How far, in chunks, to search for an Academy building. Beyond this, one is built near world spawn if 'guarantee' is on. 0 never searches.")
                 .defineInRange("locate_radius_chunks", 64, 0, 256);
         ACADEMY_GUARANTEE = builder
                 .comment("Whether an Academy is built near world spawn when none is within reach.")

@@ -6,6 +6,7 @@ import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -14,7 +15,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.RelativeMovement;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -24,8 +24,8 @@ import net.minecraft.world.phys.Vec3;
  * ground it runs along the ground the way the player is steering, climbing or dropping a block at a
  * time, and carries on level across a gap rather than following a cliff down. In the air or on
  * reishi footing it follows the player's gaze (at most 45° up or down) when they steer straight
- * ahead. It stops short of walls, lava and anything harmful. Distance, cost and cooldown come from
- * Hohō (see {@link ShinigamiLogic#flashStepDistance}).
+ * ahead. It stops short of walls, lava, anything harmful and the world border. Distance, cost and
+ * cooldown come from Hohō (see {@link ShinigamiLogic#flashStepDistance}).
  */
 public final class FlashStep {
     /** How finely the path is checked. */
@@ -85,7 +85,15 @@ public final class FlashStep {
         boolean grounded = player.onGround() && !onFooting;
         Vec3 start = player.position();
         Vec3 direction = direction(player.getYRot(), player.getXRot(), forward, left, !grounded);
-        DashPath path = sweep(level, player, player.getBoundingBox(), direction, distance, grounded);
+        DashPath path;
+        FootingState footing = player.getData(SoulAttachments.FOOTING);
+        try {
+            // The dasher's own plates do not stand in the way, so they can dash down off them.
+            footing.active = false;
+            path = sweep(level, player, player.getBoundingBox(), direction, distance, grounded);
+        } finally {
+            footing.active = onFooting;
+        }
         Vec3 end = path.end();
         if (!Double.isFinite(end.x) || !Double.isFinite(end.y) || !Double.isFinite(end.z)
                 || end.distanceTo(start) < MIN_DISTANCE) {
@@ -104,13 +112,16 @@ public final class FlashStep {
         if (onFooting) {
             player.teleportTo(end.x, end.y, end.z);
             ReishiFooting.reanchorAfterDash(player);
-        } else if (path.supported()) {
-            // Ending on something solid, from the ground or the air, lands as if they had run there.
+        } else if (grounded && path.supported()) {
+            // From the ground to the ground lands as if they had run there.
             player.teleportTo(end.x, end.y, end.z);
             player.resetFallDistance();
         } else if (!ReishiFooting.startAfterDash(player, data, end)) {
-            // Still in the air with no footing: keep the way they were moving, and how far they have fallen.
-            player.connection.teleport(end.x, end.y, end.z, player.getYRot(), player.getXRot(), RelativeMovement.ALL);
+            // From the air, or into it with no footing: keep the way they were moving, and how far
+            // they have fallen. The move itself is absolute, so the client's lag is not added to it.
+            Vec3 motion = player.getKnownMovement();
+            player.teleportTo(end.x, end.y, end.z);
+            player.connection.send(new ClientboundSetEntityMotionPacket(player.getId(), motion));
         }
     }
 
@@ -174,11 +185,12 @@ public final class FlashStep {
                 next = lifted;
             }
             if (settling) {
-                // Never run out over lava, even where the ground is only a step down.
-                if (SafeLanding.touchesLava(level, next.expandTowards(0.0, -SETTLE, 0.0))) {
+                Vec3 settle = Entity.collideBoundingBox(entity, new Vec3(0.0, -SETTLE, 0.0), next, level, List.of());
+                // Never run out over lava, even where the ground is only a step down. Lava under
+                // the ground itself, as under a bridge, does not count.
+                if (SafeLanding.touchesLava(level, next.expandTowards(0.0, settle.y, 0.0))) {
                     break;
                 }
-                Vec3 settle = Entity.collideBoundingBox(entity, new Vec3(0.0, -SETTLE, 0.0), next, level, List.of());
                 if (settle.y <= -SETTLE + 1.0E-7) {
                     // Nothing within a block below: a drop, so carry on level from here.
                     settling = false;
@@ -195,10 +207,11 @@ public final class FlashStep {
         return new DashPath(end, !level.noCollision(entity, box.move(0.0, -0.01, 0.0)));
     }
 
-    /** Whether the body fits here: loaded, nothing in the way, nothing harmful and no lava. */
+    /** Whether the body fits here: loaded, inside the world border, nothing in the way, nothing harmful and no lava. */
     private static boolean isFree(Level level, Entity entity, AABB box) {
         return level.hasChunksAt(Mth.floor(box.minX), Mth.floor(box.minY), Mth.floor(box.minZ),
                         Mth.floor(box.maxX), Mth.floor(box.maxY), Mth.floor(box.maxZ))
+                && level.getWorldBorder().isWithinBounds(box)
                 && level.noCollision(entity, box) && !SafeLanding.isHarmful(level, entity, box)
                 && !SafeLanding.touchesLava(level, box);
     }

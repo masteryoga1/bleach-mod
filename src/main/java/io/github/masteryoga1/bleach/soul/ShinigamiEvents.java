@@ -13,6 +13,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.server.level.ServerLevel;
@@ -35,6 +36,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.EventHooks;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -57,9 +59,9 @@ public final class ShinigamiEvents {
     /** How often one soul may make an offer: every 5 seconds. */
     private static final int OFFER_INTERVAL_TICKS = 100;
     /**
-     * The second use of a blade on a Human that confirms lending them power must come this long after
-     * the first, and no later than {@link #POWER_CONFIRM_TICKS}, so holding the button down does not
-     * confirm it.
+     * The second use of a blade on a Human that confirms lending them power must come at least this
+     * long after the use before it, and at most {@link #POWER_CONFIRM_TICKS}. Holding the button down
+     * repeats the use every 4 ticks, and each repeat restarts the wait, so it never confirms.
      */
     private static final int POWER_CONFIRM_MIN_TICKS = 10;
     private static final int POWER_CONFIRM_TICKS = 100;
@@ -80,6 +82,30 @@ public final class ShinigamiEvents {
         bus.addListener(ShinigamiEvents::onEntityInteract);
         bus.addListener(ShinigamiEvents::onPlayerTick);
         bus.addListener(ShinigamiEvents::onChangedDimension);
+        bus.addListener(ShinigamiEvents::onLoggedIn);
+        bus.addListener(ShinigamiEvents::onServerStarted);
+    }
+
+    /** A new world builds its guaranteed Academy before anyone can build where it goes. Not for game tests. */
+    private static void onServerStarted(ServerStartedEvent event) {
+        if (!(event.getServer() instanceof GameTestServer)) {
+            AcademyLocator.prepareNewWorld(event.getServer());
+        }
+    }
+
+    /**
+     * A Plus who never learned where the Academy is (one from before there was an Academy) senses it
+     * now, and a soul who left while standing on reishi is standing on it again.
+     */
+    private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !SoulLogic.hasSoul(player)) {
+            return;
+        }
+        SoulData data = SoulLogic.get(player);
+        if (data.state() == SoulState.PLUS && data.shinigami().academyPos().isEmpty()) {
+            AcademyLocator.sense(player);
+        }
+        ReishiFooting.resumeAfterLogin(player);
     }
 
     /** Reishi footing does not follow a soul into another world. */
@@ -133,6 +159,9 @@ public final class ShinigamiEvents {
         giveAsauchi(player, data);
         playSound(player, SoundEvents.BOOK_PAGE_TURN);
         player.sendSystemMessage(Component.translatable("message.bleach.enrolled"));
+        if (player instanceof ServerPlayer serverPlayer) {
+            Milestones.check(serverPlayer, data);
+        }
         return true;
     }
 
@@ -215,6 +244,10 @@ public final class ShinigamiEvents {
         konsoEffects(plus);
         plus.sendSystemMessage(Component.translatable("message.bleach.konso.received")
                 .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        if (plus instanceof ServerPlayer soul) {
+            // Granted now, as the soul may enroll and graduate before the next periodic check.
+            Milestones.check(soul, data);
+        }
         if (sendOn && BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY) && plus instanceof ServerPlayer soul) {
             AcademyLocator.sendTo(soul);
         }
@@ -311,11 +344,13 @@ public final class ShinigamiEvents {
                     .withStyle(ChatFormatting.GRAY), true);
             return;
         }
-        long sinceFirstUse = now - giverData.powerConfirmAt;
-        if (human.getUUID().equals(giverData.powerConfirmTarget) && sinceFirstUse <= POWER_CONFIRM_TICKS) {
-            if (sinceFirstUse >= POWER_CONFIRM_MIN_TICKS) {
+        long sinceLastUse = now - giverData.powerConfirmAt;
+        if (human.getUUID().equals(giverData.powerConfirmTarget) && sinceLastUse <= POWER_CONFIRM_TICKS) {
+            if (sinceLastUse >= POWER_CONFIRM_MIN_TICKS) {
                 giverData.powerConfirmTarget = null;
                 offer(giver, human, SoulOffer.Kind.POWER);
+            } else {
+                giverData.powerConfirmAt = now;
             }
             return;
         }

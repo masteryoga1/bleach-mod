@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.world;
 
+import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.soul.SafeLanding;
@@ -11,44 +12,77 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * Finding the Academy: the nearest one that generated, or the one this world was guaranteed (see
  * {@link AcademySites}). A Plus senses which way it lies, and Konsō can send a soul there. The search
- * is slow, so it runs only when a soul becomes a Plus, when Konsō is offered or performed, and by
- * command, and its answer is kept in the soul's {@code academy_pos}.
+ * is slow, so it runs only when a world is new, when a soul becomes a Plus (or logs in as one that
+ * does not know the way), when Konsō is offered or performed, and by command, and its answer is kept
+ * in the soul's {@code academy_pos}.
  */
 public final class AcademyLocator {
     /** The spots tried around an Academy's corner when sending a soul there, the corner first. */
     private static final int[][] LANDING_OFFSETS = {
             {0, 0}, {1, 1}, {1, 0}, {0, 1}, {-1, 0}, {0, -1}, {-1, -1}, {1, -1}, {-1, 1}};
+    private static final ResourceKey<StructureSet> ACADEMY_SET = ResourceKey.create(Registries.STRUCTURE_SET, BleachMod.id("academy"));
+    /** The spacing in the Academy's structure set, if it cannot be read. */
+    private static final int DEFAULT_SPACING = 24;
 
     private AcademyLocator() {
     }
 
     /**
-     * The nearest Academy to a spot in the Overworld, building the guaranteed one if there is none and
-     * the config allows it. Slow: never call it every tick.
+     * The nearest Academy to a spot in the Overworld, building the guaranteed one if none generated
+     * within the configured radius and the config allows it. Slow: never call it every tick.
      */
     @Nullable
     public static BlockPos nearest(ServerLevel overworld, BlockPos from) {
         int radius = BleachConfig.get(BleachConfig.ACADEMY_LOCATE_RADIUS_CHUNKS);
-        BlockPos found = radius > 0 ? overworld.findNearestMapStructure(BleachTags.ACADEMY, from, radius, false) : null;
+        // The search counts in rings of placement cells, not chunks.
+        BlockPos found = radius > 0 ? overworld.findNearestMapStructure(BleachTags.ACADEMY, from,
+                Mth.positiveCeilDiv(radius, spacing(overworld)), false) : null;
+        double reach = radius * 16.0;
+        boolean inReach = found != null && horizontalDistanceSqr(from, found) <= reach * reach;
         AcademySites sites = AcademySites.get(overworld);
         BlockPos guaranteed = sites.guaranteed().orElse(null);
-        if (found == null && guaranteed == null && BleachConfig.get(BleachConfig.ACADEMY_GUARANTEE)) {
+        if (!inReach && guaranteed == null && BleachConfig.get(BleachConfig.ACADEMY_GUARANTEE)) {
             guaranteed = sites.ensureGuaranteed(overworld);
         }
         if (found == null || guaranteed == null) {
             return found != null ? found : guaranteed;
         }
         return horizontalDistanceSqr(from, found) <= horizontalDistanceSqr(from, guaranteed) ? found : guaranteed;
+    }
+
+    /** How many chunks apart Academies are spread, as their structure set says. */
+    private static int spacing(ServerLevel level) {
+        StructureSet set = level.registryAccess().registryOrThrow(Registries.STRUCTURE_SET).get(ACADEMY_SET);
+        return set != null && set.placement() instanceof RandomSpreadStructurePlacement spread
+                ? Math.max(1, spread.spacing()) : DEFAULT_SPACING;
+    }
+
+    /**
+     * In a world just created, the guaranteed Academy is built straight away if none generated in
+     * reach, before anyone has built on the ground it takes.
+     */
+    public static void prepareNewWorld(MinecraftServer server) {
+        ServerLevel overworld = server.overworld();
+        if (overworld.getGameTime() == 0L && BleachConfig.get(BleachConfig.ACADEMY_GUARANTEE)
+                && AcademySites.get(overworld).guaranteed().isEmpty()) {
+            nearest(overworld, overworld.getSharedSpawnPos());
+        }
     }
 
     private static double horizontalDistanceSqr(BlockPos a, BlockPos b) {

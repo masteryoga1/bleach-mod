@@ -321,6 +321,17 @@ public final class TechniqueTests {
     }
 
     @GameTest(template = "lane")
+    public static void flashStepCrossesABridgeOverLava(GameTestHelper helper) {
+        for (int x = 2; x <= 9; x++) {
+            helper.setBlock(x, 0, 1, Blocks.LAVA);
+        }
+        FlashStep.DashPath path = dashAlongLane(helper, 2.0, 6.0, true);
+        helper.assertTrue(Math.abs(path.end().x - 7.5) < EPSILON && Math.abs(path.end().y - 2.0) < EPSILON && path.supported(),
+                "lava under the floor stopped the flash step at " + path);
+        helper.succeed();
+    }
+
+    @GameTest(template = "lane")
     public static void flashStepRunsItsLength(GameTestHelper helper) {
         FlashStep.DashPath path = dashAlongLane(helper, 2.0, 6.0, true);
         helper.assertTrue(Math.abs(path.end().x - 7.5) < EPSILON && Math.abs(path.end().y - 2.0) < EPSILON && path.supported(),

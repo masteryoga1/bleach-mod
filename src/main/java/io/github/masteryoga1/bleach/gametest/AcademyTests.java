@@ -33,6 +33,8 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.DoubleTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
@@ -44,6 +46,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -311,6 +314,42 @@ public final class AcademyTests {
         helper.assertTrue(ShinigamiNpc.EXAMINED_ARTS.size() == 4 && ShinigamiNpc.EXAMINED_ARTS.contains(Stat.KIDO),
                 "the exams do not cover the four Zankensoki");
         helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void instructorStaysWhereHeStands(GameTestHelper helper) {
+        AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 1, 1, 1);
+        helper.assertFalse(instructor.canBeLeashed(), "the instructor can be leashed");
+        helper.assertTrue(instructor.getPistonPushReaction() == PushReaction.IGNORE, "pistons push the instructor");
+        helper.assertFalse(instructor.isPushedByFluid(), "water pushes the instructor");
+        helper.assertFalse(instructor.canUsePortal(false), "the instructor goes through portals");
+        Vec3[] home = new Vec3[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(instructor.home() != null, "the instructor never settled"))
+                .thenExecute(() -> {
+                    home[0] = instructor.home();
+                    // A fishing rod's pull, then dragged three blocks.
+                    instructor.setDeltaMovement(1.5, 0.4, 0.0);
+                    instructor.setPos(home[0].x + 3.0, home[0].y, home[0].z);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(instructor.position().distanceTo(home[0]) < 1.0E-3,
+                        "the instructor stayed where he was dragged, at " + instructor.position()))
+                .thenExecute(() -> {
+                    CompoundTag saved = instructor.saveWithoutId(new CompoundTag());
+                    AcademyInstructor reloaded = ModEntities.ACADEMY_INSTRUCTOR.get().create(helper.getLevel());
+                    reloaded.load(saved);
+                    helper.assertTrue(home[0].equals(reloaded.home()), "the instructor forgot where he stands");
+                    // A copy saved somewhere else, as a structure block makes, finds its own place to stand.
+                    ListTag elsewhere = new ListTag();
+                    elsewhere.add(DoubleTag.valueOf(home[0].x + 40.0));
+                    elsewhere.add(DoubleTag.valueOf(home[0].y));
+                    elsewhere.add(DoubleTag.valueOf(home[0].z));
+                    saved.put("Pos", elsewhere);
+                    AcademyInstructor copy = ModEntities.ACADEMY_INSTRUCTOR.get().create(helper.getLevel());
+                    copy.load(saved);
+                    helper.assertTrue(copy.home() == null, "a copied instructor walks back to the original's place");
+                })
+                .thenSucceed();
     }
 
     @GameTest(template = "academy/academy")

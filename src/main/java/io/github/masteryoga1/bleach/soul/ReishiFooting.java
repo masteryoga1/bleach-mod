@@ -25,8 +25,8 @@ import net.minecraft.world.phys.Vec3;
  * at the anchor height under and just ahead of the player while it lasts, and drains reiryoku every
  * tick. Sneaking lets the player sink through; letting go holds them again where they are. Pressing
  * the key (or jump) again while falling raises the anchor to the new height, so a soul climbs one
- * block per jump. Footing ends on solid ground, when the reiryoku runs out, or when the soul may no
- * longer use it.
+ * block per jump. Footing ends on solid ground or a ladder, when the reiryoku runs out, or when the
+ * soul may no longer use it.
  */
 public final class ReishiFooting {
     /** Footing ends if the player gets this far above it, launched or otherwise. */
@@ -38,6 +38,11 @@ public final class ReishiFooting {
     /** Plates are laid under the player's box widened by this much on each side. */
     private static final double FOOTPRINT_MARGIN = 0.3;
     private static final int PARTICLE_INTERVAL_TICKS = 10;
+    /** The patch under the middle of the feet checked for real ground. */
+    private static final double SOLE_WIDTH = 0.02;
+    private static final double SOLE_DEPTH = 1.0E-3;
+    /** How long after logging in footing waits for the ground around the player to load before giving up. */
+    private static final int RESUME_WAIT_TICKS = 200;
 
     private ReishiFooting() {
     }
@@ -69,7 +74,7 @@ public final class ReishiFooting {
         int anchor = ShinigamiLogic.footingAnchor(player.getY());
         boolean allowed = mayStand(player, data, level.getGameTime()) && !player.onGround()
                 && !level.isOutsideBuildHeight(anchor)
-                && (!viaJump || player.fallDistance > 0.0F && noGroundBelow(level, player));
+                && (!viaJump || noGroundBelow(level, player));
         if (allowed && !footing.active && !SoulLogic.trySpend(player, data, ShinigamiLogic.footingDrainPerTick(data) * 20.0F)) {
             player.displayClientMessage(Component.translatable("message.bleach.reishi_footing.too_weak")
                     .withStyle(ChatFormatting.GRAY), true);
@@ -107,12 +112,16 @@ public final class ReishiFooting {
      * Footing straight after a flash step that ends in the air: the soul is moved to where the step
      * ends and lands on reishi there. Pays the upfront cost like {@link #activate}.
      *
-     * @return false, leaving the soul where it is and charging nothing, if it may not stand there or cannot pay
+     * @return false, leaving the soul where it is and charging nothing, if it may not stand there, the
+     *         ground is within a block below anyway, or it cannot pay
      */
     public static boolean startAfterDash(ServerPlayer player, SoulData data, Vec3 end) {
         FootingState footing = player.getData(SoulAttachments.FOOTING);
+        ServerLevel level = player.serverLevel();
         int anchor = ShinigamiLogic.footingAnchor(end.y);
-        if (!mayStand(player, data, player.level().getGameTime()) || player.serverLevel().isOutsideBuildHeight(anchor)
+        AABB endBox = player.getDimensions(player.getPose()).makeBoundingBox(end);
+        if (!mayStand(player, data, level.getGameTime()) || level.isOutsideBuildHeight(anchor)
+                || !level.noCollision((Entity) null, endBox.expandTowards(0.0, -1.0, 0.0))
                 || !footing.active && !SoulLogic.trySpend(player, data, ShinigamiLogic.footingDrainPerTick(data) * 20.0F)) {
             return false;
         }
@@ -120,6 +129,40 @@ public final class ReishiFooting {
         start(player, footing, anchor);
         sendState(player, footing);
         return true;
+    }
+
+    /**
+     * A soul who logged out standing on reishi in mid-air stands on it again once the ground around
+     * them has loaded, rather than falling. Footing itself is never saved, so this goes by where they
+     * are: any soul who may use footing and logs in with no ground within two blocks below stands on
+     * reishi, without paying to start it.
+     */
+    public static void resumeAfterLogin(ServerPlayer player) {
+        player.getData(SoulAttachments.FOOTING).resumePending = true;
+    }
+
+    /** The check {@link #resumeAfterLogin} waits for: once the chunks under the player are loaded, starts footing for free. */
+    private static void tryResume(ServerPlayer player, SoulData data, FootingState footing) {
+        ServerLevel level = player.serverLevel();
+        AABB below = player.getBoundingBox().expandTowards(0.0, -2.0, 0.0);
+        if (!level.hasChunksAt(Mth.floor(below.minX), Mth.floor(below.minY), Mth.floor(below.minZ),
+                Mth.floor(below.maxX), Mth.floor(below.maxY), Mth.floor(below.maxZ))) {
+            footing.resumePending = player.tickCount < RESUME_WAIT_TICKS;
+            return;
+        }
+        footing.resumePending = false;
+        int anchor = ShinigamiLogic.footingAnchor(player.getY());
+        if (footing.active || !mayStand(player, data, level.getGameTime()) || player.getAbilities().mayfly
+                || level.isOutsideBuildHeight(anchor) || !noGroundBelow(level, player)) {
+            return;
+        }
+        // The saved OnGround was the plates, which are gone.
+        player.setOnGround(false);
+        footing.active = true;
+        footing.anchorY = anchor;
+        footing.hasLast = false;
+        place(level, player, footing);
+        sendState(player, footing);
     }
 
     /** After a flash step while standing on footing, the footing moves to the new height. */
@@ -145,13 +188,18 @@ public final class ReishiFooting {
 
     /** Runs every tick for every player: keeps the plates under them, drains reiryoku, or ends footing. */
     public static void tick(ServerPlayer player, SoulData data) {
-        if (!isActive(player)) {
+        if (!player.hasData(SoulAttachments.FOOTING)) {
             return;
         }
         FootingState footing = player.getData(SoulAttachments.FOOTING);
+        if (footing.resumePending) {
+            tryResume(player, data, footing);
+        }
+        if (!footing.active) {
+            return;
+        }
         ServerLevel level = player.serverLevel();
-        if (!mayStand(player, data, level.getGameTime())
-                || player.onGround() && !player.getBlockStateOn().is(ModBlocks.REISHI_FOOTING.get())
+        if (!mayStand(player, data, level.getGameTime()) || player.onClimbable() || onRealGround(level, player)
                 || player.getY() > footing.anchorY + MAX_RISE || level.isOutsideBuildHeight(footing.anchorY)) {
             end(player);
             return;
@@ -178,6 +226,21 @@ public final class ReishiFooting {
         footing.lastX = player.getX();
         footing.lastZ = player.getZ();
         footing.hasLast = true;
+    }
+
+    /**
+     * Whether the player stands on real ground rather than reishi. The server also looks under the
+     * middle of their feet itself, so a client that never reports landing does not keep footing, and
+     * its reiryoku draining, on the ground.
+     */
+    private static boolean onRealGround(Level level, Player player) {
+        if (player.onGround() && !player.getBlockStateOn().is(ModBlocks.REISHI_FOOTING.get())) {
+            return true;
+        }
+        AABB sole = AABB.ofSize(new Vec3(player.getX(), player.getY() - SOLE_DEPTH / 2.0, player.getZ()),
+                SOLE_WIDTH, SOLE_DEPTH, SOLE_WIDTH);
+        // With no entity, the plates are not solid.
+        return !level.noCollision((Entity) null, sole);
     }
 
     /** Lays plates at the anchor under the player, and a few ahead of where they are heading. */
