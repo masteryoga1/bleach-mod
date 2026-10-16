@@ -114,7 +114,12 @@ jobs:
       - name: Run the client smoke test
         run: |
           set -o pipefail
-          timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientSmokeTest --stacktrace 2>&1 | tee client.log
+          # NeoForge's early loading window sometimes fails to start on a runner ("An error occurred
+          # initializing a font for rendering"), and its error prompt then waits on input forever.
+          # The game opens its own window just as well, so turn the early one off.
+          mkdir -p run/smoketest/config
+          printf 'earlyWindowControl = false\n' > run/smoketest/config/fml.toml
+          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientSmokeTest --stacktrace 2>&1 | tee client.log
           grep -F "Bleach client smoke test passed" client.log
 
       - name: Upload the smoke test screenshots
