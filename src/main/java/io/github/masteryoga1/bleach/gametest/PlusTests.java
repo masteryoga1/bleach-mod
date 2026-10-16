@@ -225,7 +225,8 @@ public final class PlusTests {
         double start = plus.distanceTo(spider);
         // With no Hollow player about, the only thing a Plus can be running from is the Hollow.
         helper.succeedWhen(() -> {
-            helper.assertTrue(plus.goalSelector.getRunningGoals().anyMatch(goal -> goal.getGoal() instanceof AvoidEntityGoal),
+            helper.assertTrue(plus.goalSelector.getAvailableGoals().stream()
+                            .anyMatch(goal -> goal.isRunning() && goal.getGoal() instanceof AvoidEntityGoal),
                     "a Plus is not running from a Hollow");
             helper.assertTrue(plus.distanceTo(spider) > start + 1.0, "a Plus running from a Hollow got no further from it");
             plus.discard();
