@@ -334,9 +334,10 @@ public final class AcademyTests {
                 .thenWaitUntil(() -> helper.assertTrue(instructor.home() != null, "the instructor never settled"))
                 .thenExecute(() -> {
                     home[0] = instructor.home();
-                    // A fishing rod's pull, then dragged three blocks.
+                    // A fishing rod's pull, then dragged a block: twice the slack he allows, and still inside
+                    // the template, whose chunks are the only ones a test keeps ticking entities in.
                     instructor.setDeltaMovement(1.5, 0.4, 0.0);
-                    instructor.setPos(home[0].x + 3.0, home[0].y, home[0].z);
+                    instructor.setPos(home[0].x + 1.0, home[0].y, home[0].z);
                 })
                 .thenWaitUntil(() -> helper.assertTrue(instructor.position().distanceTo(home[0]) < 1.0E-3,
                         "the instructor stayed where he was dragged, at " + instructor.position()))
