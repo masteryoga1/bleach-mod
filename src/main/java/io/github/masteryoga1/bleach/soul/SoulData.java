@@ -11,9 +11,10 @@ import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Everything the mod knows about one soul: its state, its spiritual energy, its stats and which
- * powers have awakened. Stored on players as the {@link SoulAttachments#SOUL} attachment, saved
- * with the player and sent to their client so the HUD and stats screen can show it.
+ * Everything the mod knows about one soul: its state, its spiritual energy, its stats, which
+ * powers have awakened and its record against Hollows. Stored as the {@link SoulAttachments#SOUL}
+ * attachment on players and on spirit mobs (Shinigami NPCs, Hollows, Pluses) and saved with them.
+ * A player's own soul is also sent to their client so the HUD and stats screen can show it.
  */
 public final class SoulData {
     private static final long NEVER = Long.MIN_VALUE / 2;
@@ -39,7 +40,8 @@ public final class SoulData {
             Codec.INT.optionalFieldOf("chain_max_ticks", 0).forGetter(SoulData::chainMaxTicks),
             Codec.BOOL.optionalFieldOf("reiatsu_released", false).forGetter(SoulData::isReiatsuReleased),
             ShinigamiProgress.CODEC.lenientOptionalFieldOf("shinigami", ShinigamiProgress.NONE)
-                    .forGetter(SoulData::shinigami)
+                    .forGetter(SoulData::shinigami),
+            HuntRecord.CODEC.lenientOptionalFieldOf("hunt", HuntRecord.NONE).forGetter(SoulData::hunt)
     ).apply(instance, SoulData::new));
 
     private SoulState state = SoulState.HUMAN;
@@ -58,6 +60,8 @@ public final class SoulData {
     private boolean reiatsuReleased;
     /** The Academy, the Asauchi, Konsō and power given or taken: see {@link ShinigamiLogic}. */
     private ShinigamiProgress shinigami = ShinigamiProgress.NONE;
+    /** The first Hollow, Garganta arrivals, and the Hollows and Pluses this soul has dealt with: see {@link HollowLogic}. */
+    private HuntRecord hunt = HuntRecord.NONE;
 
     // Server-side bookkeeping. Not saved or synced; it starts over when the player logs in or respawns.
     private boolean dirty = true;
@@ -94,6 +98,14 @@ public final class SoulData {
     long lastOfferAt = NEVER;
     /** Game time of this soul's last flash step, for the cooldown. */
     long lastFlashStepAt = NEVER;
+    /** The Fishbone D hunting this soul as its first Hollow, once it has landed. */
+    UUID firstHollowId;
+    /** No Garganta opens near this soul before this game time: set on joining, respawning and changing dimension. */
+    long arrivalGraceUntil = NEVER;
+    /** Game time this Plus was last told a Hollow's bite gnawed at its chain, so the message is not spammed. */
+    long lastBiteMessageAt = NEVER;
+    /** Blows that landed on a Hollow's body in a row, without one to the mask, for the hint to aim for the mask. */
+    int bodyHitsWithoutMask;
 
     public SoulData() {
     }
@@ -101,7 +113,7 @@ public final class SoulData {
     private SoulData(SoulState state, boolean initialized, float reiryoku, float maxReiryoku,
                      Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers,
                      long lastCloseCallTime, int chainTicks, int chainMaxTicks, boolean reiatsuReleased,
-                     ShinigamiProgress shinigami) {
+                     ShinigamiProgress shinigami, HuntRecord hunt) {
         this.state = state;
         this.initialized = initialized;
         this.maxReiryoku = Math.max(0.0F, maxReiryoku);
@@ -114,6 +126,7 @@ public final class SoulData {
         this.chainTicks = Mth.clamp(chainTicks, 0, this.chainMaxTicks);
         this.reiatsuReleased = reiatsuReleased;
         this.shinigami = shinigami;
+        this.hunt = hunt;
     }
 
     /** A map keyed by enum name that skips names it does not recognise when reading. */
@@ -305,6 +318,17 @@ public final class SoulData {
         }
     }
 
+    public HuntRecord hunt() {
+        return hunt;
+    }
+
+    public void setHunt(HuntRecord record) {
+        if (!record.equals(hunt)) {
+            hunt = record;
+            markDirty();
+        }
+    }
+
     /** Whether the client's copy is out of date. */
     public boolean isDirty() {
         return dirty;
@@ -321,6 +345,6 @@ public final class SoulData {
     /** A copy of the saved data, without the server-side bookkeeping. */
     public SoulData copy() {
         return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime,
-                chainTicks, chainMaxTicks, reiatsuReleased, shinigami);
+                chainTicks, chainMaxTicks, reiatsuReleased, shinigami, hunt);
     }
 }

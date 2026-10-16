@@ -1,0 +1,163 @@
+{
+  "entity.hollow.ambient": {
+    "subtitle": "subtitles.bleach.entity.hollow.ambient",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ghast/moan1",
+        "pitch": 0.55,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/ghast/moan2",
+        "pitch": 0.55,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/ghast/moan3",
+        "pitch": 0.55,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/ghast/moan4",
+        "pitch": 0.55,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/ghast/moan5",
+        "pitch": 0.55,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/ghast/moan6",
+        "pitch": 0.55,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/ghast/moan7",
+        "pitch": 0.55,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.hollow.hurt": {
+    "subtitle": "subtitles.bleach.entity.hollow.hurt",
+    "sounds": [
+      {
+        "name": "minecraft:mob/endermen/scream1",
+        "pitch": 0.7
+      },
+      {
+        "name": "minecraft:mob/endermen/scream2",
+        "pitch": 0.7
+      },
+      {
+        "name": "minecraft:mob/endermen/scream3",
+        "pitch": 0.7
+      },
+      {
+        "name": "minecraft:mob/endermen/scream4",
+        "pitch": 0.7
+      }
+    ]
+  },
+  "entity.hollow.death": {
+    "subtitle": "subtitles.bleach.entity.hollow.death",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ghast/death",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:mob/ghast/scream1",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:mob/ghast/scream2",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:mob/ghast/scream3",
+        "pitch": 0.5
+      }
+    ]
+  },
+  "entity.hollow.mask_crack": {
+    "subtitle": "subtitles.bleach.entity.hollow.mask_crack",
+    "sounds": [
+      {
+        "name": "minecraft:block/bone_block/break1",
+        "pitch": 1.2
+      },
+      {
+        "name": "minecraft:block/bone_block/break2",
+        "pitch": 1.2
+      },
+      {
+        "name": "minecraft:block/bone_block/break3",
+        "pitch": 1.2
+      },
+      {
+        "name": "minecraft:block/bone_block/break4",
+        "pitch": 1.2
+      },
+      {
+        "name": "minecraft:block/bone_block/break5",
+        "pitch": 1.2
+      }
+    ]
+  },
+  "entity.fishbone_d.roar": {
+    "subtitle": "subtitles.bleach.entity.fishbone_d.roar",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ravager/roar1",
+        "pitch": 0.65,
+        "attenuation_distance": 64
+      },
+      {
+        "name": "minecraft:mob/ravager/roar2",
+        "pitch": 0.65,
+        "attenuation_distance": 64
+      },
+      {
+        "name": "minecraft:mob/ravager/roar3",
+        "pitch": 0.65,
+        "attenuation_distance": 64
+      },
+      {
+        "name": "minecraft:mob/ravager/roar4",
+        "pitch": 0.65,
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "entity.garganta.open": {
+    "subtitle": "subtitles.bleach.entity.garganta.open",
+    "sounds": [
+      {
+        "name": "minecraft:random/glass1",
+        "pitch": 0.5,
+        "attenuation_distance": 64
+      },
+      {
+        "name": "minecraft:random/glass2",
+        "pitch": 0.5,
+        "attenuation_distance": 64
+      },
+      {
+        "name": "minecraft:random/glass3",
+        "pitch": 0.5,
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "item.denreishinki.ping": {
+    "subtitle": "subtitles.bleach.item.denreishinki.ping",
+    "sounds": [
+      {
+        "name": "minecraft:note/pling",
+        "pitch": 1.6
+      }
+    ]
+  }
+}

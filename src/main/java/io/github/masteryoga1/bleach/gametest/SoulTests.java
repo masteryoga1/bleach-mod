@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -74,6 +75,28 @@ public final class SoulTests {
         helper.assertTrue(reloaded.state() == SoulState.RUKONGAI, "a Rukongai soul loaded as " + reloaded.state());
         helper.assertTrue(reloaded.shinigami().equals(progress), "Shinigami progress loaded as " + reloaded.shinigami());
         helper.assertTrue(reloaded.copy().shinigami().equals(progress), "copying lost the Shinigami progress");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void huntRecordSurvivesSaving(GameTestHelper helper) {
+        SoulData data = new SoulData();
+        data.markInitialized();
+        HuntRecord hunt = new HuntRecord(1234, true, 99L, 3, 4, 5, true);
+        data.setHunt(hunt);
+
+        Tag saved = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
+        SoulData loaded = SoulData.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
+        helper.assertTrue(loaded.hunt().equals(hunt), "the hunt record loaded as " + loaded.hunt());
+        helper.assertTrue(data.copy().hunt().equals(hunt), "copying lost the hunt record");
+
+        // A save from before Hollows had no hunt record at all.
+        helper.assertTrue(saved instanceof CompoundTag, "a soul did not save as a compound tag");
+        CompoundTag older = ((CompoundTag) saved).copy();
+        older.remove("hunt");
+        SoulData old = SoulData.CODEC.parse(NbtOps.INSTANCE, older).getOrThrow();
+        helper.assertTrue(old.hunt().equals(HuntRecord.NONE), "a save without a hunt record loaded " + old.hunt());
+        helper.assertTrue(old.isInitialized(), "a save without a hunt record lost the rest of the soul");
         helper.succeed();
     }
 

@@ -2,8 +2,14 @@ package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.GargantaRift;
+import io.github.masteryoga1.bleach.entity.Hollow;
+import io.github.masteryoga1.bleach.entity.HollowMask;
+import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
+import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -14,15 +20,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
+import javax.annotation.Nullable;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
@@ -40,10 +51,11 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * reiatsu, brings on Encroachment, turns them into a Hollow and opens the soul screen. Then it makes
  * them a Shinigami in the Shihakushō with a sheathed Asauchi, opens the Tailoring Table and the
  * instructor's dialogue, flash steps, stands on reishi footing by jumping while falling, places an
- * Academy and quits. All of it is seen with the camera behind the player, so the chain, mask, garb,
- * saya, NPCs and HUD are drawn, and screenshots of the main moments are saved for review. Any crash
- * in the mod's client code fails the run, and so does anything that did not reach the client as
- * expected.
+ * Academy, summons each Hollow and a Plus, cracks a mask, purifies a Hollow, sends a Plus on, opens a
+ * Garganta and checks that a soul just below the threshold sees only a shimmer, and quits. All of it
+ * is seen with the camera behind the player, so the chain, mask, garb, saya, NPCs, Hollows and HUD
+ * are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client
+ * code fails the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -54,6 +66,11 @@ public final class ClientSmokeTest {
     /** How far the flash step must carry the player, and how high above the ground footing must hold them. */
     private static final double DASH_MIN_DISTANCE = 4.0;
     private static final double FOOTING_MIN_HEIGHT = 8.0;
+    /** How far around the player the summoned Hollows and Plus, and the Garganta, are looked for. */
+    private static final double SUMMONED_RANGE = 24.0;
+    private static final double RIFT_RANGE = 40.0;
+    /** Summoned creatures stand still, facing south, towards a player who faces north. */
+    private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
 
     private static boolean worldRequested;
     private static int ticksWaiting;
@@ -63,6 +80,9 @@ public final class ClientSmokeTest {
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** Where the player stood before the flash step. */
     private static Vec3 dashFrom;
+    /** What the current step acts on: the Hollow to strike, or the Plus to send on. */
+    @Nullable
+    private static Entity subject;
 
     private ClientSmokeTest() {
     }
@@ -100,6 +120,34 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, 450, 500, () -> instructorsNear(minecraft, 64.0).size() >= 2,
                 "the placed Academy's instructor never reached the client");
+        expectWithin(minecraft, 565, 640, () -> summonedSeen(minecraft),
+                "the summoned Hollows and Plus never reached the client");
+        if (expectWithin(minecraft, 660, 700, () -> subject instanceof Hollow hollow && hollow.isMaskCracked(),
+                "a blow to the mask did not crack it")) {
+            shot(minecraft, "mask");
+        }
+        if (expectWithin(minecraft, 720, 760, () -> soul.hunt().purified() >= 1,
+                "the Asauchi kill did not purify the Hollow")) {
+            shot(minecraft, "purify");
+        }
+        // The Plus summoned at tick 561 stands within 4 blocks too, so this follows the Plus that was sent on.
+        expectWithin(minecraft, 785, 830,
+                () -> subject instanceof PlusSpirit sent && sent.isRemoved() && soul.hunt().sentOn() >= 1,
+                "Konsō did not send the Plus on");
+        if (expectWithin(minecraft, 842, 900, () -> openRift(minecraft) != null,
+                "the Garganta never opened on the client")) {
+            GargantaRift rift = openRift(minecraft);
+            if (rift != null) {
+                look(minecraft, rift.position().add(0.0, 2.0, 0.0));
+            }
+        }
+        if (expectWithin(minecraft, 910, 950,
+                () -> nearest(minecraft, SpiderHollow.class, 6.0,
+                        spider -> spider.isAlive() && isSpiderHollow(spider) && ClientSouls.isHiddenFromViewer(spider)) != null
+                        && SpiritShimmer.emitted() > 0,
+                "an unaware soul just below the threshold saw the Hollow or no shimmer")) {
+            shot(minecraft, "unaware");
+        }
         if (finished) {
             return;
         }
@@ -107,6 +155,8 @@ public final class ClientSmokeTest {
         switch (ticksInWorld) {
             case 40 -> {
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                // No Garganta, wandering Plus or first Hollow comes on its own: every Hollow here is summoned.
+                command(minecraft, "gamerule doMobSpawning false");
                 command(minecraft, "bleach soul @s plus");
             }
             case 80 -> {
@@ -188,8 +238,72 @@ public final class ClientSmokeTest {
             case 510 -> minecraft.setScreen(new SoulStatsScreen());
             // A screenshot shows the last frame drawn, so it waits a moment for the screen to be drawn.
             case 515 -> shot(minecraft, "stats");
-            case 550 -> {
-                minecraft.setScreen(null);
+            case 550 -> minecraft.setScreen(null);
+            // Hollows vanish on Peaceful. Back on the ground, off the footing, facing north.
+            case 560 -> {
+                command(minecraft, "difficulty easy");
+                command(minecraft, "tp @s ~ -60 ~ 180 0");
+            }
+            case 561 -> {
+                command(minecraft, "summon bleach:spider_hollow ~-4 ~ ~-6 " + STILL);
+                command(minecraft, "summon bleach:hexapodus ~-1.5 ~ ~-6 " + STILL);
+                command(minecraft, "summon bleach:hound_hollow ~1.5 ~ ~-6 " + STILL);
+                command(minecraft, "summon bleach:serpent_hollow ~4 ~ ~-7 " + STILL);
+                command(minecraft, "summon bleach:fishbone_d ~ ~ ~-11 " + STILL);
+                command(minecraft, "summon bleach:plus ~-2 ~ ~-3 " + STILL);
+            }
+            case 600 -> shot(minecraft, "hollows");
+            case 645 -> command(minecraft, "summon bleach:spider_hollow ~ ~ ~-2.5 " + STILL);
+            case 650 -> aimAtMask(minecraft, "the Spider Hollow in front of the player never reached the client");
+            // Slot 0 is empty, so this is a bare hand.
+            case 654 -> {
+                if (subject != null) {
+                    minecraft.gameMode.attack(player, subject);
+                }
+            }
+            case 705 -> command(minecraft, "kill @e[type=bleach:spider_hollow,distance=..4]");
+            case 710 -> command(minecraft, "summon bleach:spider_hollow ~ ~ ~-2.5 {NoAI:1b,Rotation:[0f,0f],Health:1f}");
+            // The Asauchi, put in the last hotbar slot at tick 262.
+            case 712 -> player.getInventory().selected = 8;
+            case 714 -> aimAtMask(minecraft, "the weakened Spider Hollow never reached the client");
+            case 716 -> {
+                if (subject != null) {
+                    minecraft.gameMode.attack(player, subject);
+                }
+            }
+            case 770 -> command(minecraft, "summon bleach:plus ~ ~ ~-2 " + STILL);
+            case 775 -> minecraft.options.keyShift.setDown(true);
+            case 778 -> {
+                subject = nearest(minecraft, PlusSpirit.class, 3.0, plus -> plus.isAlive() && !plus.isDeparting());
+                expect(minecraft, subject != null, "the Plus in front of the player never reached the client");
+                if (subject != null) {
+                    look(minecraft, subject.getEyePosition());
+                }
+            }
+            // The interaction carries the sneak with it, so the server sees Konsō.
+            case 780 -> {
+                if (subject != null) {
+                    minecraft.gameMode.interact(player, subject, InteractionHand.MAIN_HAND);
+                }
+            }
+            case 786 -> minecraft.options.keyShift.setDown(false);
+            case 840 -> command(minecraft, "bleach garganta @s spider");
+            case 885 -> shot(minecraft, "garganta");
+            case 902 -> command(minecraft, "kill @e[type=#bleach:hollows]");
+            case 905 -> {
+                // Just below the threshold with no power awakened. The Hollow state at tick 180 left a Hollow tier.
+                command(minecraft, "bleach soul @s human");
+                command(minecraft, "bleach tier @s shinigami 0");
+                command(minecraft, "bleach tier @s hollow 0");
+                command(minecraft, "bleach reiryoku @s 22 22");
+                command(minecraft, "summon bleach:spider_hollow ~ ~ ~-3 {NoAI:1b}");
+            }
+            case 955 -> {
+                command(minecraft, "kill @e[type=#bleach:hollows]");
+                command(minecraft, "kill @e[type=bleach:plus]");
+                command(minecraft, "difficulty peaceful");
+            }
+            case 980 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -246,6 +360,61 @@ public final class ClientSmokeTest {
         LocalPlayer player = minecraft.player;
         return minecraft.level.getEntitiesOfClass(AcademyInstructor.class, player.getBoundingBox().inflate(range),
                 instructor -> instructor.distanceTo(player) <= range);
+    }
+
+    /** The nearest entity of this class within {@code range} blocks of the player that passes the filter, or null. */
+    @Nullable
+    private static <T extends Entity> T nearest(Minecraft minecraft, Class<T> type, double range, Predicate<T> filter) {
+        LocalPlayer player = minecraft.player;
+        T nearest = null;
+        double nearestSqr = range * range;
+        for (T entity : minecraft.level.getEntitiesOfClass(type, player.getBoundingBox().inflate(range), filter)) {
+            double distanceSqr = entity.distanceToSqr(player);
+            if (distanceSqr <= nearestSqr) {
+                nearest = entity;
+                nearestSqr = distanceSqr;
+            }
+        }
+        return nearest;
+    }
+
+    /** Turns the player's eyes to a point, as the mouse would. */
+    private static void look(Minecraft minecraft, Vec3 target) {
+        minecraft.player.lookAt(EntityAnchorArgument.Anchor.EYES, target);
+    }
+
+    /** Whether this is a Spider Hollow and not a Hexapodus, which is a kind of Spider Hollow too. */
+    private static boolean isSpiderHollow(Entity entity) {
+        return entity.getType() == ModEntities.SPIDER_HOLLOW.get();
+    }
+
+    /** Takes the living Spider Hollow just in front of the player as the subject, and looks at its mask. */
+    private static void aimAtMask(Minecraft minecraft, String problem) {
+        subject = nearest(minecraft, SpiderHollow.class, 3.5, spider -> spider.isAlive() && isSpiderHollow(spider));
+        expect(minecraft, subject != null, problem);
+        if (subject instanceof Hollow hollow) {
+            look(minecraft, HollowMask.maskCenter(hollow));
+        }
+    }
+
+    /** Whether one of each kind of Hollow and a Plus has reached the client nearby, and none is hidden. */
+    private static boolean summonedSeen(Minecraft minecraft) {
+        List<EntityType<?>> types = List.of(ModEntities.SPIDER_HOLLOW.get(), ModEntities.HEXAPODUS.get(),
+                ModEntities.HOUND_HOLLOW.get(), ModEntities.SERPENT_HOLLOW.get(), ModEntities.FISHBONE_D.get(),
+                ModEntities.PLUS.get());
+        for (EntityType<?> type : types) {
+            if (nearest(minecraft, Entity.class, SUMMONED_RANGE,
+                    entity -> entity.getType() == type && !ClientSouls.isHiddenFromViewer(entity)) == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The nearest Garganta on the client that is at least mostly open, or null. */
+    @Nullable
+    private static GargantaRift openRift(Minecraft minecraft) {
+        return nearest(minecraft, GargantaRift.class, RIFT_RANGE, rift -> rift.openness(0.0F) >= 0.8F);
     }
 
     private static double horizontalDistance(Vec3 a, Vec3 b) {

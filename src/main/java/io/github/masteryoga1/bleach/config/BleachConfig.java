@@ -15,8 +15,11 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue REGEN_FRACTION_PER_SECOND;
     public static final ModConfigSpec.DoubleValue REST_REGEN_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue RESPAWN_REIRYOKU_FRACTION;
+    public static final ModConfigSpec.DoubleValue SHIMMER_FRACTION;
 
-    public static final ModConfigSpec.DoubleValue KILL_GROWTH_PER_MAX_HEALTH;
+    public static final ModConfigSpec.DoubleValue MUNDANE_KILL_GROWTH_PER_MAX_HEALTH;
+    public static final ModConfigSpec.DoubleValue SPIRIT_KILL_GROWTH_PER_REIATSU;
+    public static final ModConfigSpec.DoubleValue PURIFICATION_GROWTH_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue CLOSE_CALL_GROWTH;
     public static final ModConfigSpec.IntValue CLOSE_CALL_COOLDOWN_SECONDS;
     public static final ModConfigSpec.DoubleValue LEVEL_UP_GROWTH;
@@ -37,6 +40,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue ENCROACHMENT_FRACTION;
     public static final ModConfigSpec.BooleanValue HOLLOWFICATION;
     public static final ModConfigSpec.DoubleValue HOLLOWFICATION_GROWTH;
+    public static final ModConfigSpec.IntValue HOLLOW_BITE_CHAIN_COST_SECONDS;
 
     public static final ModConfigSpec.DoubleValue REIATSU_DIFFERENCE_RATIO;
     public static final ModConfigSpec.DoubleValue REIATSU_DIFFERENCE_MIN_DAMAGE;
@@ -84,6 +88,44 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.DoubleValue SHIHAKUSHO_SET_REGEN_BONUS;
 
+    public static final ModConfigSpec.BooleanValue GARGANTA_ARRIVALS;
+    public static final ModConfigSpec.DoubleValue ARRIVAL_CHANCE_PER_MINUTE;
+    public static final ModConfigSpec.DoubleValue MAX_ARRIVAL_CHANCE_PER_MINUTE;
+    public static final ModConfigSpec.DoubleValue ARRIVAL_NIGHT_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue ARRIVAL_PLUS_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue ARRIVAL_RELEASED_MULTIPLIER;
+    public static final ModConfigSpec.IntValue ARRIVAL_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue ARRIVAL_GRACE_SECONDS;
+    public static final ModConfigSpec.IntValue MAX_NEARBY_HOLLOWS;
+    public static final ModConfigSpec.IntValue ACADEMY_SAFE_RADIUS;
+
+    public static final ModConfigSpec.DoubleValue HOLLOW_HEALTH_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue HOLLOW_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue MASK_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue HOLLOW_REGEN_PER_SECOND;
+    public static final ModConfigSpec.IntValue MASK_REGEN_PAUSE_SECONDS;
+    public static final ModConfigSpec.BooleanValue HUNT_UNAWARE;
+    public static final ModConfigSpec.BooleanValue HUNT_HOLLOW_PLAYERS;
+    public static final ModConfigSpec.IntValue HOLLOW_LEAVE_AFTER_MINUTES;
+    public static final ModConfigSpec.IntValue HOLLOW_HIT_STAT_XP;
+    public static final ModConfigSpec.IntValue MASK_HIT_STAT_XP_BONUS;
+    public static final ModConfigSpec.IntValue PURIFICATION_ZANJUTSU_XP;
+
+    public static final ModConfigSpec.BooleanValue FIRST_HOLLOW;
+    public static final ModConfigSpec.IntValue FIRST_HOLLOW_DELAY_MINUTES;
+    public static final ModConfigSpec.IntValue FIRST_HOLLOW_RETRY_MINUTES;
+    public static final ModConfigSpec.BooleanValue FIRST_HOLLOW_WOUNDED_SHINIGAMI;
+
+    public static final ModConfigSpec.BooleanValue AMBIENT_PLUSES;
+    public static final ModConfigSpec.DoubleValue PLUS_CHANCE_PER_MINUTE;
+    public static final ModConfigSpec.DoubleValue PLUS_VILLAGE_MULTIPLIER;
+    public static final ModConfigSpec.IntValue MAX_NEARBY_PLUSES;
+    public static final ModConfigSpec.IntValue PLUS_CHAIN_MINUTES;
+    public static final ModConfigSpec.BooleanValue VILLAGER_PLUSES;
+    public static final ModConfigSpec.IntValue VILLAGER_PLUS_CAP;
+
+    public static final ModConfigSpec.IntValue DENREISHINKI_RANGE;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -106,12 +148,21 @@ public final class BleachConfig {
         RESPAWN_REIRYOKU_FRACTION = builder
                 .comment("Share of maximum reiryoku a player has after respawning.")
                 .defineInRange("respawn_reiryoku_fraction", 0.5, 0.0, 1.0);
+        SHIMMER_FRACTION = builder
+                .comment("Share of the awareness threshold at which an unaware Human starts to sense spirits: a faint shimmer and distant screams. 1 turns it off.")
+                .defineInRange("shimmer_fraction", 0.67, 0.0, 1.0);
         builder.pop();
 
         builder.push("growth");
-        KILL_GROWTH_PER_MAX_HEALTH = builder
-                .comment("Maximum reiryoku gained per point of max health of a hostile creature you kill.")
-                .defineInRange("kill_growth_per_max_health", 0.02, 0.0, 100.0);
+        MUNDANE_KILL_GROWTH_PER_MAX_HEALTH = builder
+                .comment("Maximum reiryoku gained per point of max health of a hostile creature that is not a spirit.")
+                .defineInRange("mundane_kill_growth_per_max_health", 0.0, 0.0, 100.0);
+        SPIRIT_KILL_GROWTH_PER_REIATSU = builder
+                .comment("Maximum reiryoku gained per point of a slain Hollow's reiatsu, down to a tenth against one far weaker than you.")
+                .defineInRange("spirit_kill_growth_per_reiatsu", 0.025, 0.0, 100.0);
+        PURIFICATION_GROWTH_MULTIPLIER = builder
+                .comment("Extra growth for purifying a Hollow with a zanpakutō.")
+                .defineInRange("purification_growth_multiplier", 1.5, 1.0, 100.0);
         CLOSE_CALL_GROWTH = builder
                 .comment("Maximum reiryoku gained for surviving a hit that leaves you below 30% health.")
                 .defineInRange("close_call_growth", 0.25, 0.0, 1_000.0);
@@ -172,6 +223,9 @@ public final class BleachConfig {
         HOLLOWFICATION_GROWTH = builder
                 .comment("Maximum reiryoku gained on becoming a Hollow.")
                 .defineInRange("hollowfication_growth", 50.0, 0.0, 100_000.0);
+        HOLLOW_BITE_CHAIN_COST_SECONDS = builder
+                .comment("Seconds of chain a Hollow's bite takes from a Plus, never below a minute.")
+                .defineInRange("hollow_bite_chain_cost_seconds", 30, 0, 3_600);
         builder.pop();
 
         builder.push("reiatsu");
@@ -310,6 +364,120 @@ public final class BleachConfig {
         SHIHAKUSHO_SET_REGEN_BONUS = builder
                 .comment("Extra reiryoku regeneration from wearing the full Shihakushō, for Shinigami and Academy students (0.1 = +10%).")
                 .defineInRange("set_regen_bonus", 0.1, 0.0, 10.0);
+        builder.pop();
+
+        builder.push("garganta");
+        GARGANTA_ARRIVALS = builder
+                .comment("Whether Hollows come through Garganta near spiritually aware souls.")
+                .define("arrivals", true);
+        ARRIVAL_CHANCE_PER_MINUTE = builder
+                .comment("Chance a minute at 40 reiatsu; grows with the square root of reiatsu.")
+                .defineInRange("chance_per_minute", 0.06, 0.0, 1.0);
+        MAX_ARRIVAL_CHANCE_PER_MINUTE = builder
+                .comment("Highest chance a minute, however strong the soul, before the multipliers below.")
+                .defineInRange("max_chance_per_minute", 0.4, 0.0, 1.0);
+        ARRIVAL_NIGHT_MULTIPLIER = builder
+                .comment("How much likelier an arrival is at night.")
+                .defineInRange("night_multiplier", 1.5, 0.0, 10.0);
+        ARRIVAL_PLUS_MULTIPLIER = builder
+                .comment("How much likelier an arrival is for a Plus.")
+                .defineInRange("plus_multiplier", 1.5, 0.0, 10.0);
+        ARRIVAL_RELEASED_MULTIPLIER = builder
+                .comment("How much likelier an arrival is while reiatsu is released.")
+                .defineInRange("released_multiplier", 2.0, 0.0, 10.0);
+        ARRIVAL_COOLDOWN_SECONDS = builder
+                .comment("Seconds that pass at least between two arrivals near the same soul.")
+                .defineInRange("cooldown_seconds", 120, 0, 86_400);
+        ARRIVAL_GRACE_SECONDS = builder
+                .comment("Seconds without arrivals after joining, respawning or changing dimension.")
+                .defineInRange("grace_seconds", 60, 0, 3_600);
+        MAX_NEARBY_HOLLOWS = builder
+                .comment("No arrivals while this many Hollows are within 64 blocks.")
+                .defineInRange("max_nearby_hollows", 4, 1, 32);
+        ACADEMY_SAFE_RADIUS = builder
+                .comment("No tears this close to an Academy instructor, in blocks.")
+                .defineInRange("academy_safe_radius", 32, 0, 256);
+        builder.pop();
+
+        builder.push("hollows");
+        HOLLOW_HEALTH_MULTIPLIER = builder
+                .comment("Multiplier on every Hollow's health.")
+                .defineInRange("health_multiplier", 1.0, 0.1, 100.0);
+        HOLLOW_DAMAGE_MULTIPLIER = builder
+                .comment("Multiplier on every Hollow's attack damage.")
+                .defineInRange("damage_multiplier", 1.0, 0.1, 100.0);
+        MASK_DAMAGE_MULTIPLIER = builder
+                .comment("Damage multiplier for a blow or arrow that strikes a Hollow's mask.")
+                .defineInRange("mask_damage_multiplier", 2.0, 1.0, 10.0);
+        HOLLOW_REGEN_PER_SECOND = builder
+                .comment("Health a Hollow heals each second once nothing has hurt it for 5 seconds.")
+                .defineInRange("regeneration_per_second", 0.5, 0.0, 100.0);
+        MASK_REGEN_PAUSE_SECONDS = builder
+                .comment("Seconds a Hollow cannot heal after a blow to its mask.")
+                .defineInRange("mask_regeneration_pause_seconds", 10, 0, 600);
+        HUNT_UNAWARE = builder
+                .comment("Whether Hollows hunt players who cannot see them.")
+                .define("hunt_unaware", false);
+        HUNT_HOLLOW_PLAYERS = builder
+                .comment("Whether Hollows hunt players who are Hollows or Arrancar themselves.")
+                .define("hunt_hollow_players", false);
+        HOLLOW_LEAVE_AFTER_MINUTES = builder
+                .comment("Minutes a Hollow with no prey near an aware soul waits before it leaves through a tear. 0 means they never leave.")
+                .defineInRange("leave_after_minutes", 2, 0, 1_440);
+        HOLLOW_HIT_STAT_XP = builder
+                .comment("Zanjutsu or Hakuda XP for a landed hit on a Hollow.")
+                .defineInRange("hit_stat_xp", 2, 1, 100);
+        MASK_HIT_STAT_XP_BONUS = builder
+                .comment("Extra Zanjutsu or Hakuda XP when that hit strikes the mask.")
+                .defineInRange("mask_hit_stat_xp_bonus", 1, 0, 100);
+        PURIFICATION_ZANJUTSU_XP = builder
+                .comment("Zanjutsu XP for purifying a Hollow.")
+                .defineInRange("purification_zanjutsu_xp", 5, 0, 1_000);
+        builder.pop();
+
+        builder.push("first_hollow");
+        FIRST_HOLLOW = builder
+                .comment("Whether a soul's first Hollow is Fishbone D, who comes for it alone before any other Hollow does.")
+                .define("enabled", true);
+        FIRST_HOLLOW_DELAY_MINUTES = builder
+                .comment("Minutes of play while aware before Fishbone D comes, on the first night after that.")
+                .defineInRange("delay_minutes", 10, 0, 1_440);
+        FIRST_HOLLOW_RETRY_MINUTES = builder
+                .comment("Minutes before Fishbone D comes back after it retreats.")
+                .defineInRange("retry_minutes", 10, 1, 1_440);
+        FIRST_HOLLOW_WOUNDED_SHINIGAMI = builder
+                .comment("Whether a wounded Shinigami stumbles in just ahead of Fishbone D for a Human who could take her power. Also needs substitute.wounded_encounters.")
+                .define("wounded_shinigami", true);
+        builder.pop();
+
+        builder.push("pluses");
+        AMBIENT_PLUSES = builder
+                .comment("Whether Pluses sometimes wander near spiritually aware souls.")
+                .define("ambient", true);
+        PLUS_CHANCE_PER_MINUTE = builder
+                .comment("Chance each minute that a Plus appears near such a soul.")
+                .defineInRange("chance_per_minute", 0.1, 0.0, 1.0);
+        PLUS_VILLAGE_MULTIPLIER = builder
+                .comment("How much likelier a Plus is in a village.")
+                .defineInRange("village_multiplier", 3.0, 0.0, 100.0);
+        MAX_NEARBY_PLUSES = builder
+                .comment("No more Pluses appear while this many are within 48 blocks.")
+                .defineInRange("max_nearby", 3, 0, 32);
+        PLUS_CHAIN_MINUTES = builder
+                .comment("How long a Plus spirit's Chain of Fate lasts, in minutes of play.")
+                .defineInRange("chain_minutes", 20, 1, 10_080);
+        VILLAGER_PLUSES = builder
+                .comment("Whether villagers who die leave a Plus.")
+                .define("villager_pluses", true);
+        VILLAGER_PLUS_CAP = builder
+                .comment("A villager who dies leaves no Plus while this many Pluses are within 16 blocks.")
+                .defineInRange("villager_cap", 8, 0, 64);
+        builder.pop();
+
+        builder.push("denreishinki");
+        DENREISHINKI_RANGE = builder
+                .comment("How far, in blocks, a Denreishinki hears tears open and Pluses turn Hollow, and finds the nearest Hollow.")
+                .defineInRange("range", 96, 16, 512);
         builder.pop();
 
         SPEC = builder.build();

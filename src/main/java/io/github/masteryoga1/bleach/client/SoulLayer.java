@@ -4,7 +4,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulState;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.SkullModel;
 import net.minecraft.client.model.SkullModelBase;
@@ -16,13 +15,8 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.SkullBlockRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.AbstractSkullBlock;
 import net.minecraft.world.level.block.SkullBlock;
 
@@ -32,11 +26,6 @@ import net.minecraft.world.level.block.SkullBlock;
  * the mod has its own art.
  */
 public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
-    /** Chain pieces at full length. Each piece is a chain item sprite. */
-    private static final int MAX_CHAIN_PIECES = 5;
-    private static final float PIECE_SIZE = 0.2F;
-
-    private final ItemStack chain = new ItemStack(Items.CHAIN);
     private final SkullModelBase mask;
     private final RenderType maskType = SkullBlockRenderer.getRenderType(SkullBlock.Types.SKELETON, null);
 
@@ -64,7 +53,6 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
     /** A column of chain pieces hanging from the middle of the chest. */
     private void renderChain(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                              AbstractClientPlayer player, float fraction) {
-        int pieces = Mth.clamp(Mth.ceil(fraction * MAX_CHAIN_PIECES), 1, MAX_CHAIN_PIECES);
         poseStack.pushPose();
         getParentModel().body.translateAndRotate(poseStack);
         // In front of the chest, or of the chestplate when one is worn.
@@ -72,14 +60,7 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
         poseStack.translate(0.0F, 0.3F, front);
         // Model space is upside down; turn it back so the sprites hang the right way up.
         poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
-        for (int i = 0; i < pieces; i++) {
-            poseStack.pushPose();
-            poseStack.translate(0.0F, -(i + 0.5F) * PIECE_SIZE, 0.0F);
-            poseStack.scale(PIECE_SIZE, PIECE_SIZE, PIECE_SIZE);
-            Minecraft.getInstance().getItemRenderer().renderStatic(chain, ItemDisplayContext.FIXED, packedLight,
-                    OverlayTexture.NO_OVERLAY, poseStack, buffer, player.level(), player.getId() + i);
-            poseStack.popPose();
-        }
+        ChainPieces.render(poseStack, buffer, packedLight, player.level(), player.getId(), fraction);
         poseStack.popPose();
     }
 

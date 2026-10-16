@@ -222,8 +222,16 @@ def lane():
     return t
 
 
+def field():
+    """A game-test field for Hollows: 16 by 16 with a stone floor and 11 blocks of air above."""
+    t = Template(16, 12, 16)
+    t.fill(0, 0, 0, 15, 0, 15, "minecraft:stone")
+    return t
+
+
 TEMPLATES = {
     "academy/academy.nbt": academy,
+    "field.nbt": field,
     "lane.nbt": lane,
 }
 

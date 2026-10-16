@@ -23,7 +23,7 @@ public final class SoulLogic {
     /** How long exhaustion lasts after running out of reiryoku, in ticks. */
     public static final int EXHAUSTION_TICKS = 100;
 
-    /** Creature types that are spirits, hidden from the spiritually unaware: the Shinigami NPCs, and Hollows to come. */
+    /** Creature types that are spirits, hidden from the spiritually unaware: Shinigami NPCs, Hollows, Pluses and the Garganta. */
     public static final TagKey<EntityType<?>> SPIRITS = TagKey.create(Registries.ENTITY_TYPE, BleachMod.id("spirits"));
 
     /** Share of maximum reiryoku needed to start releasing reiatsu. */
@@ -54,6 +54,21 @@ public final class SoulLogic {
     public static boolean isAware(SoulData data) {
         return data.state().isSpirit() || hasAwakenedPower(data)
                 || data.maxReiryoku() >= BleachConfig.get(BleachConfig.AWARENESS_THRESHOLD);
+    }
+
+    /** Whether this player sees spirits: in creative or spectator mode, or with a spiritually aware soul. */
+    public static boolean seesSpirits(Player player) {
+        return player.isCreative() || player.isSpectator() || hasSoul(player) && isAware(get(player));
+    }
+
+    /**
+     * Whether this Human is just below the awareness threshold, where spirits cannot be seen yet but
+     * give themselves away: hidden spirits shimmer faintly and Hollow screams sound far off.
+     */
+    public static boolean inShimmerBand(SoulData data) {
+        double fraction = BleachConfig.get(BleachConfig.SHIMMER_FRACTION);
+        return data.state() == SoulState.HUMAN && data.isInitialized() && !isAware(data) && fraction < 1.0
+                && data.maxReiryoku() >= BleachConfig.get(BleachConfig.AWARENESS_THRESHOLD) * fraction;
     }
 
     /** Whether any {@link PowerPath} has awakened in this soul. */
@@ -180,14 +195,17 @@ public final class SoulLogic {
         return entity.getType().is(SPIRITS);
     }
 
-    /** Whether this creature has a soul the mod tracks (for now, players once initialized). */
+    /**
+     * Whether this creature has a soul the mod tracks: a player once initialized, or a spirit mob
+     * (Shinigami NPC, Hollow or Plus) once it has been given one.
+     */
     public static boolean hasSoul(Entity entity) {
         return entity.hasData(SoulAttachments.SOUL) && entity.getData(SoulAttachments.SOUL).isInitialized();
     }
 
     /**
-     * A creature's spiritual pressure: maximum reiryoku for a soul, and max health as a stand-in for
-     * creatures without one.
+     * A creature's spiritual pressure: maximum reiryoku for a soul (players and spirit mobs alike),
+     * and max health as a stand-in for creatures without one.
      */
     public static float reiatsu(LivingEntity entity) {
         return hasSoul(entity) ? get(entity).maxReiryoku() : entity.getMaxHealth();

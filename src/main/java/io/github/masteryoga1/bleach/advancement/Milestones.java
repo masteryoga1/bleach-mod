@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.advancement;
 
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
+import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -31,10 +32,23 @@ public final class Milestones {
     public static final String SHUNPO = "shunpo";
     /** Stood on hardened reishi in mid-air. */
     public static final String REISHI_FOOTING = "reishi_footing";
+    /** Saw a Garganta open. Granted when it happens, as are the three below. */
+    public static final String GARGANTA = "garganta";
+    /** Lived through the first Hollow, Fishbone D. */
+    public static final String FIRST_HOLLOW = "first_hollow";
+    /** Struck a Hollow's mask. */
+    public static final String MASK_STRIKE = "mask_strike";
+    /** Purified Fishbone D. */
+    public static final String FISHBONE_D = "fishbone_d";
+    /** Purified a Hollow with a zanpakutō. Granted when it happens and by {@link #check}. */
+    public static final String PURIFIED = "purified";
+    /** Sent ten Pluses on. */
+    public static final String SOUL_BURIAL = "soul_burial";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
     private static final float RISING_REIATSU_AMOUNT = 100.0F;
+    private static final int SOUL_BURIAL_COUNT = 10;
 
     private Milestones() {
     }
@@ -63,6 +77,13 @@ public final class Milestones {
         }
         if (ShihakushoItem.isFullSet(player)) {
             trigger.trigger(player, SHIHAKUSHO);
+        }
+        HuntRecord hunt = data.hunt();
+        if (hunt.purified() >= 1) {
+            trigger.trigger(player, PURIFIED);
+        }
+        if (hunt.sentOn() >= SOUL_BURIAL_COUNT) {
+            trigger.trigger(player, SOUL_BURIAL);
         }
     }
 

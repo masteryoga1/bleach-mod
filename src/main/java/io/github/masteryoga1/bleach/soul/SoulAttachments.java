@@ -11,8 +11,8 @@ public final class SoulAttachments {
             DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, BleachMod.MODID);
 
     /**
-     * A player's soul. Not copied on death automatically: {@link SoulEvents} copies it so it can
-     * change what carries over.
+     * A soul: a player's, or a spirit mob's (Shinigami NPCs, Hollows, Pluses). Not copied on death
+     * automatically: {@link SoulEvents} copies a player's so it can change what carries over.
      */
     public static final Supplier<AttachmentType<SoulData>> SOUL = ATTACHMENT_TYPES.register("soul",
             () -> AttachmentType.builder(() -> new SoulData()).serialize(SoulData.CODEC).build());

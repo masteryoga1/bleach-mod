@@ -2,7 +2,9 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
+import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
@@ -11,7 +13,6 @@ import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.network.chat.Component;
@@ -22,7 +23,6 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
@@ -31,8 +31,6 @@ import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.EventHooks;
@@ -49,7 +47,8 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  *
  * <p>Between players, the giver sneaks and uses a Zanpakutō on the other player to offer Konsō (to
  * a Plus) or their power (to a Human, used twice to confirm), and the other accepts by using an
- * empty hand on them within {@link #OFFER_TICKS} ticks.
+ * empty hand on them within {@link #OFFER_TICKS} ticks. A Plus spirit is sent on the same way,
+ * without being asked (see {@link #konsoPlus}).
  */
 public final class ShinigamiEvents {
     private static final int KONSO_RING_POINTS = 16;
@@ -190,6 +189,7 @@ public final class ShinigamiEvents {
         give(player, new ItemStack(ModItems.SHIHAKUSHO_KOSODE.get()));
         give(player, new ItemStack(ModItems.SHIHAKUSHO_HAKAMA.get()));
         give(player, new ItemStack(ModItems.WARAJI.get()));
+        DenreishinkiItem.giveIfMissing(player);
         playSound(player, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE);
         player.sendSystemMessage(Component.translatable("message.bleach.graduated").withStyle(ChatFormatting.GOLD));
         if (player instanceof ServerPlayer serverPlayer) {
@@ -259,32 +259,73 @@ public final class ShinigamiEvents {
             AcademyLocator.sendTo(soul);
         }
         if (performer instanceof Player player && SoulLogic.hasSoul(player)) {
-            ShinigamiLogic.rewardKonso(SoulLogic.get(player), player.level().getGameTime());
             player.displayClientMessage(Component.translatable("message.bleach.konso.performed", plus.getDisplayName()), true);
-            if (player instanceof ServerPlayer serverPlayer) {
-                Milestones.grant(serverPlayer, Milestones.KONSO);
-            }
+            konsoPerformed(player, SoulLogic.get(player));
         }
         return true;
     }
 
-    /** A seal ring at the feet, soul wisps sinking into it, and one dark puff where the chain was. */
-    private static void konsoEffects(Player plus) {
-        if (!(plus.level() instanceof ServerLevel level)) {
+    /**
+     * Konsō on a Plus spirit, from a player sneaking with a zanpakutō: it closes its eyes and sinks
+     * away into the light. A Plus spirit is not asked first. Only those who can perform Konsō can.
+     *
+     * @return whether the Plus was sent on
+     */
+    public static boolean konsoPlus(Player performer, PlusSpirit plus) {
+        if (!SoulLogic.hasSoul(performer) || !plus.isAlive() || plus.isDeparting()) {
+            return false;
+        }
+        SoulData data = SoulLogic.get(performer);
+        if (!SoulLogic.isAware(data)) {
+            return false;
+        }
+        long now = performer.level().getGameTime();
+        if (!ShinigamiLogic.canPerformKonso(data, now)) {
+            String key = ShinigamiLogic.hasShinigamiPower(data) && ShinigamiLogic.isPowerLent(data, now)
+                    ? "message.bleach.power_lent" : "message.bleach.konso.untrained";
+            performer.displayClientMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY), true);
+            return false;
+        }
+        plus.startDeparture(PlusSpirit.SINKING);
+        konsoEffects(plus);
+        performer.displayClientMessage(Component.translatable("message.bleach.konso.performed", plus.getDisplayName()), true);
+        performer.sendSystemMessage(Component.translatable(
+                        "message.bleach.plus.farewell." + performer.getRandom().nextInt(PlusSpirit.FAREWELL_LINES))
+                .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        konsoPerformed(performer, data);
+        return true;
+    }
+
+    /** The performer of a Konsō grows a little stronger, up to the daily limit, and counts one more soul sent on. */
+    private static void konsoPerformed(Player performer, SoulData data) {
+        ShinigamiLogic.rewardKonso(data, performer.level().getGameTime());
+        data.setHunt(data.hunt().withSentOn(data.hunt().sentOn() + 1));
+        if (performer instanceof ServerPlayer serverPlayer) {
+            Milestones.grant(serverPlayer, Milestones.KONSO);
+            Milestones.check(serverPlayer, data);
+        }
+    }
+
+    /**
+     * A seal ring at the feet, soul wisps sinking into it, and one dark puff where the chain was,
+     * seen and heard only by those who can see the soul.
+     */
+    static void konsoEffects(LivingEntity soul) {
+        if (!(soul.level() instanceof ServerLevel level)) {
             return;
         }
-        double x = plus.getX();
-        double y = plus.getY() + 0.05;
-        double z = plus.getZ();
+        double x = soul.getX();
+        double y = soul.getY() + 0.05;
+        double z = soul.getZ();
         for (int i = 0; i < KONSO_RING_POINTS; i++) {
             double angle = 2.0 * Math.PI * i / KONSO_RING_POINTS;
-            level.sendParticles(ParticleTypes.END_ROD, x + Math.cos(angle) * KONSO_RING_RADIUS, y,
+            SpiritSenses.particles(level, ParticleTypes.END_ROD, x + Math.cos(angle) * KONSO_RING_RADIUS, y,
                     z + Math.sin(angle) * KONSO_RING_RADIUS, 1, 0.0, 0.0, 0.0, 0.0);
         }
-        level.sendParticles(ParticleTypes.SOUL, x, plus.getY() + 1.0, z, 6, 0.25, 0.4, 0.25, 0.01);
-        level.sendParticles(ParticleTypes.SQUID_INK, x, plus.getY() + 1.1, z, 1, 0.0, 0.0, 0.0, 0.0);
-        level.playSound(null, x, y, z, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.0F);
-        level.playSound(null, x, y, z, SoundEvents.SOUL_ESCAPE.value(), SoundSource.PLAYERS, 1.0F, 1.0F);
+        SpiritSenses.particles(level, ParticleTypes.SOUL, x, soul.getY() + 1.0, z, 6, 0.25, 0.4, 0.25, 0.01);
+        SpiritSenses.particles(level, ParticleTypes.SQUID_INK, x, soul.getY() + 1.1, z, 1, 0.0, 0.0, 0.0, 0.0);
+        SpiritSenses.play(level, x, y, z, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.0F, false);
+        SpiritSenses.play(level, x, y, z, SoundEvents.SOUL_ESCAPE.value(), SoundSource.PLAYERS, 1.0F, 1.0F, false);
     }
 
     // ---- Offers between players ----
@@ -480,6 +521,7 @@ public final class ShinigamiEvents {
         SoulLogic.applyStatModifiers(giver, giverData);
         SoulLogic.applyStatModifiers(human, humanData);
         giveAsauchi(human, humanData);
+        DenreishinkiItem.giveIfMissing(human);
         powerEffects(human);
         giver.sendSystemMessage(Component.translatable("message.bleach.power.given", human.getDisplayName())
                 .withStyle(ChatFormatting.DARK_RED));
@@ -495,6 +537,7 @@ public final class ShinigamiEvents {
         ShinigamiLogic.awaken(data, BleachConfig.get(BleachConfig.AWAKENING_GROWTH));
         SoulLogic.applyStatModifiers(human, data);
         giveAsauchi(human, data);
+        DenreishinkiItem.giveIfMissing(human);
         giver.markGavePower();
         powerEffects(human);
         human.sendSystemMessage(Component.translatable("message.bleach.power.received").withStyle(ChatFormatting.AQUA));
@@ -503,7 +546,8 @@ public final class ShinigamiEvents {
 
     /**
      * Once a minute at night, a wounded Shinigami may come down near an aware Human out under the sky
-     * who could take her power.
+     * who could take her power. If the Human still awaits their first Hollow, it is the Hollow that
+     * hurt her, half a minute behind.
      */
     private static void tryEncounter(ServerPlayer player, SoulData data, long now) {
         ServerLevel level = player.serverLevel();
@@ -511,14 +555,33 @@ public final class ShinigamiEvents {
                 || !ShinigamiLogic.canMeetWoundedShinigami(data, now) || !level.canSeeSky(player.blockPosition())
                 || player.getRandom().nextDouble() >= BleachConfig.get(BleachConfig.ENCOUNTER_CHANCE_PER_MINUTE)
                 || !level.getEntitiesOfClass(WoundedShinigami.class,
-                        player.getBoundingBox().inflate(ENCOUNTER_EXCLUSION_RANGE)).isEmpty()) {
+                        player.getBoundingBox().inflate(ENCOUNTER_EXCLUSION_RANGE)).isEmpty()
+                || spawnWoundedFor(player, data, now) == null) {
             return;
         }
+        player.sendSystemMessage(Component.translatable("message.bleach.wounded_nearby")
+                .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        if (HollowLogic.awaitsFirstHollow(data) && GargantaEvents.mayArriveNear(player, data, now)
+                && HollowLogic.firstHollowMayReturn(data.hunt(), now)) {
+            GargantaEvents.startFirstHollow(player, data, now, true);
+        }
+    }
+
+    /**
+     * A wounded Shinigami comes down on open ground 8 to 16 blocks from the player, facing them, and
+     * the player is marked as having met one. No conditions are checked here.
+     *
+     * @return her, or null if there was no room or she could not be added
+     */
+    @Nullable
+    static WoundedShinigami spawnWoundedFor(ServerPlayer player, SoulData data, long now) {
+        ServerLevel level = player.serverLevel();
         EntityType<WoundedShinigami> type = ModEntities.WOUNDED_SHINIGAMI.get();
-        Vec3 spot = findEncounterSpot(level, player, type);
+        Vec3 spot = SpawnSpots.openGround(level, player, type, ENCOUNTER_MIN_DISTANCE, ENCOUNTER_MAX_DISTANCE,
+                ENCOUNTER_TRIES, Integer.MAX_VALUE);
         WoundedShinigami npc = spot != null ? type.create(level) : null;
         if (npc == null) {
-            return;
+            return null;
         }
         float yaw = (float) (Mth.atan2(player.getZ() - spot.z, player.getX() - spot.x) * Mth.RAD_TO_DEG) - 90.0F;
         npc.moveTo(spot.x, spot.y, spot.z, yaw, 0.0F);
@@ -526,37 +589,10 @@ public final class ShinigamiEvents {
         npc.setYBodyRot(yaw);
         EventHooks.finalizeMobSpawn(npc, level, level.getCurrentDifficultyAt(npc.blockPosition()), MobSpawnType.EVENT, null);
         if (!level.addFreshEntity(npc)) {
-            return;
+            return null;
         }
         data.setShinigami(data.shinigami().withWoundedMetAt(now));
-        player.sendSystemMessage(Component.translatable("message.bleach.wounded_nearby")
-                .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
-    }
-
-    /** Open ground 8 to 16 blocks from the player, in a chunk that is ticking, with room to stand. */
-    @Nullable
-    private static Vec3 findEncounterSpot(ServerLevel level, Player player, EntityType<?> type) {
-        RandomSource random = player.getRandom();
-        for (int i = 0; i < ENCOUNTER_TRIES; i++) {
-            double angle = random.nextDouble() * 2.0 * Math.PI;
-            double distance = Mth.nextDouble(random, ENCOUNTER_MIN_DISTANCE, ENCOUNTER_MAX_DISTANCE);
-            int x = Mth.floor(player.getX() + Math.cos(angle) * distance);
-            int z = Mth.floor(player.getZ() + Math.sin(angle) * distance);
-            if (!level.isPositionEntityTicking(BlockPos.containing(x, player.getY(), z))) {
-                continue;
-            }
-            BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
-            BlockPos below = pos.below();
-            if (!level.getWorldBorder().isWithinBounds(pos) || !level.getFluidState(pos).isEmpty()
-                    || !level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)) {
-                continue;
-            }
-            AABB box = type.getSpawnAABB(x + 0.5, pos.getY(), z + 0.5);
-            if (level.noCollision(box) && !level.containsAnyLiquid(box)) {
-                return new Vec3(x + 0.5, pos.getY(), z + 0.5);
-            }
-        }
-        return null;
+        return npc;
     }
 
     private static void powerEffects(Player human) {

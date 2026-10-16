@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:konso",
+  "display": {
+    "icon": {
+      "id": "minecraft:soul_lantern"
+    },
+    "title": {
+      "translate": "advancements.bleach.soul_burial.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.soul_burial.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "soul_burial": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "soul_burial"
+      }
+    }
+  }
+}

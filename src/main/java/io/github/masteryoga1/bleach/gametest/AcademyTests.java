@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
+import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
@@ -190,6 +191,11 @@ public final class AcademyTests {
         for (var piece : List.of(ModItems.SHIHAKUSHO_KOSODE.get(), ModItems.SHIHAKUSHO_HAKAMA.get(), ModItems.WARAJI.get())) {
             helper.assertTrue(player.getInventory().countItem(piece) == 1, "graduating did not give " + piece);
         }
+        int pagers = player.getInventory().countItem(ModItems.DENREISHINKI.get());
+        helper.assertTrue(pagers == 1, "graduating gave " + pagers + " Denreishinki");
+        DenreishinkiItem.giveIfMissing(player);
+        pagers = player.getInventory().countItem(ModItems.DENREISHINKI.get());
+        helper.assertTrue(pagers == 1, "a Shinigami who carries a Denreishinki was given another, and has " + pagers);
         helper.assertFalse(ShinigamiEvents.graduate(player), "a Shinigami graduated again");
         helper.succeed();
     }

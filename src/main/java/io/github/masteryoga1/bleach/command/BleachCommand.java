@@ -7,6 +7,9 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.masteryoga1.bleach.advancement.Milestones;
+import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.soul.GargantaEvents;
+import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -19,6 +22,8 @@ import io.github.masteryoga1.bleach.world.AcademyLocator;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
+import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -32,6 +37,7 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
@@ -48,12 +54,15 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
  * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
+ * /bleach garganta &lt;players&gt; [spider|hexapodus|hound|serpent|fishbone_d]   (a tear now; not on Peaceful)
+ * /bleach firsthollow &lt;players&gt; &lt;reset|skip|start&gt;   (the Fishbone D encounter)
  * </pre>
  */
 public final class BleachCommand {
     private static final SuggestionProvider<CommandSourceStack> STATES = suggest(SoulState.values());
     private static final SuggestionProvider<CommandSourceStack> STATS = suggest(Stat.values());
     private static final SuggestionProvider<CommandSourceStack> PATHS = suggest(PowerPath.values());
+    private static final SuggestionProvider<CommandSourceStack> HOLLOW_KINDS = suggest(HollowKind.values());
 
     private BleachCommand() {
     }
@@ -101,7 +110,26 @@ public final class BleachCommand {
                         .then(Commands.argument("players", EntityArgument.players())
                                 .executes(BleachCommand::reset)))
                 .then(Commands.literal("academy")
-                        .executes(context -> academy(context.getSource()))));
+                        .executes(context -> academy(context.getSource())))
+                .then(Commands.literal("garganta")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(context -> garganta(context, null))
+                                .then(Commands.argument("kind", StringArgumentType.word())
+                                        .suggests(HOLLOW_KINDS)
+                                        .executes(context -> garganta(context,
+                                                StringArgumentType.getString(context, "kind"))))))
+                .then(Commands.literal("firsthollow")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.literal("reset")
+                                        .executes(context -> changeFirstHollow(context, "reset", hunt -> hunt
+                                                .withAwareSincePlayTicks(-1)
+                                                .withFirstHollowDone(false)
+                                                .withLastArrivalAt(HuntRecord.NEVER))))
+                                .then(Commands.literal("skip")
+                                        .executes(context -> changeFirstHollow(context, "skip",
+                                                hunt -> hunt.withFirstHollowDone(true))))
+                                .then(Commands.literal("start")
+                                        .executes(BleachCommand::startFirstHollow)))));
     }
 
     private static int info(CommandSourceStack source, ServerPlayer player) {
@@ -136,6 +164,10 @@ public final class BleachCommand {
                 line.accept(Component.translatable("commands.bleach.info.tier", path.displayName(), data.tier(path)));
             }
         }
+        HuntRecord hunt = data.hunt();
+        line.accept(Component.translatable("commands.bleach.info.hunt", hunt.purified(), hunt.slain(), hunt.sentOn(),
+                Component.translatable(hunt.firstHollowDone()
+                        ? "commands.bleach.info.first_hollow.done" : "commands.bleach.info.first_hollow.pending")));
         return 1;
     }
 
@@ -158,6 +190,86 @@ public final class BleachCommand {
                                 Component.translatable("chat.coordinates.tooltip"))));
         source.sendSuccess(() -> Component.translatable("commands.bleach.academy.success", coordinates), false);
         return 1;
+    }
+
+    /**
+     * Opens a Garganta near each player now, with Hollows of the kind given or of one their reiatsu
+     * draws. It ignores the chance, the cooldown, the cap on nearby Hollows and whether the soul could
+     * draw one at all, and leaves the cooldown as it was; it only needs open ground to land on. Peaceful
+     * refuses it, since the Hollows would vanish at once.
+     */
+    private static int garganta(CommandContext<CommandSourceStack> context, @Nullable String name)
+            throws CommandSyntaxException {
+        HollowKind kind = null;
+        if (name != null) {
+            kind = byName(HollowKind.values(), name);
+            if (kind == null) {
+                context.getSource().sendFailure(Component.translatable("commands.bleach.unknown_hollow", name));
+                return 0;
+            }
+        }
+        if (peaceful(context.getSource())) {
+            return 0;
+        }
+        int opened = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            if (GargantaEvents.openArrival(player, SoulLogic.get(player), kind, player.level().getGameTime(), true)) {
+                opened++;
+            } else {
+                context.getSource().sendFailure(Component.translatable("commands.bleach.garganta.failed",
+                        player.getDisplayName()));
+            }
+        }
+        if (opened == 0) {
+            return 0;
+        }
+        int count = opened;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.garganta.success", count), true);
+        return count;
+    }
+
+    /** Resets or skips the first Hollow: {@code key} is the last part of the success message's key. */
+    private static int changeFirstHollow(CommandContext<CommandSourceStack> context, String key,
+                                         UnaryOperator<HuntRecord> change) throws CommandSyntaxException {
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            data.setHunt(change.apply(data.hunt()));
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.firsthollow." + key,
+                players.size()), true);
+        return players.size();
+    }
+
+    /** Sends Fishbone D after each player now, as if their first Hollow were due. */
+    private static int startFirstHollow(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        if (peaceful(context.getSource())) {
+            return 0;
+        }
+        int started = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            if (GargantaEvents.startFirstHollow(player, SoulLogic.get(player), player.level().getGameTime(), false)) {
+                started++;
+            } else {
+                context.getSource().sendFailure(Component.translatable("commands.bleach.firsthollow.failed",
+                        player.getDisplayName()));
+            }
+        }
+        if (started == 0) {
+            return 0;
+        }
+        int count = started;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.firsthollow.start", count), true);
+        return count;
+    }
+
+    /** Refuses, with a message, when the world is on Peaceful, where every Hollow would vanish at once. */
+    private static boolean peaceful(CommandSourceStack source) {
+        if (source.getLevel().getDifficulty() != Difficulty.PEACEFUL) {
+            return false;
+        }
+        source.sendFailure(Component.translatable("commands.bleach.garganta.peaceful"));
+        return true;
     }
 
     private static int setState(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {

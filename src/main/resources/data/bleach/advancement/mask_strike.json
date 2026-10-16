@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:garganta",
+  "display": {
+    "icon": {
+      "id": "minecraft:skeleton_skull"
+    },
+    "title": {
+      "translate": "advancements.bleach.mask_strike.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.mask_strike.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "mask_strike": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "mask_strike"
+      }
+    }
+  }
+}

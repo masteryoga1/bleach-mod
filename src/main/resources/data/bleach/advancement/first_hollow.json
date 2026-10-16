@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:garganta",
+  "display": {
+    "icon": {
+      "id": "minecraft:bone"
+    },
+    "title": {
+      "translate": "advancements.bleach.first_hollow.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.first_hollow.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "first_hollow": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "first_hollow"
+      }
+    }
+  }
+}
