@@ -74,11 +74,12 @@ public final class ReishiFootingClient {
     }
 
     /**
-     * Before the local player moves: for a moment after footing is asked for, moves or is stood on, a
+     * Before the local player moves: while footing holds, or for a moment after it is asked for, a
      * fall stops at the footing's top until a plate is there to land on. Once one is, the plate
-     * itself holds the player. The hold lapses on its own, so a player over real ground with no
-     * plates under them still lands. Like the server, sinking below the footing while not sneaking
-     * moves it down to the new height.
+     * itself holds the player. Where no plate can form, because the blocks at the footing's height
+     * under the player are not air, the hold lapses on its own, so a player over grass, water or a
+     * slab still lands. Like the server, sinking below the footing while not sneaking moves it down
+     * to the new height.
      */
     static void onPlayerTickPre(PlayerTickEvent.Pre event) {
         if (!(event.getEntity() instanceof LocalPlayer player) || !player.hasData(SoulAttachments.FOOTING)) {
@@ -93,9 +94,12 @@ public final class ReishiFootingClient {
             footing.clampUntilTick = player.tickCount + ReishiFootingStatePayload.CLAMP_TICKS;
         }
         if (footing.active && plateUnder(player, footing.anchorY)) {
-            // Standing on the plates: hold on for a moment past their edge, while the next ones arrive.
             footing.clampUntilTick = player.tickCount + ReishiFootingStatePayload.CLAMP_TICKS;
             return;
+        }
+        if (footing.active && airUnder(player, footing.anchorY)) {
+            // Plates can still form here, however late they arrive.
+            footing.clampUntilTick = player.tickCount + ReishiFootingStatePayload.CLAMP_TICKS;
         }
         Vec3 motion = player.getDeltaMovement();
         double top = footing.anchorY + 1.0;
@@ -110,6 +114,19 @@ public final class ReishiFootingClient {
         AABB box = player.getBoundingBox();
         // With no entity, the plates are not solid.
         return !player.level().noCollision((Entity) null, box.expandTowards(0.0, top - box.minY - 1.0E-3, 0.0));
+    }
+
+    /** Whether any block at the footing's height under the player is air, where a plate can still be laid. */
+    private static boolean airUnder(LocalPlayer player, int anchorY) {
+        AABB box = player.getBoundingBox();
+        for (int x = Mth.floor(box.minX); x <= Mth.floor(box.maxX); x++) {
+            for (int z = Mth.floor(box.minZ); z <= Mth.floor(box.maxZ); z++) {
+                if (player.level().getBlockState(new BlockPos(x, anchorY, z)).isAir()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean plateUnder(LocalPlayer player, int anchorY) {

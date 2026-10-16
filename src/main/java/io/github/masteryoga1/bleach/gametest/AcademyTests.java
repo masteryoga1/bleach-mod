@@ -413,6 +413,27 @@ public final class AcademyTests {
         helper.succeed();
     }
 
+    /** Around a spot far from the other tests and from the Academy above, standing in for world spawn. */
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void guaranteedAcademyIsBuiltNearSpawn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        AcademySites sites = new AcademySites();
+        BlockPos spawn = new BlockPos(-16000, 64, 16000);
+        BlockPos built = sites.ensureGuaranteed(level, spawn);
+        helper.assertTrue(built != null, "no guaranteed Academy was built");
+        helper.assertTrue(sites.guaranteed().filter(built::equals).isPresent(), "the guaranteed Academy was not remembered");
+        double dx = built.getX() - spawn.getX();
+        double dz = built.getZ() - spawn.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        helper.assertTrue(distance > 64.0 && distance < 1320.0, "the guaranteed Academy is " + distance + " blocks from spawn");
+        helper.assertTrue(built.equals(sites.ensureGuaranteed(level, spawn)), "a second Academy was built");
+        AABB around = new AABB(built).inflate(32.0, 0.0, 32.0).setMinY(level.getMinBuildHeight()).setMaxY(level.getMaxBuildHeight());
+        List<AcademyInstructor> instructors = level.getEntitiesOfClass(AcademyInstructor.class, around);
+        helper.assertTrue(instructors.size() == 1, "the guaranteed Academy has " + instructors.size() + " instructors");
+        instructors.forEach(instructor -> instructor.discard());
+        helper.succeed();
+    }
+
     @GameTest(template = "empty")
     public static void academySitesSurviveSaving(GameTestHelper helper) {
         HolderLookup.Provider registries = helper.getLevel().registryAccess();

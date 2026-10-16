@@ -18,6 +18,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -170,14 +171,16 @@ public final class FlashStep {
         int steps = (int) Math.floor(max / STEP + 1.0E-6);
         for (int i = 0; i < steps; i++) {
             AABB next = box.move(step);
-            if (!isFree(level, entity, next)) {
+            // A body already past the world border may move along it or back in, but no further out.
+            double border = outsideBorder(level, box) + 1.0E-7;
+            if (!isFree(level, entity, next, border)) {
                 if (!grounded) {
                     break;
                 }
                 AABB lifted = null;
                 for (double lift : LIFTS) {
                     AABB candidate = next.move(0.0, lift, 0.0);
-                    if (isFree(level, entity, candidate)) {
+                    if (isFree(level, entity, candidate, border)) {
                         lifted = candidate;
                         break;
                     }
@@ -186,6 +189,9 @@ public final class FlashStep {
                     break;
                 }
                 next = lifted;
+            } else if (!grounded && SafeLanding.touchesLava(level, next.expandTowards(0.0, -1.0, 0.0))) {
+                // Reishi cannot harden in lava, so a step through the air never ends right above it.
+                break;
             }
             if (settling) {
                 // Never run out over lava, even where the ground is only a step down.
@@ -198,7 +204,7 @@ public final class FlashStep {
                     settling = false;
                 } else {
                     AABB settled = next.move(settle);
-                    if (isFree(level, entity, settled)) {
+                    if (isFree(level, entity, settled, border)) {
                         next = settled;
                     }
                 }
@@ -207,6 +213,13 @@ public final class FlashStep {
         }
         Vec3 end = new Vec3(box.getCenter().x, box.minY, box.getCenter().z);
         return new DashPath(end, !level.noCollision(entity, box.move(0.0, -0.01, 0.0)));
+    }
+
+    /** How far the box sticks out past the world border, or 0 if it is inside. */
+    private static double outsideBorder(Level level, AABB box) {
+        WorldBorder border = level.getWorldBorder();
+        return Math.max(0.0, Math.max(Math.max(border.getMinX() - box.minX, box.maxX - border.getMaxX()),
+                Math.max(border.getMinZ() - box.minZ, box.maxZ - border.getMaxZ())));
     }
 
     /**
@@ -234,11 +247,14 @@ public final class FlashStep {
         return false;
     }
 
-    /** Whether the body fits here: loaded, inside the world border, nothing in the way, nothing harmful and no lava. */
-    private static boolean isFree(Level level, Entity entity, AABB box) {
+    /**
+     * Whether the body fits here: loaded, no further past the world border than {@code border}
+     * blocks, nothing in the way, nothing harmful and no lava.
+     */
+    private static boolean isFree(Level level, Entity entity, AABB box, double border) {
         return level.hasChunksAt(Mth.floor(box.minX), Mth.floor(box.minY), Mth.floor(box.minZ),
                         Mth.floor(box.maxX), Mth.floor(box.maxY), Mth.floor(box.maxZ))
-                && level.getWorldBorder().isWithinBounds(box)
+                && outsideBorder(level, box) <= border
                 && level.noCollision(entity, box) && !SafeLanding.isHarmful(level, entity, box)
                 && !SafeLanding.touchesLava(level, box);
     }

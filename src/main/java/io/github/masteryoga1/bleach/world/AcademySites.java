@@ -23,6 +23,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.saveddata.SavedData;
 
@@ -45,11 +46,13 @@ public final class AcademySites extends SavedData {
     private static final int MAX_HEIGHT_SPREAD = 4;
     /** After finding nowhere to build, how long before looking again: 5 minutes. */
     private static final long RETRY_TICKS = 6000L;
+    /** Far enough in the past that subtracting it from a game time cannot overflow. */
+    private static final long NEVER = Long.MIN_VALUE / 2;
 
     @Nullable
     private BlockPos guaranteed;
-    /** When the last search for somewhere to build found nowhere. Not saved. */
-    private long failedAt = Long.MIN_VALUE;
+    /** When the last search for somewhere to build found nowhere, or long ago. Not saved. */
+    private long failedAt = NEVER;
 
     public static SavedData.Factory<AcademySites> factory() {
         return new SavedData.Factory<>(AcademySites::new, AcademySites::load, null);
@@ -88,11 +91,16 @@ public final class AcademySites extends SavedData {
      */
     @Nullable
     public BlockPos ensureGuaranteed(ServerLevel overworld) {
+        return ensureGuaranteed(overworld, overworld.getSharedSpawnPos());
+    }
+
+    /** {@link #ensureGuaranteed(ServerLevel)} around another spot than world spawn, for tests. */
+    @Nullable
+    public BlockPos ensureGuaranteed(ServerLevel overworld, BlockPos spawn) {
         long now = overworld.getGameTime();
         if (guaranteed != null || now - failedAt < RETRY_TICKS) {
             return guaranteed;
         }
-        BlockPos spawn = overworld.getSharedSpawnPos();
         StructureStart fallback = null;
         ChunkPos fallbackChunk = null;
         for (int distance : RING_DISTANCES) {
@@ -102,10 +110,10 @@ public final class AcademySites extends SavedData {
                 int z = spawn.getZ() + (int) Math.round(Math.sin(angle) * distance);
                 ChunkPos chunk = new ChunkPos(SectionPos.blockToSectionCoord(x), SectionPos.blockToSectionCoord(z));
                 StructureStart start = generate(overworld, chunk);
-                if (start == null || !isUntouched(overworld, start.getBoundingBox())) {
+                if (start == null || !isUntouched(overworld, footprint(start))) {
                     continue;
                 }
-                if (isGoodGround(overworld, start.getBoundingBox())) {
+                if (isGoodGround(overworld, footprint(start))) {
                     return record(overworld, start, chunk);
                 }
                 if (fallback == null) {
@@ -198,9 +206,18 @@ public final class AcademySites extends SavedData {
         return start.isValid() ? start : null;
     }
 
+    /**
+     * The blocks the Academy's pieces take up. The start's own box is wider by the margin its
+     * terrain adaptation would smooth, which nothing smooths when it is built this way.
+     */
+    private static BoundingBox footprint(StructureStart start) {
+        return BoundingBox.encapsulatingBoxes(start.getPieces().stream().map(StructurePiece::getBoundingBox).toList())
+                .orElse(start.getBoundingBox());
+    }
+
     private static BlockPos place(ServerLevel level, StructureStart start, ChunkPos chunk) {
         ChunkGenerator generator = level.getChunkSource().getGenerator();
-        List<ChunkPos> chunks = chunksUnder(start.getBoundingBox());
+        List<ChunkPos> chunks = chunksUnder(footprint(start));
         chunks.forEach(each -> level.getChunk(each.x, each.z));
         chunks.forEach(each -> start.placeInChunk(level, level.structureManager(), generator,
                 level.getRandom(), new BoundingBox(each.getMinBlockX(), level.getMinBuildHeight(), each.getMinBlockZ(),

@@ -141,6 +141,20 @@ public final class ReishiFooting {
         player.getData(SoulAttachments.FOOTING).resumePending = true;
     }
 
+    /**
+     * Runs at the start of every player tick, before the server moves the player: resumes footing
+     * after login. Before the move, the player is still where they logged out, and the new plates
+     * hold them through it.
+     */
+    public static void tickBeforeMove(ServerPlayer player, SoulData data) {
+        if (player.hasData(SoulAttachments.FOOTING)) {
+            FootingState footing = player.getData(SoulAttachments.FOOTING);
+            if (footing.resumePending) {
+                tryResume(player, data, footing);
+            }
+        }
+    }
+
     /** The check {@link #resumeAfterLogin} waits for: once the chunks under the player are loaded, starts footing for free. */
     private static void tryResume(ServerPlayer player, SoulData data, FootingState footing) {
         ServerLevel level = player.serverLevel();
@@ -156,8 +170,10 @@ public final class ReishiFooting {
                 || level.isOutsideBuildHeight(anchor) || !noGroundBelow(level, player)) {
             return;
         }
-        // The saved OnGround was the plates, which are gone.
+        // The saved OnGround was the plates, which are gone, and the saved fall starts again from rest.
         player.setOnGround(false);
+        player.setDeltaMovement(player.getDeltaMovement().multiply(1.0, 0.0, 1.0));
+        player.resetFallDistance();
         footing.active = true;
         footing.anchorY = anchor;
         footing.hasLast = false;
@@ -188,16 +204,10 @@ public final class ReishiFooting {
 
     /** Runs every tick for every player: keeps the plates under them, drains reiryoku, or ends footing. */
     public static void tick(ServerPlayer player, SoulData data) {
-        if (!player.hasData(SoulAttachments.FOOTING)) {
+        if (!isActive(player)) {
             return;
         }
         FootingState footing = player.getData(SoulAttachments.FOOTING);
-        if (footing.resumePending) {
-            tryResume(player, data, footing);
-        }
-        if (!footing.active) {
-            return;
-        }
         ServerLevel level = player.serverLevel();
         if (!mayStand(player, data, level.getGameTime()) || player.onClimbable() || onRealGround(level, player)
                 || player.getY() > footing.anchorY + MAX_RISE || level.isOutsideBuildHeight(footing.anchorY)) {

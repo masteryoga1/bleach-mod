@@ -80,6 +80,7 @@ public final class ShinigamiEvents {
     public static void register(IEventBus bus) {
         bus.addListener(ShinigamiEvents::onRespawn);
         bus.addListener(ShinigamiEvents::onEntityInteract);
+        bus.addListener(ShinigamiEvents::onPlayerTickPre);
         bus.addListener(ShinigamiEvents::onPlayerTick);
         bus.addListener(ShinigamiEvents::onChangedDimension);
         bus.addListener(ShinigamiEvents::onLoggedIn);
@@ -112,6 +113,12 @@ public final class ShinigamiEvents {
     private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ReishiFooting.end(player);
+        }
+    }
+
+    private static void onPlayerTickPre(PlayerTickEvent.Pre event) {
+        if (event.getEntity() instanceof ServerPlayer player && SoulLogic.hasSoul(player)) {
+            ReishiFooting.tickBeforeMove(player, SoulLogic.get(player));
         }
     }
 
