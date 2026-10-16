@@ -45,7 +45,7 @@ public final class ReishiFootingBlock extends Block {
         super(properties);
     }
 
-    public static Properties properties() {
+    public static Properties footingProperties() {
         return Properties.of()
                 .noOcclusion()
                 .dynamicShape()

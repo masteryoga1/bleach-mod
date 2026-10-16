@@ -15,7 +15,7 @@ public final class ModBlocks {
             () -> new TailoringTableBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.LOOM)));
     /** Hardened reishi under a player's feet. It has no item: only reishi footing places it. */
     public static final DeferredBlock<ReishiFootingBlock> REISHI_FOOTING = BLOCKS.register("reishi_footing",
-            () -> new ReishiFootingBlock(ReishiFootingBlock.properties()));
+            () -> new ReishiFootingBlock(ReishiFootingBlock.footingProperties()));
 
     private ModBlocks() {
     }
