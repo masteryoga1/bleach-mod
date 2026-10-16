@@ -1,0 +1,103 @@
+package io.github.masteryoga1.bleach.soul;
+
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.level.BlockCollisions;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+
+/**
+ * Moving a player somewhere they have not walked to (back to where they died, or to the Academy
+ * after Konsō) without dropping them into a wall, a liquid, a long fall or something that hurts.
+ */
+public final class SafeLanding {
+    private SafeLanding() {
+    }
+
+    /**
+     * Moves the player to the spot, settled onto the ground below it so a spot in mid-air does not end
+     * in a long fall.
+     *
+     * @return false, leaving the player where they are, if that spot is in a wall, a liquid or
+     *         something harmful, outside the world border, or over the void
+     */
+    public static boolean tryMoveTo(ServerPlayer player, ServerLevel level, Vec3 target) {
+        if (target.y < level.getMinBuildHeight() || target.y >= level.getMaxBuildHeight()) {
+            return false;
+        }
+        AABB box = player.getDimensions(Pose.STANDING).makeBoundingBox(target);
+        // The spot may not be loaded (the player may have sat on the death screen, or be headed
+        // somewhere far), and collision checks treat unloaded chunks as empty, so load it first.
+        for (int chunkX = Mth.floor(box.minX) >> 4; chunkX <= Mth.floor(box.maxX) >> 4; chunkX++) {
+            for (int chunkZ = Mth.floor(box.minZ) >> 4; chunkZ <= Mth.floor(box.maxZ) >> 4; chunkZ++) {
+                level.getChunk(chunkX, chunkZ);
+            }
+        }
+        if (!level.noCollision(player, box)) {
+            return false;
+        }
+        while (level.noCollision(player, box.move(0.0, -1.0, 0.0))) {
+            box = box.move(0.0, -1.0, 0.0);
+            if (box.minY < level.getMinBuildHeight()) {
+                return false;
+            }
+        }
+        // The drop above moves in whole blocks; settle the rest of the way onto what the feet will rest on.
+        box = box.move(Entity.collideBoundingBox(player, new Vec3(0.0, -1.0, 0.0), box, level, List.of()));
+        if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, player, box)) {
+            return false;
+        }
+        player.teleportTo(level, target.x, box.minY, target.z, player.getYRot(), player.getXRot());
+        return true;
+    }
+
+    /**
+     * Whether the spot would hurt or trap whoever stands in it: fire, powder snow, wither roses and the
+     * like where the body would be, or magma underfoot.
+     */
+    public static boolean isHarmful(Level level, Entity entity, AABB box) {
+        // Shrunk a hair, as vanilla does, so blocks the box only touches from outside do not count.
+        if (BlockPos.betweenClosedStream(box.deflate(1.0E-7)).anyMatch(pos -> isHarmful(level.getBlockState(pos)))) {
+            return true;
+        }
+        // Underfoot only magma hurts, and only through the block vanilla would treat as the support:
+        // the colliding block whose centre is nearest the feet (Entity.checkSupportingBlock, measured
+        // from the spot instead of where the entity is now), or what lies right under it, so magma
+        // under a carpet counts too.
+        Vec3 feet = new Vec3(box.getCenter().x, box.minY, box.getCenter().z);
+        AABB sole = new AABB(box.minX, box.minY - 1.0E-6, box.minZ, box.maxX, box.minY, box.maxZ);
+        BlockCollisions<BlockPos> under = new BlockCollisions<>(level, entity, sole, false, (pos, shape) -> pos.immutable());
+        BlockPos support = null;
+        double nearest = Double.MAX_VALUE;
+        while (under.hasNext()) {
+            BlockPos pos = under.next();
+            double distance = pos.distToCenterSqr(feet);
+            if (distance < nearest || distance == nearest && (support == null || support.compareTo(pos) < 0)) {
+                support = pos;
+                nearest = distance;
+            }
+        }
+        return support != null
+                && level.getBlockState(support.atY(Mth.floor(box.minY - 0.2))).is(Blocks.MAGMA_BLOCK);
+    }
+
+    public static boolean isHarmful(BlockState state) {
+        return state.is(BlockTags.FIRE) || state.is(BlockTags.CAMPFIRES) || state.is(Blocks.POWDER_SNOW)
+                || state.is(Blocks.WITHER_ROSE) || state.is(Blocks.SWEET_BERRY_BUSH) || state.is(Blocks.CACTUS);
+    }
+
+    /** Whether any lava lies inside the box. */
+    public static boolean touchesLava(Level level, AABB box) {
+        return BlockPos.betweenClosedStream(box.deflate(1.0E-7)).anyMatch(pos -> level.getFluidState(pos).is(FluidTags.LAVA));
+    }
+}

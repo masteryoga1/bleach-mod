@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
@@ -11,6 +12,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
@@ -36,6 +38,8 @@ public final class SoulEvents {
     private static final int MEDITATION_TICKS_PER_XP = 100;
     /** Meditation stops training after this many XP grants (one minute) until the player moves again. */
     private static final int MEDITATION_GRANTS_PER_SESSION = 12;
+    /** A Plus who meditates this long is reminded which way the Academy lies, once per sitting. */
+    private static final int ACADEMY_REMINDER_TICKS = 40;
     private static final float CLOSE_CALL_HEALTH_FRACTION = 0.3F;
 
     private SoulEvents() {
@@ -55,6 +59,7 @@ public final class SoulEvents {
         SpiritEvents.register(bus);
         ChainEvents.register(bus);
         ReiatsuEvents.register(bus);
+        ShinigamiEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -79,12 +84,15 @@ public final class SoulEvents {
         data.hasLastPosition = true;
 
         boolean meditating = player.isCrouching() && player.onGround() && movedSqr < 1.0E-4;
-        // Releasing reiatsu pours it out; it does not refill until the release ends and the reiatsu settles.
-        if (!data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data)) {
-            SoulLogic.regenTick(data, meditating || player.isSleeping());
+        if (mayRegenerate(player, data)) {
+            SoulLogic.regenTick(data, meditating || player.isSleeping(),
+                    ShinigamiLogic.regenMultiplier(player, data, player.level().getGameTime()));
         }
 
         if (meditating) {
+            if (++data.meditatingFor == ACADEMY_REMINDER_TICKS) {
+                AcademyLocator.remind(player, data);
+            }
             if (data.meditationGrants < MEDITATION_GRANTS_PER_SESSION
                     && ++data.meditationTicks >= MEDITATION_TICKS_PER_XP) {
                 data.meditationTicks = 0;
@@ -94,6 +102,7 @@ public final class SoulEvents {
         } else {
             data.meditationTicks = 0;
             data.meditationGrants = 0;
+            data.meditatingFor = 0;
         }
 
         if (player.isSprinting() && player.onGround() && movedSqr > 0.01) {
@@ -109,6 +118,14 @@ public final class SoulEvents {
         if (data.isDirty() && player.tickCount % SYNC_INTERVAL_TICKS == 0) {
             BleachNetwork.syncSoul(player, data);
         }
+    }
+
+    /**
+     * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
+     * the release ends and the reiatsu settles; standing on reishi footing spends it as it comes.
+     */
+    public static boolean mayRegenerate(Player player, SoulData data) {
+        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !ReishiFooting.isActive(player);
     }
 
     /** Zanjutsu and Hakuda make melee hits stronger. Training happens once a hit lands, in {@link #onDamageTaken}. */

@@ -25,6 +25,10 @@ public final class SoulAttachments {
     public static final Supplier<AttachmentType<Fright>> FRIGHT = ATTACHMENT_TYPES.register("fright",
             () -> AttachmentType.builder(() -> Fright.NONE).build());
 
+    /** Reishi footing: whether the player stands on hardened reishi, and at what height. Never saved. */
+    public static final Supplier<AttachmentType<FootingState>> FOOTING = ATTACHMENT_TYPES.register("footing",
+            () -> AttachmentType.builder(() -> new FootingState()).build());
+
     private SoulAttachments() {
     }
 }

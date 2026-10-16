@@ -22,6 +22,45 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # A malformed or duplicated key in a JSON file is otherwise skipped quietly by the game.
+      - name: Check the JSON resources
+        run: |
+          python3 -I - <<'EOF'
+          import json, pathlib, sys
+          def hook(pairs):
+              seen = set()
+              for key, _ in pairs:
+                  if key in seen:
+                      raise ValueError(f"duplicate key {key!r}")
+                  seen.add(key)
+              return dict(pairs)
+          bad = 0
+          for path in sorted(pathlib.Path("src/main/resources").rglob("*")):
+              if path.suffix in (".json", ".mcmeta"):
+                  try:
+                      json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=hook)
+                  except Exception as error:
+                      print(f"{path}: {error}")
+                      bad = 1
+          sys.exit(bad)
+          EOF
+
+      # The placeholder textures are drawn by a script; this fails if someone edits one but not the other.
+      - name: Check the placeholder textures
+        run: python3 -I tools/art/make_placeholders.py --check
+
+      # Structure templates are built by a script too.
+      - name: Check the structure templates
+        run: python3 -I tools/structures/make_structures.py --check
+
+      # Client classes only exist on the client; common code that imports one crashes a dedicated server.
+      - name: Check that client classes stay in client packages
+        run: |
+          if grep -rlE "import (net\.minecraft\.client|com\.mojang\.blaze3d|net\.neoforged\.neoforge\.client)" src/main/java --include=*.java | grep -v "/client/"; then
+            echo "These files outside a client package import client-only classes"
+            exit 1
+          fi
+
       - name: Build the mod jar
         run: ./gradlew build --stacktrace
 
@@ -53,8 +92,10 @@ jobs:
           if-no-files-found: ignore
 
   # Starts the real game client under a virtual display and runs ClientSmokeTest: it makes a world,
-  # becomes a Plus and then a Hollow with the camera behind the player, and quits. Game tests only
-  # run on a server, so this is what catches crashes in rendering, the HUD and the client mixins.
+  # becomes a Plus, a Hollow and then a Shinigami in the Shihakushō, opens the Tailoring Table and an
+  # instructor's dialogue, flash steps, stands on reishi footing and places an Academy, with the camera
+  # behind the player, and quits. Game tests only run on a server, so this is what catches crashes in
+  # rendering, the HUD, the screens and the client mixins. Its screenshots are kept for review.
   client-smoke-test:
     runs-on: ubuntu-latest
     steps:
@@ -73,8 +114,21 @@ jobs:
       - name: Run the client smoke test
         run: |
           set -o pipefail
-          timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientSmokeTest --stacktrace 2>&1 | tee client.log
+          # NeoForge's early loading window sometimes fails to start on a runner ("An error occurred
+          # initializing a font for rendering"), and its error prompt then waits on input forever.
+          # The game opens its own window just as well, so turn the early one off.
+          mkdir -p run/smoketest/config
+          printf 'earlyWindowControl = false\n' > run/smoketest/config/fml.toml
+          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientSmokeTest --stacktrace 2>&1 | tee client.log
           grep -F "Bleach client smoke test passed" client.log
+
+      - name: Upload the smoke test screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: client-smoke-screenshots
+          path: run/smoketest/screenshots/
+          if-no-files-found: ignore
 
       - name: Upload the client log
         if: failure()

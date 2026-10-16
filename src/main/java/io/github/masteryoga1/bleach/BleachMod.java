@@ -5,8 +5,13 @@ import io.github.masteryoga1.bleach.advancement.BleachTriggers;
 import io.github.masteryoga1.bleach.command.BleachCommand;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.registry.ModArmorMaterials;
+import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModCreativeTabs;
+import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.registry.ModMenus;
+import io.github.masteryoga1.bleach.registry.ModRecipes;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
 import net.minecraft.resources.ResourceLocation;
@@ -23,12 +28,19 @@ public final class BleachMod {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public BleachMod(IEventBus modEventBus, ModContainer modContainer) {
+        ModArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
+        ModBlocks.BLOCKS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
+        ModEntities.ENTITY_TYPES.register(modEventBus);
+        ModMenus.MENUS.register(modEventBus);
+        ModRecipes.RECIPE_TYPES.register(modEventBus);
+        ModRecipes.RECIPE_SERIALIZERS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
         SoulAttachments.ATTACHMENT_TYPES.register(modEventBus);
         BleachTriggers.TRIGGERS.register(modEventBus);
         modContainer.registerConfig(ModConfig.Type.SERVER, BleachConfig.SPEC);
         modEventBus.addListener(BleachNetwork::register);
+        modEventBus.addListener(ModEntities::onAttributes);
 
         SoulEvents.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(BleachCommand::register);

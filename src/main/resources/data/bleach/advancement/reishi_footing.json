@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:shunpo",
+  "display": {
+    "icon": {
+      "id": "minecraft:light_blue_stained_glass"
+    },
+    "title": {
+      "translate": "advancements.bleach.reishi_footing.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.reishi_footing.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "reishi_footing": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "reishi_footing"
+      }
+    }
+  }
+}

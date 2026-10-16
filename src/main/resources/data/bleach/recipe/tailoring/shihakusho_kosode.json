@@ -1,0 +1,13 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:black_wool"
+  },
+  "cloth_count": 5,
+  "trim": {
+    "item": "minecraft:white_wool"
+  },
+  "result": {
+    "id": "bleach:shihakusho_kosode"
+  }
+}

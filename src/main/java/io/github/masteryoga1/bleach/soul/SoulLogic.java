@@ -23,7 +23,7 @@ public final class SoulLogic {
     /** How long exhaustion lasts after running out of reiryoku, in ticks. */
     public static final int EXHAUSTION_TICKS = 100;
 
-    /** Creature types that are spirits, hidden from the spiritually unaware. Hollows join this in step 3. */
+    /** Creature types that are spirits, hidden from the spiritually unaware: the Shinigami NPCs, and Hollows to come. */
     public static final TagKey<EntityType<?>> SPIRITS = TagKey.create(Registries.ENTITY_TYPE, BleachMod.id("spirits"));
 
     /** Share of maximum reiryoku needed to start releasing reiatsu. */
@@ -47,10 +47,23 @@ public final class SoulLogic {
         data.markInitialized();
     }
 
-    /** Whether this soul can perceive spirits: every spirit can, and Humans above the threshold can. */
+    /**
+     * Whether this soul can perceive spirits: every spirit can, Humans above the threshold can, and so
+     * can anyone whose power has awakened, however little reiryoku they have.
+     */
     public static boolean isAware(SoulData data) {
-        return data.state().isSpirit()
+        return data.state().isSpirit() || hasAwakenedPower(data)
                 || data.maxReiryoku() >= BleachConfig.get(BleachConfig.AWARENESS_THRESHOLD);
+    }
+
+    /** Whether any {@link PowerPath} has awakened in this soul. */
+    public static boolean hasAwakenedPower(SoulData data) {
+        for (PowerPath path : PowerPath.values()) {
+            if (data.tier(path) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static float regenPerTick(SoulData data, boolean resting) {
@@ -65,8 +78,13 @@ public final class SoulLogic {
 
     /** Regenerates one tick's worth of reiryoku. */
     public static void regenTick(SoulData data, boolean resting) {
-        if (data.reiryoku() < data.maxReiryoku()) {
-            data.setReiryoku(data.reiryoku() + regenPerTick(data, resting));
+        regenTick(data, resting, 1.0);
+    }
+
+    /** Regenerates one tick's worth of reiryoku, scaled by {@code multiplier} (see ShinigamiLogic#regenMultiplier). */
+    public static void regenTick(SoulData data, boolean resting, double multiplier) {
+        if (data.reiryoku() < data.maxReiryoku() && multiplier > 0.0) {
+            data.setReiryoku(data.reiryoku() + (float) (regenPerTick(data, resting) * multiplier));
         }
     }
 
@@ -243,15 +261,20 @@ public final class SoulLogic {
     }
 
     /**
-     * What a soul becomes after its body dies. A spiritually aware Human lingers as a Plus with a
-     * fresh Chain of Fate; a Plus that dies loses part of its chain; everyone keeps their progress.
+     * What a soul becomes after its body dies. A Substitute's Shinigami power holds their soul
+     * together and they become a Shinigami; any other spiritually aware Human lingers as a Plus with
+     * a fresh Chain of Fate; a Plus that dies loses part of its chain; everyone keeps their progress.
      */
     public static SoulData afterDeath(SoulData old) {
         SoulData next = old.copy();
         next.setReiatsuReleased(false);
         next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
-        if (old.state() == SoulState.HUMAN && BleachConfig.get(BleachConfig.DEATH_INTO_PLUS)
-                && (BleachConfig.get(BleachConfig.ALWAYS_BECOME_PLUS) || isAware(old))) {
+        boolean intoSpirit = old.state() == SoulState.HUMAN && BleachConfig.get(BleachConfig.DEATH_INTO_PLUS);
+        if (intoSpirit && old.tier(PowerPath.SHINIGAMI) > 0) {
+            next.setState(SoulState.SHINIGAMI);
+            next.clearChain();
+            next.becameShinigami = true;
+        } else if (intoSpirit && (BleachConfig.get(BleachConfig.ALWAYS_BECOME_PLUS) || isAware(old))) {
             next.setState(SoulState.PLUS);
             next.startChain(chainLifeTicks());
             next.becamePlus = true;
@@ -277,7 +300,10 @@ public final class SoulLogic {
         entity.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 160, 0));
     }
 
-    /** Changes state with the side effects a state brings: a Plus gets a chain, a Hollow its first tier. */
+    /**
+     * Changes state with the side effects a state brings: a Plus gets a chain, and a Shinigami or a
+     * Hollow its first tier. Every other state loses the chain.
+     */
     public static void changeState(SoulData data, SoulState state) {
         data.setState(state);
         if (state == SoulState.PLUS) {
@@ -289,6 +315,9 @@ public final class SoulLogic {
         }
         if (state == SoulState.HOLLOW && data.tier(PowerPath.HOLLOW) <= 0) {
             data.setTier(PowerPath.HOLLOW, 1);
+        }
+        if (state == SoulState.SHINIGAMI && data.tier(PowerPath.SHINIGAMI) <= 0) {
+            data.setTier(PowerPath.SHINIGAMI, 1);
         }
     }
 

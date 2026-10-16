@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:graduated",
+  "display": {
+    "icon": {
+      "id": "minecraft:amethyst_shard"
+    },
+    "title": {
+      "translate": "advancements.bleach.konso.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.konso.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "konso": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "konso"
+      }
+    }
+  }
+}

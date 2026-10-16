@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:passed_on",
+  "display": {
+    "icon": {
+      "id": "minecraft:writable_book"
+    },
+    "title": {
+      "translate": "advancements.bleach.enrolled.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.enrolled.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "enrolled": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "enrolled"
+      }
+    }
+  }
+}

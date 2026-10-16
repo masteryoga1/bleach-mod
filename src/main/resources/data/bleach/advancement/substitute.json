@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "bleach:asauchi"
+    },
+    "title": {
+      "translate": "advancements.bleach.substitute.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.substitute.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "substitute": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "substitute"
+      }
+    }
+  }
+}

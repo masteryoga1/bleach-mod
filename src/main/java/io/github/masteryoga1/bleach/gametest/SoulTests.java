@@ -3,10 +3,13 @@ package io.github.masteryoga1.bleach.gametest;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -59,6 +62,18 @@ public final class SoulTests {
         helper.assertTrue(loaded.chainMaxTicks() == 1000 && loaded.chainTicks() == 400,
                 "chain was " + loaded.chainTicks() + " of " + loaded.chainMaxTicks());
         helper.assertTrue(loaded.isReiatsuReleased(), "released reiatsu was lost");
+
+        SoulData soul = new SoulData();
+        soul.markInitialized();
+        soul.setState(SoulState.RUKONGAI);
+        ShinigamiProgress progress = new ShinigamiProgress(true, 11L, 22L, 33.5F, 44L, 55L, 6L, 7,
+                Optional.of(new BlockPos(100, 64, -200)));
+        soul.setShinigami(progress);
+        SoulData reloaded = SoulData.CODEC.parse(NbtOps.INSTANCE,
+                SoulData.CODEC.encodeStart(NbtOps.INSTANCE, soul).getOrThrow()).getOrThrow();
+        helper.assertTrue(reloaded.state() == SoulState.RUKONGAI, "a Rukongai soul loaded as " + reloaded.state());
+        helper.assertTrue(reloaded.shinigami().equals(progress), "Shinigami progress loaded as " + reloaded.shinigami());
+        helper.assertTrue(reloaded.copy().shinigami().equals(progress), "copying lost the Shinigami progress");
         helper.succeed();
     }
 
@@ -78,6 +93,10 @@ public final class SoulTests {
         tiers.putInt("quincy", 2);
         tiers.putInt("bount", 1);
         saved.put("path_tiers", tiers);
+        CompoundTag shinigami = new CompoundTag();
+        shinigami.putString("enrolled", "oops");
+        shinigami.putInt("asauchi_issued_at", 5);
+        saved.put("shinigami", shinigami);
 
         SoulData loaded = SoulData.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
         helper.assertTrue(loaded.state() == SoulState.HUMAN, "an unknown state should fall back to Human");
@@ -86,6 +105,9 @@ public final class SoulTests {
         helper.assertTrue(Math.abs(loaded.reiryoku() - 20.0F) < EPSILON, "reiryoku was " + loaded.reiryoku());
         helper.assertTrue(loaded.level(Stat.ZANJUTSU) == 4, "Zanjutsu level was " + loaded.level(Stat.ZANJUTSU));
         helper.assertTrue(loaded.tier(PowerPath.QUINCY) == 2, "Quincy tier was " + loaded.tier(PowerPath.QUINCY));
+        helper.assertFalse(loaded.shinigami().enrolled(), "a bad enrolment flag was not dropped");
+        helper.assertTrue(loaded.shinigami().asauchiIssuedAt() == 5L,
+                "one bad Shinigami field wiped the rest: " + loaded.shinigami());
         helper.succeed();
     }
 

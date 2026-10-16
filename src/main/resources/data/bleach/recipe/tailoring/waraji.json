@@ -1,0 +1,13 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:wheat"
+  },
+  "cloth_count": 3,
+  "trim": {
+    "item": "minecraft:white_wool"
+  },
+  "result": {
+    "id": "bleach:waraji"
+  }
+}

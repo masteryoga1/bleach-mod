@@ -26,3 +26,6 @@ repo
 
 # data generator cache
 src/generated/**/.cache
+
+# python
+__pycache__/

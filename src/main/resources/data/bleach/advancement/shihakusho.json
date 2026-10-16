@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "bleach:shihakusho_kosode"
+    },
+    "title": {
+      "translate": "advancements.bleach.shihakusho.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.shihakusho.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "shihakusho": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "shihakusho"
+      }
+    }
+  }
+}

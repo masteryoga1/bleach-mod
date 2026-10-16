@@ -18,7 +18,7 @@ public final class ClientSouls {
     public static SoulAppearance appearance(Entity entity) {
         LocalPlayer self = Minecraft.getInstance().player;
         if (entity == self) {
-            return SoulAppearance.of(self.getData(SoulAttachments.SOUL));
+            return SoulAppearance.of(self, self.getData(SoulAttachments.SOUL));
         }
         return entity.hasData(SoulAttachments.APPEARANCE)
                 ? entity.getData(SoulAttachments.APPEARANCE)
