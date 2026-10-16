@@ -122,10 +122,10 @@ public final class SoulEvents {
 
     /**
      * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
-     * the release ends and the reiatsu settles.
+     * the release ends and the reiatsu settles; standing on reishi footing spends it as it comes.
      */
     public static boolean mayRegenerate(Player player, SoulData data) {
-        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data);
+        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !ReishiFooting.isActive(player);
     }
 
     /** Zanjutsu and Hakuda make melee hits stronger. Training happens once a hit lands, in {@link #onDamageTaken}. */

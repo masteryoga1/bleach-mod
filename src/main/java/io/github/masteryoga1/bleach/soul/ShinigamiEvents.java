@@ -79,6 +79,14 @@ public final class ShinigamiEvents {
         bus.addListener(ShinigamiEvents::onRespawn);
         bus.addListener(ShinigamiEvents::onEntityInteract);
         bus.addListener(ShinigamiEvents::onPlayerTick);
+        bus.addListener(ShinigamiEvents::onChangedDimension);
+    }
+
+    /** Reishi footing does not follow a soul into another world. */
+    private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            ReishiFooting.end(player);
+        }
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -87,6 +95,7 @@ public final class ShinigamiEvents {
         }
         SoulData data = SoulLogic.get(player);
         long now = player.level().getGameTime();
+        ReishiFooting.tick(player, data);
         if (player.tickCount % 20 == 0) {
             if (ShinigamiLogic.endLoanIfDue(data, now)) {
                 SoulLogic.applyStatModifiers(player, data);

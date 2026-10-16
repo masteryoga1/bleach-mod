@@ -18,6 +18,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
@@ -43,12 +44,15 @@ public final class BleachClient {
     private static boolean releaseKeyWasDown;
 
     public BleachClient(IEventBus modEventBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.CLIENT, BleachClientConfig.SPEC);
         modEventBus.addListener(BleachClient::registerGuiLayers);
         modEventBus.addListener(BleachClient::registerKeyMappings);
         modEventBus.addListener(BleachClient::addLayers);
         modEventBus.addListener(BleachClient::registerScreens);
         modEventBus.addListener(BleachClient::registerRenderers);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
+        NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onClientTickPre);
+        NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onPlayerTickPre);
         NeoForge.EVENT_BUS.addListener(BleachClient::onRenderLiving);
         if (ClientSmokeTest.isEnabled()) {
             NeoForge.EVENT_BUS.addListener(ClientSmokeTest::onClientTick);
@@ -62,6 +66,7 @@ public final class BleachClient {
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(SOUL_SCREEN_KEY);
         event.register(REIATSU_RELEASE_KEY);
+        event.register(ReishiFootingClient.REISHI_FOOTING_KEY);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {

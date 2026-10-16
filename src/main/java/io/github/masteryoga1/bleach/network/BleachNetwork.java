@@ -13,7 +13,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class BleachNetwork {
     /** Bump when a payload changes shape, so mismatched clients are refused instead of breaking. */
-    private static final String VERSION = "4";
+    private static final String VERSION = "5";
 
     private BleachNetwork() {
     }
@@ -26,7 +26,10 @@ public final class BleachNetwork {
                 .playToClient(OpenDialoguePayload.TYPE, OpenDialoguePayload.STREAM_CODEC, OpenDialoguePayload::handle)
                 .playToServer(ToggleReiatsuPayload.TYPE, ToggleReiatsuPayload.STREAM_CODEC,
                         ToggleReiatsuPayload::handle)
-                .playToServer(NpcActionPayload.TYPE, NpcActionPayload.STREAM_CODEC, NpcActionPayload::handle);
+                .playToClient(ReishiFootingStatePayload.TYPE, ReishiFootingStatePayload.STREAM_CODEC,
+                        ReishiFootingStatePayload::handle)
+                .playToServer(NpcActionPayload.TYPE, NpcActionPayload.STREAM_CODEC, NpcActionPayload::handle)
+                .playToServer(ReishiFootingPayload.TYPE, ReishiFootingPayload.STREAM_CODEC, ReishiFootingPayload::handle);
     }
 
     /** Sends a player their own soul data and marks it as up to date. */
@@ -54,6 +57,16 @@ public final class BleachNetwork {
     /** Sends the answer the player picked in a Shinigami NPC's dialogue. */
     public static void requestNpcAction(int entityId, NpcAction action) {
         PacketDistributor.sendToServer(new NpcActionPayload(entityId, action));
+    }
+
+    /** Tells a player whether their reishi footing holds, and at what height. */
+    public static void sendFooting(ServerPlayer player, boolean active, int anchorY) {
+        PacketDistributor.sendToPlayer(player, new ReishiFootingStatePayload(active, anchorY));
+    }
+
+    /** Asks the server for reishi footing. */
+    public static void requestFooting(boolean viaJump) {
+        PacketDistributor.sendToServer(new ReishiFootingPayload(viaJump));
     }
 
     /** Asks the server to toggle the reiatsu release. */

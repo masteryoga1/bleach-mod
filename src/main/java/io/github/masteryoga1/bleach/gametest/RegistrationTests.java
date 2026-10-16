@@ -8,6 +8,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.Tiers;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -50,6 +51,15 @@ public final class RegistrationTests {
         LootTable drops = helper.getLevel().getServer().reloadableRegistries()
                 .getLootTable(ModBlocks.TAILORING_TABLE.get().getLootTable());
         helper.assertTrue(drops != LootTable.EMPTY, "the Tailoring Table has no loot table");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void reishiFootingHasNoItem(GameTestHelper helper) {
+        helper.assertTrue(BuiltInRegistries.BLOCK.containsKey(BleachMod.id("reishi_footing")), "reishi footing is not a block");
+        helper.assertTrue(ModBlocks.REISHI_FOOTING.get().asItem() == Items.AIR, "reishi footing can be held as an item");
+        helper.assertFalse(ModBlocks.REISHI_FOOTING.get().defaultBlockState().isAir(),
+                "reishi footing counts as air, so the server would think players on it are flying");
         helper.succeed();
     }
 
