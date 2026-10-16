@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import java.util.List;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
@@ -11,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -18,6 +20,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 
 /**
  * Shunpo, the flash step: a burst of speed too fast to follow, a few blocks in an instant. On the
@@ -185,12 +188,11 @@ public final class FlashStep {
                 next = lifted;
             }
             if (settling) {
-                Vec3 settle = Entity.collideBoundingBox(entity, new Vec3(0.0, -SETTLE, 0.0), next, level, List.of());
-                // Never run out over lava, even where the ground is only a step down. Lava under
-                // the ground itself, as under a bridge, does not count.
-                if (SafeLanding.touchesLava(level, next.expandTowards(0.0, settle.y, 0.0))) {
+                // Never run out over lava, even where the ground is only a step down.
+                if (lavaUnderfoot(level, entity, next)) {
                     break;
                 }
+                Vec3 settle = Entity.collideBoundingBox(entity, new Vec3(0.0, -SETTLE, 0.0), next, level, List.of());
                 if (settle.y <= -SETTLE + 1.0E-7) {
                     // Nothing within a block below: a drop, so carry on level from here.
                     settling = false;
@@ -205,6 +207,31 @@ public final class FlashStep {
         }
         Vec3 end = new Vec3(box.getCenter().x, box.minY, box.getCenter().z);
         return new DashPath(end, !level.noCollision(entity, box.move(0.0, -0.01, 0.0)));
+    }
+
+    /**
+     * Whether lava lies within a step down under any part of the body with nothing solid over it, so
+     * a foot could go in. Lava under the ground itself, as under a bridge, does not count.
+     */
+    private static boolean lavaUnderfoot(Level level, Entity entity, AABB box) {
+        CollisionContext context = CollisionContext.of(entity);
+        int top = Mth.floor(box.minY - 1.0E-7);
+        int bottom = Mth.floor(box.minY - SETTLE);
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = Mth.floor(box.minX + 1.0E-7); x <= Mth.floor(box.maxX - 1.0E-7); x++) {
+            for (int z = Mth.floor(box.minZ + 1.0E-7); z <= Mth.floor(box.maxZ - 1.0E-7); z++) {
+                for (int y = top; y >= bottom; y--) {
+                    pos.set(x, y, z);
+                    if (level.getFluidState(pos).is(FluidTags.LAVA)) {
+                        return true;
+                    }
+                    if (!level.getBlockState(pos).getCollisionShape(level, pos, context).isEmpty()) {
+                        break;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether the body fits here: loaded, inside the world border, nothing in the way, nothing harmful and no lava. */
