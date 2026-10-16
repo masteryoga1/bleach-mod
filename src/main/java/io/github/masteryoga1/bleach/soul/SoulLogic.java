@@ -23,7 +23,7 @@ public final class SoulLogic {
     /** How long exhaustion lasts after running out of reiryoku, in ticks. */
     public static final int EXHAUSTION_TICKS = 100;
 
-    /** Creature types that are spirits, hidden from the spiritually unaware. Hollows join this in step 3. */
+    /** Creature types that are spirits, hidden from the spiritually unaware: the Shinigami NPCs, and Hollows to come. */
     public static final TagKey<EntityType<?>> SPIRITS = TagKey.create(Registries.ENTITY_TYPE, BleachMod.id("spirits"));
 
     /** Share of maximum reiryoku needed to start releasing reiatsu. */

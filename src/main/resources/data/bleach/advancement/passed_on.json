@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:plus",
+  "display": {
+    "icon": {
+      "id": "minecraft:feather"
+    },
+    "title": {
+      "translate": "advancements.bleach.passed_on.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.passed_on.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "passed_on": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "rukongai"
+      }
+    }
+  }
+}

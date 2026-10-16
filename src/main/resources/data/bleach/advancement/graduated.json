@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:enrolled",
+  "display": {
+    "icon": {
+      "id": "bleach:asauchi"
+    },
+    "title": {
+      "translate": "advancements.bleach.graduated.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.graduated.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "graduated": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "graduated"
+      }
+    }
+  }
+}

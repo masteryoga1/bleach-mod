@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:trained",
+  "display": {
+    "icon": {
+      "id": "minecraft:sugar"
+    },
+    "title": {
+      "translate": "advancements.bleach.shunpo.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.shunpo.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "shunpo": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "shunpo"
+      }
+    }
+  }
+}
