@@ -53,6 +53,8 @@ public class GetsugaTensho extends Projectile {
             ResourceKey.create(Registries.DAMAGE_TYPE, BleachMod.id("getsuga_tensho"));
     /** Blocks a tick. */
     public static final float SPEED = 1.6F;
+    /** How far in front of where the swing starts the crescent appears, in blocks. */
+    public static final double SWING_REACH = 1.0;
 
     private static final EntityDataAccessor<Float> DATA_CHARGE =
             SynchedEntityData.defineId(GetsugaTensho.class, EntityDataSerializers.FLOAT);
@@ -73,6 +75,9 @@ public class GetsugaTensho extends Projectile {
     private int blocksLeft;
     private int age;
     private ItemStack blade = ItemStack.EMPTY;
+    /** Where the swing started: nothing wholly behind it is ever touched. Unset on a crescent not launched. */
+    @Nullable
+    private Vec3 root;
     /** The creatures already cut, so each is struck once however many ticks it stays in the path. */
     private final IntOpenHashSet struck = new IntOpenHashSet();
 
@@ -83,21 +88,25 @@ public class GetsugaTensho extends Projectile {
     }
 
     /**
-     * Swings a crescent out from {@code from} along {@code direction} and adds it to the level. The
-     * charge, from 0 to 1, sets how wide it is and how many creatures it cuts through; the damage and
-     * life (in ticks) are the caller's, so a test can pin them. {@code blade} is the zanpakutō it came
-     * from, copied, and {@code colour} tints it.
+     * Swings a crescent out along {@code direction} from {@code root}, where the swing starts (for a
+     * wielder, just below the eyes), and adds it to the level: it appears {@link #SWING_REACH} on, and
+     * never touches anything wholly behind {@code root}. The charge, from 0 to 1, sets how wide it is
+     * and how many creatures it cuts through; the damage and life (in ticks) are the caller's, so a
+     * test can pin them. {@code blade} is the zanpakutō it came from, copied, and {@code colour} tints it.
      */
-    public static GetsugaTensho launch(Level level, @Nullable LivingEntity owner, Vec3 from, Vec3 direction,
+    public static GetsugaTensho launch(Level level, @Nullable LivingEntity owner, Vec3 root, Vec3 direction,
                                        float charge, float damage, int lifeTicks, ItemStack blade, int colour) {
         GetsugaTensho crescent = new GetsugaTensho(ModEntities.GETSUGA_TENSHO.get(), level);
         crescent.setOwner(owner);
-        Vec3 motion = direction.normalize().scale(SPEED);
+        Vec3 heading = direction.normalize();
+        Vec3 motion = heading.scale(SPEED);
+        Vec3 from = root.add(heading.scale(SWING_REACH));
         // Turned the way a mob faces when it looks along the path; the renderer draws it that way.
         float yRot = (float) (Mth.atan2(-motion.x, motion.z) * Mth.RAD_TO_DEG);
         float xRot = (float) (-Mth.atan2(motion.y, motion.horizontalDistance()) * Mth.RAD_TO_DEG);
         crescent.moveTo(from.x, from.y, from.z, yRot, xRot);
         crescent.setDeltaMovement(motion);
+        crescent.root = root;
         crescent.damage = damage;
         crescent.pierceLeft = pierceFor(charge);
         crescent.blocksLeft = BleachConfig.get(BleachConfig.GETSUGA_BLOCK_BUDGET);
@@ -262,9 +271,10 @@ public class GetsugaTensho extends Projectile {
     /**
      * Sweeps this tick's path, as wide and tall as the crescent: knocks every projectile that is not
      * the owner's (nor another crescent) out of the air, then cuts the creatures in it, nearest first,
-     * each costing one of its pierces. Nothing wholly behind where the crescent starts this tick is
-     * touched, so it never cuts what stands behind the one who fired it. A shield that stops it, or
-     * the last pierce, ends it. Returns whether the crescent is still flying.
+     * each costing one of its pierces. Nothing wholly behind where the swing started is touched, so
+     * it never cuts what stands behind the one who fired it, yet still cuts what is pressed against
+     * their front. A shield that stops it, or the last pierce, ends it. Returns whether the crescent
+     * is still flying.
      */
     private boolean sweep(Entity owner, Vec3 from, Vec3 motion) {
         float charge = charge();
@@ -273,9 +283,10 @@ public class GetsugaTensho extends Projectile {
         AABB path = new AABB(from.x - halfWidth, from.y - halfHeight, from.z - halfWidth,
                 from.x + halfWidth, from.y + halfHeight, from.z + halfWidth).expandTowards(motion);
         Vec3 heading = motion.normalize();
+        Vec3 rear = root != null ? root : from;
         for (Projectile projectile : level().getEntitiesOfClass(Projectile.class, path,
                 other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner
-                        && ahead(other, from, heading))) {
+                        && ahead(other, rear, heading))) {
             // An arrow or trident someone could have picked up is knocked down, not destroyed.
             if (projectile instanceof AbstractArrow arrow && arrow.pickup == AbstractArrow.Pickup.ALLOWED) {
                 arrow.spawnAtLocation(arrow.getPickupItemStackOrigin().copy(), 0.1F);
@@ -283,7 +294,7 @@ public class GetsugaTensho extends Projectile {
             projectile.discard();
         }
         List<LivingEntity> targets = level().getEntitiesOfClass(LivingEntity.class, path,
-                target -> !struck.contains(target.getId()) && affects(target) && ahead(target, from, heading));
+                target -> !struck.contains(target.getId()) && affects(target) && ahead(target, rear, heading));
         if (targets.isEmpty()) {
             return true;
         }
@@ -302,9 +313,15 @@ public class GetsugaTensho extends Projectile {
         return true;
     }
 
-    /** Whether any part of the entity lies on or in front of the plane the crescent starts from. */
-    private static boolean ahead(Entity entity, Vec3 from, Vec3 heading) {
-        return entity.getBoundingBox().getCenter().subtract(from).dot(heading) >= -entity.getBbWidth() * 0.5;
+    /**
+     * Whether any part of the entity lies on or in front of the plane through {@code rear} square to
+     * the heading: its box's centre is no further behind the plane than the box reaches along the heading.
+     */
+    private static boolean ahead(Entity entity, Vec3 rear, Vec3 heading) {
+        AABB box = entity.getBoundingBox();
+        double reach = (box.getXsize() * Math.abs(heading.x) + box.getYsize() * Math.abs(heading.y)
+                + box.getZsize() * Math.abs(heading.z)) * 0.5;
+        return box.getCenter().subtract(rear).dot(heading) >= -reach;
     }
 
     /**

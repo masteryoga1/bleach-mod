@@ -178,9 +178,10 @@ public final class ZanpakutoEvents {
     /**
      * Brings every Asauchi the player carries in line with their bond: their own blades lose a name
      * the soul no longer knows, take the spirit's form, and seal if a release went stale (or is a
-     * second copy while the one in hand is released); someone else's released blade seals; an
-     * anvil's name comes off a bound blade. A named soul with no blade of its own sees the spirit take
-     * shape again in a nameless Asauchi it carries.
+     * second copy while the one in hand is released, or a constant release the soul has yet to make
+     * on this spirit); someone else's released blade seals; an anvil's name comes off a bound blade.
+     * A named soul with no blade of its own sees the spirit take shape again in a nameless Asauchi it
+     * carries.
      */
     public static void reconcile(Player player, SoulData data) {
         ZanpakutoBond bond = data.zanpakuto();
@@ -212,6 +213,9 @@ public final class ZanpakutoEvents {
                     }
                 } else if (blade.released() && !blade.constant() && (!data.shikaiActive || (holdingRelease && stack != held))) {
                     ShikaiEvents.sealStack(stack, player.level());
+                } else if (blade.released() && blade.constant() && !bond.firstReleaseDone() && spirit.isPresent()) {
+                    // Kept elsewhere while the spirit changed away and back: released before the soul released it.
+                    ZanpakutoItem.setReleased(stack, spirit.get(), false);
                 } else if (spirit.isPresent()) {
                     // Puts back a model or stats something else changed.
                     ZanpakutoItem.applyForm(stack, blade.released() ? spirit.get().shikai() : spirit.get().sealed());

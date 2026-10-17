@@ -349,8 +349,8 @@ public final class ShikaiEvents {
         data.setReiryoku(Math.max(ZanpakutoLogic.RESERVE, data.reiryoku() - ZanpakutoLogic.getsugaCost(data, charge)));
         player.swing(InteractionHand.MAIN_HAND, true);
         Vec3 look = player.getLookAngle();
-        Vec3 from = player.getEyePosition().add(look).subtract(0.0, 0.4, 0.0);
-        GetsugaTensho crescent = GetsugaTensho.launch(player.level(), player, from, look, charge,
+        Vec3 root = player.getEyePosition().subtract(0.0, 0.4, 0.0);
+        GetsugaTensho crescent = GetsugaTensho.launch(player.level(), player, root, look, charge,
                 ZanpakutoLogic.getsugaDamage(data, charge),
                 GetsugaTensho.lifeTicksFor(BleachConfig.get(BleachConfig.GETSUGA_RANGE)),
                 stack.copy(), ZanpakutoItem.blade(stack).colour());

@@ -71,11 +71,14 @@ public final class ShikaiTests {
     private ShikaiTests() {
     }
 
-    /** A crescent of the lowest charge with no blade, flying along +X from relative (1.5, 2.5, 8.5). */
+    /**
+     * A crescent of the lowest charge with no blade, swung along +X from relative (0.5, 2.5, 8.5), so it
+     * flies from (1.5, 2.5, 8.5).
+     */
     private static GetsugaTensho crescent(GameTestHelper helper, Player owner, float damage) {
-        Vec3 from = helper.absoluteVec(new Vec3(1.5, 2.5, 8.5));
-        Vec3 along = helper.absoluteVec(new Vec3(2.5, 2.5, 8.5)).subtract(from);
-        return GetsugaTensho.launch(helper.getLevel(), owner, from, along, 0.0F, damage, CRESCENT_LIFE, ItemStack.EMPTY,
+        Vec3 root = helper.absoluteVec(new Vec3(0.5, 2.5, 8.5));
+        Vec3 along = helper.absoluteVec(new Vec3(1.5, 2.5, 8.5)).subtract(root);
+        return GetsugaTensho.launch(helper.getLevel(), owner, root, along, 0.0F, damage, CRESCENT_LIFE, ItemStack.EMPTY,
                 ZanpakutoBlade.DEFAULT_COLOUR);
     }
 
@@ -188,6 +191,12 @@ public final class ShikaiTests {
         helper.assertTrue(ZanpakutoItem.isOwnedBy(reformed, player.getUUID()) && ZanpakutoItem.blade(reformed).released()
                         && ZanpakutoTests.model(reformed) == 1,
                 "a lost Zangetsu re-formed sealed, or not at all");
+
+        // The spirit changed away and back while this blade lay in a chest: this Zangetsu is yet to be released.
+        data.setZanpakuto(data.zanpakuto().withFirstReleaseDone(false));
+        ZanpakutoEvents.reconcile(player, data);
+        ZanpakutoBlade waiting = ZanpakutoItem.blade(player.getInventory().getItem(5));
+        helper.assertTrue(waiting.constant() && !waiting.released(), "a Zangetsu released before its first release stayed out");
         helper.succeed();
     }
 
@@ -340,16 +349,40 @@ public final class ShikaiTests {
         float plusHealth = plus.getHealth();
         float woundedHealth = wounded.getHealth();
         Player owner = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
+        // A Plus cut down by anything but a Hollow re-forms at full health, and the last damage taken is
+        // forgotten after two seconds, so any hit at all is noted as it happens.
+        boolean[] plusCut = {false};
+        boolean[] woundedCut = {false};
+        helper.onEachTick(() -> {
+            plusCut[0] |= plus.getLastDamageSource() != null;
+            woundedCut[0] |= wounded.getLastDamageSource() != null;
+        });
         crescent(helper, owner, 1000.0F);
         helper.succeedWhen(() -> {
             helper.assertFalse(spider.isAlive(), "the Hollow behind them was not cut");
-            // A Plus cut down by anything but a Hollow re-forms at full health, so its health alone proves nothing.
-            helper.assertTrue(plus.isAlive() && plus.getHealth() == plusHealth && plus.getLastDamageSource() == null,
-                    "the crescent cut a Plus");
-            helper.assertTrue(wounded.isAlive() && wounded.getHealth() == woundedHealth && wounded.getLastDamageSource() == null,
+            helper.assertTrue(plus.isAlive() && plus.getHealth() == plusHealth && !plusCut[0], "the crescent cut a Plus");
+            helper.assertTrue(wounded.isAlive() && wounded.getHealth() == woundedHealth && !woundedCut[0],
                     "the crescent cut a Shinigami");
             plus.discard();
             wounded.discard();
+        });
+    }
+
+    @GameTest(template = "field", timeoutTicks = 40, batch = "getsuga")
+    public static void getsugaCutsPointBlankButNothingBehind(GameTestHelper helper) {
+        // The swing starts at x 3.5: one pig is pressed against its front, short of where the crescent
+        // appears, and the other stands just behind it, inside the crescent's first sweep.
+        Pig front = still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(4.0, 2.0, 8.5)));
+        Pig behind = still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(2.9, 2.0, 8.5)));
+        Player owner = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
+        Vec3 root = helper.absoluteVec(new Vec3(3.5, 2.5, 8.5));
+        Vec3 along = helper.absoluteVec(new Vec3(4.5, 2.5, 8.5)).subtract(root);
+        GetsugaTensho.launch(helper.getLevel(), owner, root, along, 0.0F, 1000.0F, 4, ItemStack.EMPTY,
+                ZanpakutoBlade.DEFAULT_COLOUR);
+        helper.succeedWhen(() -> {
+            helper.assertFalse(front.isAlive(), "the crescent missed the pig against the front of the swing");
+            helper.assertTrue(behind.isAlive() && behind.getHealth() == behind.getMaxHealth(), "the crescent cut the pig behind the swing");
+            behind.discard();
         });
     }
 
@@ -406,9 +439,9 @@ public final class ShikaiTests {
 
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void getsugaWithoutAnOwnerFades(GameTestHelper helper) {
-        Vec3 from = helper.absoluteVec(new Vec3(1.5, 1.5, 1.5));
-        Vec3 along = helper.absoluteVec(new Vec3(2.5, 1.5, 1.5)).subtract(from);
-        GetsugaTensho crescent = GetsugaTensho.launch(helper.getLevel(), null, from, along, 0.0F, 10.0F, CRESCENT_LIFE,
+        Vec3 root = helper.absoluteVec(new Vec3(0.5, 1.5, 1.5));
+        Vec3 along = helper.absoluteVec(new Vec3(1.5, 1.5, 1.5)).subtract(root);
+        GetsugaTensho crescent = GetsugaTensho.launch(helper.getLevel(), null, root, along, 0.0F, 10.0F, CRESCENT_LIFE,
                 ItemStack.EMPTY, ZanpakutoBlade.DEFAULT_COLOUR);
         helper.succeedWhen(() -> helper.assertTrue(crescent.isRemoved(), "a crescent with no owner is still flying"));
     }

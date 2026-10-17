@@ -23,9 +23,12 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ProjectileWeaponItem;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tier;
 import net.minecraft.world.item.TooltipFlag;
@@ -33,6 +36,7 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.HitResult;
 
 /**
  * The Asauchi and the zanpakutō it becomes: one item whose {@link ZanpakutoBlade} component says
@@ -162,7 +166,7 @@ public final class ZanpakutoItem extends SwordItem {
         String refusal = JinzenLogic.refusal(player, data, stack, now);
         if (refusal != null) {
             if (refusal.equals("off_hand") && hasOwnUse(player.getOffhandItem(), player)) {
-                // Sneak-placing a block or raising a shield from the off hand, not reaching for Jinzen.
+                // Placing a block, eating or raising a shield with the off hand, not reaching for Jinzen.
                 return InteractionResultHolder.pass(stack);
             }
             if (!level.isClientSide()) {
@@ -178,9 +182,27 @@ public final class ZanpakutoItem extends SwordItem {
         return InteractionResultHolder.consume(stack);
     }
 
-    /** Whether the off-hand item does something of its own when used, as blocks and shields do. */
+    /**
+     * Whether the off-hand item would do something of its own if used now: a block aimed at a block in
+     * reach, food the player can eat, a bow or crossbow with something to shoot, or a shield and the
+     * like. Anything else is only in the way of Jinzen, and the player is told so.
+     */
     private static boolean hasOwnUse(ItemStack offhand, Player player) {
-        return offhand.getItem() instanceof BlockItem || offhand.getUseDuration(player) > 0;
+        Item item = offhand.getItem();
+        if (item instanceof ZanpakutoItem) {
+            return false;
+        }
+        if (item instanceof BlockItem) {
+            return player.pick(player.blockInteractionRange(), 1.0F, false).getType() == HitResult.Type.BLOCK;
+        }
+        FoodProperties food = offhand.getFoodProperties(player);
+        if (food != null) {
+            return player.canEat(food.canAlwaysEat());
+        }
+        if (item instanceof ProjectileWeaponItem) {
+            return CrossbowItem.isCharged(offhand) || !player.getProjectile(offhand).isEmpty();
+        }
+        return offhand.getUseDuration(player) > 0;
     }
 
     @Override

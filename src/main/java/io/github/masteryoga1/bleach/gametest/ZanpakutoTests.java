@@ -52,6 +52,7 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -547,6 +548,30 @@ public final class ZanpakutoTests {
         JinzenLogic.tick(player, data, blade, 6, NOW + 6L);
         helper.assertTrue(data.jinzen() == null, "moving a block away did not end Jinzen");
         helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void offHandItemsThatWouldActNowGoFirst(GameTestHelper helper) {
+        Player player = mock(helper, soul(SoulState.SHINIGAMI, 500.0F));
+        ItemStack blade = asauchi();
+        player.setItemInHand(InteractionHand.MAIN_HAND, blade);
+        player.setShiftKeyDown(true);
+        player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.SHIELD));
+        helper.assertTrue(useBlade(helper, player, blade) == InteractionResult.PASS, "the blade kept the use from a shield");
+        // A mock starts full, so the steak would do nothing and the player is told the off hand is in the way.
+        player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.COOKED_BEEF));
+        helper.assertTrue(useBlade(helper, player, blade) == InteractionResult.FAIL, "the blade passed the use to food that cannot be eaten");
+        player.getFoodData().setFoodLevel(10);
+        helper.assertTrue(useBlade(helper, player, blade) == InteractionResult.PASS, "the blade kept the use from food");
+        player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.BOW));
+        helper.assertTrue(useBlade(helper, player, blade) == InteractionResult.FAIL, "the blade passed the use to a bow with no arrows");
+        player.setItemInHand(InteractionHand.OFF_HAND, asauchi());
+        helper.assertTrue(useBlade(helper, player, blade) == InteractionResult.FAIL, "the blade passed the use to a second Asauchi");
+        helper.succeed();
+    }
+
+    private static InteractionResult useBlade(GameTestHelper helper, Player player, ItemStack blade) {
+        return blade.use(helper.getLevel(), player, InteractionHand.MAIN_HAND).getResult();
     }
 
     @GameTest(template = "empty")
