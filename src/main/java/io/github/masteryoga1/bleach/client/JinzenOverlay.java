@@ -3,10 +3,13 @@ package io.github.masteryoga1.bleach.client;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -25,6 +28,19 @@ public final class JinzenOverlay {
     private static final int COLOUR = 0x06060C;
 
     private JinzenOverlay() {
+    }
+
+    /**
+     * Says why sneak-use with the Asauchi did not start Jinzen, once the full off hand it gave way to
+     * (see ZanpakutoItem#use) has had its turn and done nothing either. Not while that item is on
+     * cooldown, as a shield an axe knocked aside is: its holder is fighting, not reaching for Jinzen.
+     */
+    public static void explainFullOffHand(LocalPlayer player) {
+        if (SoulLogic.get(player).takeOffHandRefused()
+                && !player.getCooldowns().isOnCooldown(player.getOffhandItem().getItem())) {
+            player.displayClientMessage(Component.translatable("message.bleach.jinzen.off_hand")
+                    .withStyle(ChatFormatting.GRAY), true);
+        }
     }
 
     static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {

@@ -78,6 +78,11 @@ public class GetsugaTensho extends Projectile {
     /** Where the swing started: nothing wholly behind it is ever touched. Unset on a crescent not launched. */
     @Nullable
     private Vec3 root;
+    /**
+     * The way the swing faced on the level, for judging what is behind the wielder as well as the
+     * path does. Zero on a crescent not launched.
+     */
+    private Vec3 facing = Vec3.ZERO;
     /** The creatures already cut, so each is struck once however many ticks it stays in the path. */
     private final IntOpenHashSet struck = new IntOpenHashSet();
 
@@ -107,6 +112,12 @@ public class GetsugaTensho extends Projectile {
         crescent.moveTo(from.x, from.y, from.z, yRot, xRot);
         crescent.setDeltaMovement(motion);
         crescent.root = root;
+        Vec3 facing = new Vec3(heading.x, 0.0, heading.z).normalize();
+        if (facing.lengthSqr() < 0.5 && owner != null) {
+            // Aimed straight up or down, the path faces no way on the level, but the wielder still does.
+            facing = Vec3.directionFromRotation(0.0F, owner.getYRot());
+        }
+        crescent.facing = facing;
         crescent.damage = damage;
         crescent.pierceLeft = pierceFor(charge);
         crescent.blocksLeft = BleachConfig.get(BleachConfig.GETSUGA_BLOCK_BUDGET);
@@ -284,8 +295,6 @@ public class GetsugaTensho extends Projectile {
         AABB path = new AABB(from.x - halfWidth, from.y - halfHeight, from.z - halfWidth,
                 from.x + halfWidth, from.y + halfHeight, from.z + halfWidth).expandTowards(motion);
         Vec3 heading = motion.normalize();
-        // Zero for a swing straight up or down, which has no facing on the level, so only the path counts.
-        Vec3 facing = new Vec3(heading.x, 0.0, heading.z).normalize();
         Vec3 rear = root != null ? root : from;
         for (Projectile projectile : level().getEntitiesOfClass(Projectile.class, path,
                 other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner
