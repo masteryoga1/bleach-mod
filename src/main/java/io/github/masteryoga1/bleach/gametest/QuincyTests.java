@@ -864,6 +864,35 @@ public final class QuincyTests {
         });
     }
 
+    /** A shield turned away from the shot stops nothing: one still reeling behind it is flown through. */
+    @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
+    public static void shieldsOnlyStopShotsTheyFace(GameTestHelper helper) {
+        Cow guard = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 8));
+        Cow behind = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 12));
+        guard.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.SHIELD));
+        // Facing south, away from where the arrow comes from.
+        guard.setYRot(0.0F);
+        guard.setYHeadRot(0.0F);
+        guard.setYBodyRot(0.0F);
+        guard.startUsingItem(InteractionHand.MAIN_HAND);
+        Player owner = archer(helper, 6.5, 3.5);
+        helper.runAfterDelay(8, () -> {
+            helper.assertTrue(guard.isBlocking(), "the cow is not holding its shield up");
+            // A harder blow just before, so the arrow does it no harm.
+            guard.hurt(guard.damageSources().generic(), 4.0F);
+            assertNear(helper, guard.getHealth(), 6.0, "the health of the cow after the first blow");
+            HeiligPfeil arrow = loose(helper, owner, helper.absoluteVec(new Vec3(8.5, 2.5, 3.5)), SOUTH, 3.0F, 0, 3.0F);
+            helper.runAfterDelay(8, () -> {
+                assertNear(helper, guard.getHealth(), 6.0, "the health of the cow with its back to the arrow");
+                assertNear(helper, behind.getHealth(), 7.0, "the health of the cow behind it");
+                helper.assertTrue(arrow.isRemoved(), "the arrow flew on past the cow behind");
+                guard.discard();
+                behind.discard();
+                helper.succeed();
+            });
+        });
+    }
+
     @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
     public static void heiligPfeilNeverStrikesItsOwner(GameTestHelper helper) {
         Cow ownerCow = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 6));

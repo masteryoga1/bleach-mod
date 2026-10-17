@@ -49,7 +49,7 @@ import net.neoforged.neoforge.event.EventHooks;
  * owner may harm ({@link SpiritProjectiles#mayStrike}), never the same one twice, and pierces as many
  * more as it was given. A creature that takes no harm from it and is not blocking (one still
  * reeling from a blow, or an Enderman slipping aside) is flown through without spending a pierce; a
- * shield stops it. It bursts on the first block it meets, leaves nothing to pick up, goes when its
+ * shield raised towards it stops it. It bursts on the first block it meets, leaves nothing to pick up, goes when its
  * owner does and is never saved. A Hollow it kills is destroyed, not purified: its damage type is in
  * {@code #bleach:destroys_souls} and not in {@code #bleach:purifies}. The server decides every hit; a
  * client only flies it and remembers what it passed through.
@@ -281,7 +281,7 @@ public class HeiligPfeil extends AbstractArrow {
     /**
      * Server side: strikes the creature, a Hollow's mask if the path meets it first, then tells the
      * Quincy rules about a hit that landed. A hit that hurts spends a pierce, or ends the arrow when
-     * none is left; a shield ends it; anything else (no harm done, no shield) lets it fly on through.
+     * none is left; a shield raised towards it ends it; anything else (no harm done, no shield) lets it fly on through.
      * A client only remembers the creature, so it flies on past it until the server says otherwise.
      */
     @Override
@@ -305,11 +305,13 @@ public class HeiligPfeil extends AbstractArrow {
         Vec3 from = position();
         Vec3 at = target.getBoundingBox().clip(from, from.add(getDeltaMovement()))
                 .orElse(target.getBoundingBox().getCenter());
-        // Judged before the blow too: a shield the blow breaks is no longer raised once it lands.
-        boolean blocking = target.isBlocking();
+        boolean blocking;
         boolean hurt;
         hurting = true;
         try {
+            // Judged as vanilla judges it (a shield raised towards the shot), while the arrow reads as
+            // unpierceable, and before the blow too: a shield the blow breaks is no longer raised.
+            blocking = target.isDamageSourceBlocked(source);
             hurt = entity.hurt(source, QuincyLogic.damageAgainst(damage, target));
         } finally {
             hurting = false;
