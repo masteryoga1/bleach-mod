@@ -24,6 +24,7 @@ import io.github.masteryoga1.bleach.soul.Stat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -39,12 +40,14 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.monster.breeze.Breeze;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -838,6 +841,35 @@ public final class QuincyTests {
         });
     }
 
+    /** A Breeze that turns the arrow back, just past the creature it pierced, spares the block behind. */
+    @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
+    public static void breezesTurnHeiligPfeilBack(GameTestHelper helper) {
+        Cow open = still(helper.spawnWithNoFreeWill(EntityType.COW, 4, 2, 8));
+        Cow guarded = still(helper.spawnWithNoFreeWill(EntityType.COW, 11, 2, 8));
+        Breeze breeze = still(helper.spawnWithNoFreeWill(EntityType.BREEZE, 11, 2, 9));
+        BlockPos openTarget = new BlockPos(4, 2, 10);
+        BlockPos guardedTarget = new BlockPos(11, 2, 10);
+        helper.setBlock(openTarget, Blocks.TARGET);
+        helper.setBlock(guardedTarget, Blocks.TARGET);
+        Player owner = archer(helper, 8.5, 3.5);
+        // Each meets its cow, then (in the second lane) the Breeze, then the target, all in one step.
+        HeiligPfeil unturned = loose(helper, owner, helper.absoluteVec(new Vec3(4.5, 2.5, 6.2)), SOUTH, 3.0F, 1, 4.0F);
+        loose(helper, owner, helper.absoluteVec(new Vec3(11.5, 2.5, 6.2)), SOUTH, 3.0F, 1, 4.0F);
+        helper.runAfterDelay(6, () -> {
+            assertNear(helper, open.getHealth(), 7.0, "the cow in front of the open target");
+            assertNear(helper, guarded.getHealth(), 7.0, "the cow in front of the Breeze");
+            assertNear(helper, breeze.getHealth(), breeze.getMaxHealth(), "the health of the Breeze");
+            helper.assertBlockProperty(openTarget, BlockStateProperties.POWER, power -> power > 0,
+                    "the target behind the pierced cow was not struck");
+            helper.assertBlockProperty(guardedTarget, BlockStateProperties.POWER, 0);
+            helper.assertTrue(unturned.isRemoved(), "the arrow did not burst on the open target");
+            for (Mob mob : List.<Mob>of(open, guarded, breeze)) {
+                mob.discard();
+            }
+            helper.succeed();
+        });
+    }
+
     /** A raised shield facing the shot stops it, pierce or not, and nothing behind is touched. */
     @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
     public static void shieldsStopHeiligPfeil(GameTestHelper helper) {
@@ -902,6 +934,7 @@ public final class QuincyTests {
         helper.runAfterDelay(20, () -> {
             assertNear(helper, ownerCow.getHealth(), 10.0, "the owner's health");
             assertNear(helper, target.getHealth(), 7.0, "the target's health");
+            helper.assertTrue(ownerCow.getLastHurtMob() == target, "the owner does not remember what its arrow hit");
             ownerCow.discard();
             target.discard();
             helper.succeed();

@@ -84,7 +84,10 @@ public class HeiligPfeil extends AbstractArrow {
     private boolean checkedPointBlank;
     /** Whether this arrow's own blow is being dealt, when a shield may stop it whatever its pierce. */
     private boolean hurting;
-    /** Whether this tick's flight met a creature, after which vanilla's flight no longer meets the block ahead. */
+    /**
+     * Whether this tick's flight met a creature, after which vanilla's flight no longer meets the block
+     * ahead; cleared when the arrow is turned back, since it then no longer flies that way.
+     */
     private boolean metCreature;
 
     public HeiligPfeil(EntityType<? extends HeiligPfeil> type, Level level) {
@@ -298,6 +301,10 @@ public class HeiligPfeil extends AbstractArrow {
         }
         struck.add(target.getId());
         Entity owner = getOwner();
+        if (owner instanceof LivingEntity shooter) {
+            // As any arrow does, so the shooter's tamed wolves join in.
+            shooter.setLastHurtMob(target);
+        }
         DamageSource source = new DamageSource(level().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
                 .getHolderOrThrow(DAMAGE_TYPE), this, owner);
         // Judged before the blow: a Hollow it kills starts dissolving, and a dissolving mask is never struck.
@@ -331,6 +338,13 @@ public class HeiligPfeil extends AbstractArrow {
                 pierceLeft--;
             }
         }
+    }
+
+    /** Turned back (by a Breeze): the wall ahead on the path it was flying is no longer in its way. */
+    @Override
+    protected void onDeflection(@Nullable Entity deflector, boolean byAttack) {
+        super.onDeflection(deflector, byAttack);
+        metCreature = false;
     }
 
     /**
