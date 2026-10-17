@@ -693,7 +693,11 @@ public final class BleachCommand {
 
     // ---- /bleach quincy ----
 
-    /** Settles the bloodline as if it had been chosen, but quietly: no word to the player and no Cross. */
+    /**
+     * Settles the bloodline as if it had been chosen, but quietly: no word to the player and no Cross.
+     * Awakened power cannot be left without blood, so taking the blood from an awakened Quincy is
+     * refused, pointing to the reset.
+     */
     private static int setBloodline(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "bloodline");
         Bloodline bloodline = byName(Bloodline.values(), name);
@@ -702,14 +706,24 @@ public final class BleachCommand {
             return 0;
         }
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        int changed = 0;
         for (ServerPlayer player : players) {
             SoulData data = SoulLogic.get(player);
+            if (bloodline == Bloodline.NONE && QuincyLogic.isAwakened(data)) {
+                context.getSource().sendFailure(Component.translatable("commands.bleach.quincy.bloodline.awakened",
+                        player.getDisplayName()));
+                continue;
+            }
             QuincyEvents.setBloodline(player, data, bloodline, false);
             BleachNetwork.syncSoul(player, data);
+            changed++;
         }
-        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.bloodline",
-                bloodline.displayName(), players.size()), true);
-        return players.size();
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.bloodline",
+                    bloodline.displayName(), count), true);
+        }
+        return count;
     }
 
     /**

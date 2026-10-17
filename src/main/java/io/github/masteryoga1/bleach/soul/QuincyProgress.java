@@ -8,9 +8,9 @@ import io.github.masteryoga1.bleach.quincy.BlutMode;
 /**
  * A soul's Quincy blood and what it has made of it: whether the blood runs in it at all, whether
  * that question is settled, how far its training has come, the reishi it has gathered, the Hollow
- * poison in it, the Blut it is calling on and how many souls its arrows have destroyed. The tier
- * itself is the soul's {@link PowerPath#QUINCY} tier. Saved with the soul and sent to its owner's
- * client. The rules are in {@link QuincyLogic}.
+ * poison in it, the Blut it is calling on, how many souls its arrows have destroyed and whether the
+ * soul itself is being torn apart. The tier itself is the soul's {@link PowerPath#QUINCY} tier.
+ * Saved with the soul and sent to its owner's client. The rules are in {@link QuincyLogic}.
  *
  * @param bloodline the blood: none, mixed (Gemischt) or pure (Echt)
  * @param decided   whether the bloodline question is settled, by the player, the server or an old save
@@ -19,12 +19,15 @@ import io.github.masteryoga1.bleach.quincy.BlutMode;
  * @param poison    Hollow poison, from 0 to {@link #MAX_POISON}
  * @param blut      the Blut the soul is calling on, if any
  * @param destroyed souls destroyed by this soul's Heilig Pfeil, Hollow mobs and Hollow players alike
+ * @param tornApart whether the soul is being torn apart, from just before that death until the
+ *                  respawn it knits itself together for (see {@link QuincyEvents#destroySoul}), so
+ *                  logging out on the death screen does not lose it
  */
 public record QuincyProgress(Bloodline bloodline, boolean decided, int training, float reishi,
-                             float poison, BlutMode blut, int destroyed) {
+                             float poison, BlutMode blut, int destroyed, boolean tornApart) {
     public static final float MAX_POISON = 100.0F;
 
-    public static final QuincyProgress NONE = new QuincyProgress(Bloodline.NONE, false, 0, 0.0F, 0.0F, BlutMode.OFF, 0);
+    public static final QuincyProgress NONE = new QuincyProgress(Bloodline.NONE, false, 0, 0.0F, 0.0F, BlutMode.OFF, 0, false);
 
     // Every field is read leniently, so one bad value falls back to its default on its own.
     public static final Codec<QuincyProgress> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -34,7 +37,8 @@ public record QuincyProgress(Bloodline bloodline, boolean decided, int training,
             Codec.FLOAT.lenientOptionalFieldOf("reishi", 0.0F).forGetter(QuincyProgress::reishi),
             Codec.FLOAT.lenientOptionalFieldOf("poison", 0.0F).forGetter(QuincyProgress::poison),
             BlutMode.CODEC.lenientOptionalFieldOf("blut", BlutMode.OFF).forGetter(QuincyProgress::blut),
-            Codec.INT.lenientOptionalFieldOf("destroyed", 0).forGetter(QuincyProgress::destroyed)
+            Codec.INT.lenientOptionalFieldOf("destroyed", 0).forGetter(QuincyProgress::destroyed),
+            Codec.BOOL.lenientOptionalFieldOf("torn_apart", false).forGetter(QuincyProgress::tornApart)
     ).apply(instance, QuincyProgress::new));
 
     /**
@@ -51,30 +55,34 @@ public record QuincyProgress(Bloodline bloodline, boolean decided, int training,
     }
 
     public QuincyProgress withBloodline(Bloodline value) {
-        return new QuincyProgress(value, decided, training, reishi, poison, blut, destroyed);
+        return new QuincyProgress(value, decided, training, reishi, poison, blut, destroyed, tornApart);
     }
 
     public QuincyProgress withDecided(boolean value) {
-        return new QuincyProgress(bloodline, value, training, reishi, poison, blut, destroyed);
+        return new QuincyProgress(bloodline, value, training, reishi, poison, blut, destroyed, tornApart);
     }
 
     public QuincyProgress withTraining(int value) {
-        return new QuincyProgress(bloodline, decided, value, reishi, poison, blut, destroyed);
+        return new QuincyProgress(bloodline, decided, value, reishi, poison, blut, destroyed, tornApart);
     }
 
     public QuincyProgress withReishi(float value) {
-        return new QuincyProgress(bloodline, decided, training, value, poison, blut, destroyed);
+        return new QuincyProgress(bloodline, decided, training, value, poison, blut, destroyed, tornApart);
     }
 
     public QuincyProgress withPoison(float value) {
-        return new QuincyProgress(bloodline, decided, training, reishi, value, blut, destroyed);
+        return new QuincyProgress(bloodline, decided, training, reishi, value, blut, destroyed, tornApart);
     }
 
     public QuincyProgress withBlut(BlutMode value) {
-        return new QuincyProgress(bloodline, decided, training, reishi, poison, value, destroyed);
+        return new QuincyProgress(bloodline, decided, training, reishi, poison, value, destroyed, tornApart);
     }
 
     public QuincyProgress withDestroyed(int value) {
-        return new QuincyProgress(bloodline, decided, training, reishi, poison, blut, value);
+        return new QuincyProgress(bloodline, decided, training, reishi, poison, blut, value, tornApart);
+    }
+
+    public QuincyProgress withTornApart(boolean value) {
+        return new QuincyProgress(bloodline, decided, training, reishi, poison, blut, destroyed, value);
     }
 }

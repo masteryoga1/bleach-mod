@@ -284,22 +284,17 @@ public final class SoulLogic {
      * knits itself together again as a living Human, weaker. Otherwise a Substitute's Shinigami power
      * holds their soul together and they become a Shinigami; an awakened Quincy's blood holds theirs
      * to the body and they wake alive; any other spiritually aware Human lingers as a Plus with a
-     * fresh Chain of Fate; a Plus that dies loses part of its chain. Everyone keeps their progress,
+     * fresh Chain of Fate; a Plus that dies loses part of its chain (an awakened Quincy Plus whose
+     * chain that breaks is torn apart at once, as above). Everyone keeps their progress,
      * but a Quincy loses their Blut and gathered reishi and half their Hollow poison.
      */
     public static SoulData afterDeath(SoulData old) {
         SoulData next = old.copy();
         next.setReiatsuReleased(false);
         next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
-        QuincyProgress quincy = old.quincy().withBlut(BlutMode.OFF).withReishi(0.0F);
+        QuincyProgress quincy = old.quincy().withBlut(BlutMode.OFF).withReishi(0.0F).withTornApart(false);
         if (old.isSoulDestroyed()) {
-            next.setState(SoulState.HUMAN);
-            next.clearChain();
-            next.setMaxReiryoku((float) (old.maxReiryoku() * QuincyLogic.DESTROYED_REIRYOKU_FRACTION));
-            next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
-            next.setQuincy(quincy.withPoison(0.0F));
-            next.soulReformed = true;
-            return next;
+            return reformed(old, next, quincy);
         }
         next.setQuincy(quincy.withPoison(old.quincy().poison() * 0.5F));
         boolean intoSpirit = old.state() == SoulState.HUMAN && BleachConfig.get(BleachConfig.DEATH_INTO_PLUS);
@@ -316,9 +311,24 @@ public final class SoulLogic {
             next.becamePlus = true;
         } else if (old.state() == SoulState.PLUS && next.chainMaxTicks() > 0) {
             int cost = BleachConfig.get(BleachConfig.PLUS_DEATH_CHAIN_COST_SECONDS) * 20;
+            if (next.chainTicks() - cost <= 0 && QuincyLogic.isAwakened(old) && BleachConfig.get(BleachConfig.HOLLOWFICATION)) {
+                // An awakened Quincy's chain breaking tears the soul apart: done now, not one death later.
+                return reformed(old, next, quincy);
+            }
             // Leave the last link for the next tick, so a chain that breaks does so after respawning.
             next.setChainTicks(Math.max(1, next.chainTicks() - cost));
         }
+        return next;
+    }
+
+    /** A torn soul knits itself together as a living Human, with less reiryoku and no Hollow poison. */
+    private static SoulData reformed(SoulData old, SoulData next, QuincyProgress quincy) {
+        next.setState(SoulState.HUMAN);
+        next.clearChain();
+        next.setMaxReiryoku((float) (old.maxReiryoku() * QuincyLogic.DESTROYED_REIRYOKU_FRACTION));
+        next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
+        next.setQuincy(quincy.withPoison(0.0F));
+        next.soulReformed = true;
         return next;
     }
 

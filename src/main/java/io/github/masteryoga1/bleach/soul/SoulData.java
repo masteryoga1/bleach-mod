@@ -165,8 +165,6 @@ public final class SoulData {
     boolean quincyReborn;
     /** Set on the respawned copy when this death came from the soul being torn apart. */
     boolean soulReformed;
-    /** Set just before a soul is torn apart, so its death knows. */
-    boolean soulDestroyed;
 
     public SoulData() {
     }
@@ -414,14 +412,22 @@ public final class SoulData {
         }
     }
 
-    /** Whether this soul is being torn apart by Hollow poison or a broken chain. Server side only. */
+    /**
+     * Whether this soul is being torn apart by Hollow poison or a broken chain. Saved, so a death that
+     * waits on the death screen through a logout or a restart still knows.
+     */
     public boolean isSoulDestroyed() {
-        return soulDestroyed;
+        return quincy.tornApart();
     }
 
     /** Marks the soul as torn apart, just before the death that follows (see {@link SoulLogic#afterDeath}). */
     public void markSoulDestroyed() {
-        soulDestroyed = true;
+        setQuincy(quincy.withTornApart(true));
+    }
+
+    /** Takes the mark back when the death it was for did not happen. */
+    public void clearSoulDestroyed() {
+        setQuincy(quincy.withTornApart(false));
     }
 
     /** Whether this respawned soul is an awakened Quincy who came back alive. Server side only. */

@@ -118,10 +118,11 @@ public final class QuincyClient {
             lastBlutPressAt = player.level().getGameTime();
         }
 
-        // While the soul the server last sent is settled, the question waits: either it was settled some
-        // other way since (by command, say) and the server would ignore an answer, or the soul that
-        // unsettles it (after a Quincy reset) is still on its way.
-        if (bloodlinePending && minecraft.screen == null && !player.getData(SoulAttachments.SOUL).quincy().decided()) {
+        // While the soul the server last sent has no question to answer, it waits: either it was settled
+        // some other way since (by command, say) or the soul is no longer a living Human, and the server
+        // would ignore an answer, or the soul that unsettles it (after a Quincy reset) is still on its way.
+        if (bloodlinePending && minecraft.screen == null
+                && QuincyLogic.needsBloodlineChoice(player.getData(SoulAttachments.SOUL))) {
             bloodlinePending = false;
             minecraft.setScreen(new BloodlineScreen());
         }

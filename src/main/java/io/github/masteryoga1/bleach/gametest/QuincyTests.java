@@ -33,6 +33,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -40,7 +41,10 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -60,6 +64,7 @@ public final class QuincyTests {
     private static final float EPSILON = 1.0E-4F;
     private static final int ROLLS = 2000;
     private static final Vec3 SOUTH = new Vec3(0.0, 0.0, 1.0);
+    private static final Vec3 NORTH = new Vec3(0.0, 0.0, -1.0);
     private static final Vec3 EAST = new Vec3(1.0, 0.0, 0.0);
     private static final Vec3 UP = new Vec3(0.0, 1.0, 0.0);
     private static final Vec3 DOWN = new Vec3(0.0, -1.0, 0.0);
@@ -139,7 +144,7 @@ public final class QuincyTests {
     @GameTest(template = "empty")
     public static void quincyProgressSurvivesSaving(GameTestHelper helper) {
         SoulData data = ShinigamiTests.soul(SoulState.HUMAN, 40.0F);
-        QuincyProgress progress = new QuincyProgress(Bloodline.ECHT, true, 77, 12.5F, 30.0F, BlutMode.VENE, 3);
+        QuincyProgress progress = new QuincyProgress(Bloodline.ECHT, true, 77, 12.5F, 30.0F, BlutMode.VENE, 3, true);
         data.setQuincy(progress);
 
         Tag saved = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
@@ -302,12 +307,13 @@ public final class QuincyTests {
         player.setXRot(-45.0F);
         clearHollowsNear(helper, player);
 
+        // First, while nothing has been counted yet, so only its length can keep it from counting.
+        QuincyEvents.release(player, 10);
+        helper.assertTrue(data.quincy().training() == 0, "a short draw trained the blood to " + data.quincy().training());
         QuincyEvents.release(player, 25);
         helper.assertTrue(data.quincy().training() == 2, "a long draw trained the blood to " + data.quincy().training());
         QuincyEvents.release(player, 25);
         helper.assertTrue(data.quincy().training() == 2, "a second draw at once trained the blood to " + data.quincy().training());
-        QuincyEvents.release(player, 10);
-        helper.assertTrue(data.quincy().training() == 2, "a short draw trained the blood to " + data.quincy().training());
         helper.assertFalse(QuincyLogic.isAwakened(data), "a few draws awakened the blood");
 
         data.setQuincy(data.quincy().withTraining(38));
@@ -581,7 +587,14 @@ public final class QuincyTests {
                 helper.assertTrue(poison == 0.0F, "a Hollow's blow poisoned a " + who + " with " + poison);
                 return;
             }
-            float expected = QuincyLogic.poisonFrom(data, lost, onHit, difficulty);
+            // One poison a point at Normal, half as much on Easy, a quarter more on Hard; half again
+            // more for a bite that carries an effect, and half as much under Vene. Both souls are tier 1.
+            double factor = switch (difficulty) {
+                case PEACEFUL, EASY -> 0.5;
+                case NORMAL -> 1.0;
+                case HARD -> 1.25;
+            };
+            double expected = lost * (onHit ? 1.5 : 1.0) * (data == vene ? 0.5 : 1.0) * factor;
             helper.assertTrue(poison > 0.0F, "a Hollow's blow did not poison a " + who);
             assertNear(helper, poison, expected, "the poison a " + who + " took from " + lost + " damage");
         });
@@ -607,6 +620,19 @@ public final class QuincyTests {
         QuincyLogic.cure(data, 10.0F);
         assertNear(helper, data.quincy().poison(), 0.0, "poison 5 cured by 10");
 
+        SoulData plain = quincy(Bloodline.GEMISCHT, 1, 40.0F);
+        assertNear(helper, QuincyLogic.poisonFrom(plain, 4.0F, false, Difficulty.NORMAL), 4.0, "poison from a blow of 4");
+        assertNear(helper, QuincyLogic.poisonFrom(plain, 4.0F, true, Difficulty.NORMAL), 6.0, "poison from a bite of 4");
+        assertNear(helper, QuincyLogic.poisonFrom(plain, 4.0F, false, Difficulty.EASY), 2.0, "poison from a blow of 4 on Easy");
+        assertNear(helper, QuincyLogic.poisonFrom(plain, 4.0F, false, Difficulty.PEACEFUL), 2.0, "poison from a blow of 4 on Peaceful");
+        assertNear(helper, QuincyLogic.poisonFrom(plain, 4.0F, false, Difficulty.HARD), 5.0, "poison from a blow of 4 on Hard");
+        assertNear(helper, QuincyLogic.poisonFrom(plain, 0.0F, true, Difficulty.HARD), 0.0, "poison from a blow of 0");
+        SoulData veins = quincy(Bloodline.ECHT, 1, 40.0F);
+        veins.setQuincy(veins.quincy().withBlut(BlutMode.VENE));
+        assertNear(helper, QuincyLogic.poisonFrom(veins, 4.0F, true, Difficulty.NORMAL), 3.0, "poison from a bite of 4 under Vene");
+        assertNear(helper, QuincyLogic.poisonFrom(quincy(Bloodline.GEMISCHT, 3, 40.0F), 4.0F, false, Difficulty.NORMAL), 3.2,
+                "poison from a blow of 4 at tier 3");
+
         assertNear(helper, QuincyProgress.NONE.withPoison(150.0F).poison(), 100.0, "poison 150 kept as");
         assertNear(helper, QuincyProgress.NONE.withPoison(-3.0F).poison(), 0.0, "poison -3 kept as");
         assertNear(helper, QuincyProgress.NONE.withPoison(Float.NaN).poison(), 0.0, "poison NaN kept as");
@@ -620,8 +646,12 @@ public final class QuincyTests {
         SoulData data = in(SoulState.PLUS, quincy(Bloodline.ECHT, 2, 100.0F));
         data.setQuincy(data.quincy().withPoison(100.0F).withReishi(20.0F).withBlut(BlutMode.VENE));
         data.markSoulDestroyed();
+        // As it would load after logging out on the death screen.
+        SoulData saved = SoulData.CODEC.parse(NbtOps.INSTANCE,
+                SoulData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow()).getOrThrow();
+        helper.assertTrue(saved.isSoulDestroyed(), "saving forgot that the soul was torn apart");
 
-        SoulData next = SoulLogic.afterDeath(data);
+        SoulData next = SoulLogic.afterDeath(saved);
         helper.assertTrue(next.state() == SoulState.HUMAN, "a destroyed soul came back as a " + next.state());
         helper.assertTrue(next.chainMaxTicks() == 0, "a destroyed soul came back with a chain");
         assertNear(helper, next.maxReiryoku(), 90.0, "a destroyed soul's maximum reiryoku");
@@ -630,6 +660,21 @@ public final class QuincyTests {
         helper.assertTrue(next.quincy().blut() == BlutMode.OFF, "a destroyed soul came back under " + next.quincy().blut());
         helper.assertTrue(next.tier(PowerPath.QUINCY) == 2, "a destroyed soul lost its Quincy tier");
         helper.assertTrue(next.wasSoulReformed(), "a destroyed soul is not marked as reformed");
+        helper.assertFalse(next.isSoulDestroyed(), "a reformed soul is still being torn apart");
+
+        // An awakened Quincy Plus whose death costs the last of the chain is torn apart now, not one death later.
+        SoulData plus = in(SoulState.PLUS, quincy(Bloodline.GEMISCHT, 1, 100.0F));
+        plus.setChainTicks(20);
+        SoulData torn = SoulLogic.afterDeath(plus);
+        helper.assertTrue(torn.state() == SoulState.HUMAN, "a Quincy Plus out of chain came back as a " + torn.state());
+        helper.assertTrue(torn.wasSoulReformed(), "a Quincy Plus out of chain is not marked as reformed");
+        assertNear(helper, torn.maxReiryoku(), 90.0, "a Quincy Plus out of chain's maximum reiryoku");
+        // Any other Plus keeps its last link for the tick after respawning.
+        SoulData ordinary = in(SoulState.PLUS, ShinigamiTests.soul(SoulState.HUMAN, 100.0F));
+        ordinary.setChainTicks(20);
+        SoulData hollowing = SoulLogic.afterDeath(ordinary);
+        helper.assertTrue(hollowing.state() == SoulState.PLUS && hollowing.chainTicks() == 1,
+                "a Plus out of chain came back as a " + hollowing.state() + " with " + hollowing.chainTicks() + " ticks of chain");
         helper.succeed();
     }
 
@@ -731,6 +776,60 @@ public final class QuincyTests {
         });
     }
 
+    /**
+     * A creature right behind another is not missed: not after the arrow's last pierce, and not after
+     * it flew through one that took no harm (one still reeling from a blow).
+     */
+    @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
+    public static void heiligPfeilReachesTheNextOneClose(GameTestHelper helper) {
+        Cow piercedFront = still(helper.spawnWithNoFreeWill(EntityType.COW, 4, 2, 8));
+        Cow piercedBack = still(helper.spawnWithNoFreeWill(EntityType.COW, 4, 2, 9));
+        Cow reeling = still(helper.spawnWithNoFreeWill(EntityType.COW, 11, 2, 8));
+        Cow behindReeling = still(helper.spawnWithNoFreeWill(EntityType.COW, 11, 2, 9));
+        reeling.hurt(helper.getLevel().damageSources().generic(), 4.0F);
+        Player owner = archer(helper, 8.5, 3.5);
+        HeiligPfeil piercing = loose(helper, owner, helper.absoluteVec(new Vec3(4.5, 2.5, 3.5)), SOUTH, 3.0F, 1, 3.0F);
+        HeiligPfeil single = loose(helper, owner, helper.absoluteVec(new Vec3(11.5, 2.5, 3.5)), SOUTH, 3.0F, 0, 3.0F);
+        helper.runAfterDelay(8, () -> {
+            assertNear(helper, piercedFront.getHealth(), 7.0, "the first cow in the piercing arrow's path");
+            assertNear(helper, piercedBack.getHealth(), 7.0, "the cow a step behind it");
+            assertNear(helper, reeling.getHealth(), 6.0, "the reeling cow, which the arrow flies through");
+            assertNear(helper, behindReeling.getHealth(), 7.0, "the cow a step behind the reeling one");
+            helper.assertTrue(piercing.isRemoved(), "the piercing arrow flew on past its last pierce");
+            helper.assertTrue(single.isRemoved(), "the arrow without pierce flew on past the cow it hurt");
+            for (Cow cow : List.of(piercedFront, piercedBack, reeling, behindReeling)) {
+                cow.discard();
+            }
+            helper.succeed();
+        });
+    }
+
+    /** A raised shield facing the shot stops it, pierce or not, and nothing behind is touched. */
+    @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
+    public static void shieldsStopHeiligPfeil(GameTestHelper helper) {
+        Cow guard = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 8));
+        Cow behind = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 12));
+        guard.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.SHIELD));
+        // Facing north, towards where the arrow comes from.
+        guard.setYRot(180.0F);
+        guard.setYHeadRot(180.0F);
+        guard.setYBodyRot(180.0F);
+        guard.startUsingItem(InteractionHand.MAIN_HAND);
+        Player owner = archer(helper, 6.5, 3.5);
+        helper.runAfterDelay(8, () -> {
+            helper.assertTrue(guard.isBlocking(), "the cow is not holding its shield up");
+            HeiligPfeil arrow = loose(helper, owner, helper.absoluteVec(new Vec3(8.5, 2.5, 3.5)), SOUTH, 3.0F, 2, 3.0F);
+            helper.runAfterDelay(8, () -> {
+                assertNear(helper, guard.getHealth(), 10.0, "the health of the cow behind its shield");
+                assertNear(helper, behind.getHealth(), 10.0, "the health of the cow behind the shield");
+                helper.assertTrue(arrow.isRemoved(), "the arrow flew on past the shield");
+                guard.discard();
+                behind.discard();
+                helper.succeed();
+            });
+        });
+    }
+
     @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
     public static void heiligPfeilNeverStrikesItsOwner(GameTestHelper helper) {
         Cow ownerCow = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 6));
@@ -746,14 +845,21 @@ public final class QuincyTests {
         });
     }
 
+    /** A shot from inside a creature lands; one that only starts against a creature's side, aimed away, does not. */
     @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
     public static void pointBlankShotsLand(GameTestHelper helper) {
         Cow cow = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 8));
+        Cow brushed = still(helper.spawnWithNoFreeWill(EntityType.COW, 3, 2, 8));
         Player owner = archer(helper, 6.5, 8.5);
         loose(helper, owner, cow.getBoundingBox().getCenter(), EAST, 3.0F, 0, 3.0F);
+        // A fifth of a block north of the other cow, and flying away from it.
+        AABB box = brushed.getBoundingBox();
+        loose(helper, owner, new Vec3(box.getCenter().x, box.getCenter().y, box.minZ - 0.2), NORTH, 3.0F, 0, 3.0F);
         helper.runAfterDelay(5, () -> {
             assertNear(helper, cow.getHealth(), 7.0, "the health of a cow shot from inside");
+            assertNear(helper, brushed.getHealth(), 10.0, "the health of a cow a shot started beside and flew away from");
             cow.discard();
+            brushed.discard();
             helper.succeed();
         });
     }
@@ -763,7 +869,8 @@ public final class QuincyTests {
         Player owner = archer(helper, 8.5, 5.5);
         HeiligPfeil down = loose(helper, owner, helper.absoluteVec(new Vec3(8.5, 3.5, 2.5)), DOWN, 3.0F, 0, 1.0F);
         helper.assertTrue(down.pickup == AbstractArrow.Pickup.DISALLOWED, "a Heilig Pfeil can be picked up");
-        HeiligPfeil up = loose(helper, owner, helper.absoluteVec(new Vec3(8.5, 4.0, 8.5)), UP, 3.0F, 0, 1.0F);
+        // Slow enough to stay under the test's barrier ceiling for its whole life.
+        HeiligPfeil up = loose(helper, owner, helper.absoluteVec(new Vec3(8.5, 4.0, 8.5)), UP, 3.0F, 0, 0.15F);
         int life = BleachConfig.get(BleachConfig.PFEIL_LIFE_TICKS);
         helper.runAfterDelay(5, () -> {
             helper.assertTrue(down.isRemoved(), "an arrow that met the floor is still there");

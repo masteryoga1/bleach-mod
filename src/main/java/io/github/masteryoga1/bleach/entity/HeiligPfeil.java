@@ -23,6 +23,7 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
@@ -75,6 +76,8 @@ public class HeiligPfeil extends AbstractArrow {
     private final IntOpenHashSet struck = new IntOpenHashSet();
     /** Whether the first server tick has looked for a creature the arrow starts inside. */
     private boolean checkedPointBlank;
+    /** Whether this arrow's own blow is being dealt, when a shield may stop it whatever its pierce. */
+    private boolean hurting;
 
     public HeiligPfeil(EntityType<? extends HeiligPfeil> type, Level level) {
         super(type, level);
@@ -154,15 +157,17 @@ public class HeiligPfeil extends AbstractArrow {
 
     /**
      * Strikes the nearest creature the arrow starts inside, if it may: through the same impact event
-     * and deflection check as a hit along the path.
+     * and deflection check as a hit along the path. One it only starts near counts if it lies ahead,
+     * so a creature brushing the shooter's back or side is not struck by a shot aimed elsewhere.
      */
     private void strikePointBlank() {
         Vec3 at = position();
+        Vec3 heading = getDeltaMovement();
         Entity nearest = null;
         double nearestSqr = Double.MAX_VALUE;
         AABB around = new AABB(at, at).inflate(POINT_BLANK_INFLATE);
         for (Entity entity : level().getEntities(this, around,
-                other -> other.getBoundingBox().inflate(POINT_BLANK_INFLATE).contains(at) && canHitEntity(other))) {
+                other -> startsAt(other.getBoundingBox(), at, heading) && canHitEntity(other))) {
             double distanceSqr = entity.getBoundingBox().getCenter().distanceToSqr(at);
             if (distanceSqr < nearestSqr) {
                 nearest = entity;
@@ -175,6 +180,12 @@ public class HeiligPfeil extends AbstractArrow {
                 hitTargetOrDeflectSelf(hit);
             }
         }
+    }
+
+    /** Whether a shot from {@code at} along {@code heading} starts inside this box, or just short of it. */
+    private static boolean startsAt(AABB box, Vec3 at, Vec3 heading) {
+        return box.contains(at) || box.inflate(POINT_BLANK_INFLATE).contains(at)
+                && box.getCenter().subtract(at).dot(heading) > 0.0;
     }
 
     /**
@@ -209,12 +220,19 @@ public class HeiligPfeil extends AbstractArrow {
     }
 
     /**
-     * How many more creatures vanilla's flight should look for this tick. The client never looks past
-     * the first, so it cannot keep finding creatures it has not been told were struck.
+     * Whether vanilla's flight should look for another creature this tick, after the one it met. On
+     * the server it always does while the arrow flies on, since one flown through or the last one
+     * pierced may stand right in front of the next; {@link #onHitEntity} ends the arrow when it should
+     * stop, and {@link #struck} keeps the search from meeting anyone twice. While its own blow is
+     * dealt it reads as no pierce at all, so a shield can stop it. The client never looks past the
+     * first, so it cannot keep finding creatures it has not been told were struck.
      */
     @Override
     public byte getPierceLevel() {
-        return level().isClientSide() ? (byte) 0 : (byte) Mth.clamp(pierceLeft, 0, Byte.MAX_VALUE);
+        if (level().isClientSide() || hurting) {
+            return 0;
+        }
+        return (byte) Mth.clamp(pierceLeft + 1, 1, Byte.MAX_VALUE);
     }
 
     /** Only a creature the owner may harm, through its parts for a many-part body, and never one met before. */
@@ -253,7 +271,17 @@ public class HeiligPfeil extends AbstractArrow {
         Vec3 from = position();
         Vec3 at = target.getBoundingBox().clip(from, from.add(getDeltaMovement()))
                 .orElse(target.getBoundingBox().getCenter());
-        boolean hurt = entity.hurt(source, QuincyLogic.damageAgainst(damage, target));
+        boolean hurt;
+        hurting = true;
+        try {
+            hurt = entity.hurt(source, QuincyLogic.damageAgainst(damage, target));
+        } finally {
+            hurting = false;
+        }
+        if (hurt && target instanceof EnderMan) {
+            // It slipped aside rather than took the blow: flown through, as one that takes no harm is.
+            return;
+        }
         if (hurt) {
             QuincyEvents.onArrowLanded(owner, target, mask);
             burst(at);

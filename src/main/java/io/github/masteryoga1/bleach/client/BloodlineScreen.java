@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import java.util.List;
 import java.util.Locale;
@@ -16,7 +17,8 @@ import net.minecraft.util.FormattedCharSequence;
  * The bloodline question, asked once of a new living Human: does Quincy blood run in them? Three
  * answers, each explained in its tooltip: Human, Quincy, or let fate decide. The server rolls the
  * blood from the answer. The game goes on behind it, and it cannot be put away with Escape, only
- * answered; a player who leaves without answering is asked again next time.
+ * answered; another screen that takes its place only puts it off, and a player who leaves without
+ * answering is asked again next time.
  */
 public final class BloodlineScreen extends Screen {
     private static final int PANEL_WIDTH = 260;
@@ -71,6 +73,19 @@ public final class BloodlineScreen extends Screen {
         }
         if (minecraft != null) {
             minecraft.setScreen(null);
+        }
+    }
+
+    /**
+     * Put away unanswered by another screen (a death, a container the server opened): the question
+     * waits to be asked again once nothing else is showing, while the soul still needs it.
+     */
+    @Override
+    public void removed() {
+        super.removed();
+        if (!answered && minecraft != null && minecraft.player != null
+                && QuincyLogic.needsBloodlineChoice(minecraft.player.getData(SoulAttachments.SOUL))) {
+            QuincyClient.bloodlinePending = true;
         }
     }
 

@@ -33,6 +33,7 @@ import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -290,7 +291,9 @@ public final class QuincyEvents {
      */
     private static void tickPoison(ServerPlayer player, SoulData data, long now, boolean channelling) {
         float poison = data.quincy().poison();
-        if (poison > 0.0F && now - data.lastPoisonAt >= QuincyLogic.POISON_DECAY_DELAY_TICKS) {
+        // Full poison never wears off: it tears the soul apart below, whenever the soul can feel it.
+        if (poison > 0.0F && poison < QuincyProgress.MAX_POISON
+                && now - data.lastPoisonAt >= QuincyLogic.POISON_DECAY_DELAY_TICKS) {
             boolean dense = channelling && data.reishiDensity >= QuincyLogic.CHANNEL_DECAY_MIN_DENSITY;
             poison = Math.max(0.0F, poison - QuincyLogic.poisonDecayPerTick(dense));
             data.setQuincy(data.quincy().withPoison(poison));
@@ -604,7 +607,7 @@ public final class QuincyEvents {
         data.markSoulDestroyed();
         player.hurt(soulDestruction(player.level()), Float.MAX_VALUE);
         if (player.isAlive()) {
-            data.soulDestroyed = false;
+            data.clearSoulDestroyed();
             return false;
         }
         return true;
@@ -718,12 +721,16 @@ public final class QuincyEvents {
 
     // ---- Damage ----
 
-    /** Blut Arterie: every hit the Quincy causes lands harder. */
+    /**
+     * Blut Arterie: every hit the Quincy causes lands harder. Not on the Quincy themself, and not the
+     * Thorns of their own armour, which is no blow of theirs.
+     */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
         DamageSource source = event.getSource();
         if (event.getEntity().level().isClientSide() || event.getAmount() <= 0.0F
-                || source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)
-                || !(source.getEntity() instanceof Player attacker) || !SoulLogic.hasSoul(attacker)) {
+                || source.is(DamageTypeTags.BYPASSES_INVULNERABILITY) || source.is(DamageTypes.THORNS)
+                || !(source.getEntity() instanceof Player attacker) || attacker == event.getEntity()
+                || !SoulLogic.hasSoul(attacker)) {
             return;
         }
         SoulData data = SoulLogic.get(attacker);

@@ -531,6 +531,7 @@
   "commands.bleach.zanpakuto.seal": "Sealed the zanpakutō of %s player(s)",
   "commands.bleach.zanpakuto.reset": "Reset the zanpakutō of %s player(s)",
   "commands.bleach.quincy.bloodline": "Set the bloodline to %s for %s player(s)",
+  "commands.bleach.quincy.bloodline.awakened": "%s has awakened Quincy power, which needs the blood. Use /bleach quincy <players> reset to take both away",
   "commands.bleach.quincy.training": "Set Quincy training to %s for %s player(s)",
   "commands.bleach.quincy.reishi": "Set reishi to %s for %s player(s)",
   "commands.bleach.quincy.poison": "Set Hollow poison to %s for %s player(s)",
