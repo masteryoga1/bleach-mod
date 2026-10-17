@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import net.minecraft.core.registries.Registries;
@@ -60,6 +61,9 @@ public final class SoulEvents {
         ChainEvents.register(bus);
         ReiatsuEvents.register(bus);
         ShinigamiEvents.register(bus);
+        HollowEvents.register(bus);
+        GargantaEvents.register(bus);
+        PlusEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -186,10 +190,13 @@ public final class SoulEvents {
             return;
         }
         SoulData data = SoulLogic.get(attacker);
-        // One XP per swing at most, so sweeping several mobs or spam-clicking does not train faster.
+        // One grant per swing at most, so sweeping several mobs or spam-clicking does not train faster.
+        // A Hollow is worth more than a mundane creature, and its mask more still.
         if (attacker.tickCount - data.lastCombatXpTick >= COMBAT_XP_COOLDOWN_TICKS) {
             data.lastCombatXpTick = attacker.tickCount;
-            SoulLogic.addStatXp(attacker, data, stat, 1);
+            int xp = event.getEntity() instanceof Hollow hollow
+                    ? HollowLogic.hitXp(true, hollow.wasMaskStruckAt(attacker.level().getGameTime())) : 1;
+            SoulLogic.addStatXp(attacker, data, stat, xp);
         }
     }
 
@@ -215,14 +222,16 @@ public final class SoulEvents {
     }
 
     /**
-     * Killing hostile creatures grows reiryoku. Once Hollows exist this will count spiritual beings
-     * only; until then any hostile mob stands in for them.
+     * Killing a hostile creature of the mundane world grows reiryoku only if the server turns it on
+     * (it is off by default). Spiritual beings, which are what really count, are handled by
+     * {@link HollowEvents}.
      */
     private static void onDeath(LivingDeathEvent event) {
         LivingEntity victim = event.getEntity();
-        if (event.getSource().getEntity() instanceof ServerPlayer killer && victim instanceof Enemy) {
+        if (event.getSource().getEntity() instanceof Player killer && SoulLogic.hasSoul(killer)
+                && victim instanceof Enemy && !SoulLogic.isSpirit(victim)) {
             SoulLogic.grow(SoulLogic.get(killer),
-                    victim.getMaxHealth() * BleachConfig.get(BleachConfig.KILL_GROWTH_PER_MAX_HEALTH));
+                    victim.getMaxHealth() * BleachConfig.get(BleachConfig.MUNDANE_KILL_GROWTH_PER_MAX_HEALTH));
         }
     }
 

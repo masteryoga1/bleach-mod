@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:mask_strike",
+  "display": {
+    "icon": {
+      "id": "bleach:asauchi"
+    },
+    "title": {
+      "translate": "advancements.bleach.purified.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.purified.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "purified": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "purified"
+      }
+    }
+  }
+}

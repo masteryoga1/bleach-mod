@@ -76,7 +76,12 @@ public final class ShinigamiLogic {
 
     /** A distance rounded to the nearest 50 blocks, and never less than 50, for a soul's rough sense of it. */
     public static long roundedDistance(double distance) {
-        return Math.max(50L, Math.round(distance / 50.0) * 50L);
+        return roundedDistance(distance, 50L);
+    }
+
+    /** A distance rounded to the nearest {@code step} blocks, and never less than one step. */
+    public static long roundedDistance(double distance, long step) {
+        return Math.max(step, Math.round(distance / step) * step);
     }
 
     // ---- The Academy ----

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:purified",
+  "display": {
+    "icon": {
+      "id": "minecraft:cod"
+    },
+    "title": {
+      "translate": "advancements.bleach.fishbone_d.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.fishbone_d.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "fishbone_d": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "fishbone_d"
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
+import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
@@ -190,6 +191,11 @@ public final class AcademyTests {
         for (var piece : List.of(ModItems.SHIHAKUSHO_KOSODE.get(), ModItems.SHIHAKUSHO_HAKAMA.get(), ModItems.WARAJI.get())) {
             helper.assertTrue(player.getInventory().countItem(piece) == 1, "graduating did not give " + piece);
         }
+        int pagers = player.getInventory().countItem(ModItems.DENREISHINKI.get());
+        helper.assertTrue(pagers == 1, "graduating gave " + pagers + " Denreishinki");
+        DenreishinkiItem.giveIfMissing(player);
+        pagers = player.getInventory().countItem(ModItems.DENREISHINKI.get());
+        helper.assertTrue(pagers == 1, "a Shinigami who carries a Denreishinki was given another, and has " + pagers);
         helper.assertFalse(ShinigamiEvents.graduate(player), "a Shinigami graduated again");
         helper.succeed();
     }
@@ -328,9 +334,10 @@ public final class AcademyTests {
                 .thenWaitUntil(() -> helper.assertTrue(instructor.home() != null, "the instructor never settled"))
                 .thenExecute(() -> {
                     home[0] = instructor.home();
-                    // A fishing rod's pull, then dragged three blocks.
+                    // A fishing rod's pull, then dragged a block: twice the slack he allows, and still inside
+                    // the template, whose chunks are the only ones a test keeps ticking entities in.
                     instructor.setDeltaMovement(1.5, 0.4, 0.0);
-                    instructor.setPos(home[0].x + 3.0, home[0].y, home[0].z);
+                    instructor.setPos(home[0].x + 1.0, home[0].y, home[0].z);
                 })
                 .thenWaitUntil(() -> helper.assertTrue(instructor.position().distanceTo(home[0]) < 1.0E-3,
                         "the instructor stayed where he was dragged, at " + instructor.position()))

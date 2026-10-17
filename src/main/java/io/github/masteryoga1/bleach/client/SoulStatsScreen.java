@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.client;
 
+import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -17,7 +18,10 @@ import net.minecraft.util.StringUtil;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
-/** The soul screen: state, reiryoku, stats with training progress, awakened powers and what comes next. */
+/**
+ * The soul screen: state, reiryoku, Hollows purified and slain and Pluses sent on, stats with training
+ * progress, awakened powers and what comes next.
+ */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
     private static final int LINE = 12;
@@ -76,6 +80,12 @@ public final class SoulStatsScreen extends Screen {
                     : Component.translatable("screen.bleach.soul.reiatsu.sealed",
                             BleachClient.REIATSU_RELEASE_KEY.getTranslatedKeyMessage());
             graphics.drawString(font, release, left, y, GREY);
+            y += LINE;
+        }
+        HuntRecord hunt = data.hunt();
+        if (hunt.purified() + hunt.slain() + hunt.sentOn() > 0) {
+            graphics.drawString(font, Component.translatable("screen.bleach.soul.hunt",
+                    hunt.purified(), hunt.slain(), hunt.sentOn()), left, y, GREY);
             y += LINE;
         }
         y += 6;

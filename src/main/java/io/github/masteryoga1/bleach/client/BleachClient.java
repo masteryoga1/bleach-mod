@@ -3,12 +3,20 @@ package io.github.masteryoga1.bleach.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.FishboneD;
+import io.github.masteryoga1.bleach.entity.Hexapodus;
+import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.entity.HoundHollow;
+import io.github.masteryoga1.bleach.entity.SerpentHollow;
+import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModMenus;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.SpiderModel;
+import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.resources.PlayerSkin;
@@ -53,6 +61,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachClient::addLayers);
         modEventBus.addListener(BleachClient::registerScreens);
         modEventBus.addListener(BleachClient::registerRenderers);
+        modEventBus.addListener(BleachModelLayers::register);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onClientTickPre);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onPlayerTickPre);
@@ -77,7 +86,11 @@ public final class BleachClient {
         event.register(ModMenus.TAILORING.get(), TailoringScreen::new);
     }
 
-    /** The NPCs wear two of the game's default player skins until the mod has its own. */
+    /**
+     * The NPCs wear two of the game's default player skins until the mod has its own. Hollows use the
+     * vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
+     * The type arguments are spelled out rather than left for the compiler to infer through the lambdas.
+     */
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         ResourceLocation instructor = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/kai.png");
         ResourceLocation wounded = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/noor.png");
@@ -85,6 +98,29 @@ public final class BleachClient {
                 context -> new ShinigamiNpcRenderer<AcademyInstructor>(context, instructor));
         event.registerEntityRenderer(ModEntities.WOUNDED_SHINIGAMI.get(),
                 context -> new ShinigamiNpcRenderer<WoundedShinigami>(context, wounded));
+        // Spiders end on their backs when they die; the rest fall on their sides.
+        event.registerEntityRenderer(ModEntities.SPIDER_HOLLOW.get(),
+                context -> new HollowRenderer<SpiderHollow, SpiderModel<SpiderHollow>>(context,
+                        new SpiderModel<>(context.bakeLayer(ModelLayers.SPIDER)),
+                        HollowKind.SPIDER, 180.0F));
+        event.registerEntityRenderer(ModEntities.HEXAPODUS.get(),
+                context -> new HollowRenderer<Hexapodus, HexapodusModel>(context,
+                        new HexapodusModel(context.bakeLayer(ModelLayers.SPIDER)),
+                        HollowKind.HEXAPODUS, 180.0F));
+        event.registerEntityRenderer(ModEntities.HOUND_HOLLOW.get(),
+                context -> new HollowRenderer<HoundHollow, HoundHollowModel>(context,
+                        new HoundHollowModel(context.bakeLayer(BleachModelLayers.HOUND_HOLLOW)),
+                        HollowKind.HOUND, 90.0F));
+        event.registerEntityRenderer(ModEntities.SERPENT_HOLLOW.get(),
+                context -> new HollowRenderer<SerpentHollow, SerpentHollowModel>(context,
+                        new SerpentHollowModel(context.bakeLayer(BleachModelLayers.SERPENT_HOLLOW)),
+                        HollowKind.SERPENT, 90.0F));
+        event.registerEntityRenderer(ModEntities.FISHBONE_D.get(),
+                context -> new HollowRenderer<FishboneD, FishboneDModel>(context,
+                        new FishboneDModel(context.bakeLayer(BleachModelLayers.FISHBONE_D)),
+                        HollowKind.FISHBONE_D, 90.0F));
+        event.registerEntityRenderer(ModEntities.PLUS.get(), PlusRenderer::new);
+        event.registerEntityRenderer(ModEntities.GARGANTA.get(), GargantaRenderer::new);
     }
 
     /** Adds the chain and mask layer and the sheathed blade to both player models (wide and slim arms). */
@@ -122,6 +158,10 @@ public final class BleachClient {
         }
         if (flashStep && minecraft.player != null && minecraft.screen == null && minecraft.getConnection() != null) {
             BleachNetwork.requestFlashStep(minecraft.player.input.forwardImpulse, minecraft.player.input.leftImpulse);
+        }
+
+        if (minecraft.level != null) {
+            SpiritShimmer.tick(minecraft);
         }
     }
 

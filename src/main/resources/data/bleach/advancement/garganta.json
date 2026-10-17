@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:ender_eye"
+    },
+    "title": {
+      "translate": "advancements.bleach.garganta.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.garganta.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "garganta": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "garganta"
+      }
+    }
+  }
+}

@@ -19,6 +19,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.RespawnAnchorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -93,16 +94,22 @@ public final class ChainEvents {
         }
     }
 
-    /** Whether a Shinigami, a Substitute or a Shinigami NPC is close enough to slow the chain. */
-    private static boolean shinigamiNearby(ServerPlayer player) {
+    /**
+     * Whether a Shinigami, a Substitute or a Shinigami NPC is close enough to this Plus, a player or a
+     * Plus spirit, to slow its chain. Always false off the server.
+     */
+    public static boolean shinigamiNearby(LivingEntity entity) {
+        if (!(entity.level() instanceof ServerLevel level)) {
+            return false;
+        }
         double rangeSqr = SHINIGAMI_RANGE * SHINIGAMI_RANGE;
-        for (ServerPlayer other : player.serverLevel().players()) {
-            if (other != player && other.distanceToSqr(player) <= rangeSqr && ShinigamiLogic.slowsErosion(other)) {
+        for (ServerPlayer other : level.players()) {
+            if (other != entity && other.distanceToSqr(entity) <= rangeSqr && ShinigamiLogic.slowsErosion(other)) {
                 return true;
             }
         }
-        return !player.serverLevel().getEntitiesOfClass(ShinigamiNpc.class, player.getBoundingBox().inflate(SHINIGAMI_RANGE),
-                npc -> npc.distanceToSqr(player) <= rangeSqr && ShinigamiLogic.slowsErosion(npc)).isEmpty();
+        return !level.getEntitiesOfClass(ShinigamiNpc.class, entity.getBoundingBox().inflate(SHINIGAMI_RANGE),
+                npc -> npc.distanceToSqr(entity) <= rangeSqr && ShinigamiLogic.slowsErosion(npc)).isEmpty();
     }
 
     /** The links eat each other: a moment of blindness and a little pain that never kills. */

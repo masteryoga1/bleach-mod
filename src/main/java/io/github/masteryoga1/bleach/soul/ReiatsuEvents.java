@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
+import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import java.util.List;
 import net.minecraft.ChatFormatting;
@@ -41,16 +42,20 @@ public final class ReiatsuEvents {
     }
 
     public static void register(IEventBus bus) {
-        // After Zanjutsu and Hakuda have strengthened the hit.
+        // After Zanjutsu, Hakuda and a blow to a Hollow's mask have strengthened the hit.
         bus.addListener(EventPriority.LOW, ReiatsuEvents::onIncomingDamage);
         bus.addListener(ReiatsuEvents::onPlayerTick);
         bus.addListener(ReiatsuEvents::onEntityJoin);
         bus.addListener(ReiatsuEvents::onChangeTarget);
     }
 
-    /** Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC. */
+    /**
+     * Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC
+     * and Fishbone D, who has come for one soul and does not back down.
+     */
     private static void onEntityJoin(EntityJoinLevelEvent event) {
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob && !(mob instanceof ShinigamiNpc)
+                && !(mob instanceof FishboneD)
                 && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
             mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
         }
