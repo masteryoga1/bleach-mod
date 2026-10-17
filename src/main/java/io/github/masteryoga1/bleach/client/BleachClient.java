@@ -38,7 +38,7 @@ import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import net.neoforged.neoforge.common.NeoForge;
 import org.lwjgl.glfw.GLFW;
 
-/** Client-only entry point: HUD, screens, key bindings and how souls are drawn. */
+/** Client-only entry point: HUD, screens, key bindings, and how souls and zanpakutō techniques are drawn. */
 @Mod(value = BleachMod.MODID, dist = Dist.CLIENT)
 public final class BleachClient {
     public static final String KEY_CATEGORY = "key.categories.bleach";
@@ -73,6 +73,7 @@ public final class BleachClient {
 
     private static void registerGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAbove(VanillaGuiLayers.HOTBAR, ReiryokuHud.ID, ReiryokuHud::render);
+        event.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, JinzenOverlay.ID, JinzenOverlay::render);
     }
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
@@ -80,6 +81,9 @@ public final class BleachClient {
         event.register(REIATSU_RELEASE_KEY);
         event.register(FLASH_STEP_KEY);
         event.register(ReishiFootingClient.REISHI_FOOTING_KEY);
+        event.register(ZanpakutoKeys.RELEASE);
+        event.register(ZanpakutoKeys.SEAL);
+        event.register(ZanpakutoKeys.TECHNIQUE);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
@@ -89,6 +93,7 @@ public final class BleachClient {
     /**
      * The NPCs wear two of the game's default player skins until the mod has its own. Hollows use the
      * vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
+     * Zanpakutō techniques are drawn from plain shapes and the mod's placeholder textures.
      * The type arguments are spelled out rather than left for the compiler to infer through the lambdas.
      */
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
@@ -121,16 +126,21 @@ public final class BleachClient {
                         HollowKind.FISHBONE_D, 90.0F));
         event.registerEntityRenderer(ModEntities.PLUS.get(), PlusRenderer::new);
         event.registerEntityRenderer(ModEntities.GARGANTA.get(), GargantaRenderer::new);
+        event.registerEntityRenderer(ModEntities.GETSUGA_TENSHO.get(), GetsugaTenshoRenderer::new);
+        event.registerEntityRenderer(ModEntities.ZABIMARU_LASH.get(), ZabimaruLashRenderer::new);
     }
 
-    /** Adds the chain and mask layer and the sheathed blade to both player models (wide and slim arms). */
+    /**
+     * Adds the chain and mask layer and the sheathed blade to both player models (wide and slim arms).
+     * The sheath takes the look of the blade the player carries, as their appearance tells.
+     */
     private static void addLayers(EntityRenderersEvent.AddLayers event) {
         for (PlayerSkin.Model skin : event.getSkins()) {
             EntityRenderer<? extends Player> renderer = event.getSkin(skin);
             if (renderer instanceof PlayerRenderer playerRenderer) {
                 playerRenderer.addLayer(new SoulLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new SayaLayer<>(playerRenderer,
-                        player -> ClientSouls.appearance(player).bladeSheathed()));
+                        player -> SheathLook.forModel(ClientSouls.appearance(player).sheathModel())));
             }
         }
     }
@@ -159,6 +169,8 @@ public final class BleachClient {
         if (flashStep && minecraft.player != null && minecraft.screen == null && minecraft.getConnection() != null) {
             BleachNetwork.requestFlashStep(minecraft.player.input.forwardImpulse, minecraft.player.input.leftImpulse);
         }
+
+        ZanpakutoKeys.tick(minecraft);
 
         if (minecraft.level != null) {
             SpiritShimmer.tick(minecraft);

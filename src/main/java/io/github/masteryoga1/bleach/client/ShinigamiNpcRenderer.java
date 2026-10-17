@@ -28,7 +28,7 @@ public final class ShinigamiNpcRenderer<T extends ShinigamiNpc> extends Humanoid
                 new HumanoidArmorModel<>(context.bakeLayer(ModelLayers.PLAYER_INNER_ARMOR)),
                 new HumanoidArmorModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()));
-        addLayer(new SayaLayer<>(this, npc -> true));
+        addLayer(new SayaLayer<>(this, npc -> SheathLook.ASAUCHI));
     }
 
     @Override

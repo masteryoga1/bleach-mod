@@ -8,9 +8,15 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.item.ZanpakutoItem;
+import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.registry.ModComponents;
+import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
+import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -18,9 +24,19 @@ import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
+import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
+import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
@@ -29,15 +45,20 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
@@ -56,6 +77,12 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
  * /bleach garganta &lt;players&gt; [spider|hexapodus|hound|serpent|fishbone_d]   (a tear now; not on Peaceful)
  * /bleach firsthollow &lt;players&gt; &lt;reset|skip|start&gt;   (the Fishbone D encounter)
+ * /bleach zanpakuto &lt;players&gt; bond &lt;0..1000&gt;   (the Asauchi bond, with no gates or multiplier)
+ * /bleach zanpakuto &lt;players&gt; affinity &lt;power|kido|constant_release&gt; &lt;0..10000&gt;   (the hidden leaning)
+ * /bleach zanpakuto &lt;players&gt; spirit &lt;id&gt;
+ * /bleach zanpakuto &lt;players&gt; name    (as if the spirit's test was passed)
+ * /bleach zanpakuto &lt;players&gt; seal    (a constant release can be released for the first time again)
+ * /bleach zanpakuto &lt;players&gt; reset
  * </pre>
  */
 public final class BleachCommand {
@@ -63,6 +90,11 @@ public final class BleachCommand {
     private static final SuggestionProvider<CommandSourceStack> STATS = suggest(Stat.values());
     private static final SuggestionProvider<CommandSourceStack> PATHS = suggest(PowerPath.values());
     private static final SuggestionProvider<CommandSourceStack> HOLLOW_KINDS = suggest(HollowKind.values());
+    private static final SuggestionProvider<CommandSourceStack> TYPES = suggest(ZanpakutoType.values());
+    /** The spirits the world loaded, read from the server's registry. */
+    private static final SuggestionProvider<CommandSourceStack> SPIRITS = (context, builder) ->
+            SharedSuggestionProvider.suggestResource(ZanpakutoSpirits.registry(context.getSource().getLevel())
+                    .map(Registry::keySet).orElse(Set.of()), builder);
 
     private BleachCommand() {
     }
@@ -129,7 +161,28 @@ public final class BleachCommand {
                                         .executes(context -> changeFirstHollow(context, "skip",
                                                 hunt -> hunt.withFirstHollowDone(true))))
                                 .then(Commands.literal("start")
-                                        .executes(BleachCommand::startFirstHollow)))));
+                                        .executes(BleachCommand::startFirstHollow))))
+                .then(Commands.literal("zanpakuto")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.literal("bond")
+                                        .then(Commands.argument("bond", IntegerArgumentType.integer(0, ZanpakutoBond.FULL))
+                                                .executes(BleachCommand::setBond)))
+                                .then(Commands.literal("affinity")
+                                        .then(Commands.argument("type", StringArgumentType.word())
+                                                .suggests(TYPES)
+                                                .then(Commands.argument("value",
+                                                                IntegerArgumentType.integer(0, ZanpakutoBond.MAX_AFFINITY))
+                                                        .executes(BleachCommand::setAffinity))))
+                                .then(Commands.literal("spirit")
+                                        .then(Commands.argument("spirit", ResourceLocationArgument.id())
+                                                .suggests(SPIRITS)
+                                                .executes(BleachCommand::setSpirit)))
+                                .then(Commands.literal("name")
+                                        .executes(BleachCommand::learnName))
+                                .then(Commands.literal("seal")
+                                        .executes(BleachCommand::sealZanpakuto))
+                                .then(Commands.literal("reset")
+                                        .executes(BleachCommand::resetZanpakuto)))));
     }
 
     private static int info(CommandSourceStack source, ServerPlayer player) {
@@ -168,6 +221,16 @@ public final class BleachCommand {
         line.accept(Component.translatable("commands.bleach.info.hunt", hunt.purified(), hunt.slain(), hunt.sentOn(),
                 Component.translatable(hunt.firstHollowDone()
                         ? "commands.bleach.info.first_hollow.done" : "commands.bleach.info.first_hollow.pending")));
+        ZanpakutoBond bond = data.zanpakuto();
+        line.accept(Component.translatable("commands.bleach.info.zanpakuto", bond.bond(), ZanpakutoBond.FULL,
+                bond.spirit().map(ResourceLocation::toString).orElse("-"),
+                bond.named() ? Component.translatable("commands.bleach.info.zanpakuto.named", bond.name())
+                        : Component.translatable("commands.bleach.info.zanpakuto.unnamed")));
+        Map<ZanpakutoType, Integer> effective = ZanpakutoLogic.effectiveAffinity(data);
+        line.accept(Component.translatable("commands.bleach.info.affinity",
+                bond.affinity(ZanpakutoType.POWER), effective.get(ZanpakutoType.POWER),
+                bond.affinity(ZanpakutoType.KIDO), effective.get(ZanpakutoType.KIDO),
+                bond.affinity(ZanpakutoType.CONSTANT_RELEASE), effective.get(ZanpakutoType.CONSTANT_RELEASE)));
         return 1;
     }
 
@@ -391,10 +454,189 @@ public final class BleachCommand {
     private static int reset(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
         for (ServerPlayer player : players) {
+            // What the old soul had released goes with it, so nothing it held lingers on the body.
+            ShikaiEvents.forceSeal(player, SoulLogic.get(player), null);
             player.setData(SoulAttachments.SOUL, new SoulData());
             SoulEvents.refresh(player);
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.reset.success",
+                players.size()), true);
+        return players.size();
+    }
+
+    // ---- /bleach zanpakuto ----
+
+    /** Sets the Asauchi bond straight, with no gates or multiplier. A full bond locks in the spirit. */
+    private static int setBond(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int value = IntegerArgumentType.getInteger(context, "bond");
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            data.setZanpakuto(data.zanpakuto().withBond(value).withWhispered(ZanpakutoLogic.quarterOf(value)));
+            if (value >= ZanpakutoBond.FULL) {
+                ZanpakutoEvents.ensureSpirit(player, data);
+            }
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.bond",
+                value, players.size()), true);
+        return players.size();
+    }
+
+    /** Sets the raw leaning towards one kind of spirit. */
+    private static int setAffinity(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "type");
+        ZanpakutoType type = byName(ZanpakutoType.values(), name);
+        if (type == null) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.unknown_type", name));
+            return 0;
+        }
+        int value = IntegerArgumentType.getInteger(context, "value");
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            data.setZanpakuto(data.zanpakuto().withAffinity(type, value));
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.affinity",
+                type.displayName(), value, players.size()), true);
+        return players.size();
+    }
+
+    /**
+     * Sets the spirit the blade becomes. A soul that already knows its name learns the new one's
+     * instead, and its blades take the new spirit's form at once.
+     */
+    private static int setSpirit(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ResourceLocation id = ResourceLocationArgument.getId(context, "spirit");
+        Optional<ZanpakutoSpirit> spirit = ZanpakutoSpirits.get(context.getSource().getLevel(), id);
+        if (spirit.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.unknown_spirit", id.toString()));
+            return 0;
+        }
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            ZanpakutoBond bond = data.zanpakuto().withSpirit(Optional.of(id));
+            if (bond.named()) {
+                ShikaiEvents.forceSeal(player, data, null);
+                bond = bond.asNamed(spirit.get().name().copy().withColor(spirit.get().colour()), spirit.get().isConstant());
+            }
+            data.setZanpakuto(bond);
+            ZanpakutoEvents.reconcile(player, data);
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.spirit",
+                id.toString(), players.size()), true);
+        return players.size();
+    }
+
+    /**
+     * Teaches the name as if the spirit's test was passed: the bond fills, a spirit is chosen if there
+     * is none, and the blade in hand, the first nameless Asauchi carried or a new one is bound.
+     */
+    private static int learnName(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int named = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            data.setZanpakuto(data.zanpakuto().withBond(ZanpakutoBond.FULL).withWhispered(4));
+            ZanpakutoEvents.ensureSpirit(player, data);
+            Optional<ResourceLocation> id = data.zanpakuto().spirit();
+            Optional<ZanpakutoSpirit> spirit = ZanpakutoSpirits.get(player.level(), id);
+            if (spirit.isEmpty()) {
+                BleachNetwork.syncSoul(player, data);
+                context.getSource().sendFailure(Component.translatable("commands.bleach.zanpakuto.name.failed",
+                        player.getDisplayName()));
+                continue;
+            }
+            ItemStack stack = bladeToName(player);
+            boolean fresh = stack.isEmpty();
+            if (fresh) {
+                stack = new ItemStack(ModItems.ASAUCHI.get());
+            }
+            ZanpakutoEvents.learnName(player, data, id.get(), spirit.get(), stack);
+            if (fresh && !player.getInventory().add(stack) && !stack.isEmpty()) {
+                player.drop(stack, false);
+            }
+            BleachNetwork.syncSoul(player, data);
+            named++;
+        }
+        if (named == 0) {
+            return 0;
+        }
+        int count = named;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.name", count), true);
+        return count;
+    }
+
+    /** The nameless Asauchi or own blade in hand, else the first one carried, else none. */
+    private static ItemStack bladeToName(ServerPlayer player) {
+        ItemStack held = player.getMainHandItem();
+        if (ZanpakutoLogic.isUnboundAsauchi(held) || ZanpakutoLogic.isOwnBlade(held, player)) {
+            return held;
+        }
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            if (ZanpakutoLogic.isUnboundAsauchi(inventory.getItem(slot))) {
+                return inventory.getItem(slot);
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /**
+     * Seals the zanpakutō. A constant release, which never seals otherwise, goes back to waiting for
+     * its first release, so it can be replayed.
+     */
+    private static int sealZanpakuto(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            ShikaiEvents.forceSeal(player, data, "message.bleach.shikai.sealed");
+            if (data.zanpakuto().constant()) {
+                data.setZanpakuto(data.zanpakuto().withFirstReleaseDone(false));
+                Inventory inventory = player.getInventory();
+                for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                    unreleaseConstant(player, inventory.getItem(slot));
+                }
+            }
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.seal",
+                players.size()), true);
+        return players.size();
+    }
+
+    /** Puts a released constant blade of the player's own back in its sealed form. */
+    private static void unreleaseConstant(ServerPlayer player, ItemStack stack) {
+        ZanpakutoBlade blade = ZanpakutoItem.blade(stack);
+        if (!ZanpakutoLogic.isOwnBlade(stack, player) || !blade.released() || !blade.constant()) {
+            return;
+        }
+        Optional<ZanpakutoSpirit> spirit = ZanpakutoSpirits.get(player.level(), blade.spirit());
+        if (spirit.isPresent()) {
+            ZanpakutoItem.setReleased(stack, spirit.get(), false);
+        } else {
+            ZanpakutoItem.applyForm(stack, ZanpakutoSpirit.Form.ASAUCHI);
+            stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withReleased(false));
+        }
+    }
+
+    /** Forgets the bond, the leaning and the name. The soul's blades go back to nameless Asauchi. */
+    private static int resetZanpakuto(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            ShikaiEvents.forceSeal(player, data, null);
+            if (data.jinzen() != null) {
+                player.stopUsingItem();
+                JinzenLogic.end(player, data);
+            }
+            data.setZanpakuto(ZanpakutoBond.NONE);
+            ZanpakutoEvents.reconcile(player, data);
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.reset",
                 players.size()), true);
         return players.size();
     }

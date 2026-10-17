@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.registry;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
+import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.BlockItem;
@@ -20,11 +21,12 @@ public final class ModItems {
 
     /**
      * The nameless blade every Shinigami starts with, issued by the Academy and formed for a new
-     * Substitute. In canon it takes on its wielder's soul and becomes their own zanpakutō; for now it
-     * is a plain iron-tier katana that never breaks.
+     * Substitute: an iron-tier katana that never breaks. Carried long enough it takes on its wielder's
+     * soul, and once they learn its name it becomes their own zanpakutō, with the spirit's name, look
+     * and Shikai. See {@link ZanpakutoItem}.
      */
-    public static final DeferredItem<SwordItem> ASAUCHI = ITEMS.register("asauchi",
-            () -> new SwordItem(Tiers.IRON, new Item.Properties()
+    public static final DeferredItem<ZanpakutoItem> ASAUCHI = ITEMS.register("asauchi",
+            () -> new ZanpakutoItem(Tiers.IRON, new Item.Properties()
                     .attributes(SwordItem.createAttributes(Tiers.IRON, 3, -2.4F))
                     .component(DataComponents.UNBREAKABLE, new Unbreakable(false))));
 

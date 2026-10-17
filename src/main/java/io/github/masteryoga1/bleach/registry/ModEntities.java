@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
+import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
@@ -13,6 +14,7 @@ import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
+import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -20,7 +22,7 @@ import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/** The mod's entity types: Shinigami NPCs, Hollows, Pluses and the Garganta. */
+/** The mod's entity types: Shinigami NPCs, Hollows, Pluses, the Garganta and zanpakutō techniques. */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
             DeferredRegister.create(Registries.ENTITY_TYPE, BleachMod.MODID);
@@ -111,6 +113,33 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .updateInterval(20)
                     .build(BleachMod.id("garganta").toString()));
+
+    // ---- Zanpakutō techniques ----
+
+    /**
+     * Getsuga Tenshō's crescent, swung out from Zangetsu. It flies for a second or so and is never
+     * saved; clients move it themselves between the server's position updates.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<GetsugaTensho>> GETSUGA_TENSHO =
+            ENTITY_TYPES.register("getsuga_tensho", () -> EntityType.Builder
+                    .<GetsugaTensho>of(GetsugaTensho::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .noSave()
+                    .fireImmune()
+                    .clientTrackingRange(8)
+                    .updateInterval(10)
+                    .build(BleachMod.id("getsuga_tensho").toString()));
+
+    /** Zabimaru's blade lashing out to a far blow and back. It is only for show, lasts a few ticks and is never saved. */
+    public static final DeferredHolder<EntityType<?>, EntityType<ZabimaruLash>> ZABIMARU_LASH =
+            ENTITY_TYPES.register("zabimaru_lash", () -> EntityType.Builder
+                    .<ZabimaruLash>of(ZabimaruLash::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .noSave()
+                    .fireImmune()
+                    .clientTrackingRange(8)
+                    .updateInterval(20)
+                    .build(BleachMod.id("zabimaru_lash").toString()));
 
     private ModEntities() {
     }

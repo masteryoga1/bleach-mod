@@ -1,0 +1,84 @@
+{
+  "type": "constant_release",
+  "name": {
+    "translate": "zanpakuto.bleach.zangetsu"
+  },
+  "colour": "#BFEFFF",
+  "weights": {
+    "power": 0.5,
+    "kido": 0.0,
+    "constant_release": 1.0
+  },
+  "sealed": {
+    "model": 0,
+    "damage": 6.0,
+    "speed": 1.6
+  },
+  "shikai": {
+    "model": 1,
+    "damage": 9.0,
+    "speed": 1.2,
+    "reach": 0.5
+  },
+  "ability": "getsuga_tensho",
+  "release_cost": 0.05,
+  "drain": 0.0,
+  "inner_world": {
+    "backdrop": "sideways_city",
+    "tint": "#9FC8E8"
+  },
+  "tests": [
+    {
+      "kind": "ribbons",
+      "seconds": 8
+    },
+    {
+      "kind": "question",
+      "prompt": {
+        "translate": "zanpakuto.bleach.zangetsu.question"
+      },
+      "answers": [
+        {
+          "translate": "zanpakuto.bleach.zangetsu.answer.face"
+        },
+        {
+          "translate": "zanpakuto.bleach.zangetsu.answer.run"
+        },
+        {
+          "translate": "zanpakuto.bleach.zangetsu.answer.hide"
+        }
+      ]
+    }
+  ],
+  "script": {
+    "intro": [
+      {
+        "translate": "zanpakuto.bleach.zangetsu.intro.1"
+      },
+      {
+        "translate": "zanpakuto.bleach.zangetsu.intro.2"
+      },
+      {
+        "translate": "zanpakuto.bleach.zangetsu.intro.3"
+      }
+    ],
+    "reveal": [
+      {
+        "translate": "zanpakuto.bleach.zangetsu.reveal.1"
+      }
+    ],
+    "fail": [
+      {
+        "translate": "zanpakuto.bleach.zangetsu.fail.1"
+      }
+    ],
+    "visit": [
+      {
+        "translate": "zanpakuto.bleach.zangetsu.visit.1"
+      }
+    ]
+  },
+  "bankai_name": {
+    "translate": "zanpakuto.bleach.zangetsu.bankai"
+  }
+}

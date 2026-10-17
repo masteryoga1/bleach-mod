@@ -198,15 +198,18 @@ public final class ShinigamiEvents {
         return true;
     }
 
-    /** Whether the Academy would hand this soul a new Asauchi: the wait is over and they carry no blade. */
+    /**
+     * Whether the Academy would hand this soul a new Asauchi: the wait is over and they carry no blade
+     * of their own or nameless one. Someone else's bound blade does not count.
+     */
     public static boolean mayReceiveAsauchi(Player player, SoulData data, long now) {
-        return ShinigamiLogic.canReissueAsauchi(data, now) && !player.getInventory().contains(BleachTags.ZANPAKUTO);
+        return ShinigamiLogic.canReissueAsauchi(data, now) && !ZanpakutoLogic.carriesOwnOrUnboundBlade(player);
     }
 
     /** The instructor replaces a lost Asauchi, at most once every ten minutes. */
     public static boolean reissueAsauchi(Player player) {
         SoulData data = SoulLogic.get(player);
-        if (player.getInventory().contains(BleachTags.ZANPAKUTO)) {
+        if (ZanpakutoLogic.carriesOwnOrUnboundBlade(player)) {
             player.displayClientMessage(Component.translatable("message.bleach.asauchi_already"), true);
             return false;
         }
@@ -507,7 +510,8 @@ public final class ShinigamiEvents {
 
     /**
      * A Shinigami lends a Human their power. The Human's own power awakens and a blade forms in their
-     * hands; the giver is left nearly powerless until the loan ends (see {@link ShinigamiLogic#lend}).
+     * hands, unless they already carry one that can be theirs; the giver's Shikai seals, any Jinzen
+     * ends, and they are left nearly powerless until the loan ends (see {@link ShinigamiLogic#lend}).
      */
     public static void transfer(Player giver, Player human) {
         SoulData giverData = SoulLogic.get(giver);
@@ -517,10 +521,17 @@ public final class ShinigamiEvents {
             giverData.setReiatsuReleased(false);
             giverData.lastReleaseChangeTick = giver.tickCount;
         }
+        ShikaiEvents.forceSeal(giver, giverData, "message.bleach.shikai.sealed");
+        if (giverData.jinzen() != null) {
+            giver.stopUsingItem();
+            JinzenLogic.end(giver, giverData);
+        }
         SoulLogic.exhaust(giver);
         SoulLogic.applyStatModifiers(giver, giverData);
         SoulLogic.applyStatModifiers(human, humanData);
-        giveAsauchi(human, humanData);
+        if (!ZanpakutoLogic.carriesOwnOrUnboundBlade(human)) {
+            giveAsauchi(human, humanData);
+        }
         DenreishinkiItem.giveIfMissing(human);
         powerEffects(human);
         giver.sendSystemMessage(Component.translatable("message.bleach.power.given", human.getDisplayName())
@@ -536,7 +547,9 @@ public final class ShinigamiEvents {
         }
         ShinigamiLogic.awaken(data, BleachConfig.get(BleachConfig.AWAKENING_GROWTH));
         SoulLogic.applyStatModifiers(human, data);
-        giveAsauchi(human, data);
+        if (!ZanpakutoLogic.carriesOwnOrUnboundBlade(human)) {
+            giveAsauchi(human, data);
+        }
         DenreishinkiItem.giveIfMissing(human);
         giver.markGavePower();
         powerEffects(human);

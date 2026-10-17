@@ -2,5 +2,10 @@
   "parent": "minecraft:item/handheld",
   "textures": {
     "layer0": "bleach:item/asauchi"
-  }
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 1}, "model": "bleach:item/zangetsu"},
+    {"predicate": {"custom_model_data": 2}, "model": "bleach:item/zabimaru"},
+    {"predicate": {"custom_model_data": 3}, "model": "bleach:item/zabimaru_shikai"}
+  ]
 }

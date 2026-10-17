@@ -64,6 +64,8 @@ public final class SoulEvents {
         HollowEvents.register(bus);
         GargantaEvents.register(bus);
         PlusEvents.register(bus);
+        ZanpakutoEvents.register(bus);
+        ShikaiEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -87,7 +89,9 @@ public final class SoulEvents {
         data.lastZ = player.getZ();
         data.hasLastPosition = true;
 
-        boolean meditating = player.isCrouching() && player.onGround() && movedSqr < 1.0E-4;
+        // Jinzen counts too: its screen releases every key, so the soul no longer reads as crouching.
+        boolean meditating = (player.isCrouching() && player.onGround() && movedSqr < 1.0E-4)
+                || JinzenLogic.isSitting(player, data);
         if (mayRegenerate(player, data)) {
             SoulLogic.regenTick(data, meditating || player.isSleeping(),
                     ShinigamiLogic.regenMultiplier(player, data, player.level().getGameTime()));
@@ -102,6 +106,7 @@ public final class SoulEvents {
                 data.meditationTicks = 0;
                 data.meditationGrants++;
                 SoulLogic.addStatXp(player, data, Stat.REIATSU_CONTROL, 1);
+                ZanpakutoEvents.onMeditationGrant(player, data);
             }
         } else {
             data.meditationTicks = 0;
@@ -126,10 +131,12 @@ public final class SoulEvents {
 
     /**
      * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
-     * the release ends and the reiatsu settles; standing on reishi footing spends it as it comes.
+     * the release ends and the reiatsu settles; standing on reishi footing or holding a Shikai that
+     * can seal spends it as it comes.
      */
     public static boolean mayRegenerate(Player player, SoulData data) {
-        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !ReishiFooting.isActive(player);
+        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !ReishiFooting.isActive(player)
+                && !data.isShikaiActive();
     }
 
     /** Zanjutsu and Hakuda make melee hits stronger. Training happens once a hit lands, in {@link #onDamageTaken}. */
@@ -207,7 +214,7 @@ public final class SoulEvents {
         }
     }
 
-    /** Surviving a close call against another creature grows reiryoku, at most once per cooldown. */
+    /** Surviving a close call against another creature grows reiryoku, and the Asauchi bond, at most once per cooldown. */
     private static void closeCall(ServerPlayer player, DamageSource source) {
         if (!(source.getEntity() instanceof LivingEntity attacker) || attacker == player) {
             return;
@@ -218,6 +225,7 @@ public final class SoulEvents {
         if (now - data.lastCloseCallTime() >= cooldown) {
             data.setLastCloseCallTime(now);
             SoulLogic.grow(data, BleachConfig.get(BleachConfig.CLOSE_CALL_GROWTH));
+            ZanpakutoEvents.onCloseCall(player, data, now);
         }
     }
 

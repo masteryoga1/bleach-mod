@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:asauchi_bond",
+  "display": {
+    "icon": {
+      "id": "minecraft:name_tag"
+    },
+    "title": {
+      "translate": "advancements.bleach.zanpakuto_name.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.zanpakuto_name.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "zanpakuto_name": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "zanpakuto_name"
+      }
+    }
+  }
+}

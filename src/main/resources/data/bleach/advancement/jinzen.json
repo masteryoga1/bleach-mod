@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "bleach:asauchi"
+    },
+    "title": {
+      "translate": "advancements.bleach.jinzen.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.jinzen.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "jinzen": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "jinzen"
+      }
+    }
+  }
+}

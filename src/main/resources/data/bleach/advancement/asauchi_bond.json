@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:jinzen",
+  "display": {
+    "icon": {
+      "id": "minecraft:echo_shard"
+    },
+    "title": {
+      "translate": "advancements.bleach.asauchi_bond.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.asauchi_bond.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "asauchi_bond": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "asauchi_bond"
+      }
+    }
+  }
+}

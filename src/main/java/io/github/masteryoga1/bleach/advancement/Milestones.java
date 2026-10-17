@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import net.minecraft.server.level.ServerPlayer;
 
 /** The milestone names advancements can ask for, and the checks that grant them. */
@@ -44,6 +45,16 @@ public final class Milestones {
     public static final String PURIFIED = "purified";
     /** Sent ten Pluses on. */
     public static final String SOUL_BURIAL = "soul_burial";
+    /** Sat in Jinzen until the world inside the blade opened. */
+    public static final String JINZEN = "jinzen";
+    /** Bonded with an Asauchi until its voice came through clearly. */
+    public static final String ASAUCHI_BOND = "asauchi_bond";
+    /** Passed the spirit's test and learned the zanpakutō's name. */
+    public static final String ZANPAKUTO_NAME = "zanpakuto_name";
+    /** Released a zanpakutō for the first time. */
+    public static final String SHIKAI = "shikai";
+    /** Loosed enough Getsuga Tenshō that Zangetsu named the technique. */
+    public static final String GETSUGA_TENSHO = "getsuga_tensho";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -84,6 +95,22 @@ public final class Milestones {
         }
         if (hunt.sentOn() >= SOUL_BURIAL_COUNT) {
             trigger.trigger(player, SOUL_BURIAL);
+        }
+        ZanpakutoBond bond = data.zanpakuto();
+        if (bond.jinzens() > 0) {
+            trigger.trigger(player, JINZEN);
+        }
+        if (bond.isFull()) {
+            trigger.trigger(player, ASAUCHI_BOND);
+        }
+        if (bond.named()) {
+            trigger.trigger(player, ZANPAKUTO_NAME);
+        }
+        if (bond.firstReleaseDone()) {
+            trigger.trigger(player, SHIKAI);
+        }
+        if (bond.getsugaNamed()) {
+            trigger.trigger(player, GETSUGA_TENSHO);
         }
     }
 

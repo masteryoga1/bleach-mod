@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.client;
 
+import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
@@ -8,6 +9,9 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
+import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -19,8 +23,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
 /**
- * The soul screen: state, reiryoku, Hollows purified and slain and Pluses sent on, stats with training
- * progress, awakened powers and what comes next.
+ * The soul screen: state, reiryoku, the zanpakutō (or until it has a name, the Asauchi bond), Hollows
+ * purified and slain and Pluses sent on, stats with training progress, awakened powers and what
+ * comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -82,6 +87,11 @@ public final class SoulStatsScreen extends Screen {
             graphics.drawString(font, release, left, y, GREY);
             y += LINE;
         }
+        Component zanpakuto = zanpakutoLine(player, data);
+        if (zanpakuto != null) {
+            graphics.drawString(font, zanpakuto, left, y, GREY);
+            y += LINE;
+        }
         HuntRecord hunt = data.hunt();
         if (hunt.purified() + hunt.slain() + hunt.sentOn() > 0) {
             graphics.drawString(font, Component.translatable("screen.bleach.soul.hunt",
@@ -125,6 +135,32 @@ public final class SoulStatsScreen extends Screen {
         y += 6;
 
         graphics.drawWordWrap(font, nextStep(player, data), left, y, PANEL_WIDTH, GREY);
+    }
+
+    /**
+     * The zanpakutō's name and whether it is sealed, in Shikai or always released; before the name,
+     * how far the Asauchi bond has grown, once it has begun or while a nameless Asauchi is carried.
+     * Null when there is nothing to say. Whether it is in Shikai is read from the player's own blade.
+     */
+    @Nullable
+    private static Component zanpakutoLine(Player player, SoulData data) {
+        ZanpakutoBond bond = data.zanpakuto();
+        if (bond.named()) {
+            String state;
+            if (bond.constant()) {
+                state = bond.firstReleaseDone() ? "constant" : "constant_waiting";
+            } else {
+                state = ZanpakutoItem.blade(ZanpakutoLogic.findOwnBlade(player)).released() ? "released" : "sealed";
+            }
+            Component name = bond.name().getString().isEmpty()
+                    ? Component.translatable("screen.bleach.jinzen.unknown_name") : bond.name();
+            return Component.translatable("screen.bleach.soul.zanpakuto", name,
+                    Component.translatable("screen.bleach.soul.zanpakuto." + state));
+        }
+        if (bond.bond() > 0 || ZanpakutoLogic.carriesUnboundAsauchi(player)) {
+            return Component.translatable("screen.bleach.soul.bond", bond.bond() / 10);
+        }
+        return null;
     }
 
     /**

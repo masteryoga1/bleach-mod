@@ -4,15 +4,18 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * Everything the mod knows about one soul: its state, its spiritual energy, its stats, which
- * powers have awakened and its record against Hollows. Stored as the {@link SoulAttachments#SOUL}
+ * powers have awakened, its record against Hollows and its bond with its zanpakutō. Stored as the {@link SoulAttachments#SOUL}
  * attachment on players and on spirit mobs (Shinigami NPCs, Hollows, Pluses) and saved with them.
  * A player's own soul is also sent to their client so the HUD and stats screen can show it.
  */
@@ -41,7 +44,8 @@ public final class SoulData {
             Codec.BOOL.optionalFieldOf("reiatsu_released", false).forGetter(SoulData::isReiatsuReleased),
             ShinigamiProgress.CODEC.lenientOptionalFieldOf("shinigami", ShinigamiProgress.NONE)
                     .forGetter(SoulData::shinigami),
-            HuntRecord.CODEC.lenientOptionalFieldOf("hunt", HuntRecord.NONE).forGetter(SoulData::hunt)
+            HuntRecord.CODEC.lenientOptionalFieldOf("hunt", HuntRecord.NONE).forGetter(SoulData::hunt),
+            ZanpakutoBond.CODEC.lenientOptionalFieldOf("zanpakuto", ZanpakutoBond.NONE).forGetter(SoulData::zanpakuto)
     ).apply(instance, SoulData::new));
 
     private SoulState state = SoulState.HUMAN;
@@ -62,6 +66,8 @@ public final class SoulData {
     private ShinigamiProgress shinigami = ShinigamiProgress.NONE;
     /** The first Hollow, Garganta arrivals, and the Hollows and Pluses this soul has dealt with: see {@link HollowLogic}. */
     private HuntRecord hunt = HuntRecord.NONE;
+    /** The Asauchi bond, the hidden leaning, and the zanpakutō's name once learned: see {@link ZanpakutoLogic}. */
+    private ZanpakutoBond zanpakuto = ZanpakutoBond.NONE;
 
     // Server-side bookkeeping. Not saved or synced; it starts over when the player logs in or respawns.
     private boolean dirty = true;
@@ -106,6 +112,29 @@ public final class SoulData {
     long lastBiteMessageAt = NEVER;
     /** Blows that landed on a Hollow's body in a row, without one to the mask, for the hint to aim for the mask. */
     int bodyHitsWithoutMask;
+    /** The Jinzen this soul is sitting in, from settling down to opening its eyes: see {@link JinzenLogic}. */
+    JinzenSession jinzen;
+    /** Tick of the last Shikai release or seal, so the blade settles before it changes again. */
+    int lastShikaiChangeTick = -1000;
+    /**
+     * Whether a zanpakutō that can seal is released, draining reiryoku. A constant-release blade never
+     * sets this. Not saved: a release does not outlast the session, and a stale released blade seals.
+     */
+    boolean shikaiActive;
+    /** Ticks in a row the released blade has been out of the soul's hand. */
+    int shikaiAwayTicks;
+    /** Game time a release last trained Reiatsu Control. */
+    long lastShikaiXpAt = NEVER;
+    /** Game time a Getsuga Tenshō started gathering, or {@link #NEVER} when none is. */
+    long gatherStartedAt = NEVER;
+    /** Game time of the last Getsuga Tenshō, for the cooldown. */
+    long lastGetsugaAt = NEVER;
+    /** Game time Zabimaru's blade, lashed out, has drawn back together, or {@link #NEVER}. */
+    long lashRetractUntil = NEVER;
+    /** Sealed copies of this soul's own blades, taken from its drops on death and handed back on respawning. */
+    List<ItemStack> keptBlades = List.of();
+    /** Tick of the last Hakuda blow on a Hollow that counted towards the power leaning. */
+    int lastAffinityHitTick = -1000;
 
     public SoulData() {
     }
@@ -113,7 +142,7 @@ public final class SoulData {
     private SoulData(SoulState state, boolean initialized, float reiryoku, float maxReiryoku,
                      Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers,
                      long lastCloseCallTime, int chainTicks, int chainMaxTicks, boolean reiatsuReleased,
-                     ShinigamiProgress shinigami, HuntRecord hunt) {
+                     ShinigamiProgress shinigami, HuntRecord hunt, ZanpakutoBond zanpakuto) {
         this.state = state;
         this.initialized = initialized;
         this.maxReiryoku = Math.max(0.0F, maxReiryoku);
@@ -127,10 +156,11 @@ public final class SoulData {
         this.reiatsuReleased = reiatsuReleased;
         this.shinigami = shinigami;
         this.hunt = hunt;
+        this.zanpakuto = zanpakuto;
     }
 
     /** A map keyed by enum name that skips names it does not recognise when reading. */
-    private static <E extends Enum<E> & StringRepresentable> Codec<Map<E, Integer>> enumKeyedMap(
+    static <E extends Enum<E> & StringRepresentable> Codec<Map<E, Integer>> enumKeyedMap(
             Class<E> type, E[] values) {
         return Codec.unboundedMap(Codec.STRING, Codec.INT).xmap(
                 raw -> {
@@ -329,6 +359,33 @@ public final class SoulData {
         }
     }
 
+    public ZanpakutoBond zanpakuto() {
+        return zanpakuto;
+    }
+
+    public void setZanpakuto(ZanpakutoBond bond) {
+        if (!bond.equals(zanpakuto)) {
+            zanpakuto = bond;
+            markDirty();
+        }
+    }
+
+    /** The Jinzen this soul is sitting in, or null. Server side only. */
+    @Nullable
+    public JinzenSession jinzen() {
+        return jinzen;
+    }
+
+    /** Whether a zanpakutō that can seal is released. Server side only: the client reads the blade itself. */
+    public boolean isShikaiActive() {
+        return shikaiActive;
+    }
+
+    /** Whether a Getsuga Tenshō is gathering. Server side only. */
+    public boolean isGathering() {
+        return gatherStartedAt != NEVER;
+    }
+
     /** Whether the client's copy is out of date. */
     public boolean isDirty() {
         return dirty;
@@ -345,6 +402,16 @@ public final class SoulData {
     /** A copy of the saved data, without the server-side bookkeeping. */
     public SoulData copy() {
         return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime,
-                chainTicks, chainMaxTicks, reiatsuReleased, shinigami, hunt);
+                chainTicks, chainMaxTicks, reiatsuReleased, shinigami, hunt, zanpakuto);
+    }
+
+    /**
+     * What the owner's client is sent: a copy of the saved data without the hidden leaning, which
+     * decides the spirit and is never shown to players.
+     */
+    public SoulData forClient() {
+        SoulData copy = copy();
+        copy.zanpakuto = zanpakuto.withoutAffinity();
+        return copy;
     }
 }

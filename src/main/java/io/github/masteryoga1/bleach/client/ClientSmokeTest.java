@@ -3,10 +3,12 @@ package io.github.masteryoga1.bleach.client;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
+import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
@@ -16,8 +18,13 @@ import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
+import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
+import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
@@ -29,12 +36,15 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
@@ -52,10 +62,13 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * them a Shinigami in the Shihakushō with a sheathed Asauchi, opens the Tailoring Table and the
  * instructor's dialogue, flash steps, stands on reishi footing by jumping while falling, places an
  * Academy, summons each Hollow and a Plus, cracks a mask, purifies a Hollow, sends a Plus on, opens a
- * Garganta and checks that a soul just below the threshold sees only a shimmer, and quits. All of it
- * is seen with the camera behind the player, so the chain, mask, garb, saya, NPCs, Hollows and HUD
- * are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client
- * code fails the run, and so does anything that did not reach the client as expected.
+ * Garganta and checks that a soul just below the threshold sees only a shimmer. Last, as a Shinigami
+ * again whose Asauchi bond is full, it sits in Jinzen through the real sneak and use keys, takes the
+ * red ribbon, closes the screen, learns Zangetsu's name, releases it, looses a Getsuga Tenshō and
+ * opens the soul screen, and quits. All of it is seen with the camera behind the player, so the
+ * chain, mask, garb, saya, NPCs, Hollows, zanpakutō and HUD are drawn, and screenshots of the main
+ * moments are saved for review. Any crash in the mod's client code fails the run, and so does
+ * anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -147,6 +160,33 @@ public final class ClientSmokeTest {
                         && SpiritShimmer.emitted() > 0,
                 "an unaware soul just below the threshold saw the Hollow or no shimmer")) {
             shot(minecraft, "unaware");
+        }
+        expectWithin(minecraft, 1025, 1050, player::isUsingItem, "sneak and use with the Asauchi did not start Jinzen");
+        if (expectWithin(minecraft, 1080, 1140, () -> jinzenScene(minecraft) == JinzenScene.MEETING,
+                "Jinzen never opened on the meeting")) {
+            shot(minecraft, "jinzen");
+            // Opening the screen let go of every key already; the blade stays in use while it is open.
+            minecraft.options.keyUse.setDown(false);
+            minecraft.options.keyShift.setDown(false);
+        }
+        if (expectWithin(minecraft, 1155, 1200,
+                () -> jinzenStep(minecraft).map(JinzenStep::kind).orElse(null) == JinzenStepKind.QUESTION,
+                "the red ribbon did not lead to the question")) {
+            shot(minecraft, "jinzen_question");
+        }
+        expectWithin(minecraft, 1206, 1240, () -> !player.isUsingItem() && minecraft.screen == null,
+                "closing the Jinzen screen did not end Jinzen");
+        expectWithin(minecraft, 1250, 1290,
+                () -> soul.zanpakuto().named() && ZanpakutoItem.isOwnedBy(player.getMainHandItem(), player.getUUID()),
+                "learning the name did not bind the Asauchi");
+        if (expectWithin(minecraft, 1300, 1340,
+                () -> ZanpakutoItem.blade(player.getMainHandItem()).released() && modelOf(player.getMainHandItem()) == 1,
+                "Zangetsu was not released")) {
+            shot(minecraft, "shikai");
+        }
+        if (expectWithin(minecraft, 1366, 1400, () -> nearest(minecraft, GetsugaTensho.class, 48.0, crescent -> true) != null,
+                "the Getsuga Tenshō never reached the client")) {
+            shot(minecraft, "getsuga");
         }
         if (finished) {
             return;
@@ -304,7 +344,50 @@ public final class ClientSmokeTest {
                 command(minecraft, "kill @e[type=bleach:plus]");
                 command(minecraft, "difficulty peaceful");
             }
-            case 1010 -> {
+            // A Shinigami again, a fresh Asauchi in hand whose bond is full and has settled on Zangetsu,
+            // looking up and away so the Getsuga Tenshō carves nothing.
+            case 1000 -> {
+                command(minecraft, "bleach soul @s shinigami");
+                command(minecraft, "bleach reiryoku @s 500 500");
+                command(minecraft, "effect clear @s");
+                command(minecraft, "clear @s bleach:asauchi");
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:asauchi");
+                command(minecraft, "item replace entity @s weapon.offhand with air");
+                command(minecraft, "tp @s ~ ~ ~ 180 -30");
+                command(minecraft, "bleach zanpakuto @s spirit bleach:zangetsu");
+                command(minecraft, "bleach zanpakuto @s bond 1000");
+            }
+            // Jinzen through the real keys: sneak, then hold use with the Asauchi in hand.
+            case 1015 -> minecraft.options.keyShift.setDown(true);
+            case 1020 -> {
+                expect(minecraft, soul.zanpakuto().bond() == 1000 && soul.zanpakuto().spirit().isPresent(),
+                        "the bond never reached the client");
+                minecraft.options.keyUse.setDown(true);
+            }
+            case 1150 -> {
+                JinzenScreen screen = jinzenScreen(minecraft);
+                Optional<JinzenStep> step = jinzenStep(minecraft);
+                expect(minecraft, screen != null && step.isPresent(), "the Jinzen screen showed no ribbons to take");
+                if (screen != null && step.isPresent()) {
+                    screen.answer(step.get().highlight());
+                }
+            }
+            // Closing the screen lets go of the blade, as pressing Escape would.
+            case 1205 -> minecraft.setScreen(null);
+            case 1245 -> command(minecraft, "bleach zanpakuto @s name");
+            case 1295 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+            // Held for a second, then let go: a Getsuga Tenshō of two-thirds charge.
+            case 1345 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_PRESS);
+            case 1365 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_RELEASE);
+            // As the soul screen key opens it.
+            case 1420 -> {
+                if (minecraft.player != null && minecraft.screen == null) {
+                    minecraft.setScreen(new SoulStatsScreen());
+                }
+            }
+            case 1425 -> shot(minecraft, "stats_zanpakuto");
+            case 1440 -> minecraft.setScreen(null);
+            case 1460 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -416,6 +499,31 @@ public final class ClientSmokeTest {
     @Nullable
     private static GargantaRift openRift(Minecraft minecraft) {
         return nearest(minecraft, GargantaRift.class, RIFT_RANGE, rift -> rift.openness(0.0F) >= 0.8F);
+    }
+
+    /** The Jinzen screen, if it is the one open. */
+    @Nullable
+    private static JinzenScreen jinzenScreen(Minecraft minecraft) {
+        return minecraft.screen instanceof JinzenScreen screen ? screen : null;
+    }
+
+    /** The scene the open Jinzen screen shows, or null with no Jinzen screen open. */
+    @Nullable
+    private static JinzenScene jinzenScene(Minecraft minecraft) {
+        JinzenScreen screen = jinzenScreen(minecraft);
+        return screen == null ? null : screen.page().scene();
+    }
+
+    /** The step of the test the open Jinzen screen waits on, if any. */
+    private static Optional<JinzenStep> jinzenStep(Minecraft minecraft) {
+        JinzenScreen screen = jinzenScreen(minecraft);
+        return screen == null ? Optional.empty() : screen.page().step();
+    }
+
+    /** The stack's {@code custom_model_data}, or 0 without one (the plain Asauchi's model). */
+    private static int modelOf(ItemStack stack) {
+        CustomModelData model = stack.get(DataComponents.CUSTOM_MODEL_DATA);
+        return model == null ? 0 : model.value();
     }
 
     private static double horizontalDistance(Vec3 a, Vec3 b) {

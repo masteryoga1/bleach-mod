@@ -61,6 +61,7 @@ public final class HollowEvents {
             hollow.onMaskStruck(hollow.level().getGameTime());
             if (event.getSource().getEntity() instanceof ServerPlayer player) {
                 Milestones.grant(player, Milestones.MASK_STRIKE);
+                ZanpakutoEvents.onMaskStrike(player);
             }
         }
     }
@@ -76,6 +77,7 @@ public final class HollowEvents {
             bite(victim);
         } else if (victim instanceof Hollow hollow && cause instanceof Player player && SoulLogic.hasSoul(player)) {
             countBodyHit(player, hollow);
+            ZanpakutoEvents.onHollowStruck(player, event.getSource());
         }
     }
 
@@ -153,8 +155,8 @@ public final class HollowEvents {
 
     /**
      * A soul purified a Hollow: its reiryoku grows by half as much again as for slaying it, and it
-     * trains Zanjutsu. Called once the Hollow has started to dissolve; techniques that purify (3c's
-     * Getsuga) come through here too.
+     * trains Zanjutsu, and a nameless Asauchi that did it bonds. Called once the Hollow has started to
+     * dissolve; techniques that purify (Getsuga Tenshō) come through here too.
      */
     public static void onPurified(Player killer, Hollow hollow, ItemStack weapon) {
         SoulData data = SoulLogic.get(killer);
@@ -170,6 +172,7 @@ public final class HollowEvents {
                 Milestones.grant(player, Milestones.FISHBONE_D);
             }
         }
+        ZanpakutoEvents.onPurified(killer, hollow, weapon);
     }
 
     /** A soul destroyed a Hollow without purifying it: its reiryoku still grows. */

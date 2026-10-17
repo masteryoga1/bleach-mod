@@ -1,0 +1,84 @@
+{
+  "type": "power",
+  "name": {
+    "translate": "zanpakuto.bleach.zabimaru"
+  },
+  "command": {
+    "translate": "zanpakuto.bleach.zabimaru.command"
+  },
+  "colour": "#E0483A",
+  "weights": {
+    "power": 1.0,
+    "kido": 0.2,
+    "constant_release": 0.0
+  },
+  "sealed": {
+    "model": 2,
+    "damage": 6.0,
+    "speed": 1.6
+  },
+  "shikai": {
+    "model": 3,
+    "damage": 8.0,
+    "speed": 1.4,
+    "reach": 3.0
+  },
+  "ability": "segment_lash",
+  "release_cost": 0.10,
+  "drain": 0.006,
+  "inner_world": {
+    "backdrop": "jungle",
+    "tint": "#6A8F3A"
+  },
+  "tests": [
+    {
+      "kind": "question",
+      "prompt": {
+        "translate": "zanpakuto.bleach.zabimaru.question"
+      },
+      "answers": [
+        {
+          "translate": "zanpakuto.bleach.zabimaru.answer.surpass"
+        },
+        {
+          "translate": "zanpakuto.bleach.zabimaru.answer.no"
+        },
+        {
+          "translate": "zanpakuto.bleach.zabimaru.answer.anything"
+        }
+      ]
+    },
+    {
+      "kind": "fangs",
+      "seconds": 10
+    }
+  ],
+  "script": {
+    "intro": [
+      {
+        "translate": "zanpakuto.bleach.zabimaru.intro.1"
+      },
+      {
+        "translate": "zanpakuto.bleach.zabimaru.intro.2"
+      }
+    ],
+    "reveal": [
+      {
+        "translate": "zanpakuto.bleach.zabimaru.reveal.1"
+      }
+    ],
+    "fail": [
+      {
+        "translate": "zanpakuto.bleach.zabimaru.fail.1"
+      }
+    ],
+    "visit": [
+      {
+        "translate": "zanpakuto.bleach.zabimaru.visit.1"
+      }
+    ]
+  },
+  "bankai_name": {
+    "translate": "zanpakuto.bleach.zabimaru.bankai"
+  }
+}

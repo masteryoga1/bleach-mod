@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModArmorMaterials;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
+import io.github.masteryoga1.bleach.registry.ModComponents;
 import io.github.masteryoga1.bleach.registry.ModCreativeTabs;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
@@ -15,6 +16,7 @@ import io.github.masteryoga1.bleach.registry.ModRecipes;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -31,6 +33,7 @@ public final class BleachMod {
     public BleachMod(IEventBus modEventBus, ModContainer modContainer) {
         ModArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
         ModBlocks.BLOCKS.register(modEventBus);
+        ModComponents.COMPONENTS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
         ModSounds.SOUNDS.register(modEventBus);
@@ -43,6 +46,7 @@ public final class BleachMod {
         modContainer.registerConfig(ModConfig.Type.SERVER, BleachConfig.SPEC);
         modEventBus.addListener(BleachNetwork::register);
         modEventBus.addListener(ModEntities::onAttributes);
+        modEventBus.addListener(ZanpakutoSpirits::register);
 
         SoulEvents.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(BleachCommand::register);
