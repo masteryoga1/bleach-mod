@@ -370,8 +370,8 @@ public final class ShikaiTests {
 
     @GameTest(template = "field", timeoutTicks = 40, batch = "getsuga")
     public static void getsugaCutsPointBlankButNothingBehind(GameTestHelper helper) {
-        // Three swings start at x 3.5 with the wielder facing +X: level along z 8.5, aimed 45 degrees
-        // down along z 4.5 and straight down along z 12.5. In each lane one pig is pressed against the
+        // Three swings start at x 3.5 with the wielder facing +X: level along z 6.5, aimed 45 degrees
+        // down along z 2.5 and straight down along z 10.5. In each lane one pig is pressed against the
         // front of the swing, short of where the crescent appears, and the other stands just behind
         // it, inside the crescent's first sweep.
         Player owner = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
@@ -379,7 +379,7 @@ public final class ShikaiTests {
         String[] swings = {"level", "downward", "straight-down"};
         List<Pig> fronts = new ArrayList<>();
         List<Pig> behinds = new ArrayList<>();
-        for (double[] lane : new double[][] {{8.5, 2.5, 1.0, 0.0}, {4.5, 3.2, 1.0, -1.0}, {12.5, 3.2, 0.0, -1.0}}) {
+        for (double[] lane : new double[][] {{6.5, 2.5, 1.0, 0.0}, {2.5, 3.2, 1.0, -1.0}, {10.5, 3.2, 0.0, -1.0}}) {
             double z = lane[0];
             fronts.add(still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(4.0, 2.0, z))));
             behinds.add(still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(2.9, 2.0, z))));
@@ -388,7 +388,13 @@ public final class ShikaiTests {
             GetsugaTensho.launch(helper.getLevel(), owner, root, along, 0.0F, 1000.0F, 4, ItemStack.EMPTY,
                     ZanpakutoBlade.DEFAULT_COLOUR);
         }
+        // Straight down from high up along z 14.5: a pig on the ground a little to the wielder's back
+        // side is far out along the path, not at their back, so it is cut.
+        Pig below = still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(2.6, 2.0, 14.5)));
+        GetsugaTensho.launch(helper.getLevel(), owner, helper.absoluteVec(new Vec3(3.5, 11.5, 14.5)), new Vec3(0.0, -1.0, 0.0),
+                0.0F, 1000.0F, 8, ItemStack.EMPTY, ZanpakutoBlade.DEFAULT_COLOUR);
         helper.succeedWhen(() -> {
+            helper.assertFalse(below.isAlive(), "the straight-down crescent missed the pig far below the wielder");
             for (int i = 0; i < swings.length; i++) {
                 String swing = swings[i];
                 helper.assertFalse(fronts.get(i).isAlive(), "the " + swing + " crescent missed the pig against the front of the swing");

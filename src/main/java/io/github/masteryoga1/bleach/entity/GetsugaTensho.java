@@ -282,11 +282,9 @@ public class GetsugaTensho extends Projectile {
     /**
      * Sweeps this tick's path, as wide and tall as the crescent: knocks every projectile that is not
      * the owner's (nor another crescent) out of the air, then cuts the creatures in it, nearest first,
-     * each costing one of its pierces. Nothing wholly behind where the swing started is touched,
-     * along the path or along the way the swing faces on the level (so a swing aimed up or down does
-     * not tilt "behind" through the wielder's body): it never cuts what stands at the back of the one
-     * who fired it, yet still cuts what is pressed against their front. A shield that stops it, or the
-     * last pierce, ends it. Returns whether the crescent is still flying.
+     * each costing one of its pierces. It never touches what is at the back of the one who fired it
+     * (see {@link #clearOfWielder}), yet still cuts what is pressed against their front. A shield that
+     * stops it, or the last pierce, ends it. Returns whether the crescent is still flying.
      */
     private boolean sweep(Entity owner, Vec3 from, Vec3 motion) {
         float charge = charge();
@@ -298,7 +296,7 @@ public class GetsugaTensho extends Projectile {
         Vec3 rear = root != null ? root : from;
         for (Projectile projectile : level().getEntitiesOfClass(Projectile.class, path,
                 other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner
-                        && ahead(other, rear, heading) && ahead(other, rear, facing))) {
+                        && clearOfWielder(other, rear, heading))) {
             // An arrow or trident someone could have picked up is knocked down, not destroyed.
             if (projectile instanceof AbstractArrow arrow && arrow.pickup == AbstractArrow.Pickup.ALLOWED) {
                 arrow.spawnAtLocation(arrow.getPickupItemStackOrigin().copy(), 0.1F);
@@ -306,8 +304,7 @@ public class GetsugaTensho extends Projectile {
             projectile.discard();
         }
         List<LivingEntity> targets = level().getEntitiesOfClass(LivingEntity.class, path,
-                target -> !struck.contains(target.getId()) && affects(target)
-                        && ahead(target, rear, heading) && ahead(target, rear, facing));
+                target -> !struck.contains(target.getId()) && affects(target) && clearOfWielder(target, rear, heading));
         if (targets.isEmpty()) {
             return true;
         }
@@ -327,15 +324,27 @@ public class GetsugaTensho extends Projectile {
     }
 
     /**
-     * Whether any part of the entity lies on or in front of the plane through {@code rear} square to
-     * the heading: its box's centre is no further behind the plane than the box reaches along the
-     * heading. Always true for a zero heading.
+     * Whether the entity is clear of the wielder's back. Some part of it must lie on or in front of
+     * the plane through where the swing started ({@code rear}) square to the path. While it is still
+     * beside the wielder, reaching back past where the crescent appeared, some part must also lie in
+     * front of the upright plane through {@code rear} that the swing faces, so a swing aimed up or down
+     * does not tilt "behind" through the wielder's body. Out along the path only the first plane counts.
      */
-    private static boolean ahead(Entity entity, Vec3 rear, Vec3 heading) {
+    private boolean clearOfWielder(Entity entity, Vec3 rear, Vec3 heading) {
         AABB box = entity.getBoundingBox();
-        double reach = (box.getXsize() * Math.abs(heading.x) + box.getYsize() * Math.abs(heading.y)
-                + box.getZsize() * Math.abs(heading.z)) * 0.5;
-        return box.getCenter().subtract(rear).dot(heading) >= -reach;
+        Vec3 offset = box.getCenter().subtract(rear);
+        double depth = offset.dot(heading);
+        double reach = halfDepth(box, heading);
+        if (depth < -reach) {
+            return false;
+        }
+        return depth - reach >= SWING_REACH || offset.dot(facing) >= -halfDepth(box, facing);
+    }
+
+    /** Half of how far the box reaches along a direction: zero for a zero direction. */
+    private static double halfDepth(AABB box, Vec3 direction) {
+        return (box.getXsize() * Math.abs(direction.x) + box.getYsize() * Math.abs(direction.y)
+                + box.getZsize() * Math.abs(direction.z)) * 0.5;
     }
 
     /**
