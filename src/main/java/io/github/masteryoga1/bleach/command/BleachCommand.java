@@ -517,9 +517,14 @@ public final class BleachCommand {
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
         for (ServerPlayer player : players) {
             SoulData data = SoulLogic.get(player);
+            boolean changed = !data.zanpakuto().spirit().equals(Optional.of(id));
             ZanpakutoBond bond = data.zanpakuto().withSpirit(Optional.of(id));
             if (bond.named()) {
                 ShikaiEvents.forceSeal(player, data, null);
+                if (changed) {
+                    // A new spirit starts over: its first release and its technique are still to come.
+                    bond = bond.withFirstReleaseDone(false).withGetsugaFired(0).withGetsugaNamed(false);
+                }
                 bond = bond.asNamed(spirit.get().name().copy().withColor(spirit.get().colour()), spirit.get().isConstant());
             }
             data.setZanpakuto(bond);
@@ -577,8 +582,9 @@ public final class BleachCommand {
         }
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            if (ZanpakutoLogic.isUnboundAsauchi(inventory.getItem(slot))) {
-                return inventory.getItem(slot);
+            ItemStack stack = inventory.getItem(slot);
+            if (ZanpakutoLogic.isUnboundAsauchi(stack) || ZanpakutoLogic.isOwnBlade(stack, player)) {
+                return stack;
             }
         }
         return ItemStack.EMPTY;

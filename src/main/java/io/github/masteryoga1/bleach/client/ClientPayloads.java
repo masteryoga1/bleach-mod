@@ -20,10 +20,14 @@ public final class ClientPayloads {
         }
     }
 
-    /** Opens Jinzen on the inner world, or turns the open Jinzen screen to the next page of the same session. */
+    /**
+     * Opens Jinzen on the inner world, or turns the open Jinzen screen to the next page of the same
+     * session. A page for a player who has already let go of the blade is a late reply to a Jinzen that
+     * has ended, and opens nothing.
+     */
     public static void openJinzen(OpenJinzenPayload payload) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null) {
+        if (minecraft.player == null || !minecraft.player.isUsingItem()) {
             return;
         }
         if (minecraft.screen instanceof JinzenScreen screen && screen.session() == payload.session()) {

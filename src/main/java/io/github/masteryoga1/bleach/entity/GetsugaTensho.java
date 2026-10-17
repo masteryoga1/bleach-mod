@@ -25,6 +25,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
@@ -261,8 +262,9 @@ public class GetsugaTensho extends Projectile {
     /**
      * Sweeps this tick's path, as wide and tall as the crescent: knocks every projectile that is not
      * the owner's (nor another crescent) out of the air, then cuts the creatures in it, nearest first,
-     * each costing one of its pierces. A shield that stops it, or the last pierce, ends it. Returns
-     * whether the crescent is still flying.
+     * each costing one of its pierces. Nothing wholly behind where the crescent starts this tick is
+     * touched, so it never cuts what stands behind the one who fired it. A shield that stops it, or
+     * the last pierce, ends it. Returns whether the crescent is still flying.
      */
     private boolean sweep(Entity owner, Vec3 from, Vec3 motion) {
         float charge = charge();
@@ -270,12 +272,18 @@ public class GetsugaTensho extends Projectile {
         double halfHeight = halfHeightFor(charge);
         AABB path = new AABB(from.x - halfWidth, from.y - halfHeight, from.z - halfWidth,
                 from.x + halfWidth, from.y + halfHeight, from.z + halfWidth).expandTowards(motion);
+        Vec3 heading = motion.normalize();
         for (Projectile projectile : level().getEntitiesOfClass(Projectile.class, path,
-                other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner)) {
+                other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner
+                        && ahead(other, from, heading))) {
+            // An arrow or trident someone could have picked up is knocked down, not destroyed.
+            if (projectile instanceof AbstractArrow arrow && arrow.pickup == AbstractArrow.Pickup.ALLOWED) {
+                arrow.spawnAtLocation(arrow.getPickupItemStackOrigin().copy(), 0.1F);
+            }
             projectile.discard();
         }
         List<LivingEntity> targets = level().getEntitiesOfClass(LivingEntity.class, path,
-                target -> !struck.contains(target.getId()) && affects(target));
+                target -> !struck.contains(target.getId()) && affects(target) && ahead(target, from, heading));
         if (targets.isEmpty()) {
             return true;
         }
@@ -292,6 +300,11 @@ public class GetsugaTensho extends Projectile {
             }
         }
         return true;
+    }
+
+    /** Whether any part of the entity lies on or in front of the plane the crescent starts from. */
+    private static boolean ahead(Entity entity, Vec3 from, Vec3 heading) {
+        return entity.getBoundingBox().getCenter().subtract(from).dot(heading) >= -entity.getBbWidth() * 0.5;
     }
 
     /**

@@ -537,10 +537,14 @@ public final class ZanpakutoTests {
         String ready = JinzenLogic.refusal(player, data, blade, NOW);
         helper.assertTrue(ready == null, "a Shinigami ready to sit was refused: " + ready);
 
+        // Sitting still and sneaking keeps Jinzen settling, so only the drift can end it below.
+        player.setShiftKeyDown(true);
         JinzenLogic.begin(player, data, NOW);
         helper.assertTrue(data.jinzen() != null, "sitting down started no Jinzen");
+        JinzenLogic.tick(player, data, blade, 5, NOW + 5L);
+        helper.assertTrue(data.jinzen() != null, "sitting still ended Jinzen");
         player.setPos(player.getX() + 1.0, player.getY(), player.getZ());
-        JinzenLogic.tick(player, data, blade, 10, NOW);
+        JinzenLogic.tick(player, data, blade, 6, NOW + 6L);
         helper.assertTrue(data.jinzen() == null, "moving a block away did not end Jinzen");
         helper.succeed();
     }
@@ -687,8 +691,11 @@ public final class ZanpakutoTests {
         helper.assertTrue(drops.size() == 1 && !ZanpakutoItem.isOwnedBy(drops.get(0).getItem(), player.getUUID()),
                 "the drops left were " + drops.size() + ", and not only someone else's blade");
 
+        // Kept through a save as well: a soul that quits on the death screen respawns later from its saved data.
+        Player reloaded = helper.makeMockPlayer(GameType.SURVIVAL);
+        reloaded.load(player.saveWithoutId(new CompoundTag()));
         Player respawned = helper.makeMockPlayer(GameType.SURVIVAL);
-        ZanpakutoEvents.restoreBlades(player, respawned);
+        ZanpakutoEvents.restoreBlades(reloaded, respawned);
         ItemStack kept = ItemStack.EMPTY;
         for (int slot = 0; slot < respawned.getInventory().getContainerSize(); slot++) {
             if (ZanpakutoItem.isOwnedBy(respawned.getInventory().getItem(slot), player.getUUID())) {
@@ -697,8 +704,8 @@ public final class ZanpakutoTests {
         }
         helper.assertTrue(bladesOwnedBy(respawned, player.getUUID()) == 1, "the kept blade did not come back once");
         helper.assertTrue(!ZanpakutoItem.blade(kept).released() && model(kept) == 2, "the kept blade came back released");
-        // The kept copies are package-private, so a second hand-over shows they were cleared.
-        ZanpakutoEvents.restoreBlades(player, respawned);
+        // A second hand-over shows the kept copies were cleared.
+        ZanpakutoEvents.restoreBlades(reloaded, respawned);
         helper.assertTrue(bladesOwnedBy(respawned, player.getUUID()) == 1, "the kept blade came back twice");
         helper.succeed();
     }

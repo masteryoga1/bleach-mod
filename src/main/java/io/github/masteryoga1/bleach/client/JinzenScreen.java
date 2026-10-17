@@ -283,10 +283,18 @@ public final class JinzenScreen extends Screen {
         return Mth.clamp((int) ((mouseX - left) * JinzenStep.RIBBONS / textWidth), 0, JinzenStep.RIBBONS - 1);
     }
 
+    /**
+     * How far into the current tick this frame is. A screen's own float argument is the time the frame
+     * took, not this, so the animations and the strike read it from the game's clock instead.
+     */
+    private float tickFraction() {
+        return minecraft == null ? 0.0F : minecraft.getTimer().getGameTimeDeltaPartialTick(true);
+    }
+
     /** The inner world in place of the usual blurred background, fading in from black, and the panel over it. */
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        float time = age + partialTick;
+        float time = age + tickFraction();
         JinzenBackdrops.draw(graphics, page.look(), width, height, time);
         float dark = 1.0F - Mth.clamp(time / FADE_IN_TICKS, 0.0F, 1.0F);
         if (dark > 0.0F) {
@@ -299,7 +307,8 @@ public final class JinzenScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        shownTime = pageTicks + partialTick;
+        float fraction = tickFraction();
+        shownTime = pageTicks + fraction;
         if (strikeButton != null) {
             // Ticks run slower than frames: open the strike on the frame the jaws allow it.
             updateChoices();
@@ -327,7 +336,7 @@ public final class JinzenScreen extends Screen {
         JinzenStep current = step.get();
         float time = shownTime;
         if (current.kind() == JinzenStepKind.RIBBONS) {
-            drawRibbons(graphics, current, left, stepTop, mouseX, mouseY, age + partialTick);
+            drawRibbons(graphics, current, left, stepTop, mouseX, mouseY, age + fraction);
             drawTimer(graphics, current, left, stepTop + RIBBON_HEIGHT, time);
         } else if (current.kind() == JinzenStepKind.FANGS) {
             drawJaws(graphics, current, left, stepTop, time);
@@ -418,5 +427,17 @@ public final class JinzenScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    /**
+     * Leaving lets go of the blade at once, so the server ends Jinzen before an answer still on its way
+     * back could open the screen again.
+     */
+    @Override
+    public void onClose() {
+        if (minecraft != null && minecraft.player != null && minecraft.gameMode != null && minecraft.player.isUsingItem()) {
+            minecraft.gameMode.releaseUsingItem(minecraft.player);
+        }
+        super.onClose();
     }
 }

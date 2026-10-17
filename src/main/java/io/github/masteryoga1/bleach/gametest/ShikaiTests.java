@@ -343,8 +343,11 @@ public final class ShikaiTests {
         crescent(helper, owner, 1000.0F);
         helper.succeedWhen(() -> {
             helper.assertFalse(spider.isAlive(), "the Hollow behind them was not cut");
-            helper.assertTrue(plus.isAlive() && plus.getHealth() == plusHealth, "the crescent cut a Plus");
-            helper.assertTrue(wounded.isAlive() && wounded.getHealth() == woundedHealth, "the crescent cut a Shinigami");
+            // A Plus cut down by anything but a Hollow re-forms at full health, so its health alone proves nothing.
+            helper.assertTrue(plus.isAlive() && plus.getHealth() == plusHealth && plus.getLastDamageSource() == null,
+                    "the crescent cut a Plus");
+            helper.assertTrue(wounded.isAlive() && wounded.getHealth() == woundedHealth && wounded.getLastDamageSource() == null,
+                    "the crescent cut a Shinigami");
             plus.discard();
             wounded.discard();
         });
@@ -382,6 +385,9 @@ public final class ShikaiTests {
         for (Block hard : List.of(Blocks.STONE, Blocks.OBSIDIAN, Blocks.BEDROCK, Blocks.CHEST)) {
             helper.assertFalse(GetsugaTensho.cuttable(hard.defaultBlockState(), level, pos, hardness), hard + " can be cut");
         }
+        // Soft enough, but it holds a block entity.
+        helper.assertFalse(GetsugaTensho.cuttable(Blocks.DAYLIGHT_DETECTOR.defaultBlockState(), level, pos, hardness),
+                "a daylight detector can be cut");
 
         Player builder = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
         GetsugaTensho breaker = new GetsugaTensho(ModEntities.GETSUGA_TENSHO.get(), level);

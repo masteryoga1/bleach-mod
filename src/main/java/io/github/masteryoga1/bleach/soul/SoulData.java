@@ -4,13 +4,11 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -131,8 +129,6 @@ public final class SoulData {
     long lastGetsugaAt = NEVER;
     /** Game time Zabimaru's blade, lashed out, has drawn back together, or {@link #NEVER}. */
     long lashRetractUntil = NEVER;
-    /** Sealed copies of this soul's own blades, taken from its drops on death and handed back on respawning. */
-    List<ItemStack> keptBlades = List.of();
     /** Tick of the last Hakuda blow on a Hollow that counted towards the power leaning. */
     int lastAffinityHitTick = -1000;
 

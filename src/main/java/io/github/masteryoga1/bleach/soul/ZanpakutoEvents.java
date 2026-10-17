@@ -352,18 +352,17 @@ public final class ZanpakutoEvents {
             }
         }
         if (!kept.isEmpty()) {
-            SoulData data = SoulLogic.get(player);
-            List<ItemStack> all = new ArrayList<>(data.keptBlades);
+            List<ItemStack> all = new ArrayList<>(player.getData(SoulAttachments.KEPT_BLADES));
             all.addAll(kept);
-            data.keptBlades = List.copyOf(all);
+            player.setData(SoulAttachments.KEPT_BLADES, List.copyOf(all));
         }
     }
 
     /** Hands the blades kept through death to the respawned player, dropping any that do not fit. */
     public static void restoreBlades(Player original, Player clone) {
-        SoulData data = SoulLogic.get(original);
-        List<ItemStack> kept = data.keptBlades;
-        data.keptBlades = List.of();
+        List<ItemStack> kept = original.getData(SoulAttachments.KEPT_BLADES);
+        original.setData(SoulAttachments.KEPT_BLADES, List.of());
+        clone.setData(SoulAttachments.KEPT_BLADES, List.of());
         for (ItemStack stack : kept) {
             ItemStack copy = stack.copy();
             if (!clone.getInventory().add(copy) && !copy.isEmpty()) {

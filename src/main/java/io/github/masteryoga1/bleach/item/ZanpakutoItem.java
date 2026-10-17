@@ -23,6 +23,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
@@ -160,6 +161,10 @@ public final class ZanpakutoItem extends SwordItem {
         long now = level.getGameTime();
         String refusal = JinzenLogic.refusal(player, data, stack, now);
         if (refusal != null) {
+            if (refusal.equals("off_hand") && hasOwnUse(player.getOffhandItem(), player)) {
+                // Sneak-placing a block or raising a shield from the off hand, not reaching for Jinzen.
+                return InteractionResultHolder.pass(stack);
+            }
             if (!level.isClientSide()) {
                 player.displayClientMessage(Component.translatable("message.bleach.jinzen." + refusal)
                         .withStyle(ChatFormatting.GRAY), true);
@@ -171,6 +176,11 @@ public final class ZanpakutoItem extends SwordItem {
             JinzenLogic.begin(player, data, now);
         }
         return InteractionResultHolder.consume(stack);
+    }
+
+    /** Whether the off-hand item does something of its own when used, as blocks and shields do. */
+    private static boolean hasOwnUse(ItemStack offhand, Player player) {
+        return offhand.getItem() instanceof BlockItem || offhand.getUseDuration(player) > 0;
     }
 
     @Override
