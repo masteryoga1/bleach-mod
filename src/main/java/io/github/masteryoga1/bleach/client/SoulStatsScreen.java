@@ -14,6 +14,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -21,6 +22,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.StringUtil;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -34,6 +36,12 @@ import net.minecraft.world.level.Level;
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
     private static final int LINE = 12;
+    /** The rows' spacing on a screen too short for the full layout, which also drops the gaps between sections. */
+    private static final int COMPACT_LINE = 10;
+    /** The space between sections in the full layout. */
+    private static final int GAP = 6;
+    /** How far above the bottom the Done button's top edge is. */
+    private static final int DONE_TOP = 28;
     private static final int WHITE = 0xFFFFFF;
     private static final int GREY = 0xA0A0A0;
     private static final int GOLD = 0xFFD27F;
@@ -52,7 +60,7 @@ public final class SoulStatsScreen extends Screen {
     @Override
     protected void init() {
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
-                .bounds(width / 2 - 100, height - 28, 200, 20)
+                .bounds(width / 2 - 100, height - DONE_TOP, 200, 20)
                 .build());
     }
 
@@ -64,26 +72,51 @@ public final class SoulStatsScreen extends Screen {
             return;
         }
         SoulData data = player.getData(SoulAttachments.SOUL);
+        List<FormattedCharSequence> next = font.split(nextStep(player, data), PANEL_WIDTH);
+        // Everything stays above the Done button: when the next step would reach it, the rows close up,
+        // and on a screen too short even then, what still does not fit of the next step is left out.
+        int bottom = height - DONE_TOP - 4;
+        boolean compact = drawRows(null, player, data, LINE, GAP) + next.size() * font.lineHeight > bottom;
+        int y = compact ? drawRows(graphics, player, data, COMPACT_LINE, 0) : drawRows(graphics, player, data, LINE, GAP);
+        int left = width / 2 - PANEL_WIDTH / 2;
+        for (FormattedCharSequence text : next) {
+            if (y + font.lineHeight > bottom) {
+                break;
+            }
+            graphics.drawString(font, text, left, y, GREY, false);
+            y += font.lineHeight;
+        }
+    }
+
+    /**
+     * Every row above the next step, {@code line} apart with {@code gap} more between sections; with no
+     * {@code graphics}, only measures them.
+     *
+     * @return where the next step starts
+     */
+    private int drawRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int line, int gap) {
         int left = width / 2 - PANEL_WIDTH / 2;
         int y = 16;
 
-        graphics.drawCenteredString(font, title, width / 2, y, WHITE);
-        y += LINE + 6;
+        if (graphics != null) {
+            graphics.drawCenteredString(font, title, width / 2, y, WHITE);
+        }
+        y += line + gap;
         String stateKey = ShinigamiLogic.isSubstitute(data) ? "screen.bleach.soul.state.substitute"
                 : data.state() == SoulState.HUMAN && QuincyLogic.isAwakened(data) ? "screen.bleach.soul.state.quincy"
                 : ShinigamiLogic.isStudent(data) ? "screen.bleach.soul.state.student" : "screen.bleach.soul.state";
-        graphics.drawString(font, Component.translatable(stateKey, data.state().displayName()), left, y, WHITE);
-        y += LINE;
-        graphics.drawString(font, Component.translatable("screen.bleach.soul.reiryoku",
+        text(graphics, Component.translatable(stateKey, data.state().displayName()), left, y, WHITE);
+        y += line;
+        text(graphics, Component.translatable("screen.bleach.soul.reiryoku",
                 (int) Math.floor(data.reiryoku()), (int) Math.floor(data.maxReiryoku())), left, y, REIRYOKU);
-        y += LINE;
+        y += line;
         if (data.state() == SoulState.PLUS && data.chainMaxTicks() > 0) {
             boolean encroaching = SoulLogic.isEncroaching(data);
-            graphics.drawString(font, Component.translatable(encroaching
+            text(graphics, Component.translatable(encroaching
                             ? "screen.bleach.soul.chain.encroaching" : "screen.bleach.soul.chain",
                     StringUtil.formatTickDuration(data.chainTicks(), TICKS_PER_SECOND)),
                     left, y, encroaching ? ENCROACHING : WHITE);
-            y += LINE;
+            y += line;
         }
         if (SoulLogic.isAware(data)) {
             Component release = data.isReiatsuReleased()
@@ -91,89 +124,100 @@ public final class SoulStatsScreen extends Screen {
                             BleachClient.REIATSU_RELEASE_KEY.getTranslatedKeyMessage())
                     : Component.translatable("screen.bleach.soul.reiatsu.sealed",
                             BleachClient.REIATSU_RELEASE_KEY.getTranslatedKeyMessage());
-            graphics.drawString(font, release, left, y, GREY);
-            y += LINE;
+            text(graphics, release, left, y, GREY);
+            y += line;
         }
         Component zanpakuto = zanpakutoLine(player, data);
         if (zanpakuto != null) {
-            graphics.drawString(font, zanpakuto, left, y, GREY);
-            y += LINE;
+            text(graphics, zanpakuto, left, y, GREY);
+            y += line;
         }
         HuntRecord hunt = data.hunt();
         if (hunt.purified() + hunt.slain() + hunt.sentOn() > 0) {
-            graphics.drawString(font, Component.translatable("screen.bleach.soul.hunt",
+            text(graphics, Component.translatable("screen.bleach.soul.hunt",
                     hunt.purified(), hunt.slain(), hunt.sentOn()), left, y, GREY);
-            y += LINE;
+            y += line;
         }
-        y = renderQuincy(graphics, player, data, left, y);
-        y += 6;
+        y = renderQuincy(graphics, player, data, left, y, line);
+        y += gap;
 
-        graphics.drawString(font, Component.translatable("screen.bleach.soul.stats"), left, y, GOLD);
-        y += LINE;
+        text(graphics, Component.translatable("screen.bleach.soul.stats"), left, y, GOLD);
+        y += line;
         int maxLevel = SoulLogic.maxStatLevel();
         for (Stat stat : Stat.values()) {
-            int level = data.level(stat);
-            graphics.drawString(font, stat.displayName(), left + 6, y, WHITE);
-            graphics.drawString(font, Component.translatable("screen.bleach.soul.level", level), left + 120, y, GREY);
-            float progress = level >= maxLevel ? 1.0F : (float) data.xp(stat) / SoulData.xpToNextLevel(level);
-            int barLeft = left + 165;
-            int barWidth = PANEL_WIDTH - 165;
-            graphics.fill(barLeft, y + 2, barLeft + barWidth, y + 6, XP_BACKGROUND);
-            graphics.fill(barLeft, y + 2, barLeft + Math.round(barWidth * progress), y + 6, XP_FILL);
-            y += LINE;
+            if (graphics != null) {
+                int level = data.level(stat);
+                graphics.drawString(font, stat.displayName(), left + 6, y, WHITE);
+                graphics.drawString(font, Component.translatable("screen.bleach.soul.level", level), left + 120, y, GREY);
+                float progress = level >= maxLevel ? 1.0F : (float) data.xp(stat) / SoulData.xpToNextLevel(level);
+                int barLeft = left + 165;
+                int barWidth = PANEL_WIDTH - 165;
+                graphics.fill(barLeft, y + 2, barLeft + barWidth, y + 6, XP_BACKGROUND);
+                graphics.fill(barLeft, y + 2, barLeft + Math.round(barWidth * progress), y + 6, XP_FILL);
+            }
+            y += line;
         }
-        y += 6;
+        y += gap;
 
-        graphics.drawString(font, Component.translatable("screen.bleach.soul.powers"), left, y, GOLD);
-        y += LINE;
+        text(graphics, Component.translatable("screen.bleach.soul.powers"), left, y, GOLD);
+        y += line;
         boolean anyPower = false;
         for (PowerPath path : PowerPath.values()) {
             int tier = data.tier(path);
             if (tier > 0) {
                 anyPower = true;
-                graphics.drawString(font, Component.translatable("screen.bleach.soul.tier", path.displayName(), tier),
+                text(graphics, Component.translatable("screen.bleach.soul.tier", path.displayName(), tier),
                         left + 6, y, WHITE);
-                y += LINE;
+                y += line;
             }
         }
         if (!anyPower) {
-            graphics.drawString(font, Component.translatable("screen.bleach.soul.no_powers"), left + 6, y, GREY);
-            y += LINE;
+            text(graphics, Component.translatable("screen.bleach.soul.no_powers"), left + 6, y, GREY);
+            y += line;
         }
-        y += 6;
+        return y + gap;
+    }
 
-        graphics.drawWordWrap(font, nextStep(player, data), left, y, PANEL_WIDTH, GREY);
+    /** Draws a row, unless only measuring. */
+    private void text(@Nullable GuiGraphics graphics, Component text, int x, int y, int color) {
+        if (graphics != null) {
+            graphics.drawString(font, text, x, y, color);
+        }
     }
 
     /**
      * Up to two lines on Quincy blood, when the soul has it. Awakened: the blood, reishi held and the
      * most it can hold, and the Blut it is calling on; then the Hollow poison in it, souls its arrows
      * have destroyed, and how rich the reishi is where it stands (leaving out what other souls'
-     * reiatsu adds, which only the server weighs). Not yet awakened: just the blood.
+     * reiatsu adds, which only the server weighs). Not yet awakened: just the blood. With no
+     * {@code graphics}, only counts them.
      *
      * @return the line below the last one drawn
      */
-    private int renderQuincy(GuiGraphics graphics, Player player, SoulData data, int left, int y) {
+    private int renderQuincy(@Nullable GuiGraphics graphics, Player player, SoulData data, int left, int y, int line) {
         Bloodline bloodline = QuincyLogic.bloodline(data);
         if (bloodline == Bloodline.NONE) {
             return y;
         }
         if (!QuincyLogic.isAwakened(data)) {
-            graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy.latent",
-                    bloodline.displayName()), left, y, GREY);
-            return y + LINE;
+            text(graphics, Component.translatable("screen.bleach.soul.quincy.latent", bloodline.displayName()),
+                    left, y, GREY);
+            return y + line;
+        }
+        if (graphics == null) {
+            return y + 2 * line;
         }
         QuincyProgress quincy = data.quincy();
         graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy", bloodline.displayName(),
                 Math.round(QuincyLogic.reishi(data)), Math.round(QuincyLogic.maxReishi(data)),
                 QuincyLogic.activeBlut(data).displayName()), left, y, REISHI);
-        y += LINE;
+        y += line;
         Component density = Component.translatable(
                 QuincyLogic.densityKey(QuincyLogic.placeDensity(player.level(), player.position())));
         graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy.poison",
                 Math.round(quincy.poison()), quincy.destroyed(), density),
                 left, y, quincy.poison() >= QuincyLogic.POISON_BLOCK ? POISONED : GREY);
-        return y + LINE;
+        return y + line;
     }
 
     /**
