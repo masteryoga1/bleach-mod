@@ -8,9 +8,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * The mod's sound events. Their files are vanilla sounds, pitched and spread out in
- * {@code assets/bleach/sounds.json}. A Hollow's howl, Fishbone D's roar and the tearing sky carry
- * much further than a normal mob's sounds, so they are fixed-range events; the rest reach as far as
- * their volume takes them, as usual.
+ * {@code assets/bleach/sounds.json}. A Hollow's howl, Fishbone D's roar, the tearing sky, a Shikai
+ * release and a loosed Getsuga Tenshō carry much further than a normal mob's sounds, so they are
+ * fixed-range events; the rest reach as far as their volume takes them, as usual.
  */
 public final class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
@@ -26,6 +26,17 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> GARGANTA_OPEN = fixed("entity.garganta.open", 64.0F);
     /** The soul pager's beep, played only to its holder. */
     public static final DeferredHolder<SoundEvent, SoundEvent> DENREISHINKI_PING = variable("item.denreishinki.ping");
+    /** The Asauchi whispering as the bond passes another quarter. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> ZANPAKUTO_WHISPER = variable("item.zanpakuto.whisper");
+    /** A soul settling into Jinzen. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> ZANPAKUTO_JINZEN = variable("item.zanpakuto.jinzen");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ZANPAKUTO_RELEASE = fixed("item.zanpakuto.release", 32.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> ZANPAKUTO_SEAL = variable("item.zanpakuto.seal");
+    /** Zabimaru's segments whipping out and back. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> ZABIMARU_LASH = variable("item.zabimaru.lash");
+    /** Reiatsu gathering in the blade for a Getsuga Tenshō. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GETSUGA_GATHER = variable("entity.getsuga_tensho.gather");
+    public static final DeferredHolder<SoundEvent, SoundEvent> GETSUGA_FIRE = fixed("entity.getsuga_tensho.fire", 48.0F);
 
     private ModSounds() {
     }

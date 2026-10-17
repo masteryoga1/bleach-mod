@@ -8,11 +8,14 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomModelData;
 
 /**
  * The rules of the Shinigami path: the Academy and its exams, Konsō, the Substitute route, Shunpo
@@ -55,16 +58,30 @@ public final class ShinigamiLogic {
         return now < data.shinigami().powerLentUntil();
     }
 
-    /** The last part of the {@code screen.bleach.soul.next.*} key that says what this soul can do next. */
+    /**
+     * The last part of the {@code screen.bleach.soul.next.*} key that says what this soul can do next.
+     * A Shinigami, Substitute or student whose Asauchi bond is full hears {@code .bonded} (sit in
+     * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it).
+     */
     public static String nextStepKey(SoulData data, long now) {
         if (isPowerLent(data, now)) {
             return "lent";
         }
         return switch (data.state()) {
-            case HUMAN -> isSubstitute(data) ? "substitute" : "human";
-            case RUKONGAI -> data.shinigami().enrolled() ? "student" : "rukongai";
+            case HUMAN -> isSubstitute(data) ? "substitute" + bondStep(data.zanpakuto()) : "human";
+            case RUKONGAI -> !data.shinigami().enrolled() ? "rukongai"
+                    : data.zanpakuto().isFull() && !data.zanpakuto().named() ? "student.bonded" : "student";
+            case SHINIGAMI -> "shinigami" + bondStep(data.zanpakuto());
             default -> data.state().getSerializedName();
         };
+    }
+
+    /** {@code .named} once the name is known, {@code .bonded} once the bond is full, and nothing before. */
+    private static String bondStep(ZanpakutoBond bond) {
+        if (bond.named()) {
+            return ".named";
+        }
+        return bond.isFull() ? ".bonded" : "";
     }
 
     /** The {@code message.bleach.direction.*} key for the compass point from here towards {@code dx, dz}. */
@@ -367,15 +384,26 @@ public final class ShinigamiLogic {
      * sheathed at their hip.
      */
     public static boolean hasSheathedBlade(LivingEntity entity) {
+        return sheathedModel(entity) >= 0;
+    }
+
+    /**
+     * Which blade a player wears sheathed: the {@code custom_model_data} of the first zanpakutō on
+     * their hotbar (0 for a plain Asauchi), so others see Zabimaru's red saya or Zangetsu wrapped
+     * across the back. -1 when neither hand is free of a blade or the hotbar holds none.
+     */
+    public static int sheathedModel(LivingEntity entity) {
         if (!(entity instanceof Player player)
                 || player.getMainHandItem().is(BleachTags.ZANPAKUTO) || player.getOffhandItem().is(BleachTags.ZANPAKUTO)) {
-            return false;
+            return -1;
         }
         for (int slot = 0; slot < Inventory.getSelectionSize(); slot++) {
-            if (player.getInventory().getItem(slot).is(BleachTags.ZANPAKUTO)) {
-                return true;
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(BleachTags.ZANPAKUTO)) {
+                CustomModelData model = stack.get(DataComponents.CUSTOM_MODEL_DATA);
+                return model == null ? 0 : Math.max(0, model.value());
             }
         }
-        return false;
+        return -1;
     }
 }

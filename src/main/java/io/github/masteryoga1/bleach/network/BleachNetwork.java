@@ -5,6 +5,8 @@ import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.zanpakuto.JinzenPage;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import java.util.List;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -13,7 +15,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class BleachNetwork {
     /** Bump when a payload changes shape, so mismatched clients are refused instead of breaking. */
-    private static final String VERSION = "5";
+    private static final String VERSION = "6";
 
     private BleachNetwork() {
     }
@@ -30,7 +32,10 @@ public final class BleachNetwork {
                         ReishiFootingStatePayload::handle)
                 .playToServer(NpcActionPayload.TYPE, NpcActionPayload.STREAM_CODEC, NpcActionPayload::handle)
                 .playToServer(ReishiFootingPayload.TYPE, ReishiFootingPayload.STREAM_CODEC, ReishiFootingPayload::handle)
-                .playToServer(FlashStepPayload.TYPE, FlashStepPayload.STREAM_CODEC, FlashStepPayload::handle);
+                .playToServer(FlashStepPayload.TYPE, FlashStepPayload.STREAM_CODEC, FlashStepPayload::handle)
+                .playToClient(OpenJinzenPayload.TYPE, OpenJinzenPayload.STREAM_CODEC, OpenJinzenPayload::handle)
+                .playToServer(JinzenAnswerPayload.TYPE, JinzenAnswerPayload.STREAM_CODEC, JinzenAnswerPayload::handle)
+                .playToServer(ZanpakutoKeyPayload.TYPE, ZanpakutoKeyPayload.STREAM_CODEC, ZanpakutoKeyPayload::handle);
     }
 
     /** Sends a player their own soul data and marks it as up to date. */
@@ -78,5 +83,20 @@ public final class BleachNetwork {
     /** Asks the server to toggle the reiatsu release. */
     public static void requestReiatsuToggle() {
         PacketDistributor.sendToServer(ToggleReiatsuPayload.INSTANCE);
+    }
+
+    /** Shows a player a page of the world inside their blade. See {@link OpenJinzenPayload}. */
+    public static void openJinzen(ServerPlayer player, int session, JinzenPage page) {
+        PacketDistributor.sendToPlayer(player, new OpenJinzenPayload(session, page));
+    }
+
+    /** Sends the soul's answer to a step of its spirit's test. */
+    public static void answerJinzen(int session, int step, int value) {
+        PacketDistributor.sendToServer(new JinzenAnswerPayload(session, step, value));
+    }
+
+    /** Tells the server a zanpakutō key was pressed or let go. */
+    public static void requestZanpakutoKey(ZanpakutoKey key) {
+        PacketDistributor.sendToServer(new ZanpakutoKeyPayload(key));
     }
 }

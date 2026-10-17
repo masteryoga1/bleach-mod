@@ -68,6 +68,19 @@ DEVICE_EDGE = rgb(80, 80, 92)
 SCREEN = rgb(120, 200, 150)
 KEY = rgb(170, 170, 180)
 
+# Zangetsu: a guardless cleaver with a dark back, a white-wrapped hilt and a trailing cloth.
+CLEAVER_EDGE = rgb(236, 240, 244)
+CLEAVER = rgb(196, 202, 210)
+CLEAVER_SHADE = rgb(150, 156, 166)
+CLEAVER_BACK = rgb(44, 44, 50)
+CLOTH = rgb(236, 232, 220)
+CLOTH_SHADE = rgb(190, 184, 170)
+# Zabimaru: a red-wrapped hilt and bronze guard, and fangs along the Shikai's segments.
+ZABI_WRAP = rgb(150, 36, 36)
+ZABI_WRAP_DARK = rgb(96, 20, 24)
+BRONZE = rgb(170, 120, 60)
+TOOTH = rgb(240, 236, 226)
+
 
 class Canvas:
     def __init__(self, width, height):
@@ -171,6 +184,79 @@ def asauchi():
         if i % 2 == 0:
             c.put(x, y, DIAMOND)
     c.put(0, 15, GUARD)
+    return c
+
+
+def zangetsu():
+    """Zangetsu in Shikai: a broad cleaver with no guard, its hilt wrapped in white cloth that trails off."""
+    c = Canvas(32, 32)
+    for i in range(22):
+        x, y = 9 + i, 22 - i
+        width = min(6, 22 - i)  # the edge side slants in over the last five steps
+        for w in range(width):
+            colour = CLEAVER_BACK if w == 0 else CLEAVER_EDGE if w == width - 1 else CLEAVER_SHADE if w == 1 else CLEAVER
+            c.put(x + w // 2, y + (w + 1) // 2, colour)
+    for px in range(3, 10):
+        c.put(px, 33 - px, CLOTH if px % 2 == 0 else CLOTH_SHADE)
+        c.put(px, 34 - px, CLOTH_SHADE if px % 2 == 0 else CLOTH)
+    for k, (x, y) in enumerate([(2, 30), (1, 30), (0, 29), (0, 28), (1, 27), (1, 26), (0, 25)]):
+        c.put(x, y, CLOTH if k % 2 == 0 else CLOTH_SHADE)
+    return c
+
+
+def zabimaru():
+    """Zabimaru sealed: the Asauchi's shape with a red-wrapped hilt and a bronze guard."""
+    c = asauchi()
+    for y in range(16):
+        for x in range(16):
+            colour = c.get(x, y)
+            if colour == WRAP:
+                c.put(x, y, ZABI_WRAP)
+            elif colour == DIAMOND:
+                c.put(x, y, ZABI_WRAP_DARK)
+            elif colour == GUARD:
+                c.put(x, y, BRONZE)
+    return c
+
+
+def zabimaru_shikai():
+    """Zabimaru in Shikai: a longer blade in six segments with a fang on each, the hilt still wrapped red."""
+    c = Canvas(32, 32)
+    for i in range(24):
+        if i % 4 == 3:
+            continue  # the gap between two segments
+        x, y = 7 + i, 24 - i
+        for w in range(3):
+            c.put(x + w // 2, y + (w + 1) // 2, SHADE if w == 0 else STEEL if w == 1 else EDGE)
+        if i % 4 == 0:
+            c.put(x + 1, y + 2, TOOTH)
+    for px in range(1, 7):
+        c.put(px, 31 - px, ZABI_WRAP if px % 2 else ZABI_WRAP_DARK)
+        c.put(px, 32 - px, ZABI_WRAP_DARK if px % 2 else ZABI_WRAP)
+    for x, y in [(4, 23), (5, 24), (7, 26), (8, 27)]:
+        c.put(x, y, BRONZE)
+    return c
+
+
+def getsuga_tensho():
+    """The crescent: white, brightest along its middle and fading at its tips; the renderer tints it."""
+    c = Canvas(32, 16)
+    for y in range(16):
+        across = max(0.0, 1.0 - abs(y - 7.5) / 8.0)
+        for x in range(32):
+            along = math.sin(math.pi * (x + 0.5) / 32)
+            c.put(x, y, (255, 255, 255, round(255 * across * across * along)))
+    return c
+
+
+def zabimaru_segment():
+    """One segment of Zabimaru's blade, for the lash: steel with a bright edge and fangs."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, STEEL)
+    c.rect(0, 0, 16, 2, EDGE)
+    c.rect(0, 14, 16, 16, SHADE)
+    for x in range(2, 16, 5):
+        c.rect(x, 2, x + 2, 5, TOOTH)
     return c
 
 
@@ -453,6 +539,9 @@ def denreishinki():
 
 TEXTURES = {
     "item/asauchi.png": asauchi,
+    "item/zangetsu.png": zangetsu,
+    "item/zabimaru.png": zabimaru,
+    "item/zabimaru_shikai.png": zabimaru_shikai,
     "item/shihakusho_kosode.png": kosode_icon,
     "item/shihakusho_hakama.png": hakama_icon,
     "item/waraji.png": waraji_icon,
@@ -474,6 +563,8 @@ TEXTURES = {
     "entity/hollow/fishbone_d_mask.png": fishbone_d_mask,
     "entity/hollow/fishbone_d_mask_cracked.png": cracked(fishbone_d_mask, [(63, 2), (66, 8), (65, 13), (67, 17)]),
     "entity/garganta.png": garganta,
+    "entity/getsuga_tensho.png": getsuga_tensho,
+    "entity/zabimaru_segment.png": zabimaru_segment,
     "item/denreishinki.png": denreishinki,
 }
 

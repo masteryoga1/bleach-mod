@@ -105,8 +105,9 @@ public final class HollowLogic {
 
     /**
      * The chance a minute that a Garganta opens near this soul. It grows with the square root of
-     * reiatsu up to a cap, then is likelier at night, for a Plus, and while reiatsu is released.
-     * None for the unaware, for Hollows and Arrancar, or before the first Hollow.
+     * reiatsu up to a cap, then is likelier at night, for a Plus, while reiatsu is released, and for
+     * a soul whose constant-release zanpakutō is out for good. None for the unaware, for Hollows and
+     * Arrancar, or before the first Hollow.
      */
     public static double arrivalChancePerMinute(SoulData data, boolean night) {
         if (!SoulLogic.isAware(data) || data.state() == SoulState.HOLLOW || data.state() == SoulState.ARRANCAR
@@ -118,6 +119,9 @@ public final class HollowLogic {
                 BleachConfig.get(BleachConfig.ARRIVAL_CHANCE_PER_MINUTE) * Math.sqrt(reiatsu / REFERENCE_REIATSU));
         if (data.isReiatsuReleased()) {
             chance *= BleachConfig.get(BleachConfig.ARRIVAL_RELEASED_MULTIPLIER);
+        }
+        if (data.zanpakuto().constant() && data.zanpakuto().firstReleaseDone()) {
+            chance *= BleachConfig.get(BleachConfig.CONSTANT_RELEASE_ARRIVAL_MULTIPLIER);
         }
         if (night) {
             chance *= BleachConfig.get(BleachConfig.ARRIVAL_NIGHT_MULTIPLIER);

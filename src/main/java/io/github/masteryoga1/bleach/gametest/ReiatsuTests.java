@@ -255,7 +255,8 @@ public final class ReiatsuTests {
     public static void advancementsLoad(GameTestHelper helper) {
         for (String name : List.of("root", "trained", "rising_reiatsu", "crushing_pressure", "plus", "encroachment", "hollow",
                 "passed_on", "enrolled", "graduated", "konso", "substitute", "shunpo", "reishi_footing", "shihakusho",
-                "garganta", "first_hollow", "mask_strike", "purified", "fishbone_d", "soul_burial")) {
+                "garganta", "first_hollow", "mask_strike", "purified", "fishbone_d", "soul_burial", "jinzen",
+                "asauchi_bond", "zanpakuto_name", "shikai", "getsuga_tensho")) {
             helper.assertTrue(helper.getLevel().getServer().getAdvancements().get(BleachMod.id(name)) != null,
                     "advancement bleach:" + name + " did not load");
         }

@@ -23,7 +23,7 @@ public final class BleachTags {
 
     /**
      * Damage that purifies the Hollow it kills, whatever struck the blow, as a zanpakutō's edge does.
-     * Empty for now; techniques such as Getsuga Tenshō join it as they arrive.
+     * Getsuga Tenshō is its first member; other techniques join it as they arrive.
      */
     public static final TagKey<DamageType> PURIFIES = TagKey.create(Registries.DAMAGE_TYPE, BleachMod.id("purifies"));
 

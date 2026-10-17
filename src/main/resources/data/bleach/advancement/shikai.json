@@ -1,0 +1,26 @@
+{
+  "parent": "bleach:zanpakuto_name",
+  "display": {
+    "icon": {
+      "id": "bleach:asauchi",
+      "components": {
+        "minecraft:custom_model_data": 3
+      }
+    },
+    "title": {
+      "translate": "advancements.bleach.shikai.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.shikai.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "shikai": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "shikai"
+      }
+    }
+  }
+}

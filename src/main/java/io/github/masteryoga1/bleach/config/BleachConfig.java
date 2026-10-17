@@ -127,6 +127,45 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.IntValue DENREISHINKI_RANGE;
 
+    public static final ModConfigSpec.DoubleValue BOND_MULTIPLIER;
+    public static final ModConfigSpec.IntValue BOND_PER_MINUTE_CARRIED;
+    public static final ModConfigSpec.IntValue BOND_PER_MEDITATION;
+    public static final ModConfigSpec.IntValue BOND_PER_JINZEN;
+    public static final ModConfigSpec.IntValue JINZEN_BOND_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue BOND_PER_PURIFIED_REIATSU;
+    public static final ModConfigSpec.IntValue BOND_PURIFICATION_CAP;
+    public static final ModConfigSpec.IntValue BOND_PER_CLOSE_CALL;
+    public static final ModConfigSpec.DoubleValue SUBSTITUTE_CLOSE_CALL_MULTIPLIER;
+    public static final ModConfigSpec.IntValue BOND_PER_SLEEP;
+    public static final ModConfigSpec.IntValue SLEEP_BOND_COOLDOWN_MINUTES;
+    public static final ModConfigSpec.IntValue SUBSTITUTE_CONSTANT_LEAN;
+    public static final ModConfigSpec.DoubleValue NAME_MIN_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue NAME_GROWTH;
+    public static final ModConfigSpec.IntValue JINZEN_RETRY_SECONDS;
+    public static final ModConfigSpec.BooleanValue KEEP_ON_DEATH;
+
+    public static final ModConfigSpec.DoubleValue SHIKAI_DRAIN_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue DRAIN_REDUCTION_PER_REIATSU_CONTROL_LEVEL;
+    public static final ModConfigSpec.DoubleValue MIN_DRAIN_FRACTION;
+    public static final ModConfigSpec.DoubleValue CONSTANT_RELEASE_ARRIVAL_MULTIPLIER;
+    public static final ModConfigSpec.IntValue LASH_RETRACT_TICKS;
+
+    public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
+    public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue GETSUGA_MAX_DAMAGE;
+    public static final ModConfigSpec.DoubleValue GETSUGA_UNNAMED_MULTIPLIER;
+    public static final ModConfigSpec.IntValue GETSUGA_NAMED_AFTER;
+    public static final ModConfigSpec.DoubleValue GETSUGA_MIN_COST;
+    public static final ModConfigSpec.DoubleValue GETSUGA_TAP_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue GETSUGA_FULL_COST_FRACTION;
+    public static final ModConfigSpec.IntValue GETSUGA_FULL_CHARGE_TICKS;
+    public static final ModConfigSpec.IntValue GETSUGA_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue GETSUGA_GATHER_FADE_TICKS;
+    public static final ModConfigSpec.DoubleValue GETSUGA_RANGE;
+    public static final ModConfigSpec.BooleanValue GETSUGA_BREAKS_BLOCKS;
+    public static final ModConfigSpec.DoubleValue GETSUGA_MAX_HARDNESS;
+    public static final ModConfigSpec.IntValue GETSUGA_BLOCK_BUDGET;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -482,6 +521,123 @@ public final class BleachConfig {
         DENREISHINKI_RANGE = builder
                 .comment("How far, in blocks, a Denreishinki hears tears open and Pluses turn Hollow, and finds the nearest Hollow.")
                 .defineInRange("range", 96, 16, 512);
+        builder.pop();
+
+        builder.push("zanpakuto");
+        BOND_MULTIPLIER = builder
+                .comment("Multiplier on all Asauchi bond, from every source below. The bond is full at 1000.")
+                .defineInRange("bond_multiplier", 1.0, 0.0, 100.0);
+        BOND_PER_MINUTE_CARRIED = builder
+                .comment("Bond gained for each minute a soul carries a nameless Asauchi.")
+                .defineInRange("bond_per_minute_carried", 2, 0, 1_000);
+        BOND_PER_MEDITATION = builder
+                .comment("Bond gained each time meditating trains Reiatsu Control, while a nameless Asauchi is carried.")
+                .defineInRange("bond_per_meditation", 1, 0, 1_000);
+        BOND_PER_JINZEN = builder
+                .comment("Bond gained for sitting in Jinzen with a nameless Asauchi.")
+                .defineInRange("bond_per_jinzen", 25, 0, 1_000);
+        JINZEN_BOND_COOLDOWN_SECONDS = builder
+                .comment("Seconds before another Jinzen can grow the bond.")
+                .defineInRange("jinzen_bond_cooldown_seconds", 300, 0, 86_400);
+        BOND_PER_PURIFIED_REIATSU = builder
+                .comment("Bond gained per point of a Hollow's reiatsu for purifying it with a nameless Asauchi.")
+                .defineInRange("bond_per_purified_reiatsu", 0.5, 0.0, 100.0);
+        BOND_PURIFICATION_CAP = builder
+                .comment("Most bond a single purification can give.")
+                .defineInRange("bond_purification_cap", 50, 0, 1_000);
+        BOND_PER_CLOSE_CALL = builder
+                .comment("Bond gained for surviving a close call that grows reiryoku, while a nameless Asauchi is carried.")
+                .defineInRange("bond_per_close_call", 15, 0, 1_000);
+        SUBSTITUTE_CLOSE_CALL_MULTIPLIER = builder
+                .comment("Multiplier on the close-call bond for a Substitute Shinigami, whose power grows in a fight.")
+                .defineInRange("substitute_close_call_multiplier", 2.0, 0.0, 10.0);
+        BOND_PER_SLEEP = builder
+                .comment("Bond gained for a full night's sleep with a nameless Asauchi.")
+                .defineInRange("bond_per_sleep", 30, 0, 1_000);
+        SLEEP_BOND_COOLDOWN_MINUTES = builder
+                .comment("Minutes before another night's sleep can grow the bond.")
+                .defineInRange("sleep_bond_cooldown_minutes", 20, 0, 1_440);
+        SUBSTITUTE_CONSTANT_LEAN = builder
+                .comment("Extra leaning towards a constant-release spirit, such as Zangetsu, for a Substitute Shinigami.")
+                .defineInRange("substitute_constant_lean", 60, 0, 10_000);
+        NAME_MIN_REIRYOKU = builder
+                .comment("Maximum reiryoku a soul needs before its spirit will set its test and tell it its name.")
+                .defineInRange("name_min_reiryoku", 100.0, 0.0, 100_000.0);
+        NAME_GROWTH = builder
+                .comment("Maximum reiryoku gained on learning the zanpakutō's name.")
+                .defineInRange("name_growth", 10.0, 0.0, 1_000.0);
+        JINZEN_RETRY_SECONDS = builder
+                .comment("Seconds before a soul that failed its spirit's test can face it again.")
+                .defineInRange("jinzen_retry_seconds", 180, 0, 86_400);
+        KEEP_ON_DEATH = builder
+                .comment("Whether a soul keeps its own named zanpakutō when it dies, instead of dropping it.")
+                .define("keep_on_death", true);
+        builder.pop();
+
+        builder.push("shikai");
+        SHIKAI_DRAIN_MULTIPLIER = builder
+                .comment("Multiplier on the reiryoku every Shikai drains while it lasts. Constant releases never drain.")
+                .defineInRange("drain_multiplier", 1.0, 0.0, 10.0);
+        DRAIN_REDUCTION_PER_REIATSU_CONTROL_LEVEL = builder
+                .comment("How much each Reiatsu Control level lowers the Shikai drain (0.02 = 2% less).")
+                .defineInRange("drain_reduction_per_reiatsu_control_level", 0.02, 0.0, 1.0);
+        MIN_DRAIN_FRACTION = builder
+                .comment("The smallest share of its drain a Shikai keeps, however high Reiatsu Control goes.")
+                .defineInRange("min_drain_fraction", 0.4, 0.0, 1.0);
+        CONSTANT_RELEASE_ARRIVAL_MULTIPLIER = builder
+                .comment("How much likelier a Hollow arrival is for a soul whose constant-release zanpakutō has been released, as it never seals.")
+                .defineInRange("constant_release_arrival_multiplier", 1.25, 0.0, 10.0);
+        LASH_RETRACT_TICKS = builder
+                .comment("Ticks Zabimaru's reach stays short after a lash, while its segments draw back together.")
+                .defineInRange("lash_retract_ticks", 20, 0, 200);
+        builder.pop();
+
+        builder.push("getsuga_tensho");
+        GETSUGA_BASE_DAMAGE = builder
+                .comment("Getsuga Tenshō damage before reiryoku is added.")
+                .defineInRange("base_damage", 8.0, 0.0, 1_000.0);
+        GETSUGA_DAMAGE_PER_ROOT_REIRYOKU = builder
+                .comment("Extra damage per square root of maximum reiryoku.")
+                .defineInRange("damage_per_root_reiryoku", 0.8, 0.0, 100.0);
+        GETSUGA_MAX_DAMAGE = builder
+                .comment("Highest damage, however strong the soul, before the charge scales it (from 60% ungathered to 120% fully gathered).")
+                .defineInRange("max_damage", 60.0, 0.0, 10_000.0);
+        GETSUGA_UNNAMED_MULTIPLIER = builder
+                .comment("Damage multiplier until Zangetsu names the technique.")
+                .defineInRange("unnamed_multiplier", 0.75, 0.0, 1.0);
+        GETSUGA_NAMED_AFTER = builder
+                .comment("How many Getsuga Tenshō a soul looses before Zangetsu names the technique.")
+                .defineInRange("named_after", 10, 0, 10_000);
+        GETSUGA_MIN_COST = builder
+                .comment("The least reiryoku one costs.")
+                .defineInRange("min_cost", 3.0, 0.0, 10_000.0);
+        GETSUGA_TAP_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku one costs when loosed without gathering.")
+                .defineInRange("tap_cost_fraction", 0.06, 0.0, 1.0);
+        GETSUGA_FULL_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku one costs when fully gathered.")
+                .defineInRange("full_cost_fraction", 0.16, 0.0, 1.0);
+        GETSUGA_FULL_CHARGE_TICKS = builder
+                .comment("Ticks the Technique key must be held to gather a full charge.")
+                .defineInRange("full_charge_ticks", 30, 1, 200);
+        GETSUGA_COOLDOWN_TICKS = builder
+                .comment("Ticks before another can be gathered.")
+                .defineInRange("cooldown_ticks", 20, 0, 1_200);
+        GETSUGA_GATHER_FADE_TICKS = builder
+                .comment("Ticks gathered reiatsu holds before it fades unused.")
+                .defineInRange("gather_fade_ticks", 200, 20, 2_400);
+        GETSUGA_RANGE = builder
+                .comment("How far a Getsuga Tenshō flies, in blocks.")
+                .defineInRange("range", 40.0, 4.0, 128.0);
+        GETSUGA_BREAKS_BLOCKS = builder
+                .comment("Whether it cuts through soft blocks on its way. Mob griefing, spawn protection and building rights still apply.")
+                .define("breaks_blocks", true);
+        GETSUGA_MAX_HARDNESS = builder
+                .comment("The hardest block it cuts through (dirt is 0.5, stone 1.5). Blocks with a block entity, such as chests and signs, and blocks the Wither cannot break are never cut.")
+                .defineInRange("max_hardness", 0.8, 0.0, 50.0);
+        GETSUGA_BLOCK_BUDGET = builder
+                .comment("Most blocks one can cut through.")
+                .defineInRange("block_budget", 24, 0, 256);
         builder.pop();
 
         SPEC = builder.build();

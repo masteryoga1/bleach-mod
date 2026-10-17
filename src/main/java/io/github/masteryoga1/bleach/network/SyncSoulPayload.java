@@ -12,14 +12,18 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Server to client: the player's own soul data, so the HUD and stats screen stay current. */
+/**
+ * Server to client: the player's own soul data, so the HUD and stats screen stay current. What the
+ * player must not see, such as the hidden leaning that picks their zanpakutō's spirit, is left out
+ * (see {@link SoulData#forClient}).
+ */
 public record SyncSoulPayload(CompoundTag data) implements CustomPacketPayload {
     public static final Type<SyncSoulPayload> TYPE = new Type<>(BleachMod.id("sync_soul"));
     public static final StreamCodec<ByteBuf, SyncSoulPayload> STREAM_CODEC =
             ByteBufCodecs.COMPOUND_TAG.map(SyncSoulPayload::new, SyncSoulPayload::data);
 
     public static SyncSoulPayload of(SoulData soul) {
-        Tag tag = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, soul).getOrThrow();
+        Tag tag = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, soul.forClient()).getOrThrow();
         return new SyncSoulPayload(tag instanceof CompoundTag compound ? compound : new CompoundTag());
     }
 

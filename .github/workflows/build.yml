@@ -95,8 +95,10 @@ jobs:
   # becomes a Plus, a Hollow and then a Shinigami in the Shihakushō, opens the Tailoring Table and an
   # instructor's dialogue, flash steps, stands on reishi footing and places an Academy, then summons each
   # Hollow and a Plus, cracks a mask, purifies a Hollow, sends a Plus on, opens a Garganta and checks what
-  # a soul just below the awareness threshold sees, with the camera behind the player, and quits. Game tests only run on a server, so this is what catches crashes in
-  # rendering, the HUD, the screens and the client mixins. Its screenshots are kept for review.
+  # a soul just below the awareness threshold sees, sits in Jinzen, learns Zangetsu's name, releases it and
+  # fires a Getsuga Tenshō, with the camera behind the player, and quits. Game tests only run on a server,
+  # so this is what catches crashes in rendering, the HUD, the screens and the client mixins. Its
+  # screenshots are kept for review.
   client-smoke-test:
     runs-on: ubuntu-latest
     steps:
