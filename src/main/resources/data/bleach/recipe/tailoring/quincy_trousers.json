@@ -1,0 +1,10 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:white_wool"
+  },
+  "cloth_count": 4,
+  "result": {
+    "id": "bleach:quincy_trousers"
+  }
+}

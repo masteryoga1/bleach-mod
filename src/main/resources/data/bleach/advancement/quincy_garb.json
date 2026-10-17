@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:quincy",
+  "display": {
+    "icon": {
+      "id": "bleach:quincy_tunic"
+    },
+    "title": {
+      "translate": "advancements.bleach.quincy_garb.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.quincy_garb.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "quincy_garb": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "quincy_garb"
+      }
+    }
+  }
+}

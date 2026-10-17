@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
@@ -22,7 +23,10 @@ import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/** The mod's entity types: Shinigami NPCs, Hollows, Pluses, the Garganta and zanpakutō techniques. */
+/**
+ * The mod's entity types: Shinigami NPCs, Hollows, Pluses, the Garganta, zanpakutō techniques and the
+ * Quincy's arrows.
+ */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
             DeferredRegister.create(Registries.ENTITY_TYPE, BleachMod.MODID);
@@ -140,6 +144,22 @@ public final class ModEntities {
                     .clientTrackingRange(8)
                     .updateInterval(20)
                     .build(BleachMod.id("zabimaru_lash").toString()));
+
+    // ---- Quincy techniques ----
+
+    /**
+     * A Heilig Pfeil, an arrow of reishi loosed from the Heilig Bogen. It is the size of a vanilla arrow
+     * and tracked like one, flies straight for a second and a half, and is never saved.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<HeiligPfeil>> HEILIG_PFEIL =
+            ENTITY_TYPES.register("heilig_pfeil", () -> EntityType.Builder
+                    .<HeiligPfeil>of(HeiligPfeil::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .eyeHeight(0.13F)
+                    .clientTrackingRange(4)
+                    .updateInterval(20)
+                    .noSave()
+                    .build(BleachMod.id("heilig_pfeil").toString()));
 
     private ModEntities() {
     }

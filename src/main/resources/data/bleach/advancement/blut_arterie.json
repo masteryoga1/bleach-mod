@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:blut_vene",
+  "display": {
+    "icon": {
+      "id": "minecraft:redstone"
+    },
+    "title": {
+      "translate": "advancements.bleach.blut_arterie.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.blut_arterie.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "blut_arterie": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "blut_arterie"
+      }
+    }
+  }
+}

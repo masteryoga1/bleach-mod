@@ -26,7 +26,9 @@ public enum DialogueView {
     /** The wounded Shinigami asks a Human who can see her to take her power. */
     OFFER_POWER,
     /** The wounded Shinigami has nothing to ask of this visitor. */
-    RESTING;
+    RESTING,
+    /** A Quincy, whose kind the Shinigami distrust. */
+    QUINCY;
 
     private static final IntFunction<DialogueView> BY_ID =
             ByIdMap.continuous(DialogueView::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

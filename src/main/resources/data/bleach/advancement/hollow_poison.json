@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:quincy",
+  "display": {
+    "icon": {
+      "id": "minecraft:fermented_spider_eye"
+    },
+    "title": {
+      "translate": "advancements.bleach.hollow_poison.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.hollow_poison.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "hollow_poison": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "hollow_poison"
+      }
+    }
+  }
+}

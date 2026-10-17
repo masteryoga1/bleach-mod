@@ -2,6 +2,9 @@ package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
+import io.github.masteryoga1.bleach.quincy.BlutMode;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.QuincyProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -23,8 +26,11 @@ import net.minecraft.world.item.ItemStack;
  * offhand slot or the hotbar attack indicator is on that side. It gets a white outline while
  * reiatsu is released, and a wider one in the blade's colour while the player holds their own
  * released zanpakutō, with a small bar above it that fills while a technique gathers. A Plus gets a
- * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in.
- * Placeholder look until real art exists.
+ * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in. A
+ * Quincy gets a reishi gauge beside it instead, outlined blue under Blut Vene and red under Blut
+ * Arterie, with Hollow poison filling it violet from the top (flickering once the poison brings
+ * pangs) and a bar above it that fills as the Heilig Bogen is drawn. Quincy blood not yet awakened
+ * shows only that bar, in grey. Placeholder look until real art exists.
  */
 public final class ReiryokuHud {
     public static final ResourceLocation ID = BleachMod.id("reiryoku");
@@ -43,6 +49,16 @@ public final class ReiryokuHud {
     /** The gather bar sits this far above the gauge, clear of both outlines. */
     private static final int GATHER_GAP = 5;
     private static final int GATHER_FULL = 0xFFFFFFFF;
+    private static final int REISHI_FILL = 0xFFBFE6FF;
+    private static final int REISHI_FILL_LOW = 0xFF6F9CC0;
+    private static final int POISON_FILL = 0xC08040C0;
+    private static final int VENE_OUTLINE = 0xFF3FA8FF;
+    private static final int ARTERIE_OUTLINE = 0xFFE0403A;
+    /** The Blut outline while a press is still waiting on the server. */
+    private static final int BLUT_SETTLING_OUTLINE = 0xFF808080;
+    private static final int LATENT_DRAW = 0xFF8090A0;
+    /** Past the pang threshold the poison overlay is shown for this many ticks, then hidden as long. */
+    private static final int POISON_FLICKER_TICKS = 10;
 
     private ReiryokuHud() {
     }
@@ -87,9 +103,52 @@ public final class ReiryokuHud {
             }
         }
 
-        if (data.state() == SoulState.PLUS && data.chainMaxTicks() > 0) {
+        boolean chainShown = data.state() == SoulState.PLUS && data.chainMaxTicks() > 0;
+        if (chainShown) {
             drawGauge(graphics, x + WIDTH + 2, y, data.chainFraction(),
                     SoulLogic.isEncroaching(data) ? CHAIN_FILL_ENCROACHING : CHAIN_FILL);
+        }
+
+        // The reishi gauge goes beyond the chain one, should a soul ever have both.
+        int rx = chainShown ? x + 2 * WIDTH + 8 : x + WIDTH + 6;
+        if (QuincyLogic.canUsePowers(data)) {
+            renderReishi(graphics, player, data, rx, y);
+        } else if (QuincyLogic.isLatent(data)) {
+            float draw = QuincyClient.drawPower(player);
+            if (draw > 0.0F) {
+                drawGather(graphics, rx, y - GATHER_GAP - GATHER_HEIGHT, draw, LATENT_DRAW);
+            }
+        }
+    }
+
+    /**
+     * A Quincy's reishi: the gauge, the Hollow poison over it, the Blut outline (grey while a press
+     * waits on the server), and the draw bar above it while the Heilig Bogen is drawn.
+     */
+    private static void renderReishi(GuiGraphics graphics, LocalPlayer player, SoulData data, int x, int y) {
+        float max = QuincyLogic.maxReishi(data);
+        float fraction = max > 0.0F ? Mth.clamp(QuincyLogic.reishi(data) / max, 0.0F, 1.0F) : 0.0F;
+        drawGauge(graphics, x, y, fraction, fraction < 0.2F ? REISHI_FILL_LOW : REISHI_FILL);
+
+        long gameTime = player.level().getGameTime();
+        float poison = data.quincy().poison();
+        boolean flickerOff = poison >= QuincyLogic.POISON_PANG && (gameTime / POISON_FLICKER_TICKS) % 2 != 0;
+        int poisoned = Mth.ceil((HEIGHT - 2) * Mth.clamp(poison / QuincyProgress.MAX_POISON, 0.0F, 1.0F));
+        if (poisoned > 0 && !flickerOff) {
+            graphics.fill(x + 1, y + 1, x + WIDTH - 1, y + 1 + poisoned, POISON_FILL);
+        }
+
+        BlutMode blut = QuincyLogic.activeBlut(data);
+        if (QuincyClient.blutSettling(gameTime)) {
+            graphics.renderOutline(x - 1, y - 1, WIDTH + 2, HEIGHT + 2, BLUT_SETTLING_OUTLINE);
+        } else if (blut != BlutMode.OFF) {
+            graphics.renderOutline(x - 1, y - 1, WIDTH + 2, HEIGHT + 2,
+                    blut == BlutMode.VENE ? VENE_OUTLINE : ARTERIE_OUTLINE);
+        }
+
+        float draw = QuincyClient.drawPower(player);
+        if (draw > 0.0F) {
+            drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, draw, draw >= 1.0F ? GATHER_FULL : REISHI_FILL);
         }
     }
 

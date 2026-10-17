@@ -1,8 +1,10 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulState;
 import javax.annotation.Nullable;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -49,13 +51,24 @@ public final class WoundedShinigami extends ShinigamiNpc {
         return data;
     }
 
+    /**
+     * She offers her power to a Human who can take it. An awakened Quincy, who cannot, she sends away;
+     * anyone else finds her resting.
+     */
     @Override
     public DialogueView viewFor(SoulData visitor, long now) {
         DialogueView common = commonView(visitor);
         if (common != null) {
             return common;
         }
-        return !gavePower && ShinigamiLogic.canReceivePower(visitor) ? DialogueView.OFFER_POWER : DialogueView.RESTING;
+        if (!gavePower && ShinigamiLogic.canReceivePower(visitor)) {
+            return DialogueView.OFFER_POWER;
+        }
+        if (QuincyLogic.blocksShinigamiPower(visitor) && visitor.state() == SoulState.HUMAN
+                && !ShinigamiLogic.hasShinigamiPower(visitor)) {
+            return DialogueView.QUINCY;
+        }
+        return DialogueView.RESTING;
     }
 
     @Override

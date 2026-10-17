@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "bleach:item/quincy_cross"
+  },
+  "overrides": [
+    {"predicate": {"bleach:pulling": 1}, "model": "bleach:item/heilig_bogen_pulling_0"},
+    {"predicate": {"bleach:pulling": 1, "bleach:pull": 0.65}, "model": "bleach:item/heilig_bogen_pulling_1"},
+    {"predicate": {"bleach:pulling": 1, "bleach:pull": 0.9}, "model": "bleach:item/heilig_bogen_pulling_2"}
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:quincy",
+  "display": {
+    "icon": {
+      "id": "minecraft:spectral_arrow"
+    },
+    "title": {
+      "translate": "advancements.bleach.heilig_pfeil.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.heilig_pfeil.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "heilig_pfeil": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "heilig_pfeil"
+      }
+    }
+  }
+}

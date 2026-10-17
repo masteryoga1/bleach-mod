@@ -4,16 +4,22 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.quincy.Bloodline;
+import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
+import io.github.masteryoga1.bleach.quincy.BlutMode;
+import io.github.masteryoga1.bleach.quincy.QuincyKey;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -43,6 +49,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.level.GameRules;
@@ -57,18 +64,21 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 /**
  * A check CI runs on a real client (the {@code runClientSmokeTest} Gradle task, which sets
- * {@code -Dbleach.smokeTest=true}). It makes a flat world, turns the player into a Plus, releases
- * reiatsu, brings on Encroachment, turns them into a Hollow and opens the soul screen. Then it makes
- * them a Shinigami in the Shihakushō with a sheathed Asauchi, opens the Tailoring Table and the
- * instructor's dialogue, flash steps, stands on reishi footing by jumping while falling, places an
- * Academy, summons each Hollow and a Plus, cracks a mask, purifies a Hollow, sends a Plus on, opens a
- * Garganta and checks that a soul just below the threshold sees only a shimmer. Last, as a Shinigami
- * again whose Asauchi bond is full, it sits in Jinzen through the real sneak and use keys, takes the
- * red ribbon, closes the screen, learns Zangetsu's name, releases it, looses a Getsuga Tenshō and
- * opens the soul screen, and quits. All of it is seen with the camera behind the player, so the
- * chain, mask, garb, saya, NPCs, Hollows, zanpakutō and HUD are drawn, and screenshots of the main
- * moments are saved for review. Any crash in the mod's client code fails the run, and so does
- * anything that did not reach the client as expected.
+ * {@code -Dbleach.smokeTest=true}). It makes a flat world, answers the bloodline question as a Human,
+ * turns the player into a Plus, releases reiatsu, brings on Encroachment, turns them into a Hollow and
+ * opens the soul screen. Then it makes them a Shinigami in the Shihakushō with a sheathed Asauchi,
+ * opens the Tailoring Table and the instructor's dialogue, flash steps, stands on reishi footing by
+ * jumping while falling, places an Academy, summons each Hollow and a Plus, cracks a mask, purifies a
+ * Hollow, sends a Plus on, opens a Garganta and checks that a soul just below the threshold sees only
+ * a shimmer. Next, as a Shinigami again whose Asauchi bond is full, it sits in Jinzen through the real
+ * sneak and use keys, takes the red ribbon, closes the screen, learns Zangetsu's name, releases it,
+ * looses a Getsuga Tenshō and opens the soul screen. Last, it makes them an Echt Quincy in the white
+ * garb, draws the Heilig Bogen through the real use key, fires a Heilig Pfeil into the sky and another
+ * at a Hollow, calls Blut Vene, uses Hirenkyaku and opens the soul screen once more, and quits. All of
+ * it is seen with the camera behind the player, so the chain, mask, garb, saya, NPCs, Hollows,
+ * zanpakutō, bow, arrows, veins and HUD are drawn, and screenshots of the main moments are saved for
+ * review. Any crash in the mod's client code fails the run, and so does anything that did not reach
+ * the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -84,11 +94,15 @@ public final class ClientSmokeTest {
     private static final double RIFT_RANGE = 40.0;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
+    /** How many ticks the bloodline question stays open before it is answered, so a screenshot shows it. */
+    private static final int BLOODLINE_ANSWER_TICKS = 5;
 
     private static boolean worldRequested;
     private static int ticksWaiting;
     private static int ticksInWorld;
     private static boolean finished;
+    /** How many ticks the bloodline question has been open. */
+    private static int bloodlineTicks;
     /** The first tick of each {@link #expectWithin} window that has already passed. */
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** Where the player stood before the flash step. */
@@ -122,6 +136,13 @@ public final class ClientSmokeTest {
         LocalPlayer player = minecraft.player;
         SoulData soul = player.getData(SoulAttachments.SOUL);
         ++ticksInWorld;
+        // The question comes as the world loads. A screenshot shows the last frame drawn, so the screen
+        // gets a few ticks to be drawn before it is answered.
+        if (minecraft.screen instanceof BloodlineScreen bloodline && ++bloodlineTicks >= BLOODLINE_ANSWER_TICKS) {
+            shot(minecraft, "bloodline");
+            bloodline.choose(BloodlineChoice.HUMAN);
+        }
+        expectWithin(minecraft, 2, 230, () -> soul.quincy().decided(), "the bloodline answer never reached the server");
         expectWithin(minecraft, 345, 380,
                 () -> horizontalDistance(player.position(), dashFrom) >= DASH_MIN_DISTANCE,
                 "the flash step did not carry the player " + DASH_MIN_DISTANCE + " blocks");
@@ -188,6 +209,28 @@ public final class ClientSmokeTest {
                 "the Getsuga Tenshō never reached the client")) {
             shot(minecraft, "getsuga");
         }
+        expectWithin(minecraft, 1452, 1475,
+                () -> QuincyLogic.tier(soul) == 3 && soul.quincy().bloodline() == Bloodline.ECHT
+                        && player.getMainHandItem().is(ModItems.QUINCY_CROSS.get()),
+                "the Quincy setup never reached the client");
+        if (expectWithin(minecraft, 1503, 1525, () -> nearest(minecraft, HeiligPfeil.class, 48.0, arrow -> true) != null,
+                "no Heilig Pfeil reached the client")) {
+            shot(minecraft, "heilig_pfeil");
+        }
+        expectWithin(minecraft, 1563, 1600,
+                () -> subject instanceof LivingEntity struck && (!struck.isAlive() || struck.getHealth() < struck.getMaxHealth()),
+                "the Heilig Pfeil did not strike the Hollow");
+        if (expectWithin(minecraft, 1606, 1640,
+                () -> soul.quincy().blut() == BlutMode.VENE && ClientSouls.appearance(player).blut() == BlutMode.VENE,
+                "Blut Vene never came on")) {
+            shot(minecraft, "blut_vene");
+        }
+        if (expectWithin(minecraft, 1651, 1680,
+                () -> horizontalDistance(player.position(), dashFrom) >= DASH_MIN_DISTANCE,
+                "Hirenkyaku did not carry the player " + DASH_MIN_DISTANCE + " blocks")) {
+            shot(minecraft, "hirenkyaku");
+        }
+        expectWithin(minecraft, 1686, 1720, () -> soul.quincy().blut() == BlutMode.OFF, "Blut never ended");
         if (finished) {
             return;
         }
@@ -387,7 +430,61 @@ public final class ClientSmokeTest {
             }
             case 1425 -> shot(minecraft, "stats_zanpakuto");
             case 1440 -> minecraft.setScreen(null);
-            case 1460 -> {
+            // An Echt Quincy of the third tier, no longer a Shinigami, in the Quincy garb with the Cross in
+            // hand, facing north towards a still Hollow. Hollows vanish on Peaceful.
+            case 1450 -> {
+                command(minecraft, "difficulty easy");
+                command(minecraft, "clear @s");
+                command(minecraft, "effect clear @s");
+                command(minecraft, "bleach soul @s human");
+                command(minecraft, "bleach tier @s shinigami 0");
+                command(minecraft, "bleach quincy @s bloodline echt");
+                command(minecraft, "bleach tier @s quincy 3");
+                command(minecraft, "bleach reiryoku @s 200 200");
+                command(minecraft, "bleach quincy @s reishi 200");
+                command(minecraft, "tp @s ~ ~ ~ 180 0");
+            }
+            case 1451 -> {
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:quincy_cross");
+                command(minecraft, "item replace entity @s armor.chest with bleach:quincy_tunic");
+                command(minecraft, "item replace entity @s armor.legs with bleach:quincy_trousers");
+                command(minecraft, "item replace entity @s armor.feet with bleach:quincy_shoes");
+                command(minecraft, "summon bleach:spider_hollow ~ ~ ~-6 " + STILL);
+            }
+            // The first arrow goes up and north at 45 degrees, into an empty sky, drawn through the real use key.
+            case 1476 -> look(minecraft, player.getEyePosition().add(0.0, 10.0, -10.0));
+            case 1478 -> minecraft.options.keyUse.setDown(true);
+            case 1490 -> {
+                expect(minecraft, player.isUsingItem(), "holding use with the Quincy Cross did not draw the bow");
+                shot(minecraft, "heilig_bogen");
+            }
+            case 1502 -> minecraft.options.keyUse.setDown(false);
+            // The second goes at the Hollow, too far off for the use key to reach it instead.
+            case 1535 -> {
+                subject = nearest(minecraft, SpiderHollow.class, SUMMONED_RANGE,
+                        spider -> spider.isAlive() && isSpiderHollow(spider));
+                expect(minecraft, subject != null, "the Spider Hollow in front of the Quincy never reached the client");
+                if (subject != null) {
+                    look(minecraft, subject.getBoundingBox().getCenter());
+                }
+            }
+            case 1538 -> minecraft.options.keyUse.setDown(true);
+            case 1562 -> minecraft.options.keyUse.setDown(false);
+            case 1605 -> BleachNetwork.requestQuincyKey(QuincyKey.BLUT);
+            case 1645 -> {
+                command(minecraft, "kill @e[type=#bleach:hollows]");
+                command(minecraft, "difficulty peaceful");
+            }
+            // Holding the Cross, so the movement key's dash is Hirenkyaku.
+            case 1650 -> {
+                dashFrom = player.position();
+                BleachNetwork.requestFlashStep(1.0F, 0.0F);
+            }
+            case 1685 -> BleachNetwork.requestQuincyKey(QuincyKey.BLUT_OFF);
+            case 1690 -> minecraft.setScreen(new SoulStatsScreen());
+            case 1695 -> shot(minecraft, "stats_quincy");
+            case 1710 -> minecraft.setScreen(null);
+            case 1730 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();

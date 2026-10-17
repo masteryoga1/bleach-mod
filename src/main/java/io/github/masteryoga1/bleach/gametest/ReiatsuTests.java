@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.github.masteryoga1.bleach.soul.Fright;
 import io.github.masteryoga1.bleach.soul.ReiatsuEvents;
 import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
@@ -245,6 +246,12 @@ public final class ReiatsuTests {
         SoulAppearance read = SoulAppearance.STREAM_CODEC.decode(buffer);
         helper.assertTrue(read.equals(look), "sent " + look + " but read " + read);
 
+        SoulAppearance vene = new SoulAppearance(SoulState.HUMAN, 0.0F, false, 0, BlutMode.VENE);
+        ByteBuf veneBuffer = Unpooled.buffer();
+        SoulAppearance.STREAM_CODEC.encode(veneBuffer, vene);
+        SoulAppearance veneRead = SoulAppearance.STREAM_CODEC.decode(veneBuffer);
+        helper.assertTrue(veneRead.equals(vene), "sent " + vene + " but read " + veneRead);
+
         data.setChainTicks(1);
         helper.assertTrue(SoulAppearance.of(data).chainFraction() > 0.0F, "a chain with links left should still show");
         helper.assertTrue(SoulAppearance.of(soul(SoulState.HOLLOW, 40.0F)).chainFraction() == 0.0F, "a Hollow shows a chain");
@@ -256,7 +263,8 @@ public final class ReiatsuTests {
         for (String name : List.of("root", "trained", "rising_reiatsu", "crushing_pressure", "plus", "encroachment", "hollow",
                 "passed_on", "enrolled", "graduated", "konso", "substitute", "shunpo", "reishi_footing", "shihakusho",
                 "garganta", "first_hollow", "mask_strike", "purified", "fishbone_d", "soul_burial", "jinzen",
-                "asauchi_bond", "zanpakuto_name", "shikai", "getsuga_tensho")) {
+                "asauchi_bond", "zanpakuto_name", "shikai", "getsuga_tensho", "quincy", "heilig_pfeil", "hirenkyaku",
+                "blut_vene", "blut_arterie", "quincy_garb", "hollow_poison", "last_quincy")) {
             helper.assertTrue(helper.getLevel().getServer().getAdvancements().get(BleachMod.id(name)) != null,
                     "advancement bleach:" + name + " did not load");
         }

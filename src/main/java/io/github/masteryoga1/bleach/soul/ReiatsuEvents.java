@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import java.util.List;
@@ -73,7 +74,10 @@ public final class ReiatsuEvents {
         }
     }
 
-    /** Reiatsu difference: a soul whose reiatsu dwarfs its attacker's shrugs off most of the hit. */
+    /**
+     * Reiatsu difference: a soul whose reiatsu dwarfs its attacker's shrugs off most of the hit. Blut
+     * Arterie makes the attacker's reiatsu count for more (see {@link QuincyLogic#reiatsuFactor}).
+     */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
         LivingEntity victim = event.getEntity();
         DamageSource source = event.getSource();
@@ -81,7 +85,8 @@ public final class ReiatsuEvents {
                 || !(source.getEntity() instanceof LivingEntity attacker) || attacker == victim) {
             return;
         }
-        float multiplier = SoulLogic.reiatsuDamageMultiplier(SoulLogic.reiatsu(attacker), SoulLogic.reiatsu(victim));
+        float multiplier = SoulLogic.reiatsuDamageMultiplier(
+                SoulLogic.reiatsu(attacker) * QuincyLogic.reiatsuFactor(attacker), SoulLogic.reiatsu(victim));
         if (multiplier < 1.0F) {
             event.setAmount(event.getAmount() * multiplier);
         }
@@ -110,7 +115,10 @@ public final class ReiatsuEvents {
         }
     }
 
-    /** One beat of the aura: everyone weak enough in range is weighed down, and the weakest flee. */
+    /**
+     * One beat of the aura: everyone weak enough in range is weighed down, and the weakest flee. A
+     * Hollow's or an Arrancar's aura also poisons the Quincy in it.
+     */
     private static void pulse(ServerPlayer player, SoulData data) {
         float radius = SoulLogic.pressureRadius(data);
         double radiusSqr = radius * radius;
@@ -119,7 +127,12 @@ public final class ReiatsuEvents {
                 entity -> entity.isAlive() && entity.distanceToSqr(player) <= radiusSqr && isAffected(player, entity));
         boolean crushedSomeone = false;
         long until = player.level().getGameTime() + FRIGHT_TICKS;
+        boolean poisons = QuincyLogic.isHollowSource(player);
+        float poison = (float) (BleachConfig.get(BleachConfig.HOLLOW_POISON_AURA_PER_SECOND) * PULSE_INTERVAL_TICKS / 20.0);
         for (LivingEntity target : nearby) {
+            if (poisons && target instanceof Player other) {
+                QuincyEvents.onHollowAura(other, poison);
+            }
             int weight = SoulLogic.applyPressure(target, data.maxReiryoku());
             if (weight > 0) {
                 crushedSomeone = true;

@@ -36,4 +36,14 @@ public final class ClientPayloads {
             minecraft.setScreen(new JinzenScreen(payload.session(), payload.page()));
         }
     }
+
+    /**
+     * Asks the bloodline question. It waits for the world to finish loading and for any other screen
+     * to close (see {@link QuincyClient}); asked again while it is already showing, it is not queued twice.
+     */
+    public static void openBloodline() {
+        if (!(Minecraft.getInstance().screen instanceof BloodlineScreen)) {
+            QuincyClient.bloodlinePending = true;
+        }
+    }
 }

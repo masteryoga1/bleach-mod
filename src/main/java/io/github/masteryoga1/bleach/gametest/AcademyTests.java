@@ -131,7 +131,7 @@ public final class AcademyTests {
                 case STUDENT -> List.of(NpcAction.GRADUATE, NpcAction.ASAUCHI);
                 case SUBSTITUTE, SHINIGAMI -> List.of(NpcAction.ASAUCHI);
                 case OFFER_POWER -> List.of(NpcAction.ACCEPT_POWER);
-                case LIVING, HOLLOW, RESTING -> List.of();
+                case LIVING, HOLLOW, RESTING, QUINCY -> List.of();
             };
             helper.assertTrue(offered.equals(expected), view + " offers " + offered);
         }

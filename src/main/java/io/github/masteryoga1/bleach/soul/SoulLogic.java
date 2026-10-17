@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.quincy.BlutMode;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -279,19 +280,36 @@ public final class SoulLogic {
     }
 
     /**
-     * What a soul becomes after its body dies. A Substitute's Shinigami power holds their soul
-     * together and they become a Shinigami; any other spiritually aware Human lingers as a Plus with
-     * a fresh Chain of Fate; a Plus that dies loses part of its chain; everyone keeps their progress.
+     * What a soul becomes after its body dies. A soul torn apart (see {@link QuincyEvents#destroySoul})
+     * knits itself together again as a living Human, weaker. Otherwise a Substitute's Shinigami power
+     * holds their soul together and they become a Shinigami; an awakened Quincy's blood holds theirs
+     * to the body and they wake alive; any other spiritually aware Human lingers as a Plus with a
+     * fresh Chain of Fate; a Plus that dies loses part of its chain. Everyone keeps their progress,
+     * but a Quincy loses their Blut and gathered reishi and half their Hollow poison.
      */
     public static SoulData afterDeath(SoulData old) {
         SoulData next = old.copy();
         next.setReiatsuReleased(false);
         next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
+        QuincyProgress quincy = old.quincy().withBlut(BlutMode.OFF).withReishi(0.0F);
+        if (old.isSoulDestroyed()) {
+            next.setState(SoulState.HUMAN);
+            next.clearChain();
+            next.setMaxReiryoku((float) (old.maxReiryoku() * QuincyLogic.DESTROYED_REIRYOKU_FRACTION));
+            next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
+            next.setQuincy(quincy.withPoison(0.0F));
+            next.soulReformed = true;
+            return next;
+        }
+        next.setQuincy(quincy.withPoison(old.quincy().poison() * 0.5F));
         boolean intoSpirit = old.state() == SoulState.HUMAN && BleachConfig.get(BleachConfig.DEATH_INTO_PLUS);
         if (intoSpirit && old.tier(PowerPath.SHINIGAMI) > 0) {
             next.setState(SoulState.SHINIGAMI);
             next.clearChain();
             next.becameShinigami = true;
+        } else if (intoSpirit && QuincyLogic.isAwakened(old) && !BleachConfig.get(BleachConfig.QUINCY_DEATH_INTO_PLUS)) {
+            next.clearChain();
+            next.quincyReborn = true;
         } else if (intoSpirit && (BleachConfig.get(BleachConfig.ALWAYS_BECOME_PLUS) || isAware(old))) {
             next.setState(SoulState.PLUS);
             next.startChain(chainLifeTicks());

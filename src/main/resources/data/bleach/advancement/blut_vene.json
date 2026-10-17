@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:quincy",
+  "display": {
+    "icon": {
+      "id": "minecraft:lapis_lazuli"
+    },
+    "title": {
+      "translate": "advancements.bleach.blut_vene.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.blut_vene.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "blut_vene": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "blut_vene"
+      }
+    }
+  }
+}

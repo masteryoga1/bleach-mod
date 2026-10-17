@@ -13,8 +13,9 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Everything the mod knows about one soul: its state, its spiritual energy, its stats, which
- * powers have awakened, its record against Hollows and its bond with its zanpakutō. Stored as the {@link SoulAttachments#SOUL}
- * attachment on players and on spirit mobs (Shinigami NPCs, Hollows, Pluses) and saved with them.
+ * powers have awakened, its record against Hollows, its bond with its zanpakutō and its Quincy
+ * blood. Stored as the {@link SoulAttachments#SOUL} attachment on players and on spirit mobs
+ * (Shinigami NPCs, Hollows, Pluses) and saved with them.
  * A player's own soul is also sent to their client so the HUD and stats screen can show it.
  */
 public final class SoulData {
@@ -43,7 +44,8 @@ public final class SoulData {
             ShinigamiProgress.CODEC.lenientOptionalFieldOf("shinigami", ShinigamiProgress.NONE)
                     .forGetter(SoulData::shinigami),
             HuntRecord.CODEC.lenientOptionalFieldOf("hunt", HuntRecord.NONE).forGetter(SoulData::hunt),
-            ZanpakutoBond.CODEC.lenientOptionalFieldOf("zanpakuto", ZanpakutoBond.NONE).forGetter(SoulData::zanpakuto)
+            ZanpakutoBond.CODEC.lenientOptionalFieldOf("zanpakuto", ZanpakutoBond.NONE).forGetter(SoulData::zanpakuto),
+            QuincyProgress.CODEC.lenientOptionalFieldOf("quincy", QuincyProgress.NONE).forGetter(SoulData::quincy)
     ).apply(instance, SoulData::new));
 
     private SoulState state = SoulState.HUMAN;
@@ -66,6 +68,8 @@ public final class SoulData {
     private HuntRecord hunt = HuntRecord.NONE;
     /** The Asauchi bond, the hidden leaning, and the zanpakutō's name once learned: see {@link ZanpakutoLogic}. */
     private ZanpakutoBond zanpakuto = ZanpakutoBond.NONE;
+    /** Quincy blood, training, reishi, Hollow poison and Blut: see {@link QuincyLogic}. */
+    private QuincyProgress quincy = QuincyProgress.NONE;
 
     // Server-side bookkeeping. Not saved or synced; it starts over when the player logs in or respawns.
     private boolean dirty = true;
@@ -133,6 +137,36 @@ public final class SoulData {
     int lastAffinityHitTick = -1000;
     /** Client side, for one click: sneak-use with the Asauchi gave way to a full off hand. */
     boolean offHandRefused;
+    /** Whether this soul has been asked the bloodline question this session, so it is asked once. */
+    boolean bloodlineAsked;
+    /** Game time a latent soul's draw last counted as training. */
+    long lastDrawTrainingAt = NEVER;
+    /** Game time a Heilig Pfeil hit on a Hollow last trained this soul. */
+    long lastHitTrainingAt = NEVER;
+    /** Game time a Hirenkyaku last trained this soul. */
+    long lastHirenTrainingAt = NEVER;
+    /** Game time a Heilig Pfeil hit on a Hollow last trained Reiatsu Control. */
+    long lastArrowXpAt = NEVER;
+    /** Game time a latent soul was last told its reishi slipped away, so it is not told every draw. */
+    long lastFizzleMessageAt = NEVER;
+    /** Game time Hollow poison last built up; it only wears off a while after. Starts over on logging in. */
+    long lastPoisonAt = NEVER;
+    /** Game time of the last pang of heavy Hollow poison. */
+    long lastPangAt = NEVER;
+    /** Game time the Blut key was last pressed, so a held or repeated key is ignored. */
+    long lastBlutPressAt = NEVER;
+    /** Blut cannot change again before this game time. */
+    long blutSettlesAt = NEVER;
+    /** How rich in reishi the soul's surroundings are, worked out once a second (1 is ordinary). */
+    double reishiDensity = 1.0;
+    /** The Hollow poison stage the soul was last told about (see {@link QuincyLogic#poisonStage}). */
+    int poisonStage;
+    /** Set on the respawned copy when this death left an awakened Quincy alive. */
+    boolean quincyReborn;
+    /** Set on the respawned copy when this death came from the soul being torn apart. */
+    boolean soulReformed;
+    /** Set just before a soul is torn apart, so its death knows. */
+    boolean soulDestroyed;
 
     public SoulData() {
     }
@@ -140,7 +174,7 @@ public final class SoulData {
     private SoulData(SoulState state, boolean initialized, float reiryoku, float maxReiryoku,
                      Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers,
                      long lastCloseCallTime, int chainTicks, int chainMaxTicks, boolean reiatsuReleased,
-                     ShinigamiProgress shinigami, HuntRecord hunt, ZanpakutoBond zanpakuto) {
+                     ShinigamiProgress shinigami, HuntRecord hunt, ZanpakutoBond zanpakuto, QuincyProgress quincy) {
         this.state = state;
         this.initialized = initialized;
         this.maxReiryoku = Math.max(0.0F, maxReiryoku);
@@ -155,6 +189,7 @@ public final class SoulData {
         this.shinigami = shinigami;
         this.hunt = hunt;
         this.zanpakuto = zanpakuto;
+        this.quincy = quincy;
     }
 
     /** A map keyed by enum name that skips names it does not recognise when reading. */
@@ -368,6 +403,42 @@ public final class SoulData {
         }
     }
 
+    public QuincyProgress quincy() {
+        return quincy;
+    }
+
+    public void setQuincy(QuincyProgress progress) {
+        if (!progress.equals(quincy)) {
+            quincy = progress;
+            markDirty();
+        }
+    }
+
+    /** Whether this soul is being torn apart by Hollow poison or a broken chain. Server side only. */
+    public boolean isSoulDestroyed() {
+        return soulDestroyed;
+    }
+
+    /** Marks the soul as torn apart, just before the death that follows (see {@link SoulLogic#afterDeath}). */
+    public void markSoulDestroyed() {
+        soulDestroyed = true;
+    }
+
+    /** Whether this respawned soul is an awakened Quincy who came back alive. Server side only. */
+    public boolean wasQuincyReborn() {
+        return quincyReborn;
+    }
+
+    /** Whether this respawned soul was torn apart and knit itself together again. Server side only. */
+    public boolean wasSoulReformed() {
+        return soulReformed;
+    }
+
+    /** How rich in reishi the soul's surroundings were when last worked out (1 is ordinary). Server side only. */
+    public double reishiDensity() {
+        return reishiDensity;
+    }
+
     /** The Jinzen this soul is sitting in, or null. Server side only. */
     @Nullable
     public JinzenSession jinzen() {
@@ -412,7 +483,7 @@ public final class SoulData {
     /** A copy of the saved data, without the server-side bookkeeping. */
     public SoulData copy() {
         return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime,
-                chainTicks, chainMaxTicks, reiatsuReleased, shinigami, hunt, zanpakuto);
+                chainTicks, chainMaxTicks, reiatsuReleased, shinigami, hunt, zanpakuto, quincy);
     }
 
     /**

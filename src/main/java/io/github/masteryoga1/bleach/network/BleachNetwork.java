@@ -3,6 +3,8 @@ package io.github.masteryoga1.bleach.network;
 import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
+import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
+import io.github.masteryoga1.bleach.quincy.QuincyKey;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenPage;
@@ -15,7 +17,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class BleachNetwork {
     /** Bump when a payload changes shape, so mismatched clients are refused instead of breaking. */
-    private static final String VERSION = "6";
+    private static final String VERSION = "7";
 
     private BleachNetwork() {
     }
@@ -35,7 +37,11 @@ public final class BleachNetwork {
                 .playToServer(FlashStepPayload.TYPE, FlashStepPayload.STREAM_CODEC, FlashStepPayload::handle)
                 .playToClient(OpenJinzenPayload.TYPE, OpenJinzenPayload.STREAM_CODEC, OpenJinzenPayload::handle)
                 .playToServer(JinzenAnswerPayload.TYPE, JinzenAnswerPayload.STREAM_CODEC, JinzenAnswerPayload::handle)
-                .playToServer(ZanpakutoKeyPayload.TYPE, ZanpakutoKeyPayload.STREAM_CODEC, ZanpakutoKeyPayload::handle);
+                .playToServer(ZanpakutoKeyPayload.TYPE, ZanpakutoKeyPayload.STREAM_CODEC, ZanpakutoKeyPayload::handle)
+                .playToClient(OpenBloodlinePayload.TYPE, OpenBloodlinePayload.STREAM_CODEC, OpenBloodlinePayload::handle)
+                .playToServer(BloodlineChoicePayload.TYPE, BloodlineChoicePayload.STREAM_CODEC,
+                        BloodlineChoicePayload::handle)
+                .playToServer(QuincyKeyPayload.TYPE, QuincyKeyPayload.STREAM_CODEC, QuincyKeyPayload::handle);
     }
 
     /** Sends a player their own soul data and marks it as up to date. */
@@ -98,5 +104,20 @@ public final class BleachNetwork {
     /** Tells the server a zanpakutō key was pressed or let go. */
     public static void requestZanpakutoKey(ZanpakutoKey key) {
         PacketDistributor.sendToServer(new ZanpakutoKeyPayload(key));
+    }
+
+    /** Asks a player whether Quincy blood runs in them. See {@link OpenBloodlinePayload}. */
+    public static void openBloodline(ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, OpenBloodlinePayload.INSTANCE);
+    }
+
+    /** Sends the player's answer to the bloodline question. */
+    public static void requestBloodline(BloodlineChoice choice) {
+        PacketDistributor.sendToServer(new BloodlineChoicePayload(choice));
+    }
+
+    /** Tells the server a Quincy key was pressed. */
+    public static void requestQuincyKey(QuincyKey key) {
+        PacketDistributor.sendToServer(new QuincyKeyPayload(key));
     }
 }

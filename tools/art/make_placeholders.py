@@ -81,6 +81,18 @@ ZABI_WRAP_DARK = rgb(96, 20, 24)
 BRONZE = rgb(170, 120, 60)
 TOOTH = rgb(240, 236, 226)
 
+# The Quincy: a silver cross, white cloth with blue trim, and pale blue reishi.
+SILVER = rgb(206, 212, 222)
+SILVER_SHADE = rgb(140, 148, 162)
+REISHI = rgb(200, 232, 255)
+REISHI_CORE = rgb(250, 254, 255)
+REISHI_EDGE = rgb(110, 170, 230)
+QUINCY_WHITE = rgb(244, 246, 250)
+QUINCY_FOLD = rgb(206, 212, 224)
+QUINCY_BLUE = rgb(40, 84, 170)
+VEIN = rgb(90, 170, 255)
+VEIN_DIM = rgb(60, 120, 220)
+
 
 class Canvas:
     def __init__(self, width, height):
@@ -537,6 +549,156 @@ def denreishinki():
     return c
 
 
+def quincy_cross():
+    """The Quincy Cross: a silver cross on a short chain, with a pale blue stone where the arms meet."""
+    c = Canvas(16, 16)
+    line(c, 5, 0, 7, 2, SILVER_SHADE)   # the chain
+    line(c, 10, 0, 8, 2, SILVER_SHADE)
+    c.rect(7, 3, 9, 15, SILVER)         # the upright, shaded down its right side
+    c.rect(8, 3, 9, 15, SILVER_SHADE)
+    c.rect(4, 6, 12, 8, SILVER)         # the crossbar, shaded along its bottom
+    c.rect(4, 7, 12, 8, SILVER_SHADE)
+    c.rect(7, 6, 9, 8, REISHI_EDGE)     # the stone
+    c.put(7, 14, SILVER_SHADE)          # the foot
+    c.put(8, 14, SILVER_SHADE)
+    return c
+
+
+def heilig_bogen(stage):
+    """A drawing function for the Heilig Bogen at a stage of the draw (0, 1 or 2): a bow of reishi
+    curving round the bottom left corner, its string pulled back further and its arrow longer at each
+    stage. Used while the Cross is drawn, with the vanilla bow's held transforms."""
+    def draw():
+        c = Canvas(16, 16)
+        d = stage + 1
+        for y in range(15):
+            for x in range(1, 16):
+                r = math.hypot(x + 0.5, 16 - (y + 0.5))
+                if 12.5 <= r < 13.5:
+                    c.put(x, y, REISHI)
+                elif 11.5 <= r < 12.5:
+                    c.put(x, y, REISHI_EDGE)
+        mx, my = 6 - d, 9 + d                # where the string is drawn back to
+        line(c, 1, 3, mx, my, REISHI_CORE)
+        line(c, mx, my, 12, 14, REISHI_CORE)
+        length = 3 + 2 * d
+        ex, ey = mx + length, my - length    # the arrow's tip, with two barbs behind it
+        line(c, mx, my, ex, ey, REISHI_CORE)
+        c.put(ex - 1, ey, REISHI)
+        c.put(ex, ey + 1, REISHI)
+        return c
+    draw.__name__ = "heilig_bogen_%d" % stage
+    return draw
+
+
+def quincy_tunic_icon():
+    c = Canvas(16, 16)
+    c.rect(4, 3, 12, 14, QUINCY_WHITE)   # body
+    c.rect(1, 4, 4, 10, QUINCY_WHITE)    # sleeves, with blue cuffs
+    c.rect(12, 4, 15, 10, QUINCY_WHITE)
+    c.rect(1, 9, 4, 10, QUINCY_BLUE)
+    c.rect(12, 9, 15, 10, QUINCY_BLUE)
+    c.rect(6, 1, 10, 3, QUINCY_FOLD)     # the high collar
+    c.rect(8, 3, 9, 14, QUINCY_BLUE)     # the seam down the front
+    c.rect(4, 13, 12, 14, QUINCY_BLUE)   # hem
+    for x, y in [(10, 5), (9, 6), (10, 6), (11, 6), (10, 7)]:  # a small cross on the chest
+        c.put(x, y, QUINCY_BLUE)
+    return c
+
+
+def quincy_trousers_icon():
+    c = Canvas(16, 16)
+    c.rect(4, 2, 12, 4, QUINCY_WHITE)    # waist, with a blue belt
+    c.rect(4, 3, 12, 4, QUINCY_BLUE)
+    c.rect(4, 4, 7, 15, QUINCY_WHITE)    # legs
+    c.rect(9, 4, 12, 15, QUINCY_WHITE)
+    c.rect(7, 4, 9, 6, QUINCY_WHITE)     # crotch
+    c.rect(5, 6, 6, 15, QUINCY_FOLD)     # creases
+    c.rect(10, 6, 11, 15, QUINCY_FOLD)
+    return c
+
+
+def quincy_shoes_icon():
+    c = Canvas(16, 16)
+    for left in (2, 9):
+        c.rect(left, 9, left + 5, 13, QUINCY_WHITE)
+        c.rect(left, 13, left + 5, 14, QUINCY_BLUE)  # sole
+        c.put(left + 2, 10, QUINCY_FOLD)             # laces
+    return c
+
+
+def quincy_armor_layer_1():
+    """The tunic on the body and arms, and the shoes on the legs (the boots use this layer)."""
+    c = Canvas(64, 32)
+    # Body: a long white tunic with a high collar, a blue seam down the front and a blue hem.
+    c.rect(20, 16, 36, 20, QUINCY_WHITE)
+    c.rect(16, 20, 40, 32, QUINCY_WHITE)
+    c.rect(20, 20, 28, 21, QUINCY_FOLD)
+    c.rect(24, 21, 25, 32, QUINCY_BLUE)
+    # A small cross on the wearer's left breast: the right half of the front face as drawn.
+    for x, y in [(26, 22), (25, 23), (26, 23), (27, 23), (26, 24), (26, 25)]:
+        c.put(x, y, QUINCY_BLUE)
+    c.rect(16, 31, 40, 32, QUINCY_BLUE)
+    # Arms: sleeves to the wrist, with blue cuffs.
+    c.rect(44, 16, 48, 20, QUINCY_WHITE)
+    c.rect(40, 20, 56, 32, QUINCY_WHITE)
+    c.rect(40, 30, 56, 32, QUINCY_BLUE)
+    # Legs: white shoes over the bottom three rows on a blue sole; the rest stays bare.
+    c.rect(0, 29, 16, 32, QUINCY_WHITE)
+    c.rect(0, 31, 16, 32, QUINCY_BLUE)
+    c.rect(8, 16, 12, 20, QUINCY_BLUE)
+    return c
+
+
+def quincy_armor_layer_2():
+    """The trousers, from a belted waist to just above the shoes."""
+    c = Canvas(64, 32)
+    c.rect(16, 27, 40, 32, QUINCY_WHITE)  # the waist, low on the body
+    c.rect(16, 27, 40, 28, QUINCY_BLUE)   # belt
+    c.rect(4, 16, 8, 20, QUINCY_WHITE)    # top of the legs
+    c.rect(0, 20, 16, 29, QUINCY_WHITE)
+    c.rect(6, 21, 7, 29, QUINCY_FOLD)     # creases, front and back
+    c.rect(14, 21, 15, 29, QUINCY_FOLD)
+    return c
+
+
+def heilig_pfeil():
+    """The arrow of reishi, laid out where vanilla's ArrowRenderer samples: the shaft from x 0..16 and
+    y 0..5, the end cap from x 0..5 and y 5..10. It is a spindle, the same from either end, so it
+    cannot be drawn the wrong way round; the renderer makes it glow."""
+    c = Canvas(32, 32)
+    c.rect(0, 2, 16, 3, REISHI_CORE)
+    c.rect(2, 1, 14, 2, REISHI)
+    c.rect(2, 3, 14, 4, REISHI)
+    c.rect(5, 0, 11, 1, REISHI_EDGE)
+    c.rect(5, 4, 11, 5, REISHI_EDGE)
+    c.rect(2, 5, 3, 10, REISHI_CORE)  # the cap, a small bright cross
+    c.rect(0, 7, 5, 8, REISHI_CORE)
+    c.put(2, 7, REISHI_CORE)
+    return c
+
+
+def vein(c, points):
+    """A vein along straight segments between the points, fading at its last one."""
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        line(c, x0, y0, x1, y1, VEIN)
+    c.put(*points[-1], VEIN_DIM)
+
+
+def blut_vene():
+    """Blut Vene's veins, in the player skin layout and drawn over the player's model. Only the base
+    layer's arm and body faces get veins, in columns inside both the wide and the slim arms; the
+    rest, the outer layer's included, stays clear."""
+    c = Canvas(64, 64)
+    vein(c, [(45, 20), (46, 23), (45, 26), (46, 29), (45, 31)])  # right arm, front
+    vein(c, [(42, 21), (41, 25), (42, 28), (42, 31)])            # right arm, outer side
+    vein(c, [(38, 52), (37, 55), (38, 58), (37, 61), (38, 63)])  # left arm, front
+    vein(c, [(41, 53), (42, 57), (41, 60), (42, 63)])            # left arm, outer side
+    vein(c, [(23, 20), (22, 23), (21, 26)])                      # body, front
+    vein(c, [(24, 20), (25, 23), (26, 26), (27, 29)])
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -566,6 +728,17 @@ TEXTURES = {
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,
     "item/denreishinki.png": denreishinki,
+    "item/quincy_cross.png": quincy_cross,
+    "item/heilig_bogen_pulling_0.png": heilig_bogen(0),
+    "item/heilig_bogen_pulling_1.png": heilig_bogen(1),
+    "item/heilig_bogen_pulling_2.png": heilig_bogen(2),
+    "item/quincy_tunic.png": quincy_tunic_icon,
+    "item/quincy_trousers.png": quincy_trousers_icon,
+    "item/quincy_shoes.png": quincy_shoes_icon,
+    "models/armor/quincy_garb_layer_1.png": quincy_armor_layer_1,
+    "models/armor/quincy_garb_layer_2.png": quincy_armor_layer_2,
+    "entity/heilig_pfeil.png": heilig_pfeil,
+    "entity/blut_vene.png": blut_vene,
 }
 
 

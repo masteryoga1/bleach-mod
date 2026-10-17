@@ -240,8 +240,9 @@ public final class GargantaEvents {
 
     /**
      * Called by a rift as it tears open: a scream across the sky, black ink and a swirl of portal
-     * light for those who can see it, the milestone for aware souls nearby, and a beep on every
-     * Denreishinki in range. The first Hollow's rift also carries Fishbone D's roar.
+     * light for those who can see it, the milestone for aware souls nearby, a beep on every
+     * Denreishinki in range, and a chill in the blood of Quincy in range (see
+     * {@link QuincyEvents#senseHollows}). The first Hollow's rift also carries Fishbone D's roar.
      */
     public static void onRiftOpened(ServerLevel level, GargantaRift rift) {
         double x = rift.getX();
@@ -266,6 +267,7 @@ public final class GargantaEvents {
             Milestones.grant(witness, Milestones.GARGANTA);
         }
         pingPagers(level, rift.position(), "message.bleach.denreishinki.arrival");
+        QuincyEvents.senseHollows(level, rift.position());
     }
 
     /** Fishbone D has landed and taken up the hunt: the soul it hunts remembers it, so nothing else comes meanwhile. */
@@ -300,12 +302,9 @@ public final class GargantaEvents {
      * is, with which way and roughly how far the trouble is.
      */
     public static void pingPagers(ServerLevel level, Vec3 at, String messageKey) {
-        double range = BleachConfig.get(BleachConfig.DENREISHINKI_RANGE);
         long now = level.getGameTime();
         for (ServerPlayer player : level.players()) {
-            if (!player.isAlive() || player.isSpectator() || player.distanceToSqr(at) > range * range
-                    || !SoulLogic.hasSoul(player) || !DenreishinkiItem.canRead(SoulLogic.get(player), now)
-                    || !DenreishinkiItem.carries(player)) {
+            if (!player.isAlive() || player.isSpectator() || !pagerReaches(player, at, now)) {
                 continue;
             }
             double dx = at.x - player.getX();
@@ -315,6 +314,13 @@ public final class GargantaEvents {
                     Component.translatable(ShinigamiLogic.compassKey(dx, dz)),
                     ShinigamiLogic.roundedDistance(Math.sqrt(dx * dx + dz * dz), 5L)), true);
         }
+    }
+
+    /** Whether trouble here beeps this player's Denreishinki: they carry one they can read, and are in range. */
+    static boolean pagerReaches(ServerPlayer player, Vec3 at, long now) {
+        double range = BleachConfig.get(BleachConfig.DENREISHINKI_RANGE);
+        return player.distanceToSqr(at) <= range * range && SoulLogic.hasSoul(player)
+                && DenreishinkiItem.canRead(SoulLogic.get(player), now) && DenreishinkiItem.carries(player);
     }
 
     /** The player's time in the world, in ticks, from the play-time statistic, so it survives relogging. */

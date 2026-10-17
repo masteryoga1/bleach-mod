@@ -1,8 +1,11 @@
 package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
+import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.QuincyProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -24,8 +27,9 @@ import net.minecraft.world.level.Level;
 
 /**
  * The soul screen: state, reiryoku, the zanpakutō (or until it has a name, the Asauchi bond), Hollows
- * purified and slain and Pluses sent on, stats with training progress, awakened powers and what
- * comes next.
+ * purified and slain and Pluses sent on, Quincy blood (its reishi and Blut, the Hollow poison in it,
+ * souls destroyed and how rich the reishi is here), stats with training progress, awakened powers
+ * and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -35,6 +39,8 @@ public final class SoulStatsScreen extends Screen {
     private static final int GOLD = 0xFFD27F;
     private static final int REIRYOKU = 0x8FD8FF;
     private static final int ENCROACHING = 0xFF5555;
+    private static final int REISHI = 0xBFE6FF;
+    private static final int POISONED = 0xC080E0;
     private static final float TICKS_PER_SECOND = 20.0F;
     private static final int XP_BACKGROUND = 0xFF303030;
     private static final int XP_FILL = 0xFF6FBF4F;
@@ -64,6 +70,7 @@ public final class SoulStatsScreen extends Screen {
         graphics.drawCenteredString(font, title, width / 2, y, WHITE);
         y += LINE + 6;
         String stateKey = ShinigamiLogic.isSubstitute(data) ? "screen.bleach.soul.state.substitute"
+                : data.state() == SoulState.HUMAN && QuincyLogic.isAwakened(data) ? "screen.bleach.soul.state.quincy"
                 : ShinigamiLogic.isStudent(data) ? "screen.bleach.soul.state.student" : "screen.bleach.soul.state";
         graphics.drawString(font, Component.translatable(stateKey, data.state().displayName()), left, y, WHITE);
         y += LINE;
@@ -98,6 +105,7 @@ public final class SoulStatsScreen extends Screen {
                     hunt.purified(), hunt.slain(), hunt.sentOn()), left, y, GREY);
             y += LINE;
         }
+        y = renderQuincy(graphics, player, data, left, y);
         y += 6;
 
         graphics.drawString(font, Component.translatable("screen.bleach.soul.stats"), left, y, GOLD);
@@ -135,6 +143,37 @@ public final class SoulStatsScreen extends Screen {
         y += 6;
 
         graphics.drawWordWrap(font, nextStep(player, data), left, y, PANEL_WIDTH, GREY);
+    }
+
+    /**
+     * Up to two lines on Quincy blood, when the soul has it. Awakened: the blood, reishi held and the
+     * most it can hold, and the Blut it is calling on; then the Hollow poison in it, souls its arrows
+     * have destroyed, and how rich the reishi is where it stands (leaving out what other souls'
+     * reiatsu adds, which only the server weighs). Not yet awakened: just the blood.
+     *
+     * @return the line below the last one drawn
+     */
+    private int renderQuincy(GuiGraphics graphics, Player player, SoulData data, int left, int y) {
+        Bloodline bloodline = QuincyLogic.bloodline(data);
+        if (bloodline == Bloodline.NONE) {
+            return y;
+        }
+        if (!QuincyLogic.isAwakened(data)) {
+            graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy.latent",
+                    bloodline.displayName()), left, y, GREY);
+            return y + LINE;
+        }
+        QuincyProgress quincy = data.quincy();
+        graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy", bloodline.displayName(),
+                Math.round(QuincyLogic.reishi(data)), Math.round(QuincyLogic.maxReishi(data)),
+                QuincyLogic.activeBlut(data).displayName()), left, y, REISHI);
+        y += LINE;
+        Component density = Component.translatable(
+                QuincyLogic.densityKey(QuincyLogic.placeDensity(player.level(), player.position())));
+        graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy.poison",
+                Math.round(quincy.poison()), quincy.destroyed(), density),
+                left, y, quincy.poison() >= QuincyLogic.POISON_BLOCK ? POISONED : GREY);
+        return y + LINE;
     }
 
     /**

@@ -1,0 +1,13 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:white_wool"
+  },
+  "cloth_count": 5,
+  "trim": {
+    "item": "minecraft:blue_dye"
+  },
+  "result": {
+    "id": "bleach:quincy_tunic"
+  }
+}
