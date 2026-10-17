@@ -92,7 +92,9 @@ public final class QuincyEvents {
     /**
      * Runs on every refresh (logging in, respawning, {@code /bleach reset}): settles an old save,
      * lets Blut go, tells a soul that just came back what happened to it, and settles the bloodline of
-     * a living Human who has not settled it yet, by asking or by fate, as the server is set up.
+     * a living Human who has not settled it yet, by asking or by fate, as the server is set up. A
+     * player still on the death screen is left for the refresh that comes with respawning, so a Cross
+     * is never put into a dead player's inventory.
      */
     public static void onRefresh(ServerPlayer player, SoulData data) {
         if (player instanceof FakePlayer) {
@@ -108,7 +110,7 @@ public final class QuincyEvents {
             data.quincyReborn = false;
             player.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         }
-        if (!QuincyLogic.needsBloodlineChoice(data)) {
+        if (!player.isAlive() || !QuincyLogic.needsBloodlineChoice(data)) {
             return;
         }
         switch (BleachConfig.get(BleachConfig.QUINCY_BLOODLINE_MODE)) {
@@ -134,11 +136,14 @@ public final class QuincyEvents {
 
     /**
      * The player answered the bloodline question. Only an answer to a question this session asked
-     * counts, and only once; anything else is ignored.
+     * counts, only once, and only while the soul is still a living Human the question is for (not one
+     * made a Plus or given a Shinigami's power since); anything else is ignored. A soul that dies
+     * before answering is asked again when it respawns, if it still qualifies.
      */
     public static void chooseBloodline(ServerPlayer player, BloodlineChoice choice) {
         SoulData data = SoulLogic.get(player);
-        if (data.quincy().decided() || !data.bloodlineAsked) {
+        if (data.quincy().decided() || !data.bloodlineAsked || !player.isAlive()
+                || !QuincyLogic.needsBloodlineChoice(data)) {
             return;
         }
         Bloodline bloodline = QuincyLogic.rollBloodline(choice, player.getRandom());

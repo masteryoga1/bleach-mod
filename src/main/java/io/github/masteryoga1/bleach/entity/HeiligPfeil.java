@@ -8,6 +8,9 @@ import io.github.masteryoga1.bleach.soul.QuincyEvents;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
@@ -26,6 +29,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.projectile.ProjectileDeflection;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ClipContext;
@@ -136,19 +140,27 @@ public class HeiligPfeil extends AbstractArrow {
     }
 
     /**
-     * Server side, the first tick strikes a creature the arrow starts inside, which vanilla's search
-     * along the path cannot see (a shot pressed against a foe). A tick whose flight met a creature and
-     * flew on still bursts on the block that ended its path: vanilla's flight forgets that block once
-     * it has met a creature, and would carry the arrow into or through it. After moving, the arrow goes
-     * once its time is up or its owner has gone or left this level.
+     * Server side, an arrow whose owner has gone or left this level goes before it can strike anything
+     * without its owner's rules. The first tick strikes the creatures the arrow starts inside, which
+     * vanilla's search along the path cannot see (a shot pressed against a foe). A tick whose flight
+     * met a creature and flew on still bursts on the block that ended its path: vanilla's flight
+     * forgets that block once it has met a creature, and would carry the arrow into or through it.
+     * After moving, the arrow goes once its time is up or its owner has gone.
      */
     @Override
     public void tick() {
-        if (!level().isClientSide() && !checkedPointBlank) {
-            checkedPointBlank = true;
-            strikePointBlank();
-            if (isRemoved()) {
+        if (!level().isClientSide()) {
+            Entity owner = getOwner();
+            if (owner == null || owner.level() != level()) {
+                discard();
                 return;
+            }
+            if (!checkedPointBlank) {
+                checkedPointBlank = true;
+                strikePointBlank();
+                if (isRemoved()) {
+                    return;
+                }
             }
         }
         Vec3 from = position();
@@ -175,28 +187,30 @@ public class HeiligPfeil extends AbstractArrow {
     }
 
     /**
-     * Strikes the nearest creature the arrow starts inside, if it may: through the same impact event
-     * and deflection check as a hit along the path. One it only starts near counts if it lies ahead,
-     * so a creature brushing the shooter's back or side is not struck by a shot aimed elsewhere.
+     * Strikes the creatures the arrow starts inside, nearest first, as far as it may go: each through
+     * the same impact event and deflection check as a hit along the path, until one ends the arrow,
+     * turns it aside or cancels the impact. One it only starts near counts if it lies ahead, so a
+     * creature brushing the shooter's back or side is not struck by a shot aimed elsewhere.
      */
     private void strikePointBlank() {
         Vec3 at = position();
         Vec3 heading = getDeltaMovement();
-        Entity nearest = null;
-        double nearestSqr = Double.MAX_VALUE;
         AABB around = new AABB(at, at).inflate(POINT_BLANK_INFLATE);
-        for (Entity entity : level().getEntities(this, around,
-                other -> startsAt(other.getBoundingBox(), at, heading) && canHitEntity(other))) {
-            double distanceSqr = entity.getBoundingBox().getCenter().distanceToSqr(at);
-            if (distanceSqr < nearestSqr) {
-                nearest = entity;
-                nearestSqr = distanceSqr;
+        List<Entity> inside = new ArrayList<>(level().getEntities(this, around,
+                other -> startsAt(other.getBoundingBox(), at, heading) && canHitEntity(other)));
+        inside.sort(Comparator.comparingDouble(entity -> entity.getBoundingBox().getCenter().distanceToSqr(at)));
+        for (Entity entity : inside) {
+            if (isRemoved()) {
+                return;
             }
-        }
-        if (nearest != null) {
-            EntityHitResult hit = new EntityHitResult(nearest);
-            if (!EventHooks.onProjectileImpact(this, hit)) {
-                hitTargetOrDeflectSelf(hit);
+            // One struck already may have been this one's body, or a part of it.
+            if (!canHitEntity(entity)) {
+                continue;
+            }
+            EntityHitResult hit = new EntityHitResult(entity);
+            if (EventHooks.onProjectileImpact(this, hit)
+                    || hitTargetOrDeflectSelf(hit) != ProjectileDeflection.NONE) {
+                return;
             }
         }
     }
@@ -350,6 +364,30 @@ public class HeiligPfeil extends AbstractArrow {
     public void setOwner(@Nullable Entity owner) {
         super.setOwner(owner);
         pickup = Pickup.DISALLOWED;
+    }
+
+    /** Reishi does not pass through portals: what it was loosed with is never saved, so a copy would be empty. */
+    @Override
+    public boolean canUsePortal(boolean allowPassengers) {
+        return false;
+    }
+
+    /** Only the aware see it splash into water. */
+    @Override
+    protected void doWaterSplashEffect() {
+        if (level() instanceof ServerLevel server) {
+            super.doWaterSplashEffect();
+            SpiritSenses.splash(server, this);
+        }
+    }
+
+    /**
+     * A client never counts it as in water, so vanilla's trail of bubbles is not drawn for the unaware.
+     * Its flight is the same either way: water slows it no more than air does.
+     */
+    @Override
+    public boolean isInWater() {
+        return !level().isClientSide() && super.isInWater();
     }
 
     /** Reishi is not something to pick up. */

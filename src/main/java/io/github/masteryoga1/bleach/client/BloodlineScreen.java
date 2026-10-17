@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
+import io.github.masteryoga1.bleach.soul.SoulData;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphics;
@@ -89,13 +90,20 @@ public final class BloodlineScreen extends Screen {
         }
     }
 
-    /** Settled some other way while it was showing (by command, say): there is nothing left to answer. */
+    /**
+     * Settled some other way while it was showing (by command, say), or the soul is no longer one the
+     * question is for (made a Plus, or given a Shinigami's power): there is nothing to answer now. An
+     * unsettled question waits to be asked again, should the soul qualify once more.
+     */
     @Override
     public void tick() {
         super.tick();
-        if (minecraft != null && minecraft.player != null
-                && minecraft.player.getData(SoulAttachments.SOUL).quincy().decided()) {
-            minecraft.setScreen(null);
+        if (minecraft != null && minecraft.player != null) {
+            SoulData soul = minecraft.player.getData(SoulAttachments.SOUL);
+            if (!QuincyLogic.needsBloodlineChoice(soul)) {
+                QuincyClient.bloodlinePending = !soul.quincy().decided();
+                minecraft.setScreen(null);
+            }
         }
     }
 

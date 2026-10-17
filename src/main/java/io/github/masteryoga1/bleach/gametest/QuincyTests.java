@@ -898,6 +898,32 @@ public final class QuincyTests {
         });
     }
 
+    /**
+     * A shot from inside two creatures at once strikes both if it may pierce, and one that flies
+     * through the first (still reeling from a blow) strikes the other.
+     */
+    @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
+    public static void pointBlankShotsStrikeEveryoneThere(GameTestHelper helper) {
+        Cow first = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 4));
+        Cow second = still(helper.spawnWithNoFreeWill(EntityType.COW, 8, 2, 4));
+        Cow reeling = still(helper.spawnWithNoFreeWill(EntityType.COW, 3, 2, 12));
+        Cow beside = still(helper.spawnWithNoFreeWill(EntityType.COW, 3, 2, 12));
+        reeling.hurt(helper.getLevel().damageSources().generic(), 4.0F);
+        Player owner = archer(helper, 8.5, 8.5);
+        loose(helper, owner, first.getBoundingBox().getCenter(), EAST, 3.0F, 1, 3.0F);
+        loose(helper, owner, reeling.getBoundingBox().getCenter(), EAST, 3.0F, 0, 3.0F);
+        helper.runAfterDelay(5, () -> {
+            assertNear(helper, first.getHealth(), 7.0, "the first of two cows a piercing shot started inside");
+            assertNear(helper, second.getHealth(), 7.0, "the second of two cows a piercing shot started inside");
+            assertNear(helper, reeling.getHealth(), 6.0, "the reeling cow a shot started inside");
+            assertNear(helper, beside.getHealth(), 7.0, "the cow beside the reeling one");
+            for (Cow cow : List.of(first, second, reeling, beside)) {
+                cow.discard();
+            }
+            helper.succeed();
+        });
+    }
+
     @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
     public static void heiligPfeilLeavesNothingBehind(GameTestHelper helper) {
         Player owner = archer(helper, 8.5, 5.5);
