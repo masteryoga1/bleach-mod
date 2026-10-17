@@ -294,9 +294,12 @@ public class GetsugaTensho extends Projectile {
                 from.x + halfWidth, from.y + halfHeight, from.z + halfWidth).expandTowards(motion);
         Vec3 heading = motion.normalize();
         Vec3 rear = root != null ? root : from;
+        // As far along the path from the root as the first sweep reaches: the swing itself.
+        double beside = SWING_REACH + SPEED + halfWidth * (Math.abs(heading.x) + Math.abs(heading.z))
+                + halfHeight * Math.abs(heading.y);
         for (Projectile projectile : level().getEntitiesOfClass(Projectile.class, path,
                 other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner
-                        && clearOfWielder(other, rear, heading))) {
+                        && clearOfWielder(other, rear, heading, beside))) {
             // An arrow or trident someone could have picked up is knocked down, not destroyed.
             if (projectile instanceof AbstractArrow arrow && arrow.pickup == AbstractArrow.Pickup.ALLOWED) {
                 arrow.spawnAtLocation(arrow.getPickupItemStackOrigin().copy(), 0.1F);
@@ -304,7 +307,7 @@ public class GetsugaTensho extends Projectile {
             projectile.discard();
         }
         List<LivingEntity> targets = level().getEntitiesOfClass(LivingEntity.class, path,
-                target -> !struck.contains(target.getId()) && affects(target) && clearOfWielder(target, rear, heading));
+                target -> !struck.contains(target.getId()) && affects(target) && clearOfWielder(target, rear, heading, beside));
         if (targets.isEmpty()) {
             return true;
         }
@@ -326,11 +329,13 @@ public class GetsugaTensho extends Projectile {
     /**
      * Whether the entity is clear of the wielder's back. Some part of it must lie on or in front of
      * the plane through where the swing started ({@code rear}) square to the path. While it is still
-     * beside the wielder, reaching back past where the crescent appeared, some part must also lie in
-     * front of the upright plane through {@code rear} that the swing faces, so a swing aimed up or down
-     * does not tilt "behind" through the wielder's body. Out along the path only the first plane counts.
+     * beside the wielder, reaching back to within {@code beside} of {@code rear} along the path (as far
+     * as the first sweep goes, which takes in the wielder's body and the ground about their feet), some
+     * part must also lie in front of the upright plane through {@code rear} that the swing faces, so a
+     * swing aimed up or down does not tilt "behind" through the wielder's body or what stands at their
+     * heels. Out along the path beyond that, only the first plane counts.
      */
-    private boolean clearOfWielder(Entity entity, Vec3 rear, Vec3 heading) {
+    private boolean clearOfWielder(Entity entity, Vec3 rear, Vec3 heading, double beside) {
         AABB box = entity.getBoundingBox();
         Vec3 offset = box.getCenter().subtract(rear);
         double depth = offset.dot(heading);
@@ -338,7 +343,7 @@ public class GetsugaTensho extends Projectile {
         if (depth < -reach) {
             return false;
         }
-        return depth - reach >= SWING_REACH || offset.dot(facing) >= -halfDepth(box, facing);
+        return depth - reach >= beside || offset.dot(facing) >= -halfDepth(box, facing);
     }
 
     /** Half of how far the box reaches along a direction: zero for a zero direction. */
