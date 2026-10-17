@@ -61,7 +61,8 @@ public final class ShinigamiLogic {
     /**
      * The last part of the {@code screen.bleach.soul.next.*} key that says what this soul can do next.
      * A Shinigami, Substitute or student whose Asauchi bond is full hears {@code .bonded} (sit in
-     * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it).
+     * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it). A
+     * Quincy who has passed on and whom the Academy will not take hears {@code quincy.rukongai}.
      */
     public static String nextStepKey(SoulData data, long now) {
         if (isPowerLent(data, now)) {
@@ -69,7 +70,8 @@ public final class ShinigamiLogic {
         }
         return switch (data.state()) {
             case HUMAN -> isSubstitute(data) ? "substitute" + bondStep(data.zanpakuto()) : QuincyLogic.nextStepKey(data);
-            case RUKONGAI -> !data.shinigami().enrolled() ? "rukongai"
+            case RUKONGAI -> !data.shinigami().enrolled()
+                    ? (QuincyLogic.blocksShinigamiPower(data) ? "quincy.rukongai" : "rukongai")
                     : data.zanpakuto().isFull() && !data.zanpakuto().named() ? "student.bonded" : "student";
             case SHINIGAMI -> "shinigami" + bondStep(data.zanpakuto());
             default -> data.state().getSerializedName();

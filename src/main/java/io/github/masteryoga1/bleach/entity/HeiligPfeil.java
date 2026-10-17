@@ -89,6 +89,9 @@ public class HeiligPfeil extends AbstractArrow {
      * ahead; cleared when the arrow is turned back, since it then no longer flies that way.
      */
     private boolean metCreature;
+    /** Where this tick's flight started, and how far it was to go. */
+    private Vec3 flightFrom = Vec3.ZERO;
+    private Vec3 flightStep = Vec3.ZERO;
 
     public HeiligPfeil(EntityType<? extends HeiligPfeil> type, Level level) {
         super(type, level);
@@ -147,7 +150,8 @@ public class HeiligPfeil extends AbstractArrow {
      * without its owner's rules. The first tick strikes the creatures the arrow starts inside, which
      * vanilla's search along the path cannot see (a shot pressed against a foe). A tick whose flight
      * met a creature and flew on still bursts on the block that ended its path: vanilla's flight
-     * forgets that block once it has met a creature, and would carry the arrow into or through it.
+     * forgets that block once it has met a creature, and would carry the arrow into or through it
+     * (see {@link #checkInsideBlocks}).
      * After moving, the arrow goes once its time is up or its owner has gone.
      */
     @Override
@@ -166,22 +170,12 @@ public class HeiligPfeil extends AbstractArrow {
                 }
             }
         }
-        Vec3 from = position();
-        Vec3 step = getDeltaMovement();
+        flightFrom = position();
+        flightStep = getDeltaMovement();
         metCreature = false;
         super.tick();
         if (level().isClientSide() || isRemoved()) {
             return;
-        }
-        if (metCreature) {
-            BlockHitResult wall = level().clip(new ClipContext(from, from.add(step), ClipContext.Block.COLLIDER,
-                    ClipContext.Fluid.NONE, this));
-            if (wall.getType() == HitResult.Type.BLOCK && !EventHooks.onProjectileImpact(this, wall)) {
-                hitTargetOrDeflectSelf(wall);
-                if (isRemoved()) {
-                    return;
-                }
-            }
         }
         Entity owner = getOwner();
         if (tickCount >= lifeTicks || owner == null || owner.level() != level()) {
@@ -338,6 +332,28 @@ public class HeiligPfeil extends AbstractArrow {
                 pierceLeft--;
             }
         }
+    }
+
+    /**
+     * Vanilla's flight ends by moving the arrow its whole step and letting the blocks it is then in
+     * feel it. When that flight met a creature it forgot the block that ended its path, so on the
+     * server the arrow bursts on that block first, before anything past it (a button on the far side
+     * of a thin wall) can feel the arrow.
+     */
+    @Override
+    protected void checkInsideBlocks() {
+        if (metCreature && !isRemoved() && !level().isClientSide()) {
+            metCreature = false;
+            BlockHitResult wall = level().clip(new ClipContext(flightFrom, flightFrom.add(flightStep),
+                    ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+            if (wall.getType() == HitResult.Type.BLOCK && !EventHooks.onProjectileImpact(this, wall)) {
+                hitTargetOrDeflectSelf(wall);
+                if (isRemoved()) {
+                    return;
+                }
+            }
+        }
+        super.checkInsideBlocks();
     }
 
     /** Turned back (by a Breeze): the wall ahead on the path it was flying is no longer in its way. */

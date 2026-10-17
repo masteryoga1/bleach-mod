@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -47,6 +48,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -715,6 +718,11 @@ public final class QuincyTests {
                 "an awakened Quincy can enroll at the Academy");
         helper.assertTrue(ShinigamiLogic.canEnroll(in(SoulState.RUKONGAI, quincy(Bloodline.GEMISCHT, 0, 40.0F))),
                 "a latent Quincy cannot enroll at the Academy");
+        long now = helper.getLevel().getGameTime();
+        helper.assertTrue(ShinigamiLogic.nextStepKey(in(SoulState.RUKONGAI, quincy(Bloodline.GEMISCHT, 1, 40.0F)), now)
+                .equals("quincy.rukongai"), "an awakened Quincy in the Rukongai is told to enroll");
+        helper.assertTrue(ShinigamiLogic.nextStepKey(in(SoulState.RUKONGAI, quincy(Bloodline.GEMISCHT, 0, 40.0F)), now)
+                .equals("rukongai"), "a latent Quincy in the Rukongai is not told to enroll");
         helper.succeed();
     }
 
@@ -810,8 +818,8 @@ public final class QuincyTests {
 
     /**
      * An arrow that flies on past a creature still bursts on the wall behind it, rather than carrying
-     * through to whoever stands on the other side: after a pierce, and after flying through a creature
-     * that took no harm (one still reeling from a blow).
+     * through to whoever or whatever is on the other side: after a pierce, and after flying through a
+     * creature that took no harm (one still reeling from a blow).
      */
     @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
     public static void heiligPfeilStopsAtTheWallBehindACreature(GameTestHelper helper) {
@@ -819,15 +827,21 @@ public final class QuincyTests {
         Cow reeling = still(helper.spawnWithNoFreeWill(EntityType.COW, 11, 2, 10));
         Cow hidingFromPierce = still(helper.spawnWithNoFreeWill(EntityType.COW, 4, 2, 13));
         Cow hidingFromSingle = still(helper.spawnWithNoFreeWill(EntityType.COW, 11, 2, 13));
+        // A wooden button on the far side of each wall, where each arrow's last step would end.
+        BlockState button = Blocks.OAK_BUTTON.defaultBlockState().setValue(ButtonBlock.FACING, Direction.SOUTH);
         for (int x : new int[] {4, 11}) {
             helper.setBlock(x, 2, 11, Blocks.STONE);
             helper.setBlock(x, 3, 11, Blocks.STONE);
+            helper.setBlock(x, 2, 12, button);
         }
         reeling.hurt(helper.getLevel().damageSources().generic(), 4.0F);
         Player owner = archer(helper, 8.5, 3.5);
-        HeiligPfeil piercing = loose(helper, owner, helper.absoluteVec(new Vec3(4.5, 2.5, 3.5)), SOUTH, 3.0F, 1, 3.0F);
-        HeiligPfeil single = loose(helper, owner, helper.absoluteVec(new Vec3(11.5, 2.5, 3.5)), SOUTH, 3.0F, 0, 3.0F);
+        HeiligPfeil piercing = loose(helper, owner, helper.absoluteVec(new Vec3(4.5, 2.5, 3.0)), SOUTH, 3.0F, 1, 3.0F);
+        HeiligPfeil single = loose(helper, owner, helper.absoluteVec(new Vec3(11.5, 2.5, 3.0)), SOUTH, 3.0F, 0, 3.0F);
         helper.runAfterDelay(10, () -> {
+            for (int x : new int[] {4, 11}) {
+                helper.assertBlockProperty(new BlockPos(x, 2, 12), ButtonBlock.POWERED, false);
+            }
             assertNear(helper, pierced.getHealth(), 7.0, "the cow the piercing arrow hurt before the wall");
             assertNear(helper, reeling.getHealth(), 6.0, "the reeling cow the other arrow flew through");
             assertNear(helper, hidingFromPierce.getHealth(), 10.0, "the cow behind the wall the piercing arrow met");
