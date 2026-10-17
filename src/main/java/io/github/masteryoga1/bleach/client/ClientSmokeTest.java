@@ -339,10 +339,13 @@ public final class ClientSmokeTest {
             // A screenshot shows the last frame drawn, so it waits a moment for the screen to be drawn.
             case 515 -> shot(minecraft, "stats");
             case 550 -> minecraft.setScreen(null);
-            // Hollows vanish on Peaceful. Back on the ground, off the footing, facing north.
+            // Hollows vanish on Peaceful. Back on the ground, off the footing, facing north, and clear of the
+            // Academy: placed 20 blocks south, it starts at that chunk's corner and turns at random, so it
+            // can reach up to 12 blocks north of this spot, and an arrow shot up under its ceiling bursts
+            // at once.
             case 560 -> {
                 command(minecraft, "difficulty easy");
-                command(minecraft, "tp @s ~ -60 ~ 180 0");
+                command(minecraft, "tp @s ~ -60 ~-24 180 0");
             }
             case 561 -> {
                 command(minecraft, "summon bleach:spider_hollow ~-4 ~ ~-6 " + STILL);
