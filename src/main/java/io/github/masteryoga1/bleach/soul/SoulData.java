@@ -131,6 +131,8 @@ public final class SoulData {
     long lashRetractUntil = NEVER;
     /** Tick of the last Hakuda blow on a Hollow that counted towards the power leaning. */
     int lastAffinityHitTick = -1000;
+    /** Client side, for one click: sneak-use with the Asauchi gave way to a full off hand. */
+    boolean offHandRefused;
 
     public SoulData() {
     }
@@ -370,6 +372,18 @@ public final class SoulData {
     @Nullable
     public JinzenSession jinzen() {
         return jinzen;
+    }
+
+    /** Notes, on the client, that this click's sneak-use with the Asauchi gave way to a full off hand. */
+    public void noteOffHandRefused() {
+        offHandRefused = true;
+    }
+
+    /** Whether this click's sneak-use with the Asauchi gave way to a full off hand; forgets it either way. */
+    public boolean takeOffHandRefused() {
+        boolean refused = offHandRefused;
+        offHandRefused = false;
+        return refused;
     }
 
     /** Whether a zanpakutō that can seal is released. Server side only: the client reads the blade itself. */

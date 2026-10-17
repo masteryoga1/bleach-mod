@@ -23,12 +23,8 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.food.FoodProperties;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.ProjectileWeaponItem;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tier;
 import net.minecraft.world.item.TooltipFlag;
@@ -36,7 +32,6 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.HitResult;
 
 /**
  * The Asauchi and the zanpakutō it becomes: one item whose {@link ZanpakutoBlade} component says
@@ -153,7 +148,8 @@ public final class ZanpakutoItem extends SwordItem {
     /**
      * Sneak and use with the blade in the main hand: Jinzen, if nothing stands in the way. Both sides
      * run the same check on the synced soul, so the client only starts using the blade when the server
-     * will too; the server says why not.
+     * will too; the server says why not. A full off hand is the exception: it has its turn next, and
+     * the client says why only if the off hand then does nothing either (see {@code MinecraftMixin}).
      */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
@@ -165,8 +161,10 @@ public final class ZanpakutoItem extends SwordItem {
         long now = level.getGameTime();
         String refusal = JinzenLogic.refusal(player, data, stack, now);
         if (refusal != null) {
-            if (refusal.equals("off_hand") && hasOwnUse(player.getOffhandItem(), player)) {
-                // Placing a block, eating or raising a shield with the off hand, not reaching for Jinzen.
+            if (refusal.equals("off_hand")) {
+                if (level.isClientSide()) {
+                    data.noteOffHandRefused();
+                }
                 return InteractionResultHolder.pass(stack);
             }
             if (!level.isClientSide()) {
@@ -180,29 +178,6 @@ public final class ZanpakutoItem extends SwordItem {
             JinzenLogic.begin(player, data, now);
         }
         return InteractionResultHolder.consume(stack);
-    }
-
-    /**
-     * Whether the off-hand item would do something of its own if used now: a block aimed at a block in
-     * reach, food the player can eat, a bow or crossbow with something to shoot, or a shield and the
-     * like. Anything else is only in the way of Jinzen, and the player is told so.
-     */
-    private static boolean hasOwnUse(ItemStack offhand, Player player) {
-        Item item = offhand.getItem();
-        if (item instanceof ZanpakutoItem) {
-            return false;
-        }
-        if (item instanceof BlockItem) {
-            return player.pick(player.blockInteractionRange(), 1.0F, false).getType() == HitResult.Type.BLOCK;
-        }
-        FoodProperties food = offhand.getFoodProperties(player);
-        if (food != null) {
-            return player.canEat(food.canAlwaysEat());
-        }
-        if (item instanceof ProjectileWeaponItem) {
-            return CrossbowItem.isCharged(offhand) || !player.getProjectile(offhand).isEmpty();
-        }
-        return offhand.getUseDuration(player) > 0;
     }
 
     @Override

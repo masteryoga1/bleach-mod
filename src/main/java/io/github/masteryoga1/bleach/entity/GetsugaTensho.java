@@ -271,10 +271,11 @@ public class GetsugaTensho extends Projectile {
     /**
      * Sweeps this tick's path, as wide and tall as the crescent: knocks every projectile that is not
      * the owner's (nor another crescent) out of the air, then cuts the creatures in it, nearest first,
-     * each costing one of its pierces. Nothing wholly behind where the swing started is touched, so
-     * it never cuts what stands behind the one who fired it, yet still cuts what is pressed against
-     * their front. A shield that stops it, or the last pierce, ends it. Returns whether the crescent
-     * is still flying.
+     * each costing one of its pierces. Nothing wholly behind where the swing started is touched,
+     * along the path or along the way the swing faces on the level (so a swing aimed up or down does
+     * not tilt "behind" through the wielder's body): it never cuts what stands at the back of the one
+     * who fired it, yet still cuts what is pressed against their front. A shield that stops it, or the
+     * last pierce, ends it. Returns whether the crescent is still flying.
      */
     private boolean sweep(Entity owner, Vec3 from, Vec3 motion) {
         float charge = charge();
@@ -283,10 +284,12 @@ public class GetsugaTensho extends Projectile {
         AABB path = new AABB(from.x - halfWidth, from.y - halfHeight, from.z - halfWidth,
                 from.x + halfWidth, from.y + halfHeight, from.z + halfWidth).expandTowards(motion);
         Vec3 heading = motion.normalize();
+        // Zero for a swing straight up or down, which has no facing on the level, so only the path counts.
+        Vec3 facing = new Vec3(heading.x, 0.0, heading.z).normalize();
         Vec3 rear = root != null ? root : from;
         for (Projectile projectile : level().getEntitiesOfClass(Projectile.class, path,
                 other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner
-                        && ahead(other, rear, heading))) {
+                        && ahead(other, rear, heading) && ahead(other, rear, facing))) {
             // An arrow or trident someone could have picked up is knocked down, not destroyed.
             if (projectile instanceof AbstractArrow arrow && arrow.pickup == AbstractArrow.Pickup.ALLOWED) {
                 arrow.spawnAtLocation(arrow.getPickupItemStackOrigin().copy(), 0.1F);
@@ -294,7 +297,8 @@ public class GetsugaTensho extends Projectile {
             projectile.discard();
         }
         List<LivingEntity> targets = level().getEntitiesOfClass(LivingEntity.class, path,
-                target -> !struck.contains(target.getId()) && affects(target) && ahead(target, rear, heading));
+                target -> !struck.contains(target.getId()) && affects(target)
+                        && ahead(target, rear, heading) && ahead(target, rear, facing));
         if (targets.isEmpty()) {
             return true;
         }
@@ -315,7 +319,8 @@ public class GetsugaTensho extends Projectile {
 
     /**
      * Whether any part of the entity lies on or in front of the plane through {@code rear} square to
-     * the heading: its box's centre is no further behind the plane than the box reaches along the heading.
+     * the heading: its box's centre is no further behind the plane than the box reaches along the
+     * heading. Always true for a zero heading.
      */
     private static boolean ahead(Entity entity, Vec3 rear, Vec3 heading) {
         AABB box = entity.getBoundingBox();

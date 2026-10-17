@@ -11,7 +11,8 @@
   ],
   "client": [
     "client.EntityRenderDispatcherMixin",
-    "client.GameRendererMixin"
+    "client.GameRendererMixin",
+    "client.MinecraftMixin"
   ],
   "injectors": {
     "defaultRequire": 1

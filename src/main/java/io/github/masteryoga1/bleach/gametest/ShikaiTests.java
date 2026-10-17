@@ -370,19 +370,30 @@ public final class ShikaiTests {
 
     @GameTest(template = "field", timeoutTicks = 40, batch = "getsuga")
     public static void getsugaCutsPointBlankButNothingBehind(GameTestHelper helper) {
-        // The swing starts at x 3.5: one pig is pressed against its front, short of where the crescent
+        // Two swings start at x 3.5, one level along z 8.5 and one aimed 45 degrees down along z 4.5. In
+        // each lane one pig is pressed against the front of the swing, short of where the crescent
         // appears, and the other stands just behind it, inside the crescent's first sweep.
-        Pig front = still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(4.0, 2.0, 8.5)));
-        Pig behind = still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(2.9, 2.0, 8.5)));
         Player owner = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
-        Vec3 root = helper.absoluteVec(new Vec3(3.5, 2.5, 8.5));
-        Vec3 along = helper.absoluteVec(new Vec3(4.5, 2.5, 8.5)).subtract(root);
-        GetsugaTensho.launch(helper.getLevel(), owner, root, along, 0.0F, 1000.0F, 4, ItemStack.EMPTY,
-                ZanpakutoBlade.DEFAULT_COLOUR);
+        List<Pig> fronts = new ArrayList<>();
+        List<Pig> behinds = new ArrayList<>();
+        for (double[] lane : new double[][] {{8.5, 2.5, 0.0}, {4.5, 3.2, -1.0}}) {
+            double z = lane[0];
+            fronts.add(still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(4.0, 2.0, z))));
+            behinds.add(still(helper.spawnWithNoFreeWill(EntityType.PIG, new Vec3(2.9, 2.0, z))));
+            Vec3 root = helper.absoluteVec(new Vec3(3.5, lane[1], z));
+            Vec3 along = helper.absoluteVec(new Vec3(4.5, lane[1] + lane[2], z)).subtract(root);
+            GetsugaTensho.launch(helper.getLevel(), owner, root, along, 0.0F, 1000.0F, 4, ItemStack.EMPTY,
+                    ZanpakutoBlade.DEFAULT_COLOUR);
+        }
         helper.succeedWhen(() -> {
-            helper.assertFalse(front.isAlive(), "the crescent missed the pig against the front of the swing");
-            helper.assertTrue(behind.isAlive() && behind.getHealth() == behind.getMaxHealth(), "the crescent cut the pig behind the swing");
-            behind.discard();
+            for (int i = 0; i < 2; i++) {
+                String swing = i == 0 ? "level" : "downward";
+                helper.assertFalse(fronts.get(i).isAlive(), "the " + swing + " crescent missed the pig against the front of the swing");
+                Pig behind = behinds.get(i);
+                helper.assertTrue(behind.isAlive() && behind.getHealth() == behind.getMaxHealth(),
+                        "the " + swing + " crescent cut the pig behind the swing");
+            }
+            behinds.forEach(Entity::discard);
         });
     }
 
