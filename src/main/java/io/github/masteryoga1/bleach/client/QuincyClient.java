@@ -113,7 +113,7 @@ public final class QuincyClient {
             lastBlutPressAt = NEVER;
             return;
         }
-        if (pressed && !wasDown && minecraft.screen == null) {
+        if (pressed && !wasDown && minecraft.screen == null && minecraft.getConnection() != null) {
             BleachNetwork.requestQuincyKey(player.isShiftKeyDown() ? QuincyKey.BLUT_OFF : QuincyKey.BLUT);
             lastBlutPressAt = player.level().getGameTime();
         }

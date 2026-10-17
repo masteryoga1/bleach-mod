@@ -214,7 +214,7 @@ public class HeiligPfeil extends AbstractArrow {
      */
     @Override
     public byte getPierceLevel() {
-        return level().isClientSide() ? 0 : (byte) Mth.clamp(pierceLeft, 0, Byte.MAX_VALUE);
+        return level().isClientSide() ? (byte) 0 : (byte) Mth.clamp(pierceLeft, 0, Byte.MAX_VALUE);
     }
 
     /** Only a creature the owner may harm, through its parts for a many-part body, and never one met before. */
