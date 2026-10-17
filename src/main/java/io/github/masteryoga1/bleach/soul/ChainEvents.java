@@ -75,6 +75,11 @@ public final class ChainEvents {
             speed *= BleachConfig.get(BleachConfig.NEAR_SHINIGAMI_EROSION_MULTIPLIER);
         }
         if (SoulLogic.erodeChain(data, speed)) {
+            if (QuincyLogic.isAwakened(data) && !QuincyEvents.canDestroySoulNow(player)) {
+                // Nothing can hurt the player right now (between dimensions): the chain stays broken,
+                // and the soul tears on a later tick.
+                return;
+            }
             // An awakened Quincy's soul tears apart instead. If that death is cancelled, it Hollowfies,
             // so the broken chain is not seen again next tick.
             if (!QuincyLogic.isAwakened(data) || !QuincyEvents.destroySoul(player, data)) {

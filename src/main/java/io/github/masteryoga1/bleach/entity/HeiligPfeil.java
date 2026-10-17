@@ -28,11 +28,13 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.entity.PartEntity;
 import net.neoforged.neoforge.event.EventHooks;
@@ -78,6 +80,8 @@ public class HeiligPfeil extends AbstractArrow {
     private boolean checkedPointBlank;
     /** Whether this arrow's own blow is being dealt, when a shield may stop it whatever its pierce. */
     private boolean hurting;
+    /** Whether this tick's flight met a creature, after which vanilla's flight no longer meets the block ahead. */
+    private boolean metCreature;
 
     public HeiligPfeil(EntityType<? extends HeiligPfeil> type, Level level) {
         super(type, level);
@@ -133,8 +137,10 @@ public class HeiligPfeil extends AbstractArrow {
 
     /**
      * Server side, the first tick strikes a creature the arrow starts inside, which vanilla's search
-     * along the path cannot see (a shot pressed against a foe). After moving, the arrow goes once its
-     * time is up or its owner has gone or left this level.
+     * along the path cannot see (a shot pressed against a foe). A tick whose flight met a creature and
+     * flew on still bursts on the block that ended its path: vanilla's flight forgets that block once
+     * it has met a creature, and would carry the arrow into or through it. After moving, the arrow goes
+     * once its time is up or its owner has gone or left this level.
      */
     @Override
     public void tick() {
@@ -145,9 +151,22 @@ public class HeiligPfeil extends AbstractArrow {
                 return;
             }
         }
+        Vec3 from = position();
+        Vec3 step = getDeltaMovement();
+        metCreature = false;
         super.tick();
         if (level().isClientSide() || isRemoved()) {
             return;
+        }
+        if (metCreature) {
+            BlockHitResult wall = level().clip(new ClipContext(from, from.add(step), ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE, this));
+            if (wall.getType() == HitResult.Type.BLOCK && !EventHooks.onProjectileImpact(this, wall)) {
+                hitTargetOrDeflectSelf(wall);
+                if (isRemoved()) {
+                    return;
+                }
+            }
         }
         Entity owner = getOwner();
         if (tickCount >= lifeTicks || owner == null || owner.level() != level()) {
@@ -258,6 +277,7 @@ public class HeiligPfeil extends AbstractArrow {
         if (level().isClientSide()) {
             return;
         }
+        metCreature = true;
         LivingEntity target = targetOf(entity);
         if (target == null) {
             return;
@@ -271,6 +291,8 @@ public class HeiligPfeil extends AbstractArrow {
         Vec3 from = position();
         Vec3 at = target.getBoundingBox().clip(from, from.add(getDeltaMovement()))
                 .orElse(target.getBoundingBox().getCenter());
+        // Judged before the blow too: a shield the blow breaks is no longer raised once it lands.
+        boolean blocking = target.isBlocking();
         boolean hurt;
         hurting = true;
         try {
@@ -286,7 +308,7 @@ public class HeiligPfeil extends AbstractArrow {
             QuincyEvents.onArrowLanded(owner, target, mask);
             burst(at);
         }
-        if (hurt || target.isBlocking()) {
+        if (hurt || blocking) {
             if (!hurt || pierceLeft <= 0) {
                 discard();
             } else {

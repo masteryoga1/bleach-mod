@@ -305,6 +305,10 @@ public final class QuincyEvents {
             return;
         }
         if (stage >= 4) {
+            // Nothing can hurt the player right now (between dimensions): full poison waits for a later tick.
+            if (!canDestroySoulNow(player)) {
+                return;
+            }
             if (!destroySoul(player, data)) {
                 data.setQuincy(data.quincy().withPoison(QuincyLogic.POISON_BLOCK));
                 data.poisonStage = 2;
@@ -591,6 +595,14 @@ public final class QuincyEvents {
         float poison = Math.min(QuincyProgress.MAX_POISON, data.quincy().poison() + amount);
         data.setQuincy(data.quincy().withPoison(poison));
         data.lastPoisonAt = player.level().getGameTime();
+    }
+
+    /**
+     * Whether a soul could be torn apart this tick. Not while nothing can hurt the player, as while
+     * they pass between dimensions; that is a reason to wait, not a death that was cancelled.
+     */
+    public static boolean canDestroySoulNow(Player player) {
+        return !player.isInvulnerableTo(soulDestruction(player.level()));
     }
 
     /**

@@ -44,6 +44,7 @@ import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -798,6 +799,39 @@ public final class QuincyTests {
             helper.assertTrue(piercing.isRemoved(), "the piercing arrow flew on past its last pierce");
             helper.assertTrue(single.isRemoved(), "the arrow without pierce flew on past the cow it hurt");
             for (Cow cow : List.of(piercedFront, piercedBack, reeling, behindReeling)) {
+                cow.discard();
+            }
+            helper.succeed();
+        });
+    }
+
+    /**
+     * An arrow that flies on past a creature still bursts on the wall behind it, rather than carrying
+     * through to whoever stands on the other side: after a pierce, and after flying through a creature
+     * that took no harm (one still reeling from a blow).
+     */
+    @GameTest(template = "field", batch = "quincy", timeoutTicks = 60)
+    public static void heiligPfeilStopsAtTheWallBehindACreature(GameTestHelper helper) {
+        Cow pierced = still(helper.spawnWithNoFreeWill(EntityType.COW, 4, 2, 10));
+        Cow reeling = still(helper.spawnWithNoFreeWill(EntityType.COW, 11, 2, 10));
+        Cow hidingFromPierce = still(helper.spawnWithNoFreeWill(EntityType.COW, 4, 2, 13));
+        Cow hidingFromSingle = still(helper.spawnWithNoFreeWill(EntityType.COW, 11, 2, 13));
+        for (int x : new int[] {4, 11}) {
+            helper.setBlock(x, 2, 11, Blocks.STONE);
+            helper.setBlock(x, 3, 11, Blocks.STONE);
+        }
+        reeling.hurt(helper.getLevel().damageSources().generic(), 4.0F);
+        Player owner = archer(helper, 8.5, 3.5);
+        HeiligPfeil piercing = loose(helper, owner, helper.absoluteVec(new Vec3(4.5, 2.5, 3.5)), SOUTH, 3.0F, 1, 3.0F);
+        HeiligPfeil single = loose(helper, owner, helper.absoluteVec(new Vec3(11.5, 2.5, 3.5)), SOUTH, 3.0F, 0, 3.0F);
+        helper.runAfterDelay(10, () -> {
+            assertNear(helper, pierced.getHealth(), 7.0, "the cow the piercing arrow hurt before the wall");
+            assertNear(helper, reeling.getHealth(), 6.0, "the reeling cow the other arrow flew through");
+            assertNear(helper, hidingFromPierce.getHealth(), 10.0, "the cow behind the wall the piercing arrow met");
+            assertNear(helper, hidingFromSingle.getHealth(), 10.0, "the cow behind the wall the other arrow met");
+            helper.assertTrue(piercing.isRemoved(), "the piercing arrow did not burst on the wall");
+            helper.assertTrue(single.isRemoved(), "the arrow that flew through a creature did not burst on the wall");
+            for (Cow cow : List.of(pierced, reeling, hidingFromPierce, hidingFromSingle)) {
                 cow.discard();
             }
             helper.succeed();

@@ -14,8 +14,8 @@ import org.joml.Vector3f;
 
 /**
  * Hirenkyaku, the Quincy's flying screen step: the Quincy gathers reishi under their feet and rides
- * the current several blocks in an instant. It shares the flash step key and cooldown (see
- * {@link QuincyLogic#movementFor}), and the way Shunpo finds its path and lands (see
+ * the current several blocks in an instant. It shares the flash step key and the moment its cooldown
+ * counts from (see {@link QuincyLogic#movementFor}), and the way Shunpo finds its path and lands (see
  * {@link FlashStep}), but it is paid in reishi, trains the Quincy power instead of Hohō, and leaves a
  * pale blue trail that only those who see spirits see.
  */

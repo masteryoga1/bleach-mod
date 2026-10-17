@@ -753,13 +753,13 @@ public final class BleachConfig {
                 .comment("Extra full-draw damage per square root of maximum reiryoku.")
                 .defineInRange("damage_per_root_reiryoku", 0.6, 0.0, 100.0);
         BOGEN_MAX_DAMAGE = builder
-                .comment("Highest full-draw damage, however strong the soul. A quick tap does a quarter of the full draw.")
+                .comment("Highest full-draw damage, however strong the soul. A release under a fifth of a second fires nothing; the quickest shot does about a third of the full draw.")
                 .defineInRange("max_damage", 35.0, 0.0, 10_000.0);
         BOGEN_HOLLOW_DAMAGE_MULTIPLIER = builder
                 .comment("Damage multiplier for a Heilig Pfeil that strikes a Hollow, or a Hollow or Arrancar player.")
                 .defineInRange("hollow_damage_multiplier", 1.25, 0.0, 10.0);
         BOGEN_BASE_COST = builder
-                .comment("Reishi the shortest draw costs to fire.")
+                .comment("Reishi a shot costs before the draw adds to it (the quickest shot that fires costs about half a reishi more).")
                 .defineInRange("base_cost", 1.0, 0.0, 1_000.0);
         BOGEN_FULL_DRAW_EXTRA_COST = builder
                 .comment("Extra reishi a full draw costs on top of that.")
@@ -789,10 +789,10 @@ public final class BleachConfig {
                 .comment("Reishi a Hirenkyaku costs at the third tier.")
                 .defineInRange("master_cost", 2.0, 0.0, 1_000.0);
         HIRENKYAKU_COOLDOWN_TICKS = builder
-                .comment("Ticks after a Hirenkyaku before the next dash, Shunpo included, below the third tier.")
+                .comment("Ticks after a dash of either kind before the next Hirenkyaku, below the third tier. Shunpo keeps its own cooldown, counted from the same moment.")
                 .defineInRange("cooldown_ticks", 20, 0, 1_200);
         HIRENKYAKU_MASTER_COOLDOWN_TICKS = builder
-                .comment("Ticks after a Hirenkyaku before the next dash at the third tier.")
+                .comment("The same at the third tier.")
                 .defineInRange("master_cooldown_ticks", 12, 0, 1_200);
         QUINCY_FOOTING_REISHI_PER_SECOND = builder
                 .comment("Reishi a Quincy's reishi footing drains each second, in place of the reiryoku a Shinigami pays.")

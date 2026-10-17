@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
@@ -96,6 +97,10 @@ public final class ClientSmokeTest {
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
     /** How many ticks the bloodline question stays open before it is answered, so a screenshot shows it. */
     private static final int BLOODLINE_ANSWER_TICKS = 5;
+    /** The first step, which turns the player into a Plus and so takes the bloodline question away. */
+    private static final int FIRST_STEP_TICK = 40;
+    /** How long the steps wait on the bloodline answer before the run fails. */
+    private static final int BLOODLINE_WAIT_TICKS = 400;
 
     private static boolean worldRequested;
     private static int ticksWaiting;
@@ -103,6 +108,8 @@ public final class ClientSmokeTest {
     private static boolean finished;
     /** How many ticks the bloodline question has been open. */
     private static int bloodlineTicks;
+    /** How many ticks the steps have waited on the bloodline answer. */
+    private static int bloodlineWaitTicks;
     /** The first tick of each {@link #expectWithin} window that has already passed. */
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** Where the player stood before the flash step. */
@@ -133,9 +140,19 @@ public final class ClientSmokeTest {
             return;
         }
 
+        // Nothing counts while the world is still arriving, which no other screen shows over.
+        if (minecraft.screen instanceof ReceivingLevelScreen) {
+            return;
+        }
         LocalPlayer player = minecraft.player;
         SoulData soul = player.getData(SoulAttachments.SOUL);
-        ++ticksInWorld;
+        // The steps wait for the bloodline answer: the first one makes a Plus, who is never asked.
+        if (ticksInWorld < FIRST_STEP_TICK - 1 || soul.quincy().decided()) {
+            ++ticksInWorld;
+        } else if (++bloodlineWaitTicks > BLOODLINE_WAIT_TICKS) {
+            fail(minecraft, "the bloodline answer never reached the server");
+            return;
+        }
         // The question comes as the world loads. A screenshot shows the last frame drawn, so the screen
         // gets a few ticks to be drawn before it is answered.
         if (minecraft.screen instanceof BloodlineScreen bloodline && ++bloodlineTicks >= BLOODLINE_ANSWER_TICKS) {
@@ -236,7 +253,7 @@ public final class ClientSmokeTest {
         }
 
         switch (ticksInWorld) {
-            case 40 -> {
+            case FIRST_STEP_TICK -> {
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
                 // No Garganta, wandering Plus or first Hollow comes on its own: every Hollow here is summoned.
                 command(minecraft, "gamerule doMobSpawning false");
