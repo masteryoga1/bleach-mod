@@ -16,8 +16,8 @@ import net.neoforged.neoforge.event.entity.living.LivingEvent;
 
 /**
  * Gritz, the Gintō spell that binds: whatever it holds cannot walk, swim, jump, climb or fly, and
- * cannot dash away with Hirenkyaku or Shunpo or stand on reishi either (those check for it
- * themselves). Each of its attribute modifiers multiplies the total by zero, a jump that still
+ * cannot dash away with Hirenkyaku or Shunpo, glide on an elytra, or stand on reishi either (the
+ * dashes and the footing check for it themselves). Each of its attribute modifiers multiplies the total by zero, a jump that still
  * leaves the ground (on Jump Boost, which vanilla adds after the attribute) is cancelled
  * ({@link #onJump}), and nothing carries it up a ladder or through water. Flight given by an
  * attribute is switched off with it, but a creative player's own flight is not. Only those who see
@@ -65,7 +65,8 @@ public final class GritzEffect extends MobEffect {
     /**
      * On whichever side moves the creature (a player's own client), before it moves this tick: it
      * rises neither up a ladder nor through water, which vanilla lifts it by whatever its speed, and
-     * it is not swimming, whose lift towards where it looks comes later in the same tick.
+     * it is not swimming, whose lift towards where it looks comes later in the same tick, nor
+     * gliding, which no speed of its own drives.
      * Then, on the server, holds a creature in place, since a mob's own pathing and knockback can
      * still slide it about with no speed of its own; a player's movement is their client's, and
      * their speed is already gone.
@@ -74,6 +75,9 @@ public final class GritzEffect extends MobEffect {
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
         if (entity.isControlledByLocalInstance()) {
             entity.setSwimming(false);
+            if (entity instanceof Player player && player.isFallFlying()) {
+                player.stopFallFlying();
+            }
             Vec3 motion = entity.getDeltaMovement();
             if (motion.y > 0.0 && (entity.onClimbable() || entity.isInWater())) {
                 entity.setDeltaMovement(motion.x, 0.0, motion.z);

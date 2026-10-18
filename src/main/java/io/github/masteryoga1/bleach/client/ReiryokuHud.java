@@ -38,7 +38,7 @@ import net.minecraft.world.item.ItemStack;
  * turns orange when a Letzt Stil draw is charged for a Letzt Pfeil, and pale gold while Licht Regen
  * gathers. A thin bar beside the gauge follows the Quincy arts: the day's training in the Sanrei
  * Glove (gold once mastered), the time Letzt Stil has left, the wait while the power is sealed
- * (white once the rite is open), and Vollständig (dimmed once the halo breaks) or its cooldown.
+ * (white once the power can return), and Vollständig (dimmed once the halo breaks) or its cooldown.
  * While the power is sealed, the reishi gauge stands empty in a grey outline, and holding the Cross
  * through the rite fills the bar above it. Quincy blood not yet awakened shows only the draw bar, in
  * grey. Placeholder look until real art exists.
@@ -228,7 +228,7 @@ public final class ReiryokuHud {
             colour = ART_LETZT;
         } else if (QuincyArtsLogic.isSealed(data)) {
             fraction = share(now - arts.stageSince(), QuincyArtsLogic.sealedWaitTicks());
-            colour = QuincyArtsLogic.riteOpen(data, now) ? ART_RITE_OPEN : ART_SEALED;
+            colour = QuincyArtsLogic.sealedWaitOver(data, now) ? ART_RITE_OPEN : ART_SEALED;
         } else if (QuincyArtsLogic.gloveMastered(data)) {
             fraction = 1.0F;
             colour = ART_GLOVE_MASTERED;

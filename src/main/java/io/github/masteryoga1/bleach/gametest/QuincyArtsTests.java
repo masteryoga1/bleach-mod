@@ -925,7 +925,8 @@ public final class QuincyArtsTests {
 
     @GameTest(template = "empty")
     public static void seeleDestroysSouls(GameTestHelper helper) {
-        SoulData data = restored(thirdTier());
+        // A hybrid with Shinigami power, who can purify, so the purify checks below weigh the weapon.
+        SoulData data = QuincyTests.withShinigamiPower(restored(thirdTier()));
         Player player = ZanpakutoTests.mock(helper, data);
         ItemStack blade = new ItemStack(ModItems.SEELE_SCHNEIDER.get());
         SeeleSchneiderItem.form(blade);
@@ -946,6 +947,9 @@ public final class QuincyArtsTests {
         helper.assertFalse(HollowLogic.destroysSouls(player.damageSources().playerAttack(player)),
                 "a bare Seele Schneider hilt destroys souls");
         helper.assertFalse(SoulEvents.isZanjutsuWeapon(blade), "a bare Seele Schneider hilt counts for Zanjutsu");
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.ASAUCHI.get()));
+        helper.assertTrue(HollowLogic.purifies(player.damageSources().playerAttack(player), data, now),
+                "the same hybrid's Asauchi cut does not purify");
         helper.succeed();
     }
 

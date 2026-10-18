@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.network.ReishiFootingStatePayload;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.soul.FootingState;
 import io.github.masteryoga1.bleach.soul.ReishiFooting;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
@@ -69,7 +70,7 @@ public final class ReishiFootingClient {
     private static boolean mayAsk(LocalPlayer player) {
         return !player.onGround() && !player.isInLiquid() && !player.isFallFlying() && !player.isPassenger()
                 && !player.onClimbable() && !player.isSpectator() && !player.getAbilities().flying
-                && SoulLogic.hasSoul(player)
+                && !player.hasEffect(ModEffects.GRITZ) && SoulLogic.hasSoul(player)
                 && ShinigamiLogic.canUseReishiFooting(SoulLogic.get(player), player.level().getGameTime());
     }
 

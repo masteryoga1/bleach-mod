@@ -205,6 +205,9 @@ public final class GintoTests {
         player.setSwimming(true);
         ModEffects.GRITZ.get().applyEffectTick(player, 0);
         helper.assertFalse(player.isSwimming(), "Gritz left a player swimming");
+        player.startFallFlying();
+        ModEffects.GRITZ.get().applyEffectTick(player, 0);
+        helper.assertFalse(player.isFallFlying(), "Gritz left a player gliding");
         pig.discard();
         clearCasts(helper);
         helper.succeed();
