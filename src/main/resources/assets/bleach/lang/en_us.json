@@ -488,6 +488,7 @@
   "message.bleach.ginto.no_target": "There is nothing there for the spell.",
   "message.bleach.sprenger.no_formation": "Sprenger needs five of your Seele Schneider standing in a pentagon nearby.",
   "message.bleach.sprenger.formed": "Five blades stand. A Gintō set to Sprenger will set them off.",
+  "message.bleach.sprenger.broken": "The formation broke before Sprenger went off.",
   "message.bleach.gritz.bound": "Gritz binds you.",
   "message.bleach.vollstandig.unlocked": "Your restored power has outgrown its shape. Press %s to take your full form: Vollständig.",
   "message.bleach.vollstandig.locked": "Vollständig needs %s more training.",

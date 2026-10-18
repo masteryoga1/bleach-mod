@@ -15,12 +15,13 @@ import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 
 /**
- * Gritz, the Gintō spell that binds: whatever it holds cannot walk, jump or fly, and cannot dash
- * away with Hirenkyaku or Shunpo or stand on reishi either (those check for it themselves). Each of
- * its attribute modifiers multiplies the total by zero, and a jump that still leaves the ground
- * (on Jump Boost, which vanilla adds after the attribute) is cancelled ({@link #onJump}). Flight
- * given by an attribute is switched off with it, but a creative player's own flight is not. Only
- * those who see spirits see the ring of light around a bound creature.
+ * Gritz, the Gintō spell that binds: whatever it holds cannot walk, swim, jump, climb or fly, and
+ * cannot dash away with Hirenkyaku or Shunpo or stand on reishi either (those check for it
+ * themselves). Each of its attribute modifiers multiplies the total by zero, a jump that still
+ * leaves the ground (on Jump Boost, which vanilla adds after the attribute) is cancelled
+ * ({@link #onJump}), and nothing carries it up a ladder or through water. Flight given by an
+ * attribute is switched off with it, but a creative player's own flight is not. Only those who see
+ * spirits see the ring of light around a bound creature.
  */
 public final class GritzEffect extends MobEffect {
     /** The effect's colour: the pale blue-white of reishi. */
@@ -37,6 +38,8 @@ public final class GritzEffect extends MobEffect {
         addAttributeModifier(Attributes.JUMP_STRENGTH, BleachMod.id("gritz_jump"), -1.0,
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         addAttributeModifier(Attributes.FLYING_SPEED, BleachMod.id("gritz_flying_speed"), -1.0,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        addAttributeModifier(NeoForgeMod.SWIM_SPEED, BleachMod.id("gritz_swim_speed"), -1.0,
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         addAttributeModifier(NeoForgeMod.CREATIVE_FLIGHT, BleachMod.id("gritz_flight"), -1.0,
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -60,12 +63,20 @@ public final class GritzEffect extends MobEffect {
     }
 
     /**
-     * Holds a creature in place, since a mob's own pathing and knockback can still slide it about
-     * with no speed of its own. A player's movement is their client's, and their speed is already
-     * gone. Server side only.
+     * On whichever side moves the creature (a player's own client), before it moves this tick: it
+     * rises neither up a ladder nor through water, which vanilla lifts it by whatever its speed.
+     * Then, on the server, holds a creature in place, since a mob's own pathing and knockback can
+     * still slide it about with no speed of its own; a player's movement is their client's, and
+     * their speed is already gone.
      */
     @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
+        if (entity.isControlledByLocalInstance()) {
+            Vec3 motion = entity.getDeltaMovement();
+            if (motion.y > 0.0 && (entity.onClimbable() || entity.isInWater())) {
+                entity.setDeltaMovement(motion.x, 0.0, motion.z);
+            }
+        }
         if (!(entity.level() instanceof ServerLevel level)) {
             return true;
         }

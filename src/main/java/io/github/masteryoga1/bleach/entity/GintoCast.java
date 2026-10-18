@@ -13,9 +13,11 @@ import io.github.masteryoga1.bleach.soul.SprengerShape;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -39,8 +41,8 @@ import net.minecraft.world.phys.Vec3;
  * takes the fall out of anyone who drops onto it, the pillar of Heizen, or the blast of a Sprenger
  * among five Seele Schneider. Heizen and Sprenger strike once, when the fuse runs out, for the
  * caster: Heizen everything its owner may harm in a pillar 5 blocks across and 6 high, Sprenger
- * everything inside the pentagon of blades (which it then uses up), leaving those it does not kill
- * bound by Gritz. Neither touches a block. The spell, size and fuse are synced for drawing; the rest
+ * everything inside the pentagon of blades (which it holds until then and then uses up), leaving
+ * those it does not kill bound by Gritz. Neither touches a block. The spell, size and fuse are synced for drawing; the rest
  * only the server knows. Never saved: a cast whose chunk unloads is gone.
  */
 public class GintoCast extends Entity {
@@ -85,8 +87,8 @@ public class GintoCast extends Entity {
     /**
      * Raises a cast of this spell at {@code at} for its owner and adds it to the level: {@code radius}
      * across (a Wolke's or a Sprenger's), striking with {@code strength} after {@code fuseTicks}
-     * ticks (Heizen and Sprenger), and gone after {@code lifeTicks}. A Sprenger needs its shape and
-     * uses up its blades when it strikes.
+     * ticks (Heizen and Sprenger), and gone after {@code lifeTicks}. A Sprenger needs its shape, and
+     * holds its blades (see {@link SeeleSchneiderPfeil#arm}) until it strikes and uses them up.
      */
     public static GintoCast spawn(ServerLevel level, Player owner, GintoSpell spell, Vec3 at, float radius, int fuseTicks,
                                   int lifeTicks, float strength, @Nullable SprengerShape shape,
@@ -102,7 +104,11 @@ public class GintoCast extends Entity {
         cast.strength = strength;
         cast.shape = shape;
         cast.blades = List.copyOf(blades);
-        level.addFreshEntity(cast);
+        if (level.addFreshEntity(cast)) {
+            for (SeeleSchneiderPfeil blade : cast.blades) {
+                blade.arm(true);
+            }
+        }
         return cast;
     }
 
@@ -159,8 +165,8 @@ public class GintoCast extends Entity {
 
     /**
      * On the server: a Wolke takes the fall out of everyone on it, every tick; Heizen and Sprenger
-     * strike once the fuse has run out, if their caster is still here; and the cast goes when its
-     * time is up.
+     * strike once the fuse has run out, if their caster is still here (and a Sprenger's five blades
+     * still stand, or it lets them go unused); and the cast goes when its time is up.
      */
     @Override
     public void tick() {
@@ -177,13 +183,47 @@ public class GintoCast extends Entity {
             Player owner = owner();
             if (owner != null && spell == GintoSpell.HEIZEN) {
                 heizen(server, owner);
-            } else if (owner != null && spell == GintoSpell.SPRENGER && shape != null) {
-                sprenger(server, owner, shape);
+            } else if (spell == GintoSpell.SPRENGER) {
+                if (owner != null && shape != null && bladesStand()) {
+                    sprenger(server, owner, shape);
+                } else {
+                    release();
+                    if (owner != null) {
+                        owner.displayClientMessage(Component.translatable("message.bleach.sprenger.broken")
+                                .withStyle(ChatFormatting.GRAY), true);
+                    }
+                }
             }
         }
         if (tickCount >= lifeTicks) {
             discard();
         }
+    }
+
+    /** Whether every blade of a Sprenger's formation still stands stuck where it was cast with. */
+    private boolean bladesStand() {
+        for (SeeleSchneiderPfeil blade : blades) {
+            if (blade.isRemoved() || !blade.planted()) {
+                return false;
+            }
+        }
+        return !blades.isEmpty();
+    }
+
+    /** Lets go of the blades still standing, so they can be taken up again. */
+    private void release() {
+        for (SeeleSchneiderPfeil blade : blades) {
+            if (!blade.isRemoved()) {
+                blade.arm(false);
+            }
+        }
+    }
+
+    /** Gone, by its time running out, its chunk unloading or anything else: any blade it still holds is let go. */
+    @Override
+    public void onRemovedFromLevel() {
+        super.onRemovedFromLevel();
+        release();
     }
 
     private void cushionFalls() {

@@ -303,7 +303,7 @@ public final class HollowLogic {
             return true;
         }
         ItemStack weapon = source.getWeaponItem();
-        return weapon != null && weapon.is(BleachTags.ZANPAKUTO)
+        return weapon != null && weapon.is(BleachTags.ZANPAKUTO) && source.is(DamageTypeTags.IS_PLAYER_ATTACK)
                 && source.getEntity() != null && source.getDirectEntity() == source.getEntity();
     }
 

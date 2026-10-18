@@ -1098,6 +1098,11 @@ public final class QuincyArtsTests {
         player.setOnGround(false);
         QuincyArtsEvents.endVollstandig(player, data, 1000L, true);
         helper.assertTrue(QuincyArtsLogic.arts(data).forms().landingGrace(), "ending Vollständig in the air gave no grace");
+        // A soul reset in the air keeps the grace, and only that.
+        SoulData fresh = new SoulData();
+        QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(data), fresh);
+        helper.assertTrue(QuincyArtsLogic.arts(fresh).equals(QuincyArts.NONE.withForms(QuincyForms.NONE.withLandingGrace(true))),
+                "a reset in the air left the arts " + QuincyArtsLogic.arts(fresh));
         float health = player.getHealth();
         player.causeFallDamage(10.0F, 1.0F, player.damageSources().fall());
         helper.assertTrue(player.getHealth() == health, "the spared landing hurt, leaving " + player.getHealth());

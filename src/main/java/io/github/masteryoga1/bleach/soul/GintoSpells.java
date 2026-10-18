@@ -161,14 +161,14 @@ public final class GintoSpells {
 
     /**
      * This owner's Seele Schneider standing stuck within reach of {@code around}, nearest first, at
-     * most five: the blades a Sprenger would use. Matched on the blades' own saved owner, so blades
-     * planted before a relog still count.
+     * most five: the blades a Sprenger would use, leaving out any a Sprenger already holds. Matched
+     * on the blades' own saved owner, so blades planted before a relog still count.
      */
     public static List<SeeleSchneiderPfeil> formation(Level level, UUID owner, Vec3 around) {
         double range = QuincyArtsLogic.SPRENGER_RANGE;
         List<SeeleSchneiderPfeil> found = new ArrayList<>(level.getEntitiesOfClass(SeeleSchneiderPfeil.class,
                 new AABB(around, around).inflate(range),
-                blade -> blade.isAlive() && blade.planted() && owner.equals(blade.ownerId())
+                blade -> blade.isAlive() && blade.planted() && !blade.armed() && owner.equals(blade.ownerId())
                         && blade.distanceToSqr(around) <= range * range));
         found.sort(Comparator.comparingDouble(blade -> blade.distanceToSqr(around)));
         return List.copyOf(found.subList(0, Math.min(found.size(), SprengerShape.CORNERS)));

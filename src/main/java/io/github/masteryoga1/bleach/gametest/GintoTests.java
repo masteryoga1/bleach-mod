@@ -34,6 +34,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -194,6 +195,8 @@ public final class GintoTests {
         helper.assertTrue(pig.hasEffect(ModEffects.GRITZ), "Gritz did not bind the pig");
         double speed = pig.getAttributeValue(Attributes.MOVEMENT_SPEED);
         helper.assertTrue(speed == 0.0, "the bound pig's speed is " + speed);
+        double swim = pig.getAttributeValue(NeoForgeMod.SWIM_SPEED);
+        helper.assertTrue(swim == 0.0, "the bound pig's swimming speed is " + swim);
         // A jump that leaves the ground anyway, as one on Jump Boost does, goes nowhere.
         pig.setDeltaMovement(0.2, 0.52, 0.2);
         NeoForge.EVENT_BUS.post(new LivingEvent.LivingJumpEvent(pig));
@@ -333,6 +336,31 @@ public final class GintoTests {
         helper.succeed();
     }
 
+    /** A fired blade that completes the pentagon binds what is inside, judged where it came to rest. */
+    @GameTest(template = "field", batch = "ginto", timeoutTicks = 60)
+    public static void firedFifthBladeBinds(GameTestHelper helper) {
+        Pig pig = QuincyTests.still(helper.spawnWithNoFreeWill(EntityType.PIG, 8, 2, 8));
+        Player player = QuincyTests.archer(helper, QuincyArtsTests.restored(QuincyArtsTests.thirdTier()), 8.5, 2.5);
+        List<SeeleSchneiderPfeil> blades = new ArrayList<>();
+        for (int i = 0; i < PENTAGON.length - 1; i++) {
+            blades.add(Objects.requireNonNull(SeeleSchneiderPfeil.plant(helper.getLevel(), player,
+                    helper.absolutePos(new BlockPos(PENTAGON[i][0], 1, PENTAGON[i][1]))), "a corner could not be planted"));
+        }
+        helper.assertFalse(pig.hasEffect(ModEffects.GRITZ), "four blades bound the pig");
+        // From above the middle, at a full draw's speed, so it sticks on its first tick.
+        int[] last = PENTAGON[PENTAGON.length - 1];
+        Vec3 from = helper.absoluteVec(new Vec3(8.5, 4.0, 8.3));
+        Vec3 to = helper.absoluteVec(new Vec3(last[0] + 0.5, 2.0, last[1] + 0.5));
+        blades.add(SeeleSchneiderPfeil.launch(helper.getLevel(), player, from, to.subtract(from).normalize(), 1.0F, 0, 3.8F));
+        helper.runAtTickTime(5, () -> {
+            helper.assertTrue(blades.get(blades.size() - 1).planted(), "the fired fifth blade did not stick");
+            helper.assertTrue(pig.hasEffect(ModEffects.GRITZ), "the fired fifth blade did not bind the pig inside the pentagon");
+            QuincyArtsTests.discardAll(blades);
+            pig.discard();
+            helper.succeed();
+        });
+    }
+
     /** Sprenger blasts what is inside the pentagon, uses its blades up, and leaves the floor whole. */
     @GameTest(template = "field", batch = "ginto", timeoutTicks = 80)
     public static void sprengerBlastsInsideOnly(GameTestHelper helper) {
@@ -344,6 +372,10 @@ public final class GintoTests {
         ItemStack stack = tubes(player, 1);
         helper.assertTrue(GintoSpells.cast(player, data, stack), "Sprenger was not cast with five blades standing");
         helper.assertTrue(stack.isEmpty(), "Sprenger left " + stack.getCount() + " tubes");
+        // Held until the blast: none can be taken back, and none counts for another Sprenger.
+        helper.assertTrue(blades.stream().allMatch(SeeleSchneiderPfeil::armed), "Sprenger did not hold its blades");
+        helper.assertTrue(GintoSpells.formation(helper.getLevel(), player.getUUID(), inside.position()).isEmpty(),
+                "the blades a Sprenger holds still make a formation");
         // The blast comes 10 ticks after the cast.
         helper.runAtTickTime(15, () -> {
             helper.assertTrue(hurtOrDead(inside), "Sprenger did not strike the pig inside the pentagon");

@@ -72,6 +72,13 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
     private int stuckTicks;
     /** How long it has been spent and in the air. Server only. */
     private int airTicks;
+    /**
+     * Whether it stuck during this tick's flight and has yet to ring and be looked over for a
+     * formation, which waits until the flight has carried it to where it stuck. Server only.
+     */
+    private boolean settling;
+    /** Whether a Sprenger cast holds it until the blast: no one may take it, and it does not drop its hilt. Server only. */
+    private boolean armed;
 
     public SeeleSchneiderPfeil(EntityType<? extends SeeleSchneiderPfeil> type, Level level) {
         super(type, level);
@@ -114,6 +121,8 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
         blade.onHitBlock(new BlockHitResult(blade.position(), Direction.UP, ground, false));
         // Sticking stilled it; the drift is kept for clients that start watching later.
         blade.setDeltaMovement(PLANT_SETTLE);
+        // Already where it stuck, so it settles at once.
+        blade.settle();
         return blade;
     }
 
@@ -160,8 +169,8 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
     }
 
     /**
-     * Stuck, on the server: spent from now on, a ring of steel for the aware, and the owner's blades
-     * looked over for a Sprenger formation.
+     * Stuck, on the server: spent from now on, and settling (see {@link #settle}) once the flight has
+     * carried it to where it stuck, since vanilla moves it there only after the hit.
      */
     @Override
     protected void onStuck(BlockHitResult hit) {
@@ -169,8 +178,24 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
             return;
         }
         spend();
+        settling = true;
+    }
+
+    /** Where it stuck at last: a ring of steel for the aware, and the owner's blades looked over for a Sprenger formation. */
+    private void settle() {
+        settling = false;
         SpiritSenses.play(this, ModSounds.SEELE_SCHNEIDER_STICK.get(), SoundSource.PLAYERS, 1.0F, 1.0F, false);
         GintoSpells.onSeeleStuck(this);
+    }
+
+    /** Whether a Sprenger cast holds it until the blast (see {@link #arm}). */
+    public boolean armed() {
+        return armed;
+    }
+
+    /** Held for a Sprenger's blast, or let go again if the cast ends without one. Not saved, as the cast is not. */
+    public void arm(boolean held) {
+        armed = held;
     }
 
     /** Its flight is over: spent, and turned back a little off whatever ended it, to fall from there. */
@@ -239,7 +264,7 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
      */
     @Override
     protected boolean tryPickup(Player player) {
-        if (!isSpent() || !(ownedBy(player) || ownerGone() && SoulLogic.seesSpirits(player))) {
+        if (!isSpent() || armed || !(ownedBy(player) || ownerGone() && SoulLogic.seesSpirits(player))) {
             return false;
         }
         return switch (pickup) {
@@ -261,20 +286,26 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
         return ownerId == null || server == null || server.getPlayerList().getPlayer(ownerId) == null;
     }
 
-    /** Stuck too long: it drops its hilt, if it is one to pick up, and goes. */
+    /** Stuck too long: it drops its hilt, if it is one to pick up, and goes; but not while a Sprenger holds it. */
     @Override
     protected void tickDespawn() {
-        if (++stuckTicks >= BleachConfig.get(BleachConfig.SEELE_STUCK_DESPAWN_TICKS)) {
+        if (!armed && ++stuckTicks >= BleachConfig.get(BleachConfig.SEELE_STUCK_DESPAWN_TICKS)) {
             dropHiltAndGo();
         }
     }
 
-    /** As a Heilig Pfeil (or a vanilla arrow once spent); then, on the server, a spent blade that never lands drops its hilt and goes. */
+    /**
+     * As a Heilig Pfeil (or a vanilla arrow once spent); then, on the server, a blade that stuck this
+     * tick settles where it came to rest, and a spent blade that never lands drops its hilt and goes.
+     */
     @Override
     public void tick() {
         super.tick();
         if (level().isClientSide() || isRemoved()) {
             return;
+        }
+        if (settling) {
+            settle();
         }
         if (!isSpent() || inGround) {
             airTicks = 0;

@@ -585,7 +585,9 @@ public final class BleachCommand {
             // What the old soul had released goes with it, so nothing it held lingers on the body.
             ShikaiEvents.forceSeal(player, SoulLogic.get(player), null);
             QuincyArtsEvents.endAll(player, SoulLogic.get(player));
-            player.setData(SoulAttachments.SOUL, new SoulData());
+            SoulData fresh = new SoulData();
+            QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);
+            player.setData(SoulAttachments.SOUL, fresh);
             SoulEvents.refresh(player);
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.reset.success",

@@ -730,6 +730,16 @@ public final class QuincyArtsLogic {
         };
     }
 
+    /**
+     * Gives a soul just reset the landing still to cushion from the arts it had (see
+     * {@link QuincyArtsEvents#endAll}), so a reset in the air does not hurt. Nothing else carries over.
+     */
+    public static void keepLandingGrace(QuincyArts ended, SoulData fresh) {
+        if (ended.forms().landingGrace()) {
+            setArts(fresh, arts(fresh).withForms(arts(fresh).forms().withLandingGrace(true)));
+        }
+    }
+
     // ---- Death and loading ----
 
     /**
