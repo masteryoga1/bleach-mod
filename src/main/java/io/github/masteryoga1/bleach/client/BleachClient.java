@@ -38,7 +38,10 @@ import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import net.neoforged.neoforge.common.NeoForge;
 import org.lwjgl.glfw.GLFW;
 
-/** Client-only entry point: HUD, screens, key bindings, and how souls and zanpakutō techniques are drawn. */
+/**
+ * Client-only entry point: HUD, screens, key bindings, and how souls, zanpakutō techniques and the
+ * Quincy's reishi are drawn.
+ */
 @Mod(value = BleachMod.MODID, dist = Dist.CLIENT)
 public final class BleachClient {
     public static final String KEY_CATEGORY = "key.categories.bleach";
@@ -62,6 +65,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachClient::registerScreens);
         modEventBus.addListener(BleachClient::registerRenderers);
         modEventBus.addListener(BleachModelLayers::register);
+        QuincyClient.register(modEventBus);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onClientTickPre);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onPlayerTickPre);
@@ -74,6 +78,7 @@ public final class BleachClient {
     private static void registerGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAbove(VanillaGuiLayers.HOTBAR, ReiryokuHud.ID, ReiryokuHud::render);
         event.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, JinzenOverlay.ID, JinzenOverlay::render);
+        event.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, QuincyClient.POISON_LAYER_ID, QuincyClient::renderPoison);
     }
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
@@ -84,6 +89,7 @@ public final class BleachClient {
         event.register(ZanpakutoKeys.RELEASE);
         event.register(ZanpakutoKeys.SEAL);
         event.register(ZanpakutoKeys.TECHNIQUE);
+        event.register(QuincyClient.BLUT_KEY);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
@@ -93,7 +99,8 @@ public final class BleachClient {
     /**
      * The NPCs wear two of the game's default player skins until the mod has its own. Hollows use the
      * vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
-     * Zanpakutō techniques are drawn from plain shapes and the mod's placeholder textures.
+     * Zanpakutō techniques are drawn from plain shapes and the mod's placeholder textures, and the
+     * Heilig Pfeil as a vanilla arrow in the mod's own texture.
      * The type arguments are spelled out rather than left for the compiler to infer through the lambdas.
      */
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
@@ -128,11 +135,13 @@ public final class BleachClient {
         event.registerEntityRenderer(ModEntities.GARGANTA.get(), GargantaRenderer::new);
         event.registerEntityRenderer(ModEntities.GETSUGA_TENSHO.get(), GetsugaTenshoRenderer::new);
         event.registerEntityRenderer(ModEntities.ZABIMARU_LASH.get(), ZabimaruLashRenderer::new);
+        event.registerEntityRenderer(ModEntities.HEILIG_PFEIL.get(), HeiligPfeilRenderer::new);
     }
 
     /**
-     * Adds the chain and mask layer and the sheathed blade to both player models (wide and slim arms).
-     * The sheath takes the look of the blade the player carries, as their appearance tells.
+     * Adds the chain and mask layer, the sheathed blade and Blut Vene's veins to both player models
+     * (wide and slim arms). The sheath takes the look of the blade the player carries, as their
+     * appearance tells.
      */
     private static void addLayers(EntityRenderersEvent.AddLayers event) {
         for (PlayerSkin.Model skin : event.getSkins()) {
@@ -141,6 +150,7 @@ public final class BleachClient {
                 playerRenderer.addLayer(new SoulLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new SayaLayer<>(playerRenderer,
                         player -> SheathLook.forModel(ClientSouls.appearance(player).sheathModel())));
+                playerRenderer.addLayer(new BlutLayer(playerRenderer));
             }
         }
     }
@@ -171,6 +181,7 @@ public final class BleachClient {
         }
 
         ZanpakutoKeys.tick(minecraft);
+        QuincyClient.tick(minecraft);
 
         if (minecraft.level != null) {
             SpiritShimmer.tick(minecraft);

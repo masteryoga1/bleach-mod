@@ -1,7 +1,9 @@
 package io.github.masteryoga1.bleach.advancement;
 
+import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -55,6 +57,22 @@ public final class Milestones {
     public static final String SHIKAI = "shikai";
     /** Loosed enough Getsuga Tenshō that Zangetsu named the technique. */
     public static final String GETSUGA_TENSHO = "getsuga_tensho";
+    /** Awakened the Quincy power: Quincy tier 1. */
+    public static final String QUINCY = "quincy";
+    /** Struck a spirit with a Heilig Pfeil. Granted when it happens, as are the four below. */
+    public static final String HEILIG_PFEIL = "heilig_pfeil";
+    /** Rode a current of reishi with Hirenkyaku. */
+    public static final String HIRENKYAKU = "hirenkyaku";
+    /** Called on Blut Vene. */
+    public static final String BLUT_VENE = "blut_vene";
+    /** Called on Blut Arterie. */
+    public static final String BLUT_ARTERIE = "blut_arterie";
+    /** Let Hollow poison reach halfway. */
+    public static final String HOLLOW_POISON = "hollow_poison";
+    /** Wearing the full Quincy garb. */
+    public static final String QUINCY_GARB = "quincy_garb";
+    /** Reached the third Quincy tier, the highest. */
+    public static final String LAST_QUINCY = "last_quincy";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -111,6 +129,16 @@ public final class Milestones {
         }
         if (bond.getsugaNamed()) {
             trigger.trigger(player, GETSUGA_TENSHO);
+        }
+        int quincyTier = QuincyLogic.tier(data);
+        if (quincyTier >= 1) {
+            trigger.trigger(player, QUINCY);
+        }
+        if (quincyTier >= QuincyLogic.MAX_TIER) {
+            trigger.trigger(player, LAST_QUINCY);
+        }
+        if (QuincyGarbItem.isFullSet(player)) {
+            trigger.trigger(player, QUINCY_GARB);
         }
     }
 

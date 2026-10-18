@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.config;
 
+import io.github.masteryoga1.bleach.quincy.BloodlineMode;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -165,6 +166,51 @@ public final class BleachConfig {
     public static final ModConfigSpec.BooleanValue GETSUGA_BREAKS_BLOCKS;
     public static final ModConfigSpec.DoubleValue GETSUGA_MAX_HARDNESS;
     public static final ModConfigSpec.IntValue GETSUGA_BLOCK_BUDGET;
+
+    public static final ModConfigSpec.EnumValue<BloodlineMode> QUINCY_BLOODLINE_MODE;
+    public static final ModConfigSpec.DoubleValue QUINCY_CHANCE;
+    public static final ModConfigSpec.DoubleValue QUINCY_ECHT_CHANCE;
+    public static final ModConfigSpec.BooleanValue QUINCY_GIVE_CROSS;
+    public static final ModConfigSpec.BooleanValue QUINCY_ALLOW_HYBRIDS;
+    public static final ModConfigSpec.BooleanValue QUINCY_DEATH_INTO_PLUS;
+    public static final ModConfigSpec.DoubleValue QUINCY_SENSE_RANGE;
+    public static final ModConfigSpec.IntValue QUINCY_TIER_1_TRAINING;
+    public static final ModConfigSpec.IntValue QUINCY_TIER_2_TRAINING;
+    public static final ModConfigSpec.IntValue QUINCY_TIER_3_TRAINING;
+    public static final ModConfigSpec.DoubleValue QUINCY_TIER_UP_GROWTH;
+    public static final ModConfigSpec.DoubleValue REISHI_BASE_MAX;
+    public static final ModConfigSpec.DoubleValue REISHI_MAX_PER_TIER;
+    public static final ModConfigSpec.DoubleValue REISHI_PASSIVE_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue REISHI_CHANNEL_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue QUINCY_GARB_GATHER_BONUS;
+    public static final ModConfigSpec.DoubleValue BOGEN_BASE_DAMAGE;
+    public static final ModConfigSpec.DoubleValue BOGEN_DAMAGE_PER_TIER;
+    public static final ModConfigSpec.DoubleValue BOGEN_DAMAGE_PER_ROOT_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue BOGEN_MAX_DAMAGE;
+    public static final ModConfigSpec.DoubleValue BOGEN_HOLLOW_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BOGEN_BASE_COST;
+    public static final ModConfigSpec.DoubleValue BOGEN_FULL_DRAW_EXTRA_COST;
+    public static final ModConfigSpec.DoubleValue BOGEN_REIRYOKU_FALLBACK_RATE;
+    public static final ModConfigSpec.IntValue PFEIL_LIFE_TICKS;
+    public static final ModConfigSpec.IntValue HIRENKYAKU_MIN_TIER;
+    public static final ModConfigSpec.DoubleValue HIRENKYAKU_BASE_DISTANCE;
+    public static final ModConfigSpec.DoubleValue HIRENKYAKU_MAX_DISTANCE;
+    public static final ModConfigSpec.DoubleValue HIRENKYAKU_COST;
+    public static final ModConfigSpec.DoubleValue HIRENKYAKU_MASTER_COST;
+    public static final ModConfigSpec.IntValue HIRENKYAKU_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue HIRENKYAKU_MASTER_COOLDOWN_TICKS;
+    public static final ModConfigSpec.DoubleValue QUINCY_FOOTING_REISHI_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue VENE_REDUCTION;
+    public static final ModConfigSpec.DoubleValue VENE_MAX_REDUCTION;
+    public static final ModConfigSpec.DoubleValue ARTERIE_BONUS;
+    public static final ModConfigSpec.DoubleValue ARTERIE_MAX_BONUS;
+    public static final ModConfigSpec.DoubleValue VENE_DRAIN_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue ARTERIE_DRAIN_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue ARTERIE_REIATSU_MULTIPLIER;
+    public static final ModConfigSpec.BooleanValue HOLLOW_POISON_ENABLED;
+    public static final ModConfigSpec.DoubleValue HOLLOW_POISON_PER_DAMAGE;
+    public static final ModConfigSpec.DoubleValue HOLLOW_POISON_DECAY_PER_MINUTE;
+    public static final ModConfigSpec.DoubleValue HOLLOW_POISON_AURA_PER_SECOND;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -640,6 +686,159 @@ public final class BleachConfig {
                 .defineInRange("block_budget", 24, 0, 256);
         builder.pop();
 
+        builder.push("quincy");
+        QUINCY_BLOODLINE_MODE = builder
+                .comment("How a new living Human without Shinigami power learns their bloodline: CHOICE asks them once, RANDOM rolls it for them as if they let fate decide, and OFF leaves it to commands.")
+                .defineEnum("bloodline_mode", BloodlineMode.CHOICE);
+        QUINCY_CHANCE = builder
+                .comment("Chance of Quincy blood for a soul that lets fate decide, or that RANDOM rolls for.")
+                .defineInRange("quincy_chance", 0.05, 0.0, 1.0);
+        QUINCY_ECHT_CHANCE = builder
+                .comment("Chance that Quincy blood is Echt, pure, rather than Gemischt, mixed.")
+                .defineInRange("echt_chance", 0.25, 0.0, 1.0);
+        QUINCY_GIVE_CROSS = builder
+                .comment("Whether a soul that learns it has Quincy blood is handed a Quincy Cross.")
+                .define("give_cross", true);
+        QUINCY_ALLOW_HYBRIDS = builder
+                .comment("Whether an awakened Quincy may still take a Shinigami's power or enroll at the Academy, and a Substitute Shinigami may still awaken as a Quincy.")
+                .define("allow_hybrids", false);
+        QUINCY_DEATH_INTO_PLUS = builder
+                .comment("Whether an awakened Quincy who dies lingers as a Plus like any aware Human, instead of waking alive.")
+                .define("death_into_plus", false);
+        QUINCY_SENSE_RANGE = builder
+                .comment("How far, in blocks, a Quincy senses a Garganta open and which way it lies.")
+                .defineInRange("sense_range", 128.0, 0.0, 512.0);
+
+        builder.push("training");
+        QUINCY_TIER_1_TRAINING = builder
+                .comment("Training a soul with Quincy blood needs to awaken, reaching the first Quincy tier.")
+                .defineInRange("tier_1", 40, 1, 100_000);
+        QUINCY_TIER_2_TRAINING = builder
+                .comment("Training needed for the second tier: Hirenkyaku, reishi footing and arrows that pierce.")
+                .defineInRange("tier_2", 150, 1, 100_000);
+        QUINCY_TIER_3_TRAINING = builder
+                .comment("Training needed for the third and highest tier.")
+                .defineInRange("tier_3", 500, 1, 100_000);
+        QUINCY_TIER_UP_GROWTH = builder
+                .comment("Maximum reiryoku gained for each Quincy tier reached.")
+                .defineInRange("tier_up_growth", 10.0, 0.0, 10_000.0);
+        builder.pop();
+
+        builder.push("reishi");
+        REISHI_BASE_MAX = builder
+                .comment("Reishi an awakened Quincy can hold before tiers and a tenth of maximum reiryoku are added.")
+                .defineInRange("base_max", 30.0, 0.0, 10_000.0);
+        REISHI_MAX_PER_TIER = builder
+                .comment("Extra reishi a Quincy can hold for each tier.")
+                .defineInRange("max_per_tier", 20.0, 0.0, 10_000.0);
+        REISHI_PASSIVE_PER_SECOND = builder
+                .comment("Reishi a Quincy gathers each second without trying, where reishi is neither rich nor thin.")
+                .defineInRange("passive_per_second", 0.4, 0.0, 1_000.0);
+        REISHI_CHANNEL_PER_SECOND = builder
+                .comment("Reishi gathered each second while meditating with a Quincy Cross in hand, before Reiatsu Control adds 2% a level.")
+                .defineInRange("channel_per_second", 3.0, 0.0, 1_000.0);
+        QUINCY_GARB_GATHER_BONUS = builder
+                .comment("Extra reishi gathering from wearing the full Quincy garb (0.15 = +15%).")
+                .defineInRange("garb_bonus", 0.15, 0.0, 10.0);
+        builder.pop();
+
+        builder.push("heilig_bogen");
+        BOGEN_BASE_DAMAGE = builder
+                .comment("Heilig Pfeil damage at full draw before tiers, reiryoku and Reiatsu Control add to it.")
+                .defineInRange("base_damage", 3.0, 0.0, 1_000.0);
+        BOGEN_DAMAGE_PER_TIER = builder
+                .comment("Extra full-draw damage for each Quincy tier.")
+                .defineInRange("damage_per_tier", 2.0, 0.0, 1_000.0);
+        BOGEN_DAMAGE_PER_ROOT_REIRYOKU = builder
+                .comment("Extra full-draw damage per square root of maximum reiryoku.")
+                .defineInRange("damage_per_root_reiryoku", 0.6, 0.0, 100.0);
+        BOGEN_MAX_DAMAGE = builder
+                .comment("Highest full-draw damage, however strong the soul. A release under a fifth of a second fires nothing; the quickest shot does about a third of the full draw.")
+                .defineInRange("max_damage", 35.0, 0.0, 10_000.0);
+        BOGEN_HOLLOW_DAMAGE_MULTIPLIER = builder
+                .comment("Damage multiplier for a Heilig Pfeil that strikes a Hollow, or a Hollow or Arrancar player.")
+                .defineInRange("hollow_damage_multiplier", 1.25, 0.0, 10.0);
+        BOGEN_BASE_COST = builder
+                .comment("Reishi a shot costs before the draw adds to it (the quickest shot that fires costs about half a reishi more).")
+                .defineInRange("base_cost", 1.0, 0.0, 1_000.0);
+        BOGEN_FULL_DRAW_EXTRA_COST = builder
+                .comment("Extra reishi a full draw costs on top of that.")
+                .defineInRange("full_draw_extra_cost", 3.0, 0.0, 1_000.0);
+        BOGEN_REIRYOKU_FALLBACK_RATE = builder
+                .comment("Reiryoku burned for each point of reishi a shot is short. When that would leave too little reiryoku, or this is 0, the shot fires weaker instead.")
+                .defineInRange("reiryoku_fallback_rate", 2.0, 0.0, 100.0);
+        PFEIL_LIFE_TICKS = builder
+                .comment("Ticks a Heilig Pfeil flies before it fades.")
+                .defineInRange("life_ticks", 30, 1, 200);
+        builder.pop();
+
+        builder.push("hirenkyaku");
+        HIRENKYAKU_MIN_TIER = builder
+                .comment("Quincy tier needed for Hirenkyaku and for standing on reishi footing.")
+                .defineInRange("min_tier", 2, 1, 3);
+        HIRENKYAKU_BASE_DISTANCE = builder
+                .comment("Hirenkyaku distance in blocks at that tier, before higher tiers and Reiatsu Control add to it.")
+                .defineInRange("base_distance", 7.0, 1.0, 64.0);
+        HIRENKYAKU_MAX_DISTANCE = builder
+                .comment("Longest Hirenkyaku in blocks.")
+                .defineInRange("max_distance", 16.0, 1.0, 64.0);
+        HIRENKYAKU_COST = builder
+                .comment("Reishi a Hirenkyaku costs below the third tier.")
+                .defineInRange("cost", 3.0, 0.0, 1_000.0);
+        HIRENKYAKU_MASTER_COST = builder
+                .comment("Reishi a Hirenkyaku costs at the third tier.")
+                .defineInRange("master_cost", 2.0, 0.0, 1_000.0);
+        HIRENKYAKU_COOLDOWN_TICKS = builder
+                .comment("Ticks after a dash of either kind before the next Hirenkyaku, below the third tier. Shunpo keeps its own cooldown, counted from the same moment.")
+                .defineInRange("cooldown_ticks", 20, 0, 1_200);
+        HIRENKYAKU_MASTER_COOLDOWN_TICKS = builder
+                .comment("The same at the third tier.")
+                .defineInRange("master_cooldown_ticks", 12, 0, 1_200);
+        QUINCY_FOOTING_REISHI_PER_SECOND = builder
+                .comment("Reishi a Quincy's reishi footing drains each second, in place of the reiryoku a Shinigami pays.")
+                .defineInRange("footing_reishi_per_second", 1.0, 0.0, 1_000.0);
+        builder.pop();
+
+        builder.push("blut");
+        VENE_REDUCTION = builder
+                .comment("Share of each hit Blut Vene stops at the first Quincy tier (0.2 = 20%), growing 5% a tier.")
+                .defineInRange("vene_reduction", 0.2, 0.0, 1.0);
+        VENE_MAX_REDUCTION = builder
+                .comment("The largest share of a hit Blut Vene can stop.")
+                .defineInRange("vene_max_reduction", 0.4, 0.0, 1.0);
+        ARTERIE_BONUS = builder
+                .comment("Extra damage Blut Arterie adds to each hit at the second Quincy tier (0.25 = +25%), growing 5% a tier.")
+                .defineInRange("arterie_bonus", 0.25, 0.0, 10.0);
+        ARTERIE_MAX_BONUS = builder
+                .comment("The most extra damage Blut Arterie can add.")
+                .defineInRange("arterie_max_bonus", 0.5, 0.0, 10.0);
+        VENE_DRAIN_PER_SECOND = builder
+                .comment("Reishi Blut Vene drains each second, besides half a reishi for each point of damage it stops.")
+                .defineInRange("vene_drain_per_second", 0.8, 0.0, 1_000.0);
+        ARTERIE_DRAIN_PER_SECOND = builder
+                .comment("Reishi Blut Arterie drains each second.")
+                .defineInRange("arterie_drain_per_second", 1.2, 0.0, 1_000.0);
+        ARTERIE_REIATSU_MULTIPLIER = builder
+                .comment("How many times over a Quincy's reiatsu counts in the reiatsu difference while Blut Arterie runs.")
+                .defineInRange("arterie_reiatsu_multiplier", 1.5, 1.0, 10.0);
+        builder.pop();
+
+        builder.push("hollow_poison");
+        HOLLOW_POISON_ENABLED = builder
+                .comment("Whether Hollow reiatsu poisons awakened Quincy, up to 100, where the soul tears apart.")
+                .define("enabled", true);
+        HOLLOW_POISON_PER_DAMAGE = builder
+                .comment("Poison a Quincy takes for each point of damage a Hollow deals them, mob or player, before difficulty, Blut Vene and their tier change it.")
+                .defineInRange("per_damage", 1.0, 0.0, 100.0);
+        HOLLOW_POISON_DECAY_PER_MINUTE = builder
+                .comment("Poison that wears off each minute, once a minute has passed without more.")
+                .defineInRange("decay_per_minute", 4.0, 0.0, 100.0);
+        HOLLOW_POISON_AURA_PER_SECOND = builder
+                .comment("Poison a Quincy takes each second inside the released reiatsu of a Hollow or Arrancar player.")
+                .defineInRange("aura_per_second", 1.0, 0.0, 100.0);
+        builder.pop();
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -658,6 +857,11 @@ public final class BleachConfig {
 
     /** The configured value, or its default when no world is loaded. */
     public static boolean get(ModConfigSpec.BooleanValue value) {
+        return SPEC.isLoaded() ? value.get() : value.getDefault();
+    }
+
+    /** The configured value, or its default when no world is loaded. */
+    public static <T extends Enum<T>> T get(ModConfigSpec.EnumValue<T> value) {
         return SPEC.isLoaded() ? value.get() : value.getDefault();
     }
 }

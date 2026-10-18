@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.soul;
 
+import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.netty.buffer.ByteBuf;
 import java.util.function.IntFunction;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -10,14 +11,17 @@ import net.minecraft.world.entity.LivingEntity;
 
 /**
  * The part of another player's soul that a client needs in order to draw them: whether they are a
- * spirit, how much Chain of Fate is left, whether their reiatsu is released, and which zanpakutō, if
- * any, hangs sheathed at their hip or across their back (other clients never see a player's hotbar).
- * Players only get this about others, never the full {@link SoulData}.
+ * spirit, how much Chain of Fate is left, whether their reiatsu is released, which zanpakutō, if
+ * any, hangs sheathed at their hip or across their back (other clients never see a player's hotbar),
+ * and the Blut a Quincy is calling on. Players only get this about others, never the full
+ * {@link SoulData}.
  *
  * @param sheathModel the {@code custom_model_data} of the sheathed blade (0 for a plain Asauchi), or -1 for none
+ * @param blut        the Blut the soul is calling on and can use, so Blut Vene's veins can be drawn
  */
-public record SoulAppearance(SoulState state, float chainFraction, boolean reiatsuReleased, int sheathModel) {
-    public static final SoulAppearance NONE = new SoulAppearance(SoulState.HUMAN, 0.0F, false, -1);
+public record SoulAppearance(SoulState state, float chainFraction, boolean reiatsuReleased, int sheathModel,
+                             BlutMode blut) {
+    public static final SoulAppearance NONE = new SoulAppearance(SoulState.HUMAN, 0.0F, false, -1, BlutMode.OFF);
 
     /** Chain shown in steps of a tenth, so trackers only hear about it ten times over its life. */
     public static final int CHAIN_STEPS = 10;
@@ -30,7 +34,18 @@ public record SoulAppearance(SoulState state, float chainFraction, boolean reiat
             ByteBufCodecs.FLOAT, SoulAppearance::chainFraction,
             ByteBufCodecs.BOOL, SoulAppearance::reiatsuReleased,
             ByteBufCodecs.VAR_INT, SoulAppearance::sheathModel,
+            BlutMode.STREAM_CODEC, SoulAppearance::blut,
             SoulAppearance::new);
+
+    /** An appearance without Blut, as every soul but a Quincy's looks. */
+    public SoulAppearance(SoulState state, float chainFraction, boolean reiatsuReleased, int sheathModel) {
+        this(state, chainFraction, reiatsuReleased, sheathModel, BlutMode.OFF);
+    }
+
+    /** Never null: an appearance sent without Blut has none. */
+    public SoulAppearance {
+        blut = blut == null ? BlutMode.OFF : blut;
+    }
 
     /** Whether a zanpakutō is drawn sheathed on this soul. */
     public boolean bladeSheathed() {
@@ -41,13 +56,13 @@ public record SoulAppearance(SoulState state, float chainFraction, boolean reiat
     public static SoulAppearance of(SoulData data) {
         float chain = data.chainMaxTicks() <= 0 ? 0.0F
                 : Mth.ceil(data.chainFraction() * CHAIN_STEPS) / (float) CHAIN_STEPS;
-        return new SoulAppearance(data.state(), chain, data.isReiatsuReleased(), -1);
+        return new SoulAppearance(data.state(), chain, data.isReiatsuReleased(), -1, QuincyLogic.activeBlut(data));
     }
 
     /** How this creature looks, with its soul. */
     public static SoulAppearance of(LivingEntity entity, SoulData data) {
         SoulAppearance soul = of(data);
         return new SoulAppearance(soul.state(), soul.chainFraction(), soul.reiatsuReleased(),
-                ShinigamiLogic.sheathedModel(entity));
+                ShinigamiLogic.sheathedModel(entity), soul.blut());
     }
 }

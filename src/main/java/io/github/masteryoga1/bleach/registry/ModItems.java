@@ -2,6 +2,8 @@ package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
+import io.github.masteryoga1.bleach.item.QuincyCrossItem;
+import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import net.minecraft.core.component.DataComponents;
@@ -43,6 +45,21 @@ public final class ModItems {
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",
             () -> new DenreishinkiItem(new Item.Properties().stacksTo(1)));
+
+    /**
+     * The silver cross handed down in Quincy families. In Quincy hands it draws the Heilig Bogen, a bow
+     * of reishi; to anyone else it is only silver. See {@link QuincyCrossItem}.
+     */
+    public static final DeferredItem<QuincyCrossItem> QUINCY_CROSS = ITEMS.register("quincy_cross",
+            () -> new QuincyCrossItem(new Item.Properties().stacksTo(1)));
+
+    /** The white Quincy garb, trimmed in blue: tunic, trousers and shoes. See {@link QuincyGarbItem}. */
+    public static final DeferredItem<QuincyGarbItem> QUINCY_TUNIC = ITEMS.register("quincy_tunic",
+            () -> new QuincyGarbItem(ArmorItem.Type.CHESTPLATE));
+    public static final DeferredItem<QuincyGarbItem> QUINCY_TROUSERS = ITEMS.register("quincy_trousers",
+            () -> new QuincyGarbItem(ArmorItem.Type.LEGGINGS));
+    public static final DeferredItem<QuincyGarbItem> QUINCY_SHOES = ITEMS.register("quincy_shoes",
+            () -> new QuincyGarbItem(ArmorItem.Type.BOOTS));
 
     public static final DeferredItem<DeferredSpawnEggItem> ACADEMY_INSTRUCTOR_SPAWN_EGG = ITEMS.register(
             "academy_instructor_spawn_egg",

@@ -6,10 +6,12 @@ import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -146,6 +148,9 @@ public final class HollowEvents {
                 onPurified(killer, hollow, weapon != null ? weapon : ItemStack.EMPTY);
             } else {
                 onSlain(killer, hollow);
+                if (source.is(BleachTags.DESTROYS_SOULS)) {
+                    QuincyEvents.onSoulDestroyed(killer, hollow);
+                }
             }
         }
         if (hollow instanceof FishboneD fishbone) {
@@ -155,8 +160,9 @@ public final class HollowEvents {
 
     /**
      * A soul purified a Hollow: its reiryoku grows by half as much again as for slaying it, and it
-     * trains Zanjutsu, and a nameless Asauchi that did it bonds. Called once the Hollow has started to
-     * dissolve; techniques that purify (Getsuga Tenshō) come through here too.
+     * trains Zanjutsu, and a nameless Asauchi that did it bonds. The purified soul's light eases the
+     * Hollow poison of Quincy nearby. Called once the Hollow has started to dissolve; techniques that
+     * purify (Getsuga Tenshō) come through here too.
      */
     public static void onPurified(Player killer, Hollow hollow, ItemStack weapon) {
         SoulData data = SoulLogic.get(killer);
@@ -173,9 +179,15 @@ public final class HollowEvents {
             }
         }
         ZanpakutoEvents.onPurified(killer, hollow, weapon);
+        if (hollow.level() instanceof ServerLevel level) {
+            QuincyEvents.onPurifiedNearby(level, hollow.position());
+        }
     }
 
-    /** A soul destroyed a Hollow without purifying it: its reiryoku still grows. */
+    /**
+     * A soul destroyed a Hollow without purifying it: its reiryoku still grows. A Heilig Pfeil
+     * destroys the soul itself as well (see {@link QuincyEvents#onSoulDestroyed}).
+     */
     static void onSlain(Player killer, Hollow hollow) {
         SoulData data = SoulLogic.get(killer);
         SoulLogic.grow(data, HollowLogic.killGrowth(hollow.soul().maxReiryoku(), data.maxReiryoku(), false));
@@ -185,7 +197,8 @@ public final class HollowEvents {
 
     /**
      * A Hollow or Arrancar player killed by another player is worth as much as a Hollow of their
-     * reiatsu, but grows the killer's reiryoku only once in a while: they come back as they were.
+     * reiatsu, but grows the killer's reiryoku only once in a while: they come back as they were. A
+     * Quincy's arrow counts the soul as destroyed.
      */
     private static void onHollowPlayerDeath(Player victim, DamageSource source) {
         if (!(source.getEntity() instanceof Player killer) || killer == victim
@@ -205,6 +218,9 @@ public final class HollowEvents {
             hunt = hunt.withLastPlayerKillGrowthAt(now);
         }
         data.setHunt(purified ? hunt.withPurified(hunt.purified() + 1) : hunt.withSlain(hunt.slain() + 1));
+        if (!purified && source.is(BleachTags.DESTROYS_SOULS)) {
+            QuincyEvents.onHollowPlayerDestroyed(killer, victim);
+        }
     }
 
     /**

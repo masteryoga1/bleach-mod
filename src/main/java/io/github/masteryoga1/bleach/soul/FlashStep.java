@@ -29,7 +29,8 @@ import net.minecraft.world.phys.shapes.CollisionContext;
  * time, and carries on level across a gap rather than following a cliff down. In the air or on
  * reishi footing it follows the player's gaze (at most 45° up or down) when they steer straight
  * ahead. It stops short of walls, lava, anything harmful and the world border. Distance, cost and
- * cooldown come from Hohō (see {@link ShinigamiLogic#flashStepDistance}).
+ * cooldown come from Hohō (see {@link ShinigamiLogic#flashStepDistance}). A Quincy's Hirenkyaku
+ * shares the key, and the way the path is found and the landing (see {@link Hirenkyaku}).
  */
 public final class FlashStep {
     /** How finely the path is checked. */
@@ -39,7 +40,7 @@ public final class FlashStep {
     /** How far down a grounded step looks for ground before treating the way ahead as a drop. */
     private static final double SETTLE = 1.05;
     private static final float MAX_AIR_PITCH = 45.0F;
-    private static final double MIN_DISTANCE = 1.0;
+    static final double MIN_DISTANCE = 1.0;
 
     /**
      * Where a flash step ends.
@@ -55,7 +56,7 @@ public final class FlashStep {
 
     /**
      * The player pressed the flash step key while steering this way (each from -1 to 1, as the
-     * movement keys give them).
+     * movement keys give them). A Quincy may Hirenkyaku instead (see {@link QuincyLogic#movementFor}).
      */
     public static void perform(ServerPlayer player, float forward, float left) {
         if (!SoulLogic.hasSoul(player) || !player.isAlive() || player.isSpectator() || player.isPassenger()
@@ -65,6 +66,10 @@ public final class FlashStep {
         SoulData data = SoulLogic.get(player);
         ServerLevel level = player.serverLevel();
         long now = level.getGameTime();
+        if (QuincyLogic.movementFor(data, QuincyLogic.holdsCross(player), now) == QuincyLogic.Movement.HIRENKYAKU) {
+            Hirenkyaku.perform(player, data, forward, left);
+            return;
+        }
         if (now - data.lastFlashStepAt < ShinigamiLogic.flashStepCooldownTicks(data)) {
             return;
         }
@@ -89,18 +94,9 @@ public final class FlashStep {
         boolean grounded = player.onGround() && !onFooting;
         Vec3 start = player.position();
         Vec3 direction = direction(player.getYRot(), player.getXRot(), forward, left, !grounded);
-        DashPath path;
-        FootingState footing = player.getData(SoulAttachments.FOOTING);
-        try {
-            // The dasher's own plates do not stand in the way, so they can dash down off them.
-            footing.active = false;
-            path = sweep(level, player, player.getBoundingBox(), direction, distance, grounded);
-        } finally {
-            footing.active = onFooting;
-        }
+        DashPath path = sweepFor(player, direction, distance, grounded, onFooting);
         Vec3 end = path.end();
-        if (!Double.isFinite(end.x) || !Double.isFinite(end.y) || !Double.isFinite(end.z)
-                || end.distanceTo(start) < MIN_DISTANCE) {
+        if (!reachable(start, end)) {
             refuse(player, "message.bleach.flash_step.blocked");
             return;
         }
@@ -112,7 +108,38 @@ public final class FlashStep {
         effects(level, start);
         effects(level, end);
         level.playSound(null, start.x, start.y, start.z, SoundEvents.BREEZE_JUMP, SoundSource.PLAYERS, 0.5F, 1.6F);
+        land(player, data, path, onFooting, grounded);
+    }
 
+    /**
+     * The path a dash from where the player stands would take. The dasher's own footing is left out
+     * while it is found, so they can dash down off their plates.
+     *
+     * @param onFooting whether the player is standing on reishi footing now
+     */
+    static DashPath sweepFor(ServerPlayer player, Vec3 direction, double distance, boolean grounded, boolean onFooting) {
+        FootingState footing = player.getData(SoulAttachments.FOOTING);
+        try {
+            footing.active = false;
+            return sweep(player.serverLevel(), player, player.getBoundingBox(), direction, distance, grounded);
+        } finally {
+            footing.active = onFooting;
+        }
+    }
+
+    /** Whether a dash from {@code start} that ends at {@code end} goes anywhere: somewhere real, far enough away. */
+    static boolean reachable(Vec3 start, Vec3 end) {
+        return Double.isFinite(end.x) && Double.isFinite(end.y) && Double.isFinite(end.z)
+                && end.distanceTo(start) >= MIN_DISTANCE;
+    }
+
+    /**
+     * Moves the player to the end of a dash. From footing they stay on footing at the new height;
+     * from the ground to the ground they land as if they had run there; otherwise they stand on
+     * footing where it ends if they may, or carry on through the air as they were.
+     */
+    static void land(ServerPlayer player, SoulData data, DashPath path, boolean onFooting, boolean grounded) {
+        Vec3 end = path.end();
         if (onFooting) {
             player.teleportTo(end.x, end.y, end.z);
             ReishiFooting.reanchorAfterDash(player);
@@ -129,7 +156,7 @@ public final class FlashStep {
         }
     }
 
-    private static void refuse(ServerPlayer player, String key) {
+    static void refuse(ServerPlayer player, String key) {
         player.displayClientMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY), true);
     }
 

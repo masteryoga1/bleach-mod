@@ -30,8 +30,9 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 /**
  * Death and the Chain of Fate: an aware Human who dies lingers as a Plus where they fell, their
  * chain wears away (more slowly with a Shinigami nearby), Encroachment sets in near the end, and a
- * Plus whose chain runs out becomes a Hollow. Konsō, from a Shinigami, sends a Plus on before that
- * (see {@link ShinigamiEvents#konso}).
+ * Plus whose chain runs out becomes a Hollow, or, if it is an awakened Quincy, is torn apart (see
+ * {@link QuincyEvents#destroySoul}). Konsō, from a Shinigami, sends a Plus on before that (see
+ * {@link ShinigamiEvents#konso}).
  */
 public final class ChainEvents {
     public static final ResourceKey<DamageType> ENCROACHMENT =
@@ -74,7 +75,16 @@ public final class ChainEvents {
             speed *= BleachConfig.get(BleachConfig.NEAR_SHINIGAMI_EROSION_MULTIPLIER);
         }
         if (SoulLogic.erodeChain(data, speed)) {
-            hollowfy(player, data);
+            if (QuincyLogic.isAwakened(data) && !QuincyEvents.canDestroySoulNow(player)) {
+                // Nothing can hurt the player right now (between dimensions): the chain stays broken,
+                // and the soul tears on a later tick.
+                return;
+            }
+            // An awakened Quincy's soul tears apart instead. If that death is cancelled, it Hollowfies,
+            // so the broken chain is not seen again next tick.
+            if (!QuincyLogic.isAwakened(data) || !QuincyEvents.destroySoul(player, data)) {
+                hollowfy(player, data);
+            }
             return;
         }
 

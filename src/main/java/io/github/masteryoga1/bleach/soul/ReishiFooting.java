@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import net.minecraft.ChatFormatting;
@@ -23,10 +24,11 @@ import net.minecraft.world.phys.Vec3;
  * Reishi footing: a trained soul hardens the spirit particles under their feet and stands on the
  * air. The server lays invisible plates ({@link io.github.masteryoga1.bleach.block.ReishiFootingBlock})
  * at the anchor height under and just ahead of the player while it lasts, and drains reiryoku every
- * tick. Sneaking lets the player sink through; letting go holds them again where they are. Pressing
- * the key (or jump) again while falling raises the anchor to the new height, so a soul climbs one
- * block per jump. Footing ends on solid ground or a ladder, when the reiryoku runs out, or when the
- * soul may no longer use it.
+ * tick (a Quincy's footing drains reishi instead, see {@link QuincyLogic#footingOnReishi}). Sneaking
+ * lets the player sink through; letting go holds them again where they are. Pressing the key (or
+ * jump) again while falling raises the anchor to the new height, so a soul climbs one block per
+ * jump. Footing ends on solid ground or a ladder, when what pays for it runs out, or when the soul
+ * may no longer use it.
  */
 public final class ReishiFooting {
     /** Footing ends if the player gets this far above it, launched or otherwise. */
@@ -75,7 +77,7 @@ public final class ReishiFooting {
         boolean allowed = mayStand(player, data, level.getGameTime()) && !player.onGround()
                 && !level.isOutsideBuildHeight(anchor)
                 && (!viaJump || noGroundBelow(level, player));
-        if (allowed && !footing.active && !SoulLogic.trySpend(player, data, ShinigamiLogic.footingDrainPerTick(data) * 20.0F)) {
+        if (allowed && !footing.active && !payUpfront(player, data, level.getGameTime())) {
             player.displayClientMessage(Component.translatable("message.bleach.reishi_footing.too_weak")
                     .withStyle(ChatFormatting.GRAY), true);
             allowed = false;
@@ -122,7 +124,7 @@ public final class ReishiFooting {
         AABB endBox = player.getDimensions(player.getPose()).makeBoundingBox(end);
         if (!mayStand(player, data, level.getGameTime()) || level.isOutsideBuildHeight(anchor)
                 || !level.noCollision((Entity) null, endBox.expandTowards(0.0, -1.0, 0.0))
-                || !footing.active && !SoulLogic.trySpend(player, data, ShinigamiLogic.footingDrainPerTick(data) * 20.0F)) {
+                || !footing.active && !payUpfront(player, data, level.getGameTime())) {
             return false;
         }
         player.teleportTo(end.x, end.y, end.z);
@@ -202,7 +204,7 @@ public final class ReishiFooting {
         }
     }
 
-    /** Runs every tick for every player: keeps the plates under them, drains reiryoku, or ends footing. */
+    /** Runs every tick for every player: keeps the plates under them, drains what pays for it, or ends footing. */
     public static void tick(ServerPlayer player, SoulData data) {
         if (!isActive(player)) {
             return;
@@ -214,7 +216,7 @@ public final class ReishiFooting {
             end(player);
             return;
         }
-        if (!SoulLogic.drain(player, data, ShinigamiLogic.footingDrainPerTick(data))) {
+        if (!payTick(player, data, level.getGameTime())) {
             end(player);
             player.displayClientMessage(Component.translatable("message.bleach.reishi_footing.exhausted")
                     .withStyle(ChatFormatting.GRAY), true);
@@ -297,6 +299,27 @@ public final class ReishiFooting {
             }
         }
         return false;
+    }
+
+    /** Pays the second's drain that starting footing costs, in reishi for a Quincy's footing and reiryoku for the rest. */
+    private static boolean payUpfront(ServerPlayer player, SoulData data, long now) {
+        if (QuincyLogic.footingOnReishi(data, now)) {
+            return QuincyLogic.trySpendReishi(data, (float) BleachConfig.get(BleachConfig.QUINCY_FOOTING_REISHI_PER_SECOND));
+        }
+        return SoulLogic.trySpend(player, data, ShinigamiLogic.footingDrainPerTick(data) * 20.0F);
+    }
+
+    /**
+     * Pays one tick of footing, the same way as {@link #payUpfront}.
+     *
+     * @return false when it ran dry
+     */
+    private static boolean payTick(ServerPlayer player, SoulData data, long now) {
+        if (QuincyLogic.footingOnReishi(data, now)) {
+            return QuincyLogic.drainReishi(data,
+                    (float) (BleachConfig.get(BleachConfig.QUINCY_FOOTING_REISHI_PER_SECOND) / 20.0));
+        }
+        return SoulLogic.drain(player, data, ShinigamiLogic.footingDrainPerTick(data));
     }
 
     private static void sendState(ServerPlayer player, FootingState footing) {

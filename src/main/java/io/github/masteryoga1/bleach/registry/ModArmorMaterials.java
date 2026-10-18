@@ -11,6 +11,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+/** The materials of the mod's outfits: all cloth, worn for the look and for what they do for the soul. */
 public final class ModArmorMaterials {
     public static final DeferredRegister<ArmorMaterial> ARMOR_MATERIALS =
             DeferredRegister.create(Registries.ARMOR_MATERIAL, BleachMod.MODID);
@@ -19,16 +20,26 @@ public final class ModArmorMaterials {
      * The Shinigami uniform. Cloth, not armour: it gives no protection, takes no enchantments and
      * needs no repair. Textures are {@code textures/models/armor/shihakusho_layer_1.png} and {@code _2}.
      */
-    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> SHIHAKUSHO = ARMOR_MATERIALS.register("shihakusho",
-            () -> {
-                EnumMap<ArmorItem.Type, Integer> defense = new EnumMap<>(ArmorItem.Type.class);
-                for (ArmorItem.Type type : ArmorItem.Type.values()) {
-                    defense.put(type, 0);
-                }
-                return new ArmorMaterial(defense, 0, SoundEvents.ARMOR_EQUIP_LEATHER, () -> Ingredient.EMPTY,
-                        List.of(new ArmorMaterial.Layer(BleachMod.id("shihakusho"))), 0.0F, 0.0F);
-            });
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> SHIHAKUSHO = cloth("shihakusho");
+
+    /**
+     * The white Quincy garb, cloth in the same way as the Shihakushō. Textures are
+     * {@code textures/models/armor/quincy_garb_layer_1.png} and {@code _2}.
+     */
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> QUINCY_GARB = cloth("quincy_garb");
 
     private ModArmorMaterials() {
+    }
+
+    /** Cloth: no defence, toughness or enchantability and nothing to repair it with, drawn from the named layer. */
+    private static DeferredHolder<ArmorMaterial, ArmorMaterial> cloth(String name) {
+        return ARMOR_MATERIALS.register(name, () -> {
+            EnumMap<ArmorItem.Type, Integer> defense = new EnumMap<>(ArmorItem.Type.class);
+            for (ArmorItem.Type type : ArmorItem.Type.values()) {
+                defense.put(type, 0);
+            }
+            return new ArmorMaterial(defense, 0, SoundEvents.ARMOR_EQUIP_LEATHER, () -> Ingredient.EMPTY,
+                    List.of(new ArmorMaterial.Layer(BleachMod.id(name))), 0.0F, 0.0F);
+        });
     }
 }

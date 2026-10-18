@@ -9,8 +9,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * The mod's sound events. Their files are vanilla sounds, pitched and spread out in
  * {@code assets/bleach/sounds.json}. A Hollow's howl, Fishbone D's roar, the tearing sky, a Shikai
- * release and a loosed Getsuga Tenshō carry much further than a normal mob's sounds, so they are
- * fixed-range events; the rest reach as far as their volume takes them, as usual.
+ * release, a loosed Getsuga Tenshō and a Quincy's awakening carry much further than a normal mob's
+ * sounds, so they are fixed-range events; the rest reach as far as their volume takes them, as usual.
  */
 public final class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
@@ -37,6 +37,20 @@ public final class ModSounds {
     /** Reiatsu gathering in the blade for a Getsuga Tenshō. */
     public static final DeferredHolder<SoundEvent, SoundEvent> GETSUGA_GATHER = variable("entity.getsuga_tensho.gather");
     public static final DeferredHolder<SoundEvent, SoundEvent> GETSUGA_FIRE = fixed("entity.getsuga_tensho.fire", 48.0F);
+    /** Reishi gathering into the Quincy Cross as a draw begins. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> QUINCY_CROSS_DRAW = variable("item.quincy_cross.draw");
+    /** A Quincy's power awakening, or growing by a tier. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> QUINCY_AWAKEN = fixed("item.quincy_cross.awaken", 24.0F);
+    /** Reishi slipping away from a Cross that cannot hold it yet, or from a shot too weak to fire. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> QUINCY_CROSS_FIZZLE = variable("item.quincy_cross.fizzle");
+    public static final DeferredHolder<SoundEvent, SoundEvent> HEILIG_PFEIL_FIRE = variable("entity.heilig_pfeil.fire");
+    public static final DeferredHolder<SoundEvent, SoundEvent> HEILIG_PFEIL_HIT = variable("entity.heilig_pfeil.hit");
+    /** The rush of reishi under a Quincy's feet. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HIRENKYAKU = variable("player.hirenkyaku");
+    /** Reishi flooding the blood as Blut Vene or Arterie comes on, and ebbing as it ends. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> BLUT = variable("player.blut");
+    /** The pounding heart of a Quincy deep in Hollow poison, played only to them. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HOLLOW_POISON = variable("player.hollow_poison");
 
     private ModSounds() {
     }

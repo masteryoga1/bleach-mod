@@ -256,5 +256,134 @@
         "attenuation_distance": 48
       }
     ]
+  },
+  "item.quincy_cross.draw": {
+    "subtitle": "subtitles.bleach.item.quincy_cross.draw",
+    "sounds": [
+      {
+        "name": "minecraft:block/amethyst/resonate1",
+        "pitch": 1.6
+      },
+      {
+        "name": "minecraft:block/amethyst/resonate2",
+        "pitch": 1.6
+      },
+      {
+        "name": "minecraft:block/amethyst/resonate3",
+        "pitch": 1.6
+      },
+      {
+        "name": "minecraft:block/amethyst/resonate4",
+        "pitch": 1.6
+      }
+    ]
+  },
+  "item.quincy_cross.awaken": {
+    "subtitle": "subtitles.bleach.item.quincy_cross.awaken",
+    "sounds": [
+      {
+        "name": "minecraft:block/beacon/activate",
+        "pitch": 1.4,
+        "attenuation_distance": 24
+      }
+    ]
+  },
+  "item.quincy_cross.fizzle": {
+    "subtitle": "subtitles.bleach.item.quincy_cross.fizzle",
+    "sounds": [
+      {
+        "name": "minecraft:random/fizz",
+        "pitch": 1.8
+      }
+    ]
+  },
+  "entity.heilig_pfeil.fire": {
+    "subtitle": "subtitles.bleach.entity.heilig_pfeil.fire",
+    "sounds": [
+      {
+        "name": "minecraft:random/bow",
+        "pitch": 1.7
+      }
+    ]
+  },
+  "entity.heilig_pfeil.hit": {
+    "subtitle": "subtitles.bleach.entity.heilig_pfeil.hit",
+    "sounds": [
+      {
+        "name": "minecraft:block/amethyst/step1",
+        "pitch": 1.4
+      },
+      {
+        "name": "minecraft:block/amethyst/step2",
+        "pitch": 1.4
+      },
+      {
+        "name": "minecraft:block/amethyst/step3",
+        "pitch": 1.4
+      },
+      {
+        "name": "minecraft:block/amethyst/step4",
+        "pitch": 1.4
+      }
+    ]
+  },
+  "player.hirenkyaku": {
+    "subtitle": "subtitles.bleach.player.hirenkyaku",
+    "sounds": [
+      {
+        "name": "minecraft:mob/breeze/slide1",
+        "pitch": 1.5
+      },
+      {
+        "name": "minecraft:mob/breeze/slide2",
+        "pitch": 1.5
+      },
+      {
+        "name": "minecraft:mob/breeze/slide3",
+        "pitch": 1.5
+      },
+      {
+        "name": "minecraft:mob/breeze/slide4",
+        "pitch": 1.5
+      }
+    ]
+  },
+  "player.blut": {
+    "subtitle": "subtitles.bleach.player.blut",
+    "sounds": [
+      {
+        "name": "minecraft:block/beacon/power1",
+        "pitch": 1.3
+      },
+      {
+        "name": "minecraft:block/beacon/power2",
+        "pitch": 1.3
+      },
+      {
+        "name": "minecraft:block/beacon/power3",
+        "pitch": 1.3
+      }
+    ]
+  },
+  "player.hollow_poison": {
+    "subtitle": "subtitles.bleach.player.hollow_poison",
+    "sounds": [
+      {
+        "name": "minecraft:mob/warden/heartbeat_1",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/warden/heartbeat_2",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/warden/heartbeat_3",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/warden/heartbeat_4",
+        "pitch": 0.8
+      }
+    ]
   }
 }

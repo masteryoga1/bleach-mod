@@ -2,9 +2,11 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.menu.TailoringMenu;
 import io.github.masteryoga1.bleach.recipe.TailoringInput;
 import io.github.masteryoga1.bleach.recipe.TailoringRecipe;
+import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModRecipes;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
@@ -25,12 +27,13 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** Tests for the Shihakushō, the Tailoring Table and the sheathed blade. */
+/** Tests for the Shihakushō and the Quincy garb, the Tailoring Table and the sheathed blade. */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class GarbTests {
@@ -67,7 +70,8 @@ public final class GarbTests {
                 .map(holder -> holder.value().getResultItem(helper.getLevel().registryAccess()).getItem())
                 .collect(Collectors.toSet());
         helper.assertTrue(results.equals(Set.of(ModItems.SHIHAKUSHO_KOSODE.get(), ModItems.SHIHAKUSHO_HAKAMA.get(),
-                ModItems.WARAJI.get())), "tailoring makes " + results);
+                ModItems.WARAJI.get(), ModItems.QUINCY_TUNIC.get(), ModItems.QUINCY_TROUSERS.get(),
+                ModItems.QUINCY_SHOES.get())), "tailoring makes " + results);
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("tailoring_table")).isPresent(),
                 "the Tailoring Table cannot be crafted");
         helper.succeed();
@@ -132,6 +136,36 @@ public final class GarbTests {
             helper.assertTrue(stack.getAttributeModifiers().modifiers().isEmpty(),
                     stack + " changes attributes: " + stack.getAttributeModifiers().modifiers());
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void quincyGarbIsCosmetic(GameTestHelper helper) {
+        List<Item> pieces = List.of(ModItems.QUINCY_TUNIC.get(), ModItems.QUINCY_TROUSERS.get(), ModItems.QUINCY_SHOES.get());
+        for (Item piece : pieces) {
+            ItemStack stack = new ItemStack(piece);
+            helper.assertTrue(stack.is(BleachTags.QUINCY_GARB), stack + " is not in #bleach:quincy_garb");
+            helper.assertFalse(stack.isDamageableItem(), stack + " wears out");
+            helper.assertTrue(stack.getMaxStackSize() == 1, stack + " stacks to " + stack.getMaxStackSize());
+            helper.assertTrue(stack.getAttributeModifiers().modifiers().isEmpty(),
+                    stack + " changes attributes: " + stack.getAttributeModifiers().modifiers());
+        }
+        ItemStack tunic = new ItemStack(ModItems.QUINCY_TUNIC.get());
+        helper.assertTrue(ModItems.QUINCY_TUNIC.get().getDefaultAttributeModifiers(tunic).equals(ItemAttributeModifiers.EMPTY),
+                "the Quincy tunic has attributes of its own");
+
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setItemSlot(EquipmentSlot.CHEST, tunic);
+        player.setItemSlot(EquipmentSlot.LEGS, new ItemStack(ModItems.QUINCY_TROUSERS.get()));
+        player.setItemSlot(EquipmentSlot.FEET, new ItemStack(ModItems.QUINCY_SHOES.get()));
+        helper.assertTrue(QuincyGarbItem.isFullSet(player), "the whole Quincy garb is not a full set");
+        player.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
+        helper.assertFalse(QuincyGarbItem.isFullSet(player), "two pieces of the Quincy garb made a full set");
+
+        // Neither garb counts as the other.
+        helper.assertFalse(tunic.is(BleachTags.SHINIGAMI_GARB), "the Quincy tunic counts as the Shihakushō");
+        helper.assertFalse(new ItemStack(ModItems.SHIHAKUSHO_KOSODE.get()).is(BleachTags.QUINCY_GARB),
+                "the kosode counts as the Quincy garb");
         helper.succeed();
     }
 

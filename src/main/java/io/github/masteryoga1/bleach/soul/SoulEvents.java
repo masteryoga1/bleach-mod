@@ -66,6 +66,7 @@ public final class SoulEvents {
         PlusEvents.register(bus);
         ZanpakutoEvents.register(bus);
         ShikaiEvents.register(bus);
+        QuincyEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -107,6 +108,7 @@ public final class SoulEvents {
                 data.meditationGrants++;
                 SoulLogic.addStatXp(player, data, Stat.REIATSU_CONTROL, 1);
                 ZanpakutoEvents.onMeditationGrant(player, data);
+                QuincyEvents.onMeditationGrant(player, data);
             }
         } else {
             data.meditationTicks = 0;
@@ -121,6 +123,8 @@ public final class SoulEvents {
             }
         }
 
+        QuincyEvents.tick(player, data, meditating);
+
         if (player.tickCount % MILESTONE_CHECK_TICKS == 0) {
             Milestones.check(player, data);
         }
@@ -131,11 +135,13 @@ public final class SoulEvents {
 
     /**
      * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
-     * the release ends and the reiatsu settles; standing on reishi footing or holding a Shikai that
-     * can seal spends it as it comes.
+     * the release ends and the reiatsu settles; standing on reishi footing paid in reiryoku, or holding
+     * a Shikai that can seal, spends it as it comes. A Quincy's footing is paid in reishi instead.
      */
     public static boolean mayRegenerate(Player player, SoulData data) {
-        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !ReishiFooting.isActive(player)
+        boolean footingOnReiryoku = ReishiFooting.isActive(player)
+                && !QuincyLogic.footingOnReishi(data, player.level().getGameTime());
+        return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !footingOnReiryoku
                 && !data.isShikaiActive();
     }
 
@@ -263,13 +269,17 @@ public final class SoulEvents {
         }
     }
 
-    /** Reapplies the transient stat modifiers and sends the client a full copy. */
+    /**
+     * Reapplies the transient stat modifiers, settles the Quincy bloodline (see
+     * {@link QuincyEvents#onRefresh}) and sends the client a full copy.
+     */
     public static void refresh(ServerPlayer player) {
         SoulData data = SoulLogic.get(player);
         if (!data.isInitialized()) {
             SoulLogic.initialize(data);
         }
         SoulLogic.applyStatModifiers(player, data);
+        QuincyEvents.onRefresh(player, data);
         BleachNetwork.syncSoul(player, data);
     }
 

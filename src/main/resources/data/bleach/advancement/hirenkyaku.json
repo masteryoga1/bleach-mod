@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:quincy",
+  "display": {
+    "icon": {
+      "id": "minecraft:feather"
+    },
+    "title": {
+      "translate": "advancements.bleach.hirenkyaku.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.hirenkyaku.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "hirenkyaku": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "hirenkyaku"
+      }
+    }
+  }
+}

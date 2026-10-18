@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "bleach:quincy_cross"
+    },
+    "title": {
+      "translate": "advancements.bleach.quincy.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.quincy.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "quincy": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "quincy"
+      }
+    }
+  }
+}

@@ -10,12 +10,17 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.quincy.Bloodline;
+import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.github.masteryoga1.bleach.registry.ModComponents;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyEvents;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.QuincyProgress;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -83,14 +88,24 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach zanpakuto &lt;players&gt; name    (as if the spirit's test was passed)
  * /bleach zanpakuto &lt;players&gt; seal    (a constant release can be released for the first time again)
  * /bleach zanpakuto &lt;players&gt; reset
+ * /bleach quincy &lt;players&gt; bloodline &lt;none|gemischt|echt&gt;   (as if chosen, with no word and no Cross)
+ * /bleach quincy &lt;players&gt; training &lt;0..100000&gt;   (raises the tier to match, never lowers it)
+ * /bleach quincy &lt;players&gt; reishi &lt;amount&gt;   (up to the soul's maximum)
+ * /bleach quincy &lt;players&gt; poison &lt;0..100&gt;
+ * /bleach quincy &lt;players&gt; blut &lt;off|vene|arterie&gt;   (skips the unlock, cost and poison checks; upkeep still applies)
+ * /bleach quincy &lt;players&gt; reset   (no Quincy power, and the bloodline is asked again)
  * </pre>
  */
 public final class BleachCommand {
+    /** The most Quincy training the command sets. */
+    private static final int MAX_TRAINING = 100000;
     private static final SuggestionProvider<CommandSourceStack> STATES = suggest(SoulState.values());
     private static final SuggestionProvider<CommandSourceStack> STATS = suggest(Stat.values());
     private static final SuggestionProvider<CommandSourceStack> PATHS = suggest(PowerPath.values());
     private static final SuggestionProvider<CommandSourceStack> HOLLOW_KINDS = suggest(HollowKind.values());
     private static final SuggestionProvider<CommandSourceStack> TYPES = suggest(ZanpakutoType.values());
+    private static final SuggestionProvider<CommandSourceStack> BLOODLINES = suggest(Bloodline.values());
+    private static final SuggestionProvider<CommandSourceStack> BLUT_MODES = suggest(BlutMode.values());
     /** The spirits the world loaded, read from the server's registry. */
     private static final SuggestionProvider<CommandSourceStack> SPIRITS = (context, builder) ->
             SharedSuggestionProvider.suggestResource(ZanpakutoSpirits.registry(context.getSource().getLevel())
@@ -182,7 +197,30 @@ public final class BleachCommand {
                                 .then(Commands.literal("seal")
                                         .executes(BleachCommand::sealZanpakuto))
                                 .then(Commands.literal("reset")
-                                        .executes(BleachCommand::resetZanpakuto)))));
+                                        .executes(BleachCommand::resetZanpakuto))))
+                .then(Commands.literal("quincy")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.literal("bloodline")
+                                        .then(Commands.argument("bloodline", StringArgumentType.word())
+                                                .suggests(BLOODLINES)
+                                                .executes(BleachCommand::setBloodline)))
+                                .then(Commands.literal("training")
+                                        .then(Commands.argument("training",
+                                                        IntegerArgumentType.integer(0, MAX_TRAINING))
+                                                .executes(BleachCommand::setTraining)))
+                                .then(Commands.literal("reishi")
+                                        .then(Commands.argument("reishi", FloatArgumentType.floatArg(0.0F))
+                                                .executes(BleachCommand::setReishi)))
+                                .then(Commands.literal("poison")
+                                        .then(Commands.argument("poison",
+                                                        FloatArgumentType.floatArg(0.0F, QuincyProgress.MAX_POISON))
+                                                .executes(BleachCommand::setPoison)))
+                                .then(Commands.literal("blut")
+                                        .then(Commands.argument("blut", StringArgumentType.word())
+                                                .suggests(BLUT_MODES)
+                                                .executes(BleachCommand::setBlut)))
+                                .then(Commands.literal("reset")
+                                        .executes(BleachCommand::resetQuincy)))));
     }
 
     private static int info(CommandSourceStack source, ServerPlayer player) {
@@ -231,6 +269,12 @@ public final class BleachCommand {
                 bond.affinity(ZanpakutoType.POWER), effective.get(ZanpakutoType.POWER),
                 bond.affinity(ZanpakutoType.KIDO), effective.get(ZanpakutoType.KIDO),
                 bond.affinity(ZanpakutoType.CONSTANT_RELEASE), effective.get(ZanpakutoType.CONSTANT_RELEASE)));
+        QuincyProgress quincy = data.quincy();
+        line.accept(Component.translatable("commands.bleach.info.quincy", QuincyLogic.bloodline(data).displayName(),
+                Component.translatable(quincy.decided()
+                        ? "commands.bleach.info.quincy.chosen" : "commands.bleach.info.quincy.undecided"),
+                quincy.training(), format(quincy.reishi()), format(QuincyLogic.maxReishi(data)),
+                format(quincy.poison()), quincy.blut().displayName(), quincy.destroyed()));
         return 1;
     }
 
@@ -643,6 +687,123 @@ public final class BleachCommand {
             BleachNetwork.syncSoul(player, data);
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.reset",
+                players.size()), true);
+        return players.size();
+    }
+
+    // ---- /bleach quincy ----
+
+    /**
+     * Settles the bloodline as if it had been chosen, but quietly: no word to the player and no Cross.
+     * Awakened power cannot be left without blood, so taking the blood from an awakened Quincy is
+     * refused, pointing to the reset.
+     */
+    private static int setBloodline(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "bloodline");
+        Bloodline bloodline = byName(Bloodline.values(), name);
+        if (bloodline == null) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.unknown_bloodline", name));
+            return 0;
+        }
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        int changed = 0;
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            if (bloodline == Bloodline.NONE && QuincyLogic.isAwakened(data)) {
+                context.getSource().sendFailure(Component.translatable("commands.bleach.quincy.bloodline.awakened",
+                        player.getDisplayName()));
+                continue;
+            }
+            QuincyEvents.setBloodline(player, data, bloodline, false);
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.bloodline",
+                    bloodline.displayName(), count), true);
+        }
+        return count;
+    }
+
+    /**
+     * Sets Quincy training, then raises the tier to match as if it had been earned (with its title and
+     * growth); a tier is never lowered. A soul without the blood, or one that may not awaken, only
+     * keeps the points.
+     */
+    private static int setTraining(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int training = IntegerArgumentType.getInteger(context, "training");
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            data.setQuincy(data.quincy().withTraining(training));
+            QuincyEvents.train(player, data, 0);
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.training",
+                training, players.size()), true);
+        return players.size();
+    }
+
+    /** Sets reishi, up to each soul's maximum: none at all before the power awakens. */
+    private static int setReishi(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        float reishi = FloatArgumentType.getFloat(context, "reishi");
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            QuincyLogic.setReishi(data, reishi);
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.reishi",
+                format(reishi), players.size()), true);
+        return players.size();
+    }
+
+    /** Sets Hollow poison straight. Its stages, and anything they bring, follow on the next tick. */
+    private static int setPoison(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        float poison = FloatArgumentType.getFloat(context, "poison");
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            data.setQuincy(data.quincy().withPoison(poison));
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.poison",
+                format(poison), players.size()), true);
+        return players.size();
+    }
+
+    /**
+     * Calls on Blut, or lets it go, without the unlock, settling, poison and start-cost checks. Its
+     * upkeep still applies: the next tick ends it for a soul that cannot use Quincy powers, is poisoned
+     * past the block or has no reishi left.
+     */
+    private static int setBlut(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "blut");
+        BlutMode mode = byName(BlutMode.values(), name);
+        if (mode == null) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.unknown_blut", name));
+            return 0;
+        }
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            QuincyEvents.setBlut(player, data, mode, true);
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.blut",
+                mode.displayName(), players.size()), true);
+        return players.size();
+    }
+
+    /** Takes the Quincy power away and leaves the bloodline open, so the soul is asked about it again. */
+    private static int resetQuincy(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            QuincyEvents.resetQuincy(player);
+            BleachNetwork.syncSoul(player, SoulLogic.get(player));
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.reset",
                 players.size()), true);
         return players.size();
     }

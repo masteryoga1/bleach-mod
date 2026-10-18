@@ -1,7 +1,9 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulState;
 import java.util.Set;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.CompoundTag;
@@ -39,11 +41,21 @@ public final class AcademyInstructor extends ShinigamiNpc {
         setInvulnerable(true);
     }
 
+    /**
+     * An awakened Quincy the Academy may not take in (a living Human who is no Substitute, or a
+     * Rukongai soul not yet enrolled) is turned away. Everyone else is seen for what they are: a
+     * Substitute or a living Human, a student or a Rukongai soul, or a Shinigami.
+     */
     @Override
     public DialogueView viewFor(SoulData visitor, long now) {
         DialogueView common = commonView(visitor);
         if (common != null) {
             return common;
+        }
+        if (QuincyLogic.blocksShinigamiPower(visitor)
+                && ((visitor.state() == SoulState.HUMAN && !ShinigamiLogic.isSubstitute(visitor))
+                        || (visitor.state() == SoulState.RUKONGAI && !ShinigamiLogic.isStudent(visitor)))) {
+            return DialogueView.QUINCY;
         }
         return switch (visitor.state()) {
             case HUMAN -> ShinigamiLogic.isSubstitute(visitor) ? DialogueView.SUBSTITUTE : DialogueView.LIVING;

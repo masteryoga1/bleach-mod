@@ -61,15 +61,17 @@ public final class ShinigamiLogic {
     /**
      * The last part of the {@code screen.bleach.soul.next.*} key that says what this soul can do next.
      * A Shinigami, Substitute or student whose Asauchi bond is full hears {@code .bonded} (sit in
-     * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it).
+     * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it). A
+     * Quincy who has passed on and whom the Academy will not take hears {@code quincy.rukongai}.
      */
     public static String nextStepKey(SoulData data, long now) {
         if (isPowerLent(data, now)) {
             return "lent";
         }
         return switch (data.state()) {
-            case HUMAN -> isSubstitute(data) ? "substitute" + bondStep(data.zanpakuto()) : "human";
-            case RUKONGAI -> !data.shinigami().enrolled() ? "rukongai"
+            case HUMAN -> isSubstitute(data) ? "substitute" + bondStep(data.zanpakuto()) : QuincyLogic.nextStepKey(data);
+            case RUKONGAI -> !data.shinigami().enrolled()
+                    ? (QuincyLogic.blocksShinigamiPower(data) ? "quincy.rukongai" : "rukongai")
                     : data.zanpakuto().isFull() && !data.zanpakuto().named() ? "student.bonded" : "student";
             case SHINIGAMI -> "shinigami" + bondStep(data.zanpakuto());
             default -> data.state().getSerializedName();
@@ -103,8 +105,10 @@ public final class ShinigamiLogic {
 
     // ---- The Academy ----
 
+    /** A Rukongai soul not yet enrolled, unless it is an awakened Quincy (see {@link QuincyLogic#blocksShinigamiPower}). */
     public static boolean canEnroll(SoulData data) {
-        return data.state() == SoulState.RUKONGAI && !data.shinigami().enrolled();
+        return data.state() == SoulState.RUKONGAI && !data.shinigami().enrolled()
+                && !QuincyLogic.blocksShinigamiPower(data);
     }
 
     public static void enroll(SoulData data) {
@@ -214,10 +218,13 @@ public final class ShinigamiLogic {
                 && giver.maxReiryoku() >= 2.0 * BleachConfig.get(BleachConfig.STARTING_REIRYOKU);
     }
 
-    /** Only a living Human who can sense spirits, and whose Shinigami power has not awakened yet. */
+    /**
+     * Only a living Human who can sense spirits, and whose Shinigami power has not awakened yet. An
+     * awakened Quincy's soul will not take it (see {@link QuincyLogic#blocksShinigamiPower}).
+     */
     public static boolean canReceivePower(SoulData receiver) {
         return receiver.state() == SoulState.HUMAN && SoulLogic.isAware(receiver)
-                && receiver.tier(PowerPath.SHINIGAMI) <= 0;
+                && receiver.tier(PowerPath.SHINIGAMI) <= 0 && !QuincyLogic.blocksShinigamiPower(receiver);
     }
 
     /**
@@ -291,7 +298,7 @@ public final class ShinigamiLogic {
 
     /**
      * How fast this soul regenerates compared with normal: faster in the full Shihakushō for those
-     * it suits, slower while its power is lent.
+     * it suits, slower while its power is lent or Hollow poison is in a Quincy's blood.
      */
     public static double regenMultiplier(LivingEntity entity, SoulData data, long now) {
         double multiplier = 1.0;
@@ -301,7 +308,7 @@ public final class ShinigamiLogic {
         if (isPowerLent(data, now)) {
             multiplier *= BleachConfig.get(BleachConfig.LENT_REGEN_MULTIPLIER);
         }
-        return multiplier;
+        return multiplier * QuincyLogic.poisonRegenMultiplier(data);
     }
 
     /** Whether the Shihakushō's set bonus works for this soul: Shinigami power, or an Academy student. */
@@ -359,7 +366,13 @@ public final class ShinigamiLogic {
 
     // ---- Reishi footing ----
 
+    /** Whether this soul can stand on reishi footing: as a Shinigami (see {@link #shinigamiFooting}) or as a Quincy. */
     public static boolean canUseReishiFooting(SoulData data, long now) {
+        return shinigamiFooting(data, now) || QuincyLogic.canStandOnReishi(data);
+    }
+
+    /** Whether this soul can stand on reishi footing the Shinigami way, paying in reiryoku: Hohō, and its power not lent. */
+    public static boolean shinigamiFooting(SoulData data, long now) {
         return spirituallyTrained(data) && !isPowerLent(data, now)
                 && data.level(Stat.HOHO) >= BleachConfig.get(BleachConfig.FOOTING_MIN_HOHO_LEVEL);
     }

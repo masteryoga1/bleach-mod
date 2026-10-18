@@ -7,7 +7,6 @@ import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -23,7 +22,6 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -189,36 +187,10 @@ public class GetsugaTensho extends Projectile {
     /**
      * Whether the crescent cuts this creature: never its owner, anything riding with them or their
      * tamed animals, never a Plus or a Shinigami, nor a player in creative or spectator mode or one
-     * the owner may not harm (a teammate, with friendly fire off).
+     * the owner may not harm (a teammate, with friendly fire off). See {@link SpiritProjectiles#mayStrike}.
      */
     public boolean affects(LivingEntity target) {
-        if (!target.isAlive()) {
-            return false;
-        }
-        Entity owner = getOwner();
-        if (owner != null) {
-            if (target == owner || target.getRootVehicle() == owner.getRootVehicle()) {
-                return false;
-            }
-            if (target instanceof OwnableEntity ownable) {
-                UUID tamer = ownable.getOwnerUUID();
-                if (tamer != null && tamer.equals(owner.getUUID())) {
-                    return false;
-                }
-            }
-        }
-        if (target instanceof PlusSpirit || target instanceof ShinigamiNpc) {
-            return false;
-        }
-        if (target instanceof Player player) {
-            if (player.isCreative() || player.isSpectator()) {
-                return false;
-            }
-            if (owner instanceof Player attacker && !attacker.canHarmPlayer(player)) {
-                return false;
-            }
-        }
-        return true;
+        return SpiritProjectiles.mayStrike(getOwner(), target);
     }
 
     /** From 0 for a tap to 1 for a full gather. */
