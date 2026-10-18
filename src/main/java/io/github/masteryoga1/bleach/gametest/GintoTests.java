@@ -201,6 +201,10 @@ public final class GintoTests {
         pig.setDeltaMovement(0.2, 0.52, 0.2);
         NeoForge.EVENT_BUS.post(new LivingEvent.LivingJumpEvent(pig));
         helper.assertTrue(pig.getDeltaMovement().equals(Vec3.ZERO), "the bound pig jumped off at " + pig.getDeltaMovement());
+        // Nor does a bound player swim, whose lift towards where they look comes after the effect's tick.
+        player.setSwimming(true);
+        ModEffects.GRITZ.get().applyEffectTick(player, 0);
+        helper.assertFalse(player.isSwimming(), "Gritz left a player swimming");
         pig.discard();
         clearCasts(helper);
         helper.succeed();

@@ -227,7 +227,7 @@ public final class ReiryokuHud {
             fraction = share(arts.letztEndsAt() - now, BleachConfig.get(BleachConfig.LETZT_DURATION_TICKS));
             colour = ART_LETZT;
         } else if (QuincyArtsLogic.isSealed(data)) {
-            fraction = share(now - arts.stageSince(), QuincyArtsLogic.sealedTicksNeeded(false));
+            fraction = share(now - arts.stageSince(), QuincyArtsLogic.sealedWaitTicks());
             colour = QuincyArtsLogic.riteOpen(data, now) ? ART_RITE_OPEN : ART_SEALED;
         } else if (QuincyArtsLogic.gloveMastered(data)) {
             fraction = 1.0F;

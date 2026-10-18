@@ -441,6 +441,24 @@ public final class QuincyArtsLogic {
         return BleachConfig.get(byArrow ? BleachConfig.RESTORE_ARROW_SEALED_TICKS : BleachConfig.RESTORE_SEALED_TICKS);
     }
 
+    /**
+     * Whether the sealed wait counts towards another Quincy's arrow: when the solo rite is switched
+     * off, that is the only way back. Otherwise it counts towards the rite.
+     */
+    public static boolean waitsForArrow() {
+        return !BleachConfig.get(BleachConfig.RESTORE_SOLO_RITE);
+    }
+
+    /** How long a seal lasts before the power can come back the way the wait counts towards (see {@link #waitsForArrow}). */
+    public static long sealedWaitTicks() {
+        return sealedTicksNeeded(waitsForArrow());
+    }
+
+    /** Whether the seal has lasted {@link #sealedWaitTicks}. */
+    public static boolean sealedWaitOver(SoulData data, long now) {
+        return sealedLongEnough(data, now, waitsForArrow());
+    }
+
     /** Whether the power has been sealed long enough to return this way. Never for a time before the seal. */
     public static boolean sealedLongEnough(SoulData data, long now, boolean byArrow) {
         QuincyArts arts = arts(data);
@@ -725,7 +743,8 @@ public final class QuincyArtsLogic {
                     ? (arts.glove().mastered() ? "quincy.glove_mastered" : "quincy.glove")
                     : "quincy." + QuincyLogic.tier(data);
             case LETZT_STIL -> "quincy.letzt_stil";
-            case SEALED -> sealedLongEnough(data, now, false) ? "quincy.sealed_ready" : "quincy.sealed";
+            case SEALED -> !sealedWaitOver(data, now) ? "quincy.sealed"
+                    : waitsForArrow() ? "quincy.sealed_ready_arrow" : "quincy.sealed_ready";
             case RESTORED -> vollUnlocked(data) ? "quincy.vollstandig" : "quincy.restored";
         };
     }

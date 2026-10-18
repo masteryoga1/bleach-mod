@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -26,12 +27,6 @@ import net.minecraft.world.phys.Vec3;
 public class LetztPfeil extends HeiligPfeil {
     public static final ResourceKey<DamageType> DAMAGE_TYPE =
             ResourceKey.create(Registries.DAMAGE_TYPE, BleachMod.id("letzt_pfeil"));
-
-    /**
-     * The most blocks it looks for along one tick's path: more than its full speed can pass through
-     * even on a slant, so a long carve is not cut short by the count alone.
-     */
-    private static final int MAX_CARVES_PER_TICK = 8;
 
     /** How many more blocks it may carve. Server only. */
     private int carveLeft;
@@ -86,7 +81,9 @@ public class LetztPfeil extends HeiligPfeil {
         double maxHardness = BleachConfig.get(BleachConfig.LETZT_PFEIL_MAX_HARDNESS);
         Vec3 from = position();
         Vec3 to = creatureStop(from, from.add(getDeltaMovement()));
-        for (int i = 0; i < MAX_CARVES_PER_TICK && carveLeft > 0; i++) {
+        // Every block a path this long can pass through, even on a slant, at whatever speed it was set to.
+        int mostBlocks = Mth.ceil(to.subtract(from).length() * Math.sqrt(3.0)) + 3;
+        for (int i = 0; i < mostBlocks && carveLeft > 0; i++) {
             BlockHitResult hit = level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
             if (hit.getType() != HitResult.Type.BLOCK) {
                 return;

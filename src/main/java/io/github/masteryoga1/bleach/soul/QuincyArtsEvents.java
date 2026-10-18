@@ -573,10 +573,10 @@ public final class QuincyArtsEvents {
         } else if (QuincyArtsLogic.vollUnlocked(d)) {
             startVollstandig(p, d, now, false);
         } else if (QuincyArtsLogic.isSealed(d)) {
-            tell(p, QuincyArtsLogic.sealedLongEnough(d, now, false)
-                    ? Component.translatable("message.bleach.quincy_form.sealed_ready")
-                    : Component.translatable("message.bleach.quincy_form.sealed",
-                            QuincyArtsLogic.formatTicks(sealedTicksLeft(d, now))));
+            tell(p, !QuincyArtsLogic.sealedWaitOver(d, now)
+                    ? Component.translatable("message.bleach.quincy_form.sealed", QuincyArtsLogic.formatTicks(sealedTicksLeft(d, now)))
+                    : Component.translatable(QuincyArtsLogic.waitsForArrow()
+                            ? "message.bleach.quincy_form.sealed_ready_arrow" : "message.bleach.quincy_form.sealed_ready"));
         } else if (QuincyArtsLogic.isRestored(d)) {
             tell(p, Component.translatable("message.bleach.quincy_form.locked", QuincyArtsLogic.vollTrainingLeft(d)));
         } else {
@@ -676,16 +676,17 @@ public final class QuincyArtsEvents {
         if (p.level() instanceof ServerLevel level) {
             SpiritSenses.particles(level, ParticleTypes.ASH, p.getX(), p.getY(0.5), p.getZ(), SEAL_PARTICLES, 0.3, 0.6, 0.3, 0.02);
         }
-        p.sendSystemMessage(Component.translatable("message.bleach.letzt_stil.sealed_now",
+        p.sendSystemMessage(Component.translatable(QuincyArtsLogic.waitsForArrow()
+                        ? "message.bleach.letzt_stil.sealed_now_arrow" : "message.bleach.letzt_stil.sealed_now",
                 QuincyArtsLogic.formatTicks(sealedTicksLeft(d, now))).withStyle(ChatFormatting.GRAY));
         sync(p, d);
     }
 
-    /** How long until a sealed power can return by the rite. */
+    /** How long until a sealed power can return the way its wait counts towards (see {@link QuincyArtsLogic#waitsForArrow}). */
     private static long sealedTicksLeft(SoulData d, long now) {
         long since = QuincyArtsLogic.arts(d).stageSince();
         long elapsed = now <= since ? 0L : now - since;
-        return Math.max(0L, QuincyArtsLogic.sealedTicksNeeded(false) - elapsed);
+        return Math.max(0L, QuincyArtsLogic.sealedWaitTicks() - elapsed);
     }
 
     // ---- Restoration ----

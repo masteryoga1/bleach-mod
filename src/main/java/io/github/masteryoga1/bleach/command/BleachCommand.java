@@ -329,12 +329,12 @@ public final class BleachCommand {
         return glove.given() ? "given" : "none";
     }
 
-    /** The time Letzt Stil has left, or the time sealed against the time the solo rite needs, or a dash. */
+    /** The time Letzt Stil has left, or the time sealed against the wait before the power can return, or a dash. */
     private static String artsClock(QuincyArts arts, long now) {
         return switch (arts.stage()) {
             case LETZT_STIL -> QuincyArtsLogic.formatTicks(arts.letztEndsAt() - now) + " left";
             case SEALED -> QuincyArtsLogic.formatTicks(now - arts.stageSince()) + " / "
-                    + QuincyArtsLogic.formatTicks(QuincyArtsLogic.sealedTicksNeeded(false)) + " sealed";
+                    + QuincyArtsLogic.formatTicks(QuincyArtsLogic.sealedWaitTicks()) + " sealed";
             case UNTOUCHED, RESTORED -> "-";
         };
     }

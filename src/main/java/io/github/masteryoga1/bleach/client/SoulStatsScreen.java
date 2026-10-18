@@ -260,10 +260,10 @@ public final class SoulStatsScreen extends Screen {
             }
             case LETZT_STIL -> lines.add(Component.translatable("screen.bleach.soul.quincy.letzt",
                     QuincyArtsLogic.formatTicks(arts.letztEndsAt() - now)).withColor(LETZT));
-            case SEALED -> lines.add(QuincyArtsLogic.sealedLongEnough(data, now, false)
+            case SEALED -> lines.add(QuincyArtsLogic.sealedWaitOver(data, now)
                     ? Component.translatable("screen.bleach.soul.quincy.sealed_ready")
                     : Component.translatable("screen.bleach.soul.quincy.sealed", QuincyArtsLogic.formatTicks(
-                            arts.stageSince() + QuincyArtsLogic.sealedTicksNeeded(false) - now)));
+                            arts.stageSince() + QuincyArtsLogic.sealedWaitTicks() - now)));
             case RESTORED -> lines.add(Component.translatable("screen.bleach.soul.quincy.ginrei").withColor(REISHI));
         }
 

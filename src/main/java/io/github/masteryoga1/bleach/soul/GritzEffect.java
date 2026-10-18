@@ -64,7 +64,8 @@ public final class GritzEffect extends MobEffect {
 
     /**
      * On whichever side moves the creature (a player's own client), before it moves this tick: it
-     * rises neither up a ladder nor through water, which vanilla lifts it by whatever its speed.
+     * rises neither up a ladder nor through water, which vanilla lifts it by whatever its speed, and
+     * it is not swimming, whose lift towards where it looks comes later in the same tick.
      * Then, on the server, holds a creature in place, since a mob's own pathing and knockback can
      * still slide it about with no speed of its own; a player's movement is their client's, and
      * their speed is already gone.
@@ -72,6 +73,7 @@ public final class GritzEffect extends MobEffect {
     @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
         if (entity.isControlledByLocalInstance()) {
+            entity.setSwimming(false);
             Vec3 motion = entity.getDeltaMovement();
             if (motion.y > 0.0 && (entity.onClimbable() || entity.isInWater())) {
                 entity.setDeltaMovement(motion.x, 0.0, motion.z);
