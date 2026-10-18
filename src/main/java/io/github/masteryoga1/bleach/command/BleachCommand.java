@@ -92,7 +92,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach quincy &lt;players&gt; training &lt;0..100000&gt;   (raises the tier to match, never lowers it)
  * /bleach quincy &lt;players&gt; reishi &lt;amount&gt;   (up to the soul's maximum)
  * /bleach quincy &lt;players&gt; poison &lt;0..100&gt;
- * /bleach quincy &lt;players&gt; blut &lt;off|vene|arterie&gt;   (whatever the tier, reishi or poison)
+ * /bleach quincy &lt;players&gt; blut &lt;off|vene|arterie&gt;   (skips the unlock, cost and poison checks; upkeep still applies)
  * /bleach quincy &lt;players&gt; reset   (no Quincy power, and the bloodline is asked again)
  * </pre>
  */
@@ -773,7 +773,11 @@ public final class BleachCommand {
         return players.size();
     }
 
-    /** Calls on Blut, or lets it go, whatever the soul's tier, reishi or poison. */
+    /**
+     * Calls on Blut, or lets it go, without the unlock, settling, poison and start-cost checks. Its
+     * upkeep still applies: the next tick ends it for a soul that cannot use Quincy powers, is poisoned
+     * past the block or has no reishi left.
+     */
     private static int setBlut(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "blut");
         BlutMode mode = byName(BlutMode.values(), name);
