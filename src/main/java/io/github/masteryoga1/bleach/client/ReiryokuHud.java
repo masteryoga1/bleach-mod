@@ -175,7 +175,7 @@ public final class ReiryokuHud {
                     blut == BlutMode.VENE ? VENE_OUTLINE : ARTERIE_OUTLINE);
         }
 
-        drawArtBar(graphics, data, x + WIDTH + ART_GAP, y, gameTime);
+        drawArtBar(graphics, data, x + WIDTH + ART_GAP, y, gameTime, player.level().getDayTime());
 
         int drawY = y - GATHER_GAP - GATHER_HEIGHT;
         if (QuincyClient.lichtGathering(player)) {
@@ -198,7 +198,7 @@ public final class ReiryokuHud {
         graphics.fill(x, y, x + WIDTH, y + HEIGHT, BACKGROUND);
         graphics.renderOutline(x - 1, y - 1, WIDTH + 2, HEIGHT + 2, SEALED_OUTLINE);
         long gameTime = player.level().getGameTime();
-        drawArtBar(graphics, data, x + WIDTH + ART_GAP, y, gameTime);
+        drawArtBar(graphics, data, x + WIDTH + ART_GAP, y, gameTime, player.level().getDayTime());
         int held = QuincyClient.useTicks(player);
         if (held > 0) {
             int riteTicks = Math.max(1, BleachConfig.get(BleachConfig.RESTORE_RITE_TICKS));
@@ -211,7 +211,7 @@ public final class ReiryokuHud {
      * applies: Vollständig or its cooldown, Letzt Stil's time left, the wait while sealed, or the
      * Sanrei Glove's day. Nothing for a Quincy who has none of these.
      */
-    private static void drawArtBar(GuiGraphics graphics, SoulData data, int x, int y, long now) {
+    private static void drawArtBar(GuiGraphics graphics, SoulData data, int x, int y, long now, long dayTime) {
         QuincyArts arts = QuincyArtsLogic.arts(data);
         QuincyForms forms = arts.forms();
         SanreiProgress glove = arts.glove();
@@ -233,7 +233,7 @@ public final class ReiryokuHud {
             fraction = 1.0F;
             colour = ART_GLOVE_MASTERED;
         } else if (QuincyArtsLogic.handicapped(data)) {
-            fraction = share(glove.today(), BleachConfig.get(BleachConfig.SANREI_POINTS_PER_DAY));
+            fraction = share(QuincyArtsLogic.gloveToday(glove, now, dayTime), BleachConfig.get(BleachConfig.SANREI_POINTS_PER_DAY));
             colour = ART_GLOVE;
         } else {
             return;

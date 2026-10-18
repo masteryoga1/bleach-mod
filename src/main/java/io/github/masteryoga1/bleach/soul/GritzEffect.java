@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffect;
@@ -11,13 +12,15 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForgeMod;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
 
 /**
  * Gritz, the Gintō spell that binds: whatever it holds cannot walk, jump or fly, and cannot dash
  * away with Hirenkyaku or Shunpo or stand on reishi either (those check for it themselves). Each of
- * its attribute modifiers multiplies the total by zero. Flight given by an attribute is switched off
- * with it, but a creative player's own flight is not. Only those who see spirits see the ring of
- * light around a bound creature.
+ * its attribute modifiers multiplies the total by zero, and a jump that still leaves the ground
+ * (on Jump Boost, which vanilla adds after the attribute) is cancelled ({@link #onJump}). Flight
+ * given by an attribute is switched off with it, but a creative player's own flight is not. Only
+ * those who see spirits see the ring of light around a bound creature.
  */
 public final class GritzEffect extends MobEffect {
     /** The effect's colour: the pale blue-white of reishi. */
@@ -37,6 +40,18 @@ public final class GritzEffect extends MobEffect {
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         addAttributeModifier(NeoForgeMod.CREATIVE_FLIGHT, BleachMod.id("gritz_flight"), -1.0,
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+    }
+
+    /**
+     * A bound creature that jumps anyway goes nowhere: neither up nor, sprinting, ahead. On both
+     * sides, since a player's own client moves them.
+     */
+    public static void onJump(LivingEvent.LivingJumpEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity.hasEffect(ModEffects.GRITZ)) {
+            Vec3 motion = entity.getDeltaMovement();
+            entity.setDeltaMovement(0.0, Math.min(0.0, motion.y), 0.0);
+        }
     }
 
     @Override

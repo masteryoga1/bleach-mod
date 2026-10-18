@@ -253,7 +253,8 @@ public final class SoulStatsScreen extends Screen {
                     lines.add(Component.translatable("screen.bleach.soul.quincy.glove_mastered"));
                 } else if (glove.worn()) {
                     lines.add(Component.translatable("screen.bleach.soul.quincy.glove", glove.days(),
-                            BleachConfig.get(BleachConfig.SANREI_DAYS_TO_MASTER), glove.today(),
+                            BleachConfig.get(BleachConfig.SANREI_DAYS_TO_MASTER),
+                            QuincyArtsLogic.gloveToday(glove, now, player.level().getDayTime()),
                             BleachConfig.get(BleachConfig.SANREI_POINTS_PER_DAY)));
                 }
             }

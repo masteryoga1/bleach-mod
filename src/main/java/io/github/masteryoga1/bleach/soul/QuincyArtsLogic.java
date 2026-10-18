@@ -68,11 +68,18 @@ public final class QuincyArtsLogic {
     public static final double HEART_FRONT_DOT = -0.5;
     /** How long the weakness after winning the power back lasts. */
     public static final int RESTORE_EFFECT_TICKS = 600;
+    /**
+     * For this long after winning the power back no Heilig Pfeil strikes the Quincy, so the flank
+     * arrows that fly beside a restoring shot cannot harm the one it just restored.
+     */
+    public static final int RESTORE_GRACE_TICKS = 2;
     public static final float SEELE_FIRED_SPEED_MULTIPLIER = 1.2F;
     /** A spent Seele Schneider that never lands drops its hilt after this long in the air. */
     public static final int SEELE_SPENT_AIR_TICKS = 1200;
     /** Gritz from the fifth blade of a Sprenger formation, and on what survives the blast. */
     public static final int SPRENGER_BIND_TICKS = 60;
+    /** A formation binds again only this long after it last bound, so planting a corner again is no endless bind. */
+    public static final int SPRENGER_BIND_COOLDOWN_TICKS = 200;
     public static final int SPRENGER_SURVIVOR_GRITZ_TICKS = 40;
     /** How far from the caster (or a blade that just stuck) Sprenger's blades are looked for. */
     public static final double SPRENGER_RANGE = 16.0;
@@ -371,6 +378,11 @@ public final class QuincyArtsLogic {
         return Math.floorDiv(Math.max(gameTime, dayTime), TICKS_PER_DAY);
     }
 
+    /** Today's glove training: none yet if the count saved is from an earlier day. */
+    public static int gloveToday(SanreiProgress glove, long gameTime, long dayTime) {
+        return glove.day() == gloveDay(gameTime, dayTime) ? glove.today() : 0;
+    }
+
     /**
      * Adds glove training on this day. A new day starts today's count again; today's count stops at
      * the day's points, and reaching them counts the day once. Enough counted days master the glove,
@@ -445,6 +457,16 @@ public final class QuincyArtsLogic {
     public static boolean exhausted(Player player) {
         return player.getHealth() <= BleachConfig.get(BleachConfig.RESTORE_MAX_HEALTH_FRACTION) * player.getMaxHealth()
                 && player.getFoodData().getFoodLevel() <= BleachConfig.get(BleachConfig.RESTORE_MAX_FOOD);
+    }
+
+    /** Whether this player won the Quincy power back in the last {@link #RESTORE_GRACE_TICKS}. */
+    public static boolean justRestored(Player player, long now) {
+        if (!SoulLogic.hasSoul(player)) {
+            return false;
+        }
+        QuincyArts arts = arts(SoulLogic.get(player));
+        long since = now - arts.stageSince();
+        return arts.stage() == QuincyStage.RESTORED && since >= 0 && since <= RESTORE_GRACE_TICKS;
     }
 
     /** Whether this sealed soul's power can return now, by the rite or by another Quincy's arrow. */
@@ -725,16 +747,18 @@ public final class QuincyArtsLogic {
 
     /**
      * Puts saved clocks back in reach of the game time, for a world whose time was changed or a save
-     * copied between worlds: no stage starts in the future, a Letzt Stil never has more than its full
-     * time left (one that does burns out now), no cooldown is longer than its full length, and the
-     * training at the restoration is never more than the soul has.
+     * copied between worlds: no stage starts in the future (except a seal from a death in Letzt Stil,
+     * which starts when the Letzt Stil would have ended, at most its full time ahead), a Letzt Stil
+     * never has more than its full time left (one that does burns out now), no cooldown is longer
+     * than its full length, and the training at the restoration is never more than the soul has.
      */
     public static QuincyArts normalise(QuincyArts arts, int training, long now) {
         QuincyArts out = arts;
-        if (out.stageSince() > now) {
+        long letztDuration = BleachConfig.get(BleachConfig.LETZT_DURATION_TICKS);
+        long latestSince = out.stage() == QuincyStage.SEALED ? now + letztDuration : now;
+        if (out.stageSince() > latestSince) {
             out = out.withStage(out.stage(), now);
         }
-        long letztDuration = BleachConfig.get(BleachConfig.LETZT_DURATION_TICKS);
         if (out.stage() == QuincyStage.LETZT_STIL && out.letztEndsAt() > now && out.letztEndsAt() - now > letztDuration) {
             out = out.withLetztEndsAt(now);
         }

@@ -86,6 +86,8 @@ public class HeiligPfeil extends AbstractArrow {
     private static final int BURST_COUNT = 6;
     private static final double BURST_SPREAD = 0.1;
     private static final double BURST_SPEED = 0.05;
+    /** How much bigger than its box a creature is to an arrow's flight, as vanilla's search makes it. */
+    private static final double ENTITY_HIT_INFLATE = 0.3;
     /** How a volley arrow looks: halfway between a tap and a full draw. */
     private static final float VOLLEY_CHARGE = 0.5F;
 
@@ -355,6 +357,53 @@ public class HeiligPfeil extends AbstractArrow {
         }
     }
 
+    /**
+     * Where a path from {@code from} to {@code to} this tick ends at the latest on a creature: at the
+     * first one on it that will stop the arrow (a shield raised towards it, one that turns arrows
+     * aside, or the one met past its last pierce), or at {@code to} if none will. Server side; it
+     * strikes nothing.
+     */
+    protected Vec3 creatureStop(Vec3 from, Vec3 to) {
+        AABB sweep = getBoundingBox().expandTowards(to.subtract(from)).inflate(1.0);
+        List<Entity> met = new ArrayList<>();
+        List<Vec3> where = new ArrayList<>();
+        for (Entity entity : level().getEntities(this, sweep, this::canHitEntity)) {
+            AABB box = entity.getBoundingBox().inflate(ENTITY_HIT_INFLATE);
+            Vec3 at = box.contains(from) ? from : box.clip(from, to).orElse(null);
+            if (at != null) {
+                met.add(entity);
+                where.add(at);
+            }
+        }
+        List<Integer> order = new ArrayList<>();
+        for (int i = 0; i < met.size(); i++) {
+            order.add(i);
+        }
+        order.sort(Comparator.comparingDouble(i -> where.get(i).distanceToSqr(from)));
+        DamageSource source = new DamageSource(level().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                .getHolderOrThrow(damageType()), this, getOwner());
+        IntOpenHashSet bodies = new IntOpenHashSet();
+        int pierce = pierceLeft;
+        for (int i : order) {
+            Entity entity = met.get(i);
+            LivingEntity target = targetOf(entity);
+            if (target == null || !bodies.add(target.getId())) {
+                continue;
+            }
+            boolean shielded;
+            hurting = true;
+            try {
+                shielded = target.isDamageSourceBlocked(source);
+            } finally {
+                hurting = false;
+            }
+            if (shielded || entity.deflection(this) != ProjectileDeflection.NONE || pierce-- <= 0) {
+                return where.get(i);
+            }
+        }
+        return to;
+    }
+
     /** Whether a shot from {@code at} along {@code heading} starts inside this box, or just short of it. */
     private static boolean startsAt(AABB box, Vec3 at, Vec3 heading) {
         return box.contains(at) || box.inflate(POINT_BLANK_INFLATE).contains(at)
@@ -408,14 +457,19 @@ public class HeiligPfeil extends AbstractArrow {
         return (byte) Mth.clamp(pierceLeft + 1, 1, Byte.MAX_VALUE);
     }
 
-    /** Only a creature the owner may harm, through its parts for a many-part body, and never one met before. */
+    /**
+     * Only a creature the owner may harm, through its parts for a many-part body, and never one met
+     * before. A Quincy who has just won the power back is passed by (see
+     * {@link QuincyArtsLogic#justRestored}).
+     */
     @Override
     protected boolean canHitEntity(Entity entity) {
         if (!super.canHitEntity(entity) || struck.contains(entity.getId())) {
             return false;
         }
         LivingEntity target = targetOf(entity);
-        return target != null && !struck.contains(target.getId()) && SpiritProjectiles.mayStrike(getOwner(), target);
+        return target != null && !struck.contains(target.getId()) && SpiritProjectiles.mayStrike(getOwner(), target)
+                && !(target instanceof Player player && QuincyArtsLogic.justRestored(player, level().getGameTime()));
     }
 
     /**

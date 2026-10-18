@@ -311,7 +311,8 @@ public final class BleachCommand {
         QuincyArts arts = quincy.arts();
         SanreiProgress glove = arts.glove();
         line.accept(Component.translatable("commands.bleach.info.quincy_arts", arts.stage().getSerializedName(),
-                gloveWord(glove), glove.days(), BleachConfig.get(BleachConfig.SANREI_DAYS_TO_MASTER), glove.today(),
+                gloveWord(glove), glove.days(), BleachConfig.get(BleachConfig.SANREI_DAYS_TO_MASTER),
+                QuincyArtsLogic.gloveToday(glove, now, player.level().getDayTime()),
                 artsClock(arts, now), formsWord(data), QuincyArtsLogic.formatTicks(arts.forms().vollReadyAt() - now),
                 QuincyArtsLogic.formatTicks(arts.forms().lichtRegenReadyAt() - now)));
         return 1;

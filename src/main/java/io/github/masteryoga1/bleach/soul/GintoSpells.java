@@ -176,8 +176,9 @@ public final class GintoSpells {
 
     /**
      * One of an owner's blades just stuck. If it completes a pentagon with the nearest four of theirs,
-     * and the owner knows Sprenger, the fifth blade binds every creature inside with Gritz, and the
-     * owner is told the formation stands.
+     * and the owner knows Sprenger, the owner is told the formation stands, and the fifth blade binds
+     * every creature inside not bound already with Gritz, at most once in
+     * {@link QuincyArtsLogic#SPRENGER_BIND_COOLDOWN_TICKS}.
      */
     public static void onSeeleStuck(SeeleSchneiderPfeil blade) {
         UUID ownerId = blade.ownerId();
@@ -193,9 +194,15 @@ public final class GintoSpells {
         if (shape == null) {
             return;
         }
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, reach(shape),
-                e -> e != owner && e.isAlive() && shape.contains(e.position()) && SpiritProjectiles.mayStrike(owner, e))) {
-            target.addEffect(gritz(QuincyArtsLogic.SPRENGER_BIND_TICKS), owner);
+        SoulData d = SoulLogic.get(owner);
+        long now = level.getGameTime();
+        if (now >= d.sprengerBindReadyAt) {
+            d.sprengerBindReadyAt = now + QuincyArtsLogic.SPRENGER_BIND_COOLDOWN_TICKS;
+            for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, reach(shape),
+                    e -> e != owner && e.isAlive() && !e.hasEffect(ModEffects.GRITZ) && shape.contains(e.position())
+                            && SpiritProjectiles.mayStrike(owner, e))) {
+                target.addEffect(gritz(QuincyArtsLogic.SPRENGER_BIND_TICKS), owner);
+            }
         }
         owner.displayClientMessage(Component.translatable("message.bleach.sprenger.formed").withStyle(ChatFormatting.AQUA), true);
     }

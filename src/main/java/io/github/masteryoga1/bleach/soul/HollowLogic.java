@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
@@ -308,15 +309,16 @@ public final class HollowLogic {
 
     /**
      * Whether this killing blow destroys a Hollow's soul instead of letting it go on (when it does
-     * not purify): a technique that destroys souls, such as a Heilig Pfeil, or a formed Seele
-     * Schneider in the killer's own hand.
+     * not purify): a technique that destroys souls, such as a Heilig Pfeil, or a melee swing of a
+     * formed Seele Schneider in the killer's own hand.
      */
     public static boolean destroysSouls(DamageSource source) {
         if (source.is(BleachTags.DESTROYS_SOULS)) {
             return true;
         }
         Entity cause = source.getEntity();
-        return cause != null && source.getDirectEntity() == cause && SeeleSchneiderItem.isFormed(source.getWeaponItem());
+        return cause != null && source.getDirectEntity() == cause && source.is(DamageTypeTags.IS_PLAYER_ATTACK)
+                && SeeleSchneiderItem.isFormed(source.getWeaponItem());
     }
 
     /**

@@ -19,6 +19,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageType;
@@ -233,12 +234,12 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
     }
 
     /**
-     * Only a spent blade, and only by its owner, or by anyone aware of spirits once the owner is gone;
-     * then as vanilla hands out an arrow.
+     * Only a spent blade, and only by its owner, or by anyone aware of spirits once the owner has left
+     * the server; then as vanilla hands out an arrow.
      */
     @Override
     protected boolean tryPickup(Player player) {
-        if (!isSpent() || !(ownedBy(player) || getOwner() == null && SoulLogic.seesSpirits(player))) {
+        if (!isSpent() || !(ownedBy(player) || ownerGone() && SoulLogic.seesSpirits(player))) {
             return false;
         }
         return switch (pickup) {
@@ -246,6 +247,18 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
             case CREATIVE_ONLY -> player.hasInfiniteMaterials();
             case DISALLOWED -> false;
         };
+    }
+
+    /**
+     * Whether the owner has left the server. An owner online in another level is not gone, though a
+     * blade loaded again from its chunk cannot find them from here.
+     */
+    private boolean ownerGone() {
+        if (getOwner() != null) {
+            return false;
+        }
+        MinecraftServer server = level().getServer();
+        return ownerId == null || server == null || server.getPlayerList().getPlayer(ownerId) == null;
     }
 
     /** Stuck too long: it drops its hilt, if it is one to pick up, and goes. */

@@ -33,6 +33,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -192,6 +194,10 @@ public final class GintoTests {
         helper.assertTrue(pig.hasEffect(ModEffects.GRITZ), "Gritz did not bind the pig");
         double speed = pig.getAttributeValue(Attributes.MOVEMENT_SPEED);
         helper.assertTrue(speed == 0.0, "the bound pig's speed is " + speed);
+        // A jump that leaves the ground anyway, as one on Jump Boost does, goes nowhere.
+        pig.setDeltaMovement(0.2, 0.52, 0.2);
+        NeoForge.EVENT_BUS.post(new LivingEvent.LivingJumpEvent(pig));
+        helper.assertTrue(pig.getDeltaMovement().equals(Vec3.ZERO), "the bound pig jumped off at " + pig.getDeltaMovement());
         pig.discard();
         clearCasts(helper);
         helper.succeed();
@@ -313,6 +319,15 @@ public final class GintoTests {
         helper.assertTrue(pig.hasEffect(ModEffects.GRITZ), "the fifth blade did not bind the pig inside the pentagon");
         int found = GintoSpells.formation(helper.getLevel(), player.getUUID(), pig.position()).size();
         helper.assertTrue(found == 5, "the planted pentagon is a formation of " + found + " blades, not 5");
+
+        // A corner lifted and planted again straight away does not bind once more.
+        pig.removeEffect(ModEffects.GRITZ);
+        blades.get(0).discard();
+        SeeleSchneiderPfeil again = SeeleSchneiderPfeil.plant(helper.getLevel(), player,
+                helper.absolutePos(new BlockPos(PENTAGON[0][0], 1, PENTAGON[0][1])));
+        helper.assertTrue(again != null, "the lifted corner could not be planted again");
+        helper.assertFalse(pig.hasEffect(ModEffects.GRITZ), "planting a corner again bound the pig once more");
+        blades.set(0, again);
         QuincyArtsTests.discardAll(blades);
         pig.discard();
         helper.succeed();

@@ -58,11 +58,17 @@ public class LetztPfeil extends HeiligPfeil {
         return DAMAGE_TYPE;
     }
 
-    /** On the server, it first carves the way this tick's flight will take; then it flies as a Heilig Pfeil. */
+    /**
+     * On the server, it first carves the way this tick's flight will take, if its owner is still in
+     * this level (its flight ends at once otherwise); then it flies as a Heilig Pfeil.
+     */
     @Override
     public void tick() {
-        if (!level().isClientSide() && getOwner() != null) {
-            carve();
+        if (!level().isClientSide() && !isSpent()) {
+            Entity owner = getOwner();
+            if (owner != null && owner.level() == level()) {
+                carve(owner);
+            }
         }
         super.tick();
     }
@@ -70,16 +76,16 @@ public class LetztPfeil extends HeiligPfeil {
     /**
      * Breaks, one after another, the blocks this tick's path meets first, while it has carving left,
      * block breaking is on, and each is soft enough and its owner's to break. The first one it may not
-     * break is left for its flight to burst on.
+     * break is left for its flight to burst on. The path ends at a creature that will stop the arrow
+     * (see {@link #creatureStop}), so nothing behind that creature is carved.
      */
-    private void carve() {
-        if (!BleachConfig.get(BleachConfig.LETZT_PFEIL_BREAKS_BLOCKS)) {
+    private void carve(Entity owner) {
+        if (!BleachConfig.get(BleachConfig.LETZT_PFEIL_BREAKS_BLOCKS) || carveLeft <= 0) {
             return;
         }
         double maxHardness = BleachConfig.get(BleachConfig.LETZT_PFEIL_MAX_HARDNESS);
-        Entity owner = getOwner();
         Vec3 from = position();
-        Vec3 to = from.add(getDeltaMovement());
+        Vec3 to = creatureStop(from, from.add(getDeltaMovement()));
         for (int i = 0; i < MAX_CARVES_PER_TICK && carveLeft > 0; i++) {
             BlockHitResult hit = level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
             if (hit.getType() != HitResult.Type.BLOCK) {

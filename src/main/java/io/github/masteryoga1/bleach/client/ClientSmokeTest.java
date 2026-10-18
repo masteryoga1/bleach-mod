@@ -537,8 +537,9 @@ public final class ClientSmokeTest {
             case 1752 -> look(minecraft, player.getEyePosition().add(0.0, 10.0, -10.0));
             case 1754 -> minecraft.options.keyUse.setDown(true);
             case 1778 -> minecraft.options.keyUse.setDown(false);
-            // Two taps of the Quincy Form key, well within three seconds, tear the glove.
-            case 1800, 1806 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM);
+            // Two taps of the Quincy Form key, well within three seconds, tear the glove. They are
+            // more than the server's five-tick debounce apart, with room for a slow tick between.
+            case 1790, 1806 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM);
             // Drawn past Letzt Stil's short draw and the charge after it, for a Letzt Pfeil.
             case 1835 -> minecraft.options.keyUse.setDown(true);
             case 1890 -> minecraft.options.keyUse.setDown(false);
@@ -598,7 +599,8 @@ public final class ClientSmokeTest {
                 minecraft.options.keyJump.setDown(true);
             }
             case 2360 -> minecraft.options.keyJump.setDown(false);
-            case 2380, 2405 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM_SNEAK);
+            // Sklaverei on and off again, ten ticks before the press that ends Vollständig.
+            case 2380, 2400 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM_SNEAK);
             // Let go in the air: the landing that follows must not hurt.
             case 2410 -> {
                 healthBefore = player.getHealth();

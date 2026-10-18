@@ -171,6 +171,8 @@ public final class SoulData {
     long formArmedAt = NEVER;
     /** Game time a Licht Regen started gathering, or {@link #NEVER} when none is. */
     long lichtGatherFrom = NEVER;
+    /** Game time from which a Sprenger formation's fifth blade may bind again. */
+    long sprengerBindReadyAt = NEVER;
     /** The Licht Regen volley still falling, or null. Lost on logging out, as a volley is short. */
     @Nullable
     LichtVolley lichtVolley;

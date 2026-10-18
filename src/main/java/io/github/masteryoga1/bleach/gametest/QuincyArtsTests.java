@@ -440,6 +440,8 @@ public final class QuincyArtsTests {
         helper.assertTrue(gain.glove().today() == 80 && gain.dayCounted() && gain.glove().days() == 1,
                 "20 more points on day 5 gave " + gain);
         SanreiProgress counted = gain.glove();
+        helper.assertTrue(QuincyArtsLogic.gloveToday(counted, 5L * 24_000L, 0L) == 80, "day 5 does not show its 80 points");
+        helper.assertTrue(QuincyArtsLogic.gloveToday(counted, 6L * 24_000L, 0L) == 0, "day 6 shows day 5's points");
         gain = QuincyArtsLogic.addGlovePoints(counted, 10, 5L);
         helper.assertTrue(gain.glove().equals(counted) && !gain.dayCounted() && !gain.masteredNow(),
                 "points past the day's count changed the glove: " + gain);
@@ -606,6 +608,13 @@ public final class QuincyArtsTests {
         helper.assertFalse(forms.vollstandig() || forms.sklaverei() || forms.landingGrace(),
                 "death left a form running: " + forms);
         helper.assertTrue(forms.vollReadyAt() == 500L, "death changed the Vollständig cooldown to " + forms.vollReadyAt());
+        // The respawn soon after puts the clocks in reach of the game time, and keeps that seal as it is.
+        long respawn = 3300L;
+        helper.assertTrue(QuincyArtsLogic.normalise(after, 0, respawn).stageSince() == 5000L,
+                "the respawn moved the seal from a death in Letzt Stil to " + QuincyArtsLogic.normalise(after, 0, respawn).stageSince());
+        long tooFar = respawn + BleachConfig.get(BleachConfig.LETZT_DURATION_TICKS) + 1L;
+        long pulled = QuincyArtsLogic.normalise(after.withStage(QuincyStage.SEALED, tooFar), 0, respawn).stageSince();
+        helper.assertTrue(pulled == respawn, "a seal starting further ahead than a Letzt Stil lasts was left at " + pulled);
 
         QuincyArts restored = QuincyArts.NONE.withStage(QuincyStage.RESTORED, 100L).withTrainingAtRestore(40);
         helper.assertTrue(QuincyArtsLogic.afterDeath(restored).equals(restored), "death changed a restored power");
@@ -749,6 +758,10 @@ public final class QuincyArtsTests {
         exhaust(target);
         helper.assertTrue(QuincyArtsEvents.tryRestoreByArrow(owner, target, 6000L), "the arrow did not restore the power");
         helper.assertTrue(QuincyArtsLogic.isRestored(sealed), "the arrow left the power " + QuincyArtsLogic.stage(sealed));
+        helper.assertTrue(QuincyArtsLogic.justRestored(target, 6000L + QuincyArtsLogic.RESTORE_GRACE_TICKS),
+                "the restoring shot's flank arrows may strike the Quincy it restored");
+        helper.assertFalse(QuincyArtsLogic.justRestored(target, 6001L + QuincyArtsLogic.RESTORE_GRACE_TICKS),
+                "a restored Quincy is passed by arrows long after");
         helper.succeed();
     }
 
@@ -822,6 +835,9 @@ public final class QuincyArtsTests {
         drawCross(player);
         QuincyArtsEvents.onFormKey(player, false, now + 60L);
         QuincyArtsEvents.tick(player, data, now + 95L);
+        assertNear(helper, QuincyLogic.reishi(data), 75.0, "the reishi left after Licht Regen was called again in its cooldown");
+        helper.assertTrue(player.isUsingItem(), "Licht Regen let the bow go again before its cooldown ended");
+        QuincyArtsEvents.tick(player, data, now + 96L);
         helper.assertTrue(volleyNear(helper, player).size() == 20, "Licht Regen fell again before its cooldown ended");
         discardAll(volleyNear(helper, player));
         helper.succeed();
@@ -918,6 +934,8 @@ public final class QuincyArtsTests {
         DamageSource cut = player.damageSources().playerAttack(player);
         helper.assertTrue(HollowLogic.destroysSouls(cut), "a formed Seele Schneider's cut does not destroy souls");
         helper.assertFalse(HollowLogic.purifies(cut, data, now), "a Seele Schneider's cut purifies");
+        helper.assertFalse(HollowLogic.destroysSouls(player.damageSources().thorns(player)),
+                "thorns from a Quincy holding a formed Seele Schneider destroy souls");
         helper.assertTrue(SoulEvents.isZanjutsuWeapon(blade), "a formed Seele Schneider is no blade for Zanjutsu");
         DamageSource arrow = new DamageSource(helper.getLevel().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
                 .getHolderOrThrow(HeiligPfeil.DAMAGE_TYPE), null, player);

@@ -35,6 +35,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
@@ -118,6 +119,7 @@ public final class QuincyArtsEvents {
         bus.addListener(QuincyArtsEvents::onFall);
         bus.addListener(QuincyArtsEvents::onChangedDimension);
         bus.addListener(QuincyArtsEvents::onLoggedOut);
+        bus.addListener(GritzEffect::onJump);
     }
 
     // ---- Every tick ----
@@ -353,7 +355,8 @@ public final class QuincyArtsEvents {
             return true;
         }
         int draw = QuincyArtsLogic.drawTicks(d);
-        if (QuincyArtsLogic.isRestored(d) && ticks >= draw + QuincyArtsLogic.STREAM_DELAY_TICKS
+        // The held ticks seen count from 0, so the stream's first arrow has gone only after this many.
+        if (QuincyArtsLogic.isRestored(d) && ticks > draw + QuincyArtsLogic.STREAM_DELAY_TICKS
                 && QuincyArtsLogic.streamAllowed(p, d)) {
             return true;
         }
@@ -1120,11 +1123,14 @@ public final class QuincyArtsEvents {
         }
     }
 
-    /** The player who swung a formed Seele Schneider for this hit, or null. */
+    /**
+     * The player who swung a formed Seele Schneider for this hit, or null. Only a melee swing counts,
+     * not Sklaverei or thorns, which also come straight from the player.
+     */
     @Nullable
     private static Player formedMelee(DamageSource source) {
-        return source.getDirectEntity() instanceof Player attacker && source.getEntity() == attacker
-                && SeeleSchneiderItem.isFormed(source.getWeaponItem()) ? attacker : null;
+        return source.is(DamageTypeTags.IS_PLAYER_ATTACK) && source.getDirectEntity() instanceof Player attacker
+                && source.getEntity() == attacker && SeeleSchneiderItem.isFormed(source.getWeaponItem()) ? attacker : null;
     }
 
     /**
