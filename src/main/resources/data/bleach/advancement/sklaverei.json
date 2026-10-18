@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:vollstandig",
+  "display": {
+    "icon": {
+      "id": "minecraft:end_rod"
+    },
+    "title": {
+      "translate": "advancements.bleach.sklaverei.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.sklaverei.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "sklaverei": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "sklaverei"
+      }
+    }
+  }
+}

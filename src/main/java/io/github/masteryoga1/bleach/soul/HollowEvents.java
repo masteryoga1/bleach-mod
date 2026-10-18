@@ -6,7 +6,6 @@ import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
-import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -148,7 +147,7 @@ public final class HollowEvents {
                 onPurified(killer, hollow, weapon != null ? weapon : ItemStack.EMPTY);
             } else {
                 onSlain(killer, hollow);
-                if (source.is(BleachTags.DESTROYS_SOULS)) {
+                if (HollowLogic.destroysSouls(source)) {
                     QuincyEvents.onSoulDestroyed(killer, hollow);
                 }
             }
@@ -218,7 +217,7 @@ public final class HollowEvents {
             hunt = hunt.withLastPlayerKillGrowthAt(now);
         }
         data.setHunt(purified ? hunt.withPurified(hunt.purified() + 1) : hunt.withSlain(hunt.slain() + 1));
-        if (!purified && source.is(BleachTags.DESTROYS_SOULS)) {
+        if (!purified && HollowLogic.destroysSouls(source)) {
             QuincyEvents.onHollowPlayerDestroyed(killer, victim);
         }
     }

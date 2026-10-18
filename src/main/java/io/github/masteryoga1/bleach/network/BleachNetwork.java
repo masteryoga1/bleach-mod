@@ -17,7 +17,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class BleachNetwork {
     /** Bump when a payload changes shape, so mismatched clients are refused instead of breaking. */
-    private static final String VERSION = "7";
+    private static final String VERSION = "8";
 
     private BleachNetwork() {
     }

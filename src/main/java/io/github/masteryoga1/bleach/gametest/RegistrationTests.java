@@ -2,15 +2,24 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
+import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
+import io.github.masteryoga1.bleach.item.EmptyGintoItem;
+import io.github.masteryoga1.bleach.item.GintoItem;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
+import io.github.masteryoga1.bleach.item.SanreiGloveItem;
+import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModComponents;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.QuincyArtsEvents;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import java.util.List;
@@ -22,6 +31,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageType;
@@ -132,7 +142,10 @@ public final class RegistrationTests {
 
     /**
      * The Quincy Cross and garb, the Heilig Pfeil and its damage, the damage that tears a soul apart,
-     * the Quincy garb's armour material, the Cross's recipe and the Quincy sounds.
+     * the Quincy garb's armour material, the Cross's recipe and the Quincy sounds. Then the arts past
+     * the third tier: the Sanrei Glove, the Seele Schneider and the Gintō with their recipes, the
+     * Letzt Pfeil, the blade in flight and the Gintō cast (spirits all three), Gritz, and the six
+     * new kinds of damage, each of which destroys the Hollow it kills.
      */
     @GameTest(template = "empty")
     public static void quincyPartsAreRegistered(GameTestHelper helper) {
@@ -176,9 +189,59 @@ public final class RegistrationTests {
         bypasses.forEach((what, tag) -> helper.assertTrue(destruction.get().is(tag),
                 "tearing a soul apart is stopped by " + what + " (not in " + tag.location() + ")"));
 
+        Map<String, Item> arts = Map.of(
+                "sanrei_glove", ModItems.SANREI_GLOVE.get(),
+                "seele_schneider", ModItems.SEELE_SCHNEIDER.get(),
+                "empty_ginto", ModItems.EMPTY_GINTO.get(),
+                "ginto", ModItems.GINTO.get());
+        arts.forEach((name, item) -> helper.assertTrue(BuiltInRegistries.ITEM.get(BleachMod.id(name)) == item,
+                "bleach:" + name + " is registered as " + BuiltInRegistries.ITEM.get(BleachMod.id(name))));
+        helper.assertTrue(ModItems.SANREI_GLOVE.get() instanceof SanreiGloveItem
+                        && ModItems.SEELE_SCHNEIDER.get() instanceof SeeleSchneiderItem
+                        && ModItems.EMPTY_GINTO.get() instanceof EmptyGintoItem
+                        && ModItems.GINTO.get() instanceof GintoItem,
+                "an item of the Quincy arts is not of its own kind");
+        Map<String, EntityType<?>> artsEntities = Map.of(
+                "seele_schneider", ModEntities.SEELE_SCHNEIDER.get(),
+                "letzt_pfeil", ModEntities.LETZT_PFEIL.get(),
+                "ginto_cast", ModEntities.GINTO_CAST.get());
+        artsEntities.forEach((name, type) -> {
+            helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.containsKey(BleachMod.id(name))
+                    && BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id(name)) == type, "bleach:" + name + " is not its entity type");
+            helper.assertTrue(type.is(SoulLogic.SPIRITS), "bleach:" + name + " is not in #bleach:spirits, so the unaware could see it");
+        });
+        helper.assertTrue(BuiltInRegistries.MOB_EFFECT.containsKey(BleachMod.id("gritz"))
+                        && BuiltInRegistries.MOB_EFFECT.get(BleachMod.id("gritz")) == ModEffects.GRITZ.get(),
+                "bleach:gritz is not the Gritz effect");
+        for (String recipe : List.of("seele_schneider", "empty_ginto", "tailoring/sanrei_glove")) {
+            helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id(recipe)).isPresent(),
+                    "bleach:" + recipe + " is not a recipe");
+        }
+
+        List<ResourceKey<DamageType>> artsDamage = List.of(HeiligPfeil.VOLLEY_DAMAGE_TYPE, SeeleSchneiderPfeil.DAMAGE_TYPE,
+                LetztPfeil.DAMAGE_TYPE, GintoCast.HEIZEN, GintoCast.SPRENGER, QuincyArtsEvents.SKLAVEREI);
+        List<ResourceKey<DamageType>> projectiles = List.of(HeiligPfeil.VOLLEY_DAMAGE_TYPE, SeeleSchneiderPfeil.DAMAGE_TYPE,
+                LetztPfeil.DAMAGE_TYPE);
+        // A stream's arrows and a Sklaverei pulse each land through the last blow's invulnerability frames.
+        List<ResourceKey<DamageType>> pastCooldown = List.of(HeiligPfeil.VOLLEY_DAMAGE_TYPE, QuincyArtsEvents.SKLAVEREI);
+        for (ResourceKey<DamageType> key : artsDamage) {
+            Optional<Holder.Reference<DamageType>> type = damageTypes.getHolder(key);
+            String name = key.location().toString();
+            helper.assertTrue(type.isPresent(), "the " + name + " damage type did not load");
+            helper.assertTrue(type.get().is(BleachTags.DESTROYS_SOULS), name + " does not destroy the Hollows it kills");
+            helper.assertFalse(type.get().is(BleachTags.PURIFIES), name + " purifies the Hollows it kills");
+            helper.assertTrue(!projectiles.contains(key) || type.get().is(DamageTypeTags.IS_PROJECTILE),
+                    name + " does not count as a projectile");
+            helper.assertTrue(!pastCooldown.contains(key) || type.get().is(DamageTypeTags.BYPASSES_COOLDOWN),
+                    name + " does not pass the hurt cooldown");
+        }
+
         for (String name : List.of("item.quincy_cross.draw", "item.quincy_cross.awaken", "item.quincy_cross.fizzle",
                 "entity.heilig_pfeil.fire", "entity.heilig_pfeil.hit", "player.hirenkyaku", "player.blut",
-                "player.hollow_poison")) {
+                "player.hollow_poison", "item.quincy_cross.charged", "item.sanrei_glove.tear", "player.letzt_stil",
+                "player.quincy_sealed", "player.quincy_restored", "item.seele_schneider.form", "entity.seele_schneider.stick",
+                "item.ginto.fill", "item.ginto.cast", "entity.ginto.heizen", "entity.ginto.sprenger", "player.licht_regen",
+                "player.vollstandig", "player.sklaverei")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");
         }
         helper.succeed();

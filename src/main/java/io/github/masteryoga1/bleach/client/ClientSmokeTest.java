@@ -4,21 +4,27 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
+import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
+import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.quincy.QuincyKey;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -75,11 +81,20 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * sneak and use keys, takes the red ribbon, closes the screen, learns Zangetsu's name, releases it,
  * looses a Getsuga Tenshō and opens the soul screen. Last, it makes them an Echt Quincy in the white
  * garb, draws the Heilig Bogen through the real use key, fires a Heilig Pfeil into the sky and another
- * at a Hollow, calls Blut Vene, uses Hirenkyaku and opens the soul screen once more, and quits. All of
- * it is seen with the camera behind the player, so the chain, mask, garb, saya, NPCs, Hollows,
- * zanpakutō, bow, arrows, veins and HUD are drawn, and screenshots of the main moments are saved for
- * review. Any crash in the mod's client code fails the run, and so does anything that did not reach
- * the client as expected.
+ * at a Hollow, calls Blut Vene, uses Hirenkyaku and opens the soul screen once more.
+ *
+ * <p>Then come the arts past the third tier. In the mastered Sanrei Glove a full draw looses its two
+ * flank arrows; tearing the glove with two taps of the Quincy Form key begins Letzt Stil, whose long
+ * draw fires a Letzt Pfeil. The power is sealed and restored by command, and Ginrei Kojaku streams
+ * arrows while drawn, then calls down Licht Regen. A Seele Schneider forms in the main hand and is
+ * fired from the offhand; Gintō cast Wolke underfoot and Heizen on a Hollow. Last, Vollständig gives
+ * flight, Sklaverei is switched on and off, and Vollständig is let go in the air, so the landing must
+ * not hurt. The soul screen is opened a last time, and the run quits.
+ *
+ * <p>All of it is seen with the camera behind the player, so the chain, mask, garb, saya, NPCs,
+ * Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts and HUD are drawn, and
+ * screenshots of the main moments are saved for review. Any crash in the mod's client code fails the
+ * run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -117,6 +132,12 @@ public final class ClientSmokeTest {
     /** What the current step acts on: the Hollow to strike, or the Plus to send on. */
     @Nullable
     private static Entity subject;
+    /** How high the player stood when Vollständig's flight began. */
+    private static double flightFrom;
+    /** The player's health just before Vollständig was let go in the air. */
+    private static float healthBefore;
+    /** The tick the player landed after Vollständig, or -1 before then. */
+    private static int landedAt = -1;
 
     private ClientSmokeTest() {
     }
@@ -248,6 +269,7 @@ public final class ClientSmokeTest {
             shot(minecraft, "hirenkyaku");
         }
         expectWithin(minecraft, 1686, 1720, () -> soul.quincy().blut() == BlutMode.OFF, "Blut never ended");
+        checkArts(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -504,13 +526,170 @@ public final class ClientSmokeTest {
             case 1690 -> minecraft.setScreen(new SoulStatsScreen());
             case 1695 -> shot(minecraft, "stats_quincy");
             case 1710 -> minecraft.setScreen(null);
+            // The arts past the third tier, still facing north with the Cross in hand.
             case 1730 -> {
+                command(minecraft, "bleach quincy @s glove mastered");
+                command(minecraft, "bleach quincy @s reishi 200");
+                command(minecraft, "difficulty easy");
+                command(minecraft, "tp @s ~ ~ ~ 180 0");
+            }
+            // A full draw in the mastered glove, into the sky again, looses two flank arrows beside the shot.
+            case 1752 -> look(minecraft, player.getEyePosition().add(0.0, 10.0, -10.0));
+            case 1754 -> minecraft.options.keyUse.setDown(true);
+            case 1778 -> minecraft.options.keyUse.setDown(false);
+            // Two taps of the Quincy Form key, well within three seconds, tear the glove. They are
+            // more than the server's five-tick debounce apart, with room for a slow tick between.
+            case 1790, 1806 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM);
+            // Drawn past Letzt Stil's short draw and the charge after it, for a Letzt Pfeil.
+            case 1835 -> minecraft.options.keyUse.setDown(true);
+            case 1890 -> minecraft.options.keyUse.setDown(false);
+            case 1915 -> command(minecraft, "bleach quincy @s letzt seal");
+            case 1940 -> minecraft.options.keyUse.setDown(true);
+            case 1948 -> expect(minecraft, !player.isUsingItem(), "a sealed Quincy drew the Heilig Bogen");
+            case 1949 -> minecraft.options.keyUse.setDown(false);
+            case 1955 -> command(minecraft, "bleach quincy @s letzt restore");
+            // Ginrei Kojaku streams while held; the Quincy Form key mid-draw calls down Licht Regen.
+            case 1980 -> minecraft.options.keyUse.setDown(true);
+            case 1990 -> shot(minecraft, "ginrei_kojaku");
+            case 2035 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM);
+            case 2100 -> minecraft.options.keyUse.setDown(false);
+            case 2105 -> command(minecraft, "item replace entity @s weapon.mainhand with bleach:seele_schneider 4");
+            // A Seele Schneider in the offhand is fired in place of the stream, down at the ground ahead.
+            case 2135 -> {
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:quincy_cross");
+                command(minecraft, "item replace entity @s weapon.offhand with bleach:seele_schneider 4");
+            }
+            case 2137 -> look(minecraft, player.getEyePosition().add(0.0, -2.0, -6.0));
+            case 2139 -> minecraft.options.keyUse.setDown(true);
+            case 2161 -> minecraft.options.keyUse.setDown(false);
+            case 2190 -> {
+                command(minecraft, "item replace entity @s weapon.offhand with minecraft:air");
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:ginto 8");
+                command(minecraft, "bleach quincy @s ginto wolke");
+            }
+            case 2193 -> minecraft.options.keyUse.setDown(true);
+            case 2195 -> minecraft.options.keyUse.setDown(false);
+            case 2220 -> {
+                command(minecraft, "bleach quincy @s ginto heizen");
+                command(minecraft, "summon bleach:spider_hollow ~ ~ ~-6 " + STILL);
+            }
+            case 2236 -> {
+                subject = nearest(minecraft, SpiderHollow.class, SUMMONED_RANGE,
+                        spider -> spider.isAlive() && isSpiderHollow(spider));
+                expect(minecraft, subject != null, "the Spider Hollow for Heizen never reached the client");
+                if (subject != null) {
+                    look(minecraft, subject.getBoundingBox().getCenter());
+                }
+            }
+            // The Gintō cooldown from the Wolke ended at about 2233.
+            case 2240 -> minecraft.options.keyUse.setDown(true);
+            case 2242 -> minecraft.options.keyUse.setDown(false);
+            case 2295 -> {
+                command(minecraft, "kill @e[type=#bleach:hollows]");
+                command(minecraft, "bleach quincy @s training 50000");
+                command(minecraft, "bleach quincy @s reishi 200");
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:quincy_cross");
+            }
+            case 2300 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM);
+            // Vollständig's flight, taken up as a player takes up creative flight, and climbed with jump.
+            case 2325 -> {
+                flightFrom = player.getY();
+                player.getAbilities().flying = true;
+                player.onUpdateAbilities();
+                minecraft.options.keyJump.setDown(true);
+            }
+            case 2360 -> minecraft.options.keyJump.setDown(false);
+            // Sklaverei on and off again, ten ticks before the press that ends Vollständig.
+            case 2380, 2400 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM_SNEAK);
+            // Let go in the air: the landing that follows must not hurt.
+            case 2410 -> {
+                healthBefore = player.getHealth();
+                BleachNetwork.requestQuincyKey(QuincyKey.FORM);
+            }
+            case 2490 -> minecraft.setScreen(new SoulStatsScreen());
+            case 2495 -> shot(minecraft, "stats_quincy_arts");
+            case 2510 -> minecraft.setScreen(null);
+            case 2530 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
             }
             default -> {
             }
+        }
+    }
+
+    /** The checks of the arts past the third tier, each window from the step it follows. */
+    private static void checkArts(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (expectWithin(minecraft, 1731, 1750,
+                () -> QuincyArtsLogic.gloveMastered(soul) && shows(player, QuincyArtsLogic.LOOK_GLOVE_MASTERED),
+                "the mastered Sanrei Glove never reached the client")) {
+            shot(minecraft, "sanrei_glove");
+        }
+        expectWithin(minecraft, 1779, 1795, () -> count(minecraft, HeiligPfeil.class, 48.0) >= 3,
+                "the mastered glove loosed no flank arrows");
+        if (expectWithin(minecraft, 1807, 1830,
+                () -> QuincyArtsLogic.inLetzt(soul) && shows(player, QuincyArtsLogic.LOOK_LETZT), "Letzt Stil never began")) {
+            shot(minecraft, "letzt_stil");
+        }
+        if (expectWithin(minecraft, 1891, 1910, () -> nearest(minecraft, LetztPfeil.class, 64.0, arrow -> true) != null,
+                "no Letzt Pfeil reached the client")) {
+            shot(minecraft, "letzt_pfeil");
+        }
+        if (expectWithin(minecraft, 1916, 1935,
+                () -> QuincyArtsLogic.isSealed(soul) && shows(player, QuincyArtsLogic.LOOK_SEALED),
+                "the seal never reached the client")) {
+            shot(minecraft, "quincy_sealed");
+        }
+        expectWithin(minecraft, 1956, 1975,
+                () -> QuincyArtsLogic.isRestored(soul) && shows(player, QuincyArtsLogic.LOOK_GINREI),
+                "the restoration never reached the client");
+        expectWithin(minecraft, 2006, 2030, () -> count(minecraft, HeiligPfeil.class, 48.0) >= 3,
+                "Ginrei Kojaku never streamed");
+        if (expectWithin(minecraft, 2066, 2095, () -> count(minecraft, HeiligPfeil.class, 64.0) >= 12,
+                "Licht Regen never fell")) {
+            shot(minecraft, "licht_regen");
+        }
+        if (expectWithin(minecraft, 2106, 2130, () -> SeeleSchneiderItem.isFormed(player.getMainHandItem()),
+                "the Seele Schneider never formed")) {
+            shot(minecraft, "seele_schneider");
+        }
+        if (expectWithin(minecraft, 2162, 2185, () -> nearest(minecraft, SeeleSchneiderPfeil.class, 32.0, blade -> true) != null,
+                "no Seele Schneider was fired")) {
+            shot(minecraft, "seele_fired");
+        }
+        if (expectWithin(minecraft, 2196, 2215,
+                () -> nearest(minecraft, GintoCast.class, 16.0, cast -> cast.spell() == GintoSpell.WOLKE) != null,
+                "Wolke never formed")) {
+            shot(minecraft, "ginto_wolke");
+        }
+        if (expectWithin(minecraft, 2243, 2265,
+                () -> nearest(minecraft, GintoCast.class, 32.0, cast -> cast.spell() == GintoSpell.HEIZEN) != null,
+                "Heizen never rose")) {
+            shot(minecraft, "heizen");
+        }
+        expectWithin(minecraft, 2266, 2290,
+                () -> subject instanceof LivingEntity struck && (!struck.isAlive() || struck.getHealth() < struck.getMaxHealth()),
+                "Heizen did not strike the Hollow");
+        if (expectWithin(minecraft, 2301, 2320, () -> QuincyArtsLogic.inVollstandig(soul) && player.mayFly(),
+                "Vollständig never gave flight")) {
+            shot(minecraft, "vollstandig");
+        }
+        if (expectWithin(minecraft, 2361, 2375, () -> player.getAbilities().flying && player.getY() > flightFrom + 2.5,
+                "Vollständig flight did not lift the player")) {
+            shot(minecraft, "vollstandig_flight");
+        }
+        if (expectWithin(minecraft, 2381, 2400, () -> shows(player, QuincyArtsLogic.LOOK_SKLAVEREI), "Sklaverei never began")) {
+            shot(minecraft, "sklaverei");
+        }
+        expectWithin(minecraft, 2411, 2430, () -> !QuincyArtsLogic.inVollstandig(soul) && !player.mayFly(),
+                "Vollständig never ended");
+        if (expectWithin(minecraft, 2431, 2480, player::onGround, "the player never landed after Vollständig")) {
+            landedAt = ticksInWorld;
+        }
+        // A few ticks on, so the fall damage, if any, has come back from the server.
+        if (landedAt >= 0 && ticksInWorld == landedAt + 5) {
+            expect(minecraft, player.getHealth() >= healthBefore, "the landing after Vollständig hurt");
         }
     }
 
@@ -555,6 +734,17 @@ public final class ClientSmokeTest {
             fail(minecraft, problem);
         }
         return false;
+    }
+
+    /** How many entities of this class are within {@code range} blocks of the player. */
+    private static int count(Minecraft minecraft, Class<? extends Entity> type, double range) {
+        LocalPlayer player = minecraft.player;
+        return minecraft.level.getEntitiesOfClass(type, player.getBoundingBox().inflate(range)).size();
+    }
+
+    /** Whether the player's own look, as other players' clients would draw it, has this Quincy arts bit. */
+    private static boolean shows(LocalPlayer player, int bit) {
+        return (ClientSouls.appearance(player).quincyLook() & bit) != 0;
     }
 
     private static List<AcademyInstructor> instructorsNear(Minecraft minecraft, double range) {

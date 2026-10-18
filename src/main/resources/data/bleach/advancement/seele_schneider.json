@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:restored",
+  "display": {
+    "icon": {
+      "id": "bleach:seele_schneider"
+    },
+    "title": {
+      "translate": "advancements.bleach.seele_schneider.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.seele_schneider.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "seele_schneider": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "seele_schneider"
+      }
+    }
+  }
+}

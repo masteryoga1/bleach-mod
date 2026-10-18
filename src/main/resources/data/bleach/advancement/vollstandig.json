@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:restored",
+  "display": {
+    "icon": {
+      "id": "minecraft:feather"
+    },
+    "title": {
+      "translate": "advancements.bleach.vollstandig.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.vollstandig.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "vollstandig": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "vollstandig"
+      }
+    }
+  }
+}

@@ -7,6 +7,8 @@ import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
+import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
@@ -90,6 +92,7 @@ public final class BleachClient {
         event.register(ZanpakutoKeys.SEAL);
         event.register(ZanpakutoKeys.TECHNIQUE);
         event.register(QuincyClient.BLUT_KEY);
+        event.register(QuincyClient.FORM_KEY);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
@@ -99,8 +102,9 @@ public final class BleachClient {
     /**
      * The NPCs wear two of the game's default player skins until the mod has its own. Hollows use the
      * vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
-     * Zanpakutō techniques are drawn from plain shapes and the mod's placeholder textures, and the
-     * Heilig Pfeil as a vanilla arrow in the mod's own texture.
+     * Zanpakutō techniques and Gintō spells are drawn from plain shapes and the mod's placeholder
+     * textures, and the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
+     * in the mod's own textures.
      * The type arguments are spelled out rather than left for the compiler to infer through the lambdas.
      */
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
@@ -136,12 +140,21 @@ public final class BleachClient {
         event.registerEntityRenderer(ModEntities.GETSUGA_TENSHO.get(), GetsugaTenshoRenderer::new);
         event.registerEntityRenderer(ModEntities.ZABIMARU_LASH.get(), ZabimaruLashRenderer::new);
         event.registerEntityRenderer(ModEntities.HEILIG_PFEIL.get(), HeiligPfeilRenderer::new);
+        // A Seele Schneider is the same size however it was drawn; a Letzt Pfeil is always huge.
+        event.registerEntityRenderer(ModEntities.SEELE_SCHNEIDER.get(),
+                context -> new HeiligPfeilRenderer<SeeleSchneiderPfeil>(context, HeiligPfeilRenderer.SEELE_TEXTURE,
+                        1.0F, 0.0F));
+        event.registerEntityRenderer(ModEntities.LETZT_PFEIL.get(),
+                context -> new HeiligPfeilRenderer<LetztPfeil>(context, HeiligPfeilRenderer.LETZT_TEXTURE,
+                        2.5F, 0.0F));
+        event.registerEntityRenderer(ModEntities.GINTO_CAST.get(), GintoCastRenderer::new);
     }
 
     /**
-     * Adds the chain and mask layer, the sheathed blade and Blut Vene's veins to both player models
-     * (wide and slim arms). The sheath takes the look of the blade the player carries, as their
-     * appearance tells.
+     * Adds the chain and mask layer, the sheathed blade, Blut Vene's veins and the Quincy arts (the
+     * Sanrei Glove, Letzt Stil's burning lines, and Vollständig's wings and halo) to both player
+     * models (wide and slim arms). The sheath takes the look of the blade the player carries, and the
+     * arts the look of the Quincy, as their appearance tells.
      */
     private static void addLayers(EntityRenderersEvent.AddLayers event) {
         for (PlayerSkin.Model skin : event.getSkins()) {
@@ -151,6 +164,9 @@ public final class BleachClient {
                 playerRenderer.addLayer(new SayaLayer<>(playerRenderer,
                         player -> SheathLook.forModel(ClientSouls.appearance(player).sheathModel())));
                 playerRenderer.addLayer(new BlutLayer(playerRenderer));
+                playerRenderer.addLayer(new SanreiGloveLayer(playerRenderer, event.getEntityModels()));
+                playerRenderer.addLayer(new LetztStilLayer(playerRenderer));
+                playerRenderer.addLayer(new VollstandigLayer(playerRenderer, event.getEntityModels()));
             }
         }
     }

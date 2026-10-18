@@ -211,6 +211,92 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue HOLLOW_POISON_PER_DAMAGE;
     public static final ModConfigSpec.DoubleValue HOLLOW_POISON_DECAY_PER_MINUTE;
     public static final ModConfigSpec.DoubleValue HOLLOW_POISON_AURA_PER_SECOND;
+    public static final ModConfigSpec.IntValue SANREI_DRAW_TICKS;
+    public static final ModConfigSpec.DoubleValue SANREI_HOLD_UPKEEP_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue SANREI_GATHER_MULTIPLIER;
+    public static final ModConfigSpec.IntValue SANREI_POINTS_PER_DAY;
+    public static final ModConfigSpec.IntValue SANREI_DAYS_TO_MASTER;
+    public static final ModConfigSpec.DoubleValue SANREI_MASTERED_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue SANREI_MASTERED_DAMAGE_CAP;
+    public static final ModConfigSpec.DoubleValue SANREI_FLANK_DAMAGE_FRACTION;
+    public static final ModConfigSpec.DoubleValue SANREI_FLANK_COST;
+    public static final ModConfigSpec.BooleanValue LETZT_ENABLED;
+    public static final ModConfigSpec.IntValue LETZT_DURATION_TICKS;
+    public static final ModConfigSpec.DoubleValue LETZT_POOL_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_GATHER_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_MIN_DENSITY;
+    public static final ModConfigSpec.IntValue LETZT_DRAW_TICKS;
+    public static final ModConfigSpec.DoubleValue LETZT_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_DAMAGE_CAP;
+    public static final ModConfigSpec.DoubleValue LETZT_SHOT_SPEED_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_MOVEMENT_BONUS;
+    public static final ModConfigSpec.DoubleValue LETZT_REIATSU_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_HIRENKYAKU_DISTANCE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_HIRENKYAKU_COST_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_HIRENKYAKU_COOLDOWN_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_PFEIL_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue LETZT_PFEIL_MAX_DAMAGE;
+    public static final ModConfigSpec.IntValue LETZT_PFEIL_PIERCE;
+    public static final ModConfigSpec.DoubleValue LETZT_PFEIL_SPEED;
+    public static final ModConfigSpec.DoubleValue LETZT_PFEIL_COST;
+    public static final ModConfigSpec.BooleanValue LETZT_PFEIL_BREAKS_BLOCKS;
+    public static final ModConfigSpec.IntValue LETZT_PFEIL_CARVE_BLOCKS;
+    public static final ModConfigSpec.DoubleValue LETZT_PFEIL_MAX_HARDNESS;
+    public static final ModConfigSpec.IntValue RESTORE_SEALED_TICKS;
+    public static final ModConfigSpec.IntValue RESTORE_ARROW_SEALED_TICKS;
+    public static final ModConfigSpec.BooleanValue RESTORE_SOLO_RITE;
+    public static final ModConfigSpec.IntValue RESTORE_RITE_TICKS;
+    public static final ModConfigSpec.DoubleValue RESTORE_MAX_HEALTH_FRACTION;
+    public static final ModConfigSpec.IntValue RESTORE_MAX_FOOD;
+    public static final ModConfigSpec.DoubleValue SEALED_REIATSU_MULTIPLIER;
+    public static final ModConfigSpec.IntValue GINREI_DRAW_TICKS;
+    public static final ModConfigSpec.DoubleValue GINREI_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue GINREI_DAMAGE_CAP;
+    public static final ModConfigSpec.DoubleValue GINREI_STREAM_COST;
+    public static final ModConfigSpec.DoubleValue GINREI_STREAM_DAMAGE_FRACTION;
+    public static final ModConfigSpec.DoubleValue LICHT_REGEN_COST;
+    public static final ModConfigSpec.IntValue LICHT_REGEN_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue LICHT_REGEN_ARROWS;
+    public static final ModConfigSpec.DoubleValue LICHT_REGEN_DAMAGE_FRACTION;
+    public static final ModConfigSpec.DoubleValue SEELE_FORM_COST;
+    public static final ModConfigSpec.DoubleValue SEELE_UPKEEP_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue SEELE_DAMAGE;
+    public static final ModConfigSpec.DoubleValue SEELE_ATTACK_SPEED;
+    public static final ModConfigSpec.DoubleValue SEELE_HOLLOW_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue SEELE_ARMOR_IGNORED;
+    public static final ModConfigSpec.DoubleValue SEELE_DRAIN_FRACTION;
+    public static final ModConfigSpec.DoubleValue SEELE_DRAIN_MAX;
+    public static final ModConfigSpec.DoubleValue SEELE_FIRED_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue SEELE_FIRED_COST;
+    public static final ModConfigSpec.IntValue SEELE_STUCK_DESPAWN_TICKS;
+    public static final ModConfigSpec.DoubleValue GINTO_FILL_COST;
+    public static final ModConfigSpec.IntValue GINTO_COOLDOWN_TICKS;
+    public static final ModConfigSpec.DoubleValue GINTO_RANGE;
+    public static final ModConfigSpec.DoubleValue HEIZEN_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue HEIZEN_MAX_DAMAGE;
+    public static final ModConfigSpec.IntValue GRITZ_MAX_TICKS;
+    public static final ModConfigSpec.IntValue WOLKE_TICKS;
+    public static final ModConfigSpec.DoubleValue WOLKE_RADIUS;
+    public static final ModConfigSpec.DoubleValue SPRENGER_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue SPRENGER_MAX_DAMAGE;
+    public static final ModConfigSpec.IntValue VOLL_TRAINING_AFTER_RESTORE;
+    public static final ModConfigSpec.DoubleValue VOLL_START_COST;
+    public static final ModConfigSpec.DoubleValue VOLL_START_MIN_REISHI;
+    public static final ModConfigSpec.IntValue VOLL_COOLDOWN_TICKS;
+    public static final ModConfigSpec.DoubleValue VOLL_POOL_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue VOLL_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue VOLL_DAMAGE_CAP;
+    public static final ModConfigSpec.DoubleValue VOLL_REIATSU_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue VOLL_UPKEEP_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue VOLL_FLIGHT_UPKEEP_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue VOLL_HALO_BREAK_FRACTION;
+    public static final ModConfigSpec.DoubleValue SKLAVEREI_RADIUS;
+    public static final ModConfigSpec.DoubleValue SKLAVEREI_UPKEEP_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue SKLAVEREI_HOLLOW_DAMAGE;
+    public static final ModConfigSpec.DoubleValue SKLAVEREI_PLAYER_DRAIN;
+    public static final ModConfigSpec.DoubleValue SKLAVEREI_PROJECTILE_GAIN;
+    public static final ModConfigSpec.DoubleValue SKLAVEREI_MAX_GAIN_PER_PULSE;
+    public static final ModConfigSpec.DoubleValue SKLAVEREI_POISON_PER_HOLLOW;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -836,6 +922,288 @@ public final class BleachConfig {
         HOLLOW_POISON_AURA_PER_SECOND = builder
                 .comment("Poison a Quincy takes each second inside the released reiatsu of a Hollow or Arrancar player.")
                 .defineInRange("aura_per_second", 1.0, 0.0, 100.0);
+        builder.pop();
+
+        builder.push("sanrei");
+        SANREI_DRAW_TICKS = builder
+                .comment("Ticks a full draw takes while the Sanrei Glove is worn and not yet mastered.")
+                .defineInRange("draw_ticks", 40, 1, 200);
+        SANREI_HOLD_UPKEEP_MULTIPLIER = builder
+                .comment("How many times over holding a full draw costs while the unmastered glove is worn.")
+                .defineInRange("hold_upkeep_multiplier", 2.0, 0.0, 100.0);
+        SANREI_GATHER_MULTIPLIER = builder
+                .comment("Reishi gathering multiplier while the unmastered glove is worn.")
+                .defineInRange("gather_multiplier", 0.5, 0.0, 10.0);
+        SANREI_POINTS_PER_DAY = builder
+                .comment("Glove training points that make a day count: 2 for a full draw, 1 for a Heilig Pfeil hit on a Hollow and 5 for a destroyed soul.")
+                .defineInRange("points_per_day", 80, 1, 100_000);
+        SANREI_DAYS_TO_MASTER = builder
+                .comment("Separate days of training that master the glove; sleeping through the night starts a new day.")
+                .defineInRange("days_to_master", 7, 1, 365);
+        SANREI_MASTERED_DAMAGE_MULTIPLIER = builder
+                .comment("Heilig Pfeil damage multiplier while the mastered glove is worn.")
+                .defineInRange("mastered_damage_multiplier", 1.1, 1.0, 10.0);
+        SANREI_MASTERED_DAMAGE_CAP = builder
+                .comment("Highest full-draw damage while the mastered glove is worn, never below the Heilig Bogen's own max_damage.")
+                .defineInRange("mastered_damage_cap", 40.0, 0.0, 10_000.0);
+        SANREI_FLANK_DAMAGE_FRACTION = builder
+                .comment("Share of a full draw's damage each of the two arrows loosed beside it with the mastered glove does.")
+                .defineInRange("flank_damage_fraction", 0.5, 0.0, 1.0);
+        SANREI_FLANK_COST = builder
+                .comment("Reishi the two flank arrows cost together; they are not loosed when it cannot be paid.")
+                .defineInRange("flank_cost", 1.0, 0.0, 1_000.0);
+        builder.pop();
+
+        builder.push("letzt_stil");
+        LETZT_ENABLED = builder
+                .comment("Whether tearing off the mastered Sanrei Glove burns a Quincy's power out in Letzt Stil, once per soul, and seals it after.")
+                .define("enabled", true);
+        LETZT_DURATION_TICKS = builder
+                .comment("Ticks Letzt Stil lasts before the power is sealed.")
+                .defineInRange("duration_ticks", 1_800, 20, 72_000);
+        LETZT_POOL_MULTIPLIER = builder
+                .comment("How many times over the reishi a Quincy can hold during Letzt Stil; a soul that also has a Shinigami's power gets half the extra, as with Letzt Stil's damage, gathering, speed and reiatsu.")
+                .defineInRange("pool_multiplier", 3.0, 1.0, 100.0);
+        LETZT_GATHER_MULTIPLIER = builder
+                .comment("Reishi gathering multiplier during Letzt Stil, which gathers during Blut and on reishi footing too.")
+                .defineInRange("gather_multiplier", 4.0, 0.0, 100.0);
+        LETZT_MIN_DENSITY = builder
+                .comment("Reishi density Letzt Stil gathers at wherever the reishi around it is thinner than that.")
+                .defineInRange("min_density", 2.0, 0.0, 10.0);
+        LETZT_DRAW_TICKS = builder
+                .comment("Ticks a full draw takes during Letzt Stil.")
+                .defineInRange("draw_ticks", 10, 1, 200);
+        LETZT_DAMAGE_MULTIPLIER = builder
+                .comment("Heilig Pfeil damage multiplier during Letzt Stil.")
+                .defineInRange("damage_multiplier", 1.6, 1.0, 100.0);
+        LETZT_DAMAGE_CAP = builder
+                .comment("Highest full-draw damage during Letzt Stil, never below the Heilig Bogen's own max_damage.")
+                .defineInRange("damage_cap", 60.0, 0.0, 10_000.0);
+        LETZT_SHOT_SPEED_MULTIPLIER = builder
+                .comment("Heilig Pfeil speed multiplier during Letzt Stil.")
+                .defineInRange("shot_speed_multiplier", 1.25, 0.1, 10.0);
+        LETZT_MOVEMENT_BONUS = builder
+                .comment("Extra movement speed during Letzt Stil (0.2 = +20%).")
+                .defineInRange("movement_bonus", 0.2, 0.0, 10.0);
+        LETZT_REIATSU_MULTIPLIER = builder
+                .comment("How many times over a Quincy's reiatsu counts in the reiatsu difference during Letzt Stil.")
+                .defineInRange("reiatsu_multiplier", 2.0, 1.0, 100.0);
+        LETZT_HIRENKYAKU_DISTANCE_MULTIPLIER = builder
+                .comment("Hirenkyaku distance multiplier during Letzt Stil, applied after the longest dash is reached.")
+                .defineInRange("hirenkyaku_distance_multiplier", 1.5, 0.1, 10.0);
+        LETZT_HIRENKYAKU_COST_MULTIPLIER = builder
+                .comment("Hirenkyaku reishi cost multiplier during Letzt Stil.")
+                .defineInRange("hirenkyaku_cost_multiplier", 0.5, 0.0, 10.0);
+        LETZT_HIRENKYAKU_COOLDOWN_MULTIPLIER = builder
+                .comment("Hirenkyaku cooldown multiplier during Letzt Stil.")
+                .defineInRange("hirenkyaku_cooldown_multiplier", 0.5, 0.0, 10.0);
+        LETZT_PFEIL_DAMAGE_MULTIPLIER = builder
+                .comment("Damage of the Letzt Pfeil, the shot of a draw held two seconds past full, as a multiple of a full draw's.")
+                .defineInRange("pfeil_damage_multiplier", 3.0, 0.0, 100.0);
+        LETZT_PFEIL_MAX_DAMAGE = builder
+                .comment("Highest Letzt Pfeil damage.")
+                .defineInRange("pfeil_max_damage", 120.0, 0.0, 10_000.0);
+        LETZT_PFEIL_PIERCE = builder
+                .comment("How many creatures a Letzt Pfeil passes through.")
+                .defineInRange("pfeil_pierce", 10, 0, 100);
+        LETZT_PFEIL_SPEED = builder
+                .comment("Letzt Pfeil speed in blocks a tick.")
+                .defineInRange("pfeil_speed", 3.5, 0.1, 10.0);
+        LETZT_PFEIL_COST = builder
+                .comment("Reishi a Letzt Pfeil costs; without it the charged draw looses an ordinary full-draw arrow.")
+                .defineInRange("pfeil_cost", 15.0, 0.0, 1_000.0);
+        LETZT_PFEIL_BREAKS_BLOCKS = builder
+                .comment("Whether a Letzt Pfeil carves through soft blocks where block protection allows it.")
+                .define("pfeil_breaks_blocks", true);
+        LETZT_PFEIL_CARVE_BLOCKS = builder
+                .comment("Most blocks one Letzt Pfeil carves through.")
+                .defineInRange("pfeil_carve_blocks", 16, 0, 256);
+        LETZT_PFEIL_MAX_HARDNESS = builder
+                .comment("Hardest block a Letzt Pfeil carves through (dirt is 0.5, stone 1.5, obsidian 50).")
+                .defineInRange("pfeil_max_hardness", 3.0, 0.0, 100.0);
+        builder.pop();
+
+        builder.push("restoration");
+        RESTORE_SEALED_TICKS = builder
+                .comment("Ticks a sealed Quincy's power stays gone before the rite can bring it back.")
+                .defineInRange("sealed_ticks", 48_000, 0, 10_000_000);
+        RESTORE_ARROW_SEALED_TICKS = builder
+                .comment("Ticks a sealed Quincy's power stays gone before another Quincy's full-draw arrow beside the heart can bring it back.")
+                .defineInRange("arrow_sealed_ticks", 6_000, 0, 10_000_000);
+        RESTORE_SOLO_RITE = builder
+                .comment("Whether a sealed Quincy can win their power back alone, holding the Cross through a rite.")
+                .define("solo_rite", true);
+        RESTORE_RITE_TICKS = builder
+                .comment("Ticks the Cross must be held through the rite.")
+                .defineInRange("rite_ticks", 100, 1, 6_000);
+        RESTORE_MAX_HEALTH_FRACTION = builder
+                .comment("Share of maximum health a sealed Quincy must be down to for their power to return.")
+                .defineInRange("max_health_fraction", 0.3, 0.0, 1.0);
+        RESTORE_MAX_FOOD = builder
+                .comment("Food level, out of 20, a sealed Quincy must be down to for their power to return.")
+                .defineInRange("max_food", 6, 0, 20);
+        SEALED_REIATSU_MULTIPLIER = builder
+                .comment("How much a sealed Quincy's reiatsu counts for in the reiatsu difference, unless they have a Shinigami's power.")
+                .defineInRange("sealed_reiatsu_multiplier", 0.5, 0.0, 1.0);
+        builder.pop();
+
+        builder.push("ginrei_kojaku");
+        GINREI_DRAW_TICKS = builder
+                .comment("Ticks a full draw of Ginrei Kojaku, the restored Quincy's bow, takes.")
+                .defineInRange("draw_ticks", 15, 1, 200);
+        GINREI_DAMAGE_MULTIPLIER = builder
+                .comment("Heilig Pfeil damage multiplier from Ginrei Kojaku.")
+                .defineInRange("damage_multiplier", 1.2, 1.0, 100.0);
+        GINREI_DAMAGE_CAP = builder
+                .comment("Highest full-draw damage from Ginrei Kojaku, never below the Heilig Bogen's own max_damage.")
+                .defineInRange("damage_cap", 45.0, 0.0, 10_000.0);
+        GINREI_STREAM_COST = builder
+                .comment("Reishi each arrow of the stream from a held Ginrei Kojaku draw costs.")
+                .defineInRange("stream_cost", 0.75, 0.0, 1_000.0);
+        GINREI_STREAM_DAMAGE_FRACTION = builder
+                .comment("Share of a full draw's damage each stream arrow does.")
+                .defineInRange("stream_damage_fraction", 0.25, 0.0, 1.0);
+        LICHT_REGEN_COST = builder
+                .comment("Reishi Licht Regen costs.")
+                .defineInRange("licht_regen_cost", 25.0, 0.0, 1_000.0);
+        LICHT_REGEN_COOLDOWN_TICKS = builder
+                .comment("Ticks after Licht Regen before it can be called on again.")
+                .defineInRange("licht_regen_cooldown_ticks", 300, 0, 72_000);
+        LICHT_REGEN_ARROWS = builder
+                .comment("Arrows a Licht Regen volley looses.")
+                .defineInRange("licht_regen_arrows", 20, 1, 200);
+        LICHT_REGEN_DAMAGE_FRACTION = builder
+                .comment("Share of a full draw's damage each Licht Regen arrow does.")
+                .defineInRange("licht_regen_damage_fraction", 0.25, 0.0, 1.0);
+        builder.pop();
+
+        builder.push("seele_schneider");
+        SEELE_FORM_COST = builder
+                .comment("Reishi forming a Seele Schneider's blade costs.")
+                .defineInRange("form_cost", 3.0, 0.0, 1_000.0);
+        SEELE_UPKEEP_PER_SECOND = builder
+                .comment("Reishi a formed Seele Schneider drains each second.")
+                .defineInRange("upkeep_per_second", 0.25, 0.0, 1_000.0);
+        SEELE_DAMAGE = builder
+                .comment("Attack damage of a formed Seele Schneider.")
+                .defineInRange("damage", 7.0, 1.0, 1_000.0);
+        SEELE_ATTACK_SPEED = builder
+                .comment("Attack speed of a formed Seele Schneider (a sword's is 1.6).")
+                .defineInRange("attack_speed", 1.8, 0.1, 4.0);
+        SEELE_HOLLOW_MULTIPLIER = builder
+                .comment("Damage multiplier for a formed Seele Schneider's cut on a Hollow, or a Hollow or Arrancar player.")
+                .defineInRange("hollow_multiplier", 1.25, 1.0, 10.0);
+        SEELE_ARMOR_IGNORED = builder
+                .comment("Share of armour a Seele Schneider ignores, cutting or loosed.")
+                .defineInRange("armor_ignored", 0.5, 0.0, 1.0);
+        SEELE_DRAIN_FRACTION = builder
+                .comment("Share of a Seele Schneider cut's damage that comes back as reishi, twice that from a Hollow or a soul releasing its reiatsu.")
+                .defineInRange("drain_fraction", 0.3, 0.0, 10.0);
+        SEELE_DRAIN_MAX = builder
+                .comment("Most reishi one Seele Schneider cut gives back.")
+                .defineInRange("drain_max", 5.0, 0.0, 1_000.0);
+        SEELE_FIRED_DAMAGE_MULTIPLIER = builder
+                .comment("Damage multiplier for a Seele Schneider loosed from a full Ginrei Kojaku draw, over the arrow it replaces.")
+                .defineInRange("fired_damage_multiplier", 1.5, 0.0, 10.0);
+        SEELE_FIRED_COST = builder
+                .comment("Extra reishi loosing a Seele Schneider costs; without it the draw looses an ordinary arrow.")
+                .defineInRange("fired_cost", 2.0, 0.0, 1_000.0);
+        SEELE_STUCK_DESPAWN_TICKS = builder
+                .comment("Ticks a stuck Seele Schneider stands before its blade fades and it drops as a hilt.")
+                .defineInRange("stuck_despawn_ticks", 6_000, 20, 1_000_000);
+        builder.pop();
+
+        builder.push("ginto");
+        GINTO_FILL_COST = builder
+                .comment("Reishi filling an empty Gintō costs.")
+                .defineInRange("fill_cost", 8.0, 0.0, 1_000.0);
+        GINTO_COOLDOWN_TICKS = builder
+                .comment("Ticks after a Gintō spell before the next.")
+                .defineInRange("cooldown_ticks", 40, 0, 1_200);
+        GINTO_RANGE = builder
+                .comment("How far, in blocks, a Gintō spell reaches.")
+                .defineInRange("range", 24.0, 1.0, 64.0);
+        HEIZEN_DAMAGE_MULTIPLIER = builder
+                .comment("Heizen damage as a multiple of the caster's full-draw Heilig Pfeil damage, twice that on a Hollow.")
+                .defineInRange("heizen_damage_multiplier", 1.5, 0.0, 100.0);
+        HEIZEN_MAX_DAMAGE = builder
+                .comment("Highest Heizen damage.")
+                .defineInRange("heizen_max_damage", 60.0, 0.0, 10_000.0);
+        GRITZ_MAX_TICKS = builder
+                .comment("Ticks Gritz binds a creature whose reiatsu is no greater than the caster's, down to a quarter of that against far stronger ones, and a quarter again on bosses.")
+                .defineInRange("gritz_max_ticks", 100, 1, 1_200);
+        WOLKE_TICKS = builder
+                .comment("Ticks a Wolke cloud lasts.")
+                .defineInRange("wolke_ticks", 200, 1, 6_000);
+        WOLKE_RADIUS = builder
+                .comment("Radius of a Wolke cloud in blocks.")
+                .defineInRange("wolke_radius", 3.5, 0.5, 16.0);
+        SPRENGER_DAMAGE_MULTIPLIER = builder
+                .comment("Sprenger damage as a multiple of the caster's full-draw Heilig Pfeil damage.")
+                .defineInRange("sprenger_damage_multiplier", 2.5, 0.0, 100.0);
+        SPRENGER_MAX_DAMAGE = builder
+                .comment("Highest Sprenger damage.")
+                .defineInRange("sprenger_max_damage", 80.0, 0.0, 10_000.0);
+        builder.pop();
+
+        builder.push("vollstandig");
+        VOLL_TRAINING_AFTER_RESTORE = builder
+                .comment("Training a restored Quincy needs after their power returns to take Vollständig.")
+                .defineInRange("training_after_restore", 500, 0, 100_000);
+        VOLL_START_COST = builder
+                .comment("Reishi taking Vollständig costs.")
+                .defineInRange("start_cost", 20.0, 0.0, 1_000.0);
+        VOLL_START_MIN_REISHI = builder
+                .comment("Reishi a Quincy needs to take Vollständig.")
+                .defineInRange("start_min_reishi", 30.0, 0.0, 1_000.0);
+        VOLL_COOLDOWN_TICKS = builder
+                .comment("Ticks after Vollständig ends before it can be taken again.")
+                .defineInRange("cooldown_ticks", 600, 0, 72_000);
+        VOLL_POOL_MULTIPLIER = builder
+                .comment("How many times over the reishi a Quincy can hold in Vollständig; a soul that also has a Shinigami's power gets half the extra, as with Vollständig's damage and reiatsu.")
+                .defineInRange("pool_multiplier", 1.5, 1.0, 100.0);
+        VOLL_DAMAGE_MULTIPLIER = builder
+                .comment("Heilig Pfeil damage multiplier in Vollständig.")
+                .defineInRange("damage_multiplier", 1.3, 1.0, 100.0);
+        VOLL_DAMAGE_CAP = builder
+                .comment("Highest full-draw damage in Vollständig, never below the Heilig Bogen's own max_damage.")
+                .defineInRange("damage_cap", 55.0, 0.0, 10_000.0);
+        VOLL_REIATSU_MULTIPLIER = builder
+                .comment("How many times over a Quincy's reiatsu counts in the reiatsu difference in Vollständig.")
+                .defineInRange("reiatsu_multiplier", 1.5, 1.0, 100.0);
+        VOLL_UPKEEP_PER_SECOND = builder
+                .comment("Reishi Vollständig drains each second.")
+                .defineInRange("upkeep_per_second", 1.0, 0.0, 1_000.0);
+        VOLL_FLIGHT_UPKEEP_PER_SECOND = builder
+                .comment("Extra reishi Vollständig drains each second while flying.")
+                .defineInRange("flight_upkeep_per_second", 1.5, 0.0, 1_000.0);
+        VOLL_HALO_BREAK_FRACTION = builder
+                .comment("Share of maximum health one hit must take to shatter the halo, ending Sklaverei for the rest of the form; a hit from above the brow shatters it too.")
+                .defineInRange("halo_break_fraction", 0.3, 0.0, 1.0);
+        builder.pop();
+
+        builder.push("sklaverei");
+        SKLAVEREI_RADIUS = builder
+                .comment("How far, in blocks, Sklaverei draws in the reishi around its user.")
+                .defineInRange("radius", 8.0, 1.0, 32.0);
+        SKLAVEREI_UPKEEP_PER_SECOND = builder
+                .comment("Extra reishi Vollständig drains each second while Sklaverei runs.")
+                .defineInRange("upkeep_per_second", 1.0, 0.0, 1_000.0);
+        SKLAVEREI_HOLLOW_DAMAGE = builder
+                .comment("Damage each Sklaverei pulse, twice a second, does to each Hollow in reach.")
+                .defineInRange("hollow_damage", 2.0, 0.0, 1_000.0);
+        SKLAVEREI_PLAYER_DRAIN = builder
+                .comment("Most reishi, or else reiryoku, each pulse draws from each spiritually aware player in reach whom the user may harm.")
+                .defineInRange("player_drain", 1.5, 0.0, 1_000.0);
+        SKLAVEREI_PROJECTILE_GAIN = builder
+                .comment("Reishi gained for each enemy Heilig Pfeil, Letzt Pfeil or Getsuga Tenshō Sklaverei unravels.")
+                .defineInRange("projectile_gain", 1.5, 0.0, 1_000.0);
+        SKLAVEREI_MAX_GAIN_PER_PULSE = builder
+                .comment("Most reishi one Sklaverei pulse gains.")
+                .defineInRange("max_gain_per_pulse", 3.0, 0.0, 1_000.0);
+        SKLAVEREI_POISON_PER_HOLLOW = builder
+                .comment("Hollow poison the user takes for each Hollow a pulse draws on.")
+                .defineInRange("poison_per_hollow", 1.0, 0.0, 100.0);
         builder.pop();
         builder.pop();
 

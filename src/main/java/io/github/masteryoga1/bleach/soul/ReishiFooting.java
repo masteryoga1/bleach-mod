@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -56,12 +57,12 @@ public final class ReishiFooting {
 
     /**
      * Everything footing needs apart from being in the air: alive, not a spectator, not in a liquid,
-     * riding, gliding or flying, and trained enough to use it.
+     * riding, gliding or flying, trained enough to use it, and not bound by Gritz.
      */
     private static boolean mayStand(Player player, SoulData data, long now) {
         return player.isAlive() && !player.isSpectator() && !player.isInLiquid() && !player.isPassenger()
                 && !player.isFallFlying() && !player.getAbilities().flying && SoulLogic.hasSoul(player)
-                && ShinigamiLogic.canUseReishiFooting(data, now);
+                && ShinigamiLogic.canUseReishiFooting(data, now) && !player.hasEffect(ModEffects.GRITZ);
     }
 
     /**

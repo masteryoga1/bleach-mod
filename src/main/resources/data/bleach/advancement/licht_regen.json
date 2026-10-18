@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:restored",
+  "display": {
+    "icon": {
+      "id": "minecraft:spectral_arrow"
+    },
+    "title": {
+      "translate": "advancements.bleach.licht_regen.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.licht_regen.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "licht_regen": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "licht_regen"
+      }
+    }
+  }
+}

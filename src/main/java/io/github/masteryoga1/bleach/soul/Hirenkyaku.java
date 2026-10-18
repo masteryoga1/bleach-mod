@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -41,6 +42,15 @@ public final class Hirenkyaku {
         ServerLevel level = player.serverLevel();
         long now = level.getGameTime();
         if (now - data.lastFlashStepAt < QuincyLogic.hirenkyakuCooldownTicks(data)) {
+            return;
+        }
+        // Said before the training check: a sealed Quincy knows the dash, the power is what is missing.
+        if (QuincyArtsLogic.isSealed(data)) {
+            FlashStep.refuse(player, "message.bleach.letzt_stil.sealed");
+            return;
+        }
+        if (player.hasEffect(ModEffects.GRITZ)) {
+            FlashStep.refuse(player, "message.bleach.gritz.bound");
             return;
         }
         if (!QuincyLogic.knowsHirenkyaku(data)) {

@@ -2,8 +2,12 @@ package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
+import io.github.masteryoga1.bleach.item.EmptyGintoItem;
+import io.github.masteryoga1.bleach.item.GintoItem;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
+import io.github.masteryoga1.bleach.item.SanreiGloveItem;
+import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import net.minecraft.core.component.DataComponents;
@@ -60,6 +64,29 @@ public final class ModItems {
             () -> new QuincyGarbItem(ArmorItem.Type.LEGGINGS));
     public static final DeferredItem<QuincyGarbItem> QUINCY_SHOES = ITEMS.register("quincy_shoes",
             () -> new QuincyGarbItem(ArmorItem.Type.BOOTS));
+
+    /**
+     * The Sanrei Glove, handed down to a Quincy of the third tier: worn, it fights every draw until a
+     * week of training masters it, and torn off it burns the power out in Letzt Stil. Wearing it puts
+     * it on the soul, not in a slot. See {@link SanreiGloveItem}.
+     */
+    public static final DeferredItem<SanreiGloveItem> SANREI_GLOVE = ITEMS.register("sanrei_glove",
+            () -> new SanreiGloveItem(new Item.Properties().stacksTo(1)));
+
+    /**
+     * A Seele Schneider hilt. In a restored Quincy's main hand it forms a blade of reishi; in the
+     * other hand it is loosed from Ginrei Kojaku. See {@link SeeleSchneiderItem}.
+     */
+    public static final DeferredItem<SeeleSchneiderItem> SEELE_SCHNEIDER = ITEMS.register("seele_schneider",
+            () -> new SeeleSchneiderItem(new Item.Properties().stacksTo(16)));
+
+    /** A silver tube waiting to be filled with reishi. See {@link EmptyGintoItem}. */
+    public static final DeferredItem<EmptyGintoItem> EMPTY_GINTO = ITEMS.register("empty_ginto",
+            () -> new EmptyGintoItem(new Item.Properties().stacksTo(16)));
+
+    /** A Gintō full of stored reishi, broken to cast a spell, even with the power sealed. See {@link GintoItem}. */
+    public static final DeferredItem<GintoItem> GINTO = ITEMS.register("ginto",
+            () -> new GintoItem(new Item.Properties().stacksTo(16)));
 
     public static final DeferredItem<DeferredSpawnEggItem> ACADEMY_INSTRUCTOR_SPAWN_EGG = ITEMS.register(
             "academy_instructor_spawn_egg",

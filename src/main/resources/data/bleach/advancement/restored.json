@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:letzt_stil",
+  "display": {
+    "icon": {
+      "id": "bleach:quincy_cross"
+    },
+    "title": {
+      "translate": "advancements.bleach.restored.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.restored.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "restored": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "restored"
+      }
+    }
+  }
+}

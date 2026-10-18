@@ -350,6 +350,11 @@ public final class HollowTests {
         int zanjutsuXp = BleachConfig.get(BleachConfig.PURIFICATION_ZANJUTSU_XP);
         helper.assertTrue(data.xp(Stat.ZANJUTSU) == zanjutsuXp,
                 "purifying gave " + data.xp(Stat.ZANJUTSU) + " Zanjutsu XP, not " + zanjutsuXp);
+        // Only a swing of the blade purifies, not another blow that comes straight from its wielder.
+        long now = helper.getLevel().getGameTime();
+        helper.assertTrue(HollowLogic.purifies(damage.playerAttack(purifier), data, now), "an Asauchi cut does not purify");
+        helper.assertFalse(HollowLogic.purifies(damage.thorns(purifier), data, now),
+                "thorns from a Shinigami holding an Asauchi purify");
         for (Player killer : List.of(human, swordsman)) {
             String who = killer == human ? "a Human with an Asauchi" : "a Shinigami with an iron sword";
             SoulData killerData = SoulLogic.get(killer);

@@ -71,7 +71,7 @@ public final class GarbTests {
                 .collect(Collectors.toSet());
         helper.assertTrue(results.equals(Set.of(ModItems.SHIHAKUSHO_KOSODE.get(), ModItems.SHIHAKUSHO_HAKAMA.get(),
                 ModItems.WARAJI.get(), ModItems.QUINCY_TUNIC.get(), ModItems.QUINCY_TROUSERS.get(),
-                ModItems.QUINCY_SHOES.get())), "tailoring makes " + results);
+                ModItems.QUINCY_SHOES.get(), ModItems.SANREI_GLOVE.get())), "tailoring makes " + results);
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("tailoring_table")).isPresent(),
                 "the Tailoring Table cannot be crafted");
         helper.succeed();

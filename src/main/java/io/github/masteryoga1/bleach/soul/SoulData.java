@@ -165,6 +165,17 @@ public final class SoulData {
     boolean quincyReborn;
     /** Set on the respawned copy when this death came from the soul being torn apart. */
     boolean soulReformed;
+    /** Game time the Quincy Form key was last pressed, so a held or repeated key is ignored. */
+    long lastFormPressAt = NEVER;
+    /** Game time of the first press that tears the mastered Sanrei Glove off, waiting for the second. */
+    long formArmedAt = NEVER;
+    /** Game time a Licht Regen started gathering, or {@link #NEVER} when none is. */
+    long lichtGatherFrom = NEVER;
+    /** Game time from which a Sprenger formation's fifth blade may bind again. */
+    long sprengerBindReadyAt = NEVER;
+    /** The Licht Regen volley still falling, or null. Lost on logging out, as a volley is short. */
+    @Nullable
+    LichtVolley lichtVolley;
 
     public SoulData() {
     }
@@ -471,6 +482,11 @@ public final class SoulData {
     /** Whether a Getsuga Tenshō is gathering. Server side only. */
     public boolean isGathering() {
         return gatherStartedAt != NEVER;
+    }
+
+    /** Whether a Licht Regen is gathering. Server side only. */
+    boolean lichtGathering() {
+        return lichtGatherFrom != NEVER;
     }
 
     /** Whether the client's copy is out of date. */

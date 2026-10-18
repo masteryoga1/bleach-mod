@@ -206,10 +206,15 @@ public final class SoulLogic {
 
     /**
      * A creature's spiritual pressure: maximum reiryoku for a soul (players and spirit mobs alike),
-     * and max health as a stand-in for creatures without one.
+     * weighed by a Quincy's form (see {@link QuincyArtsLogic#reiatsuFactor}), and max health as a
+     * stand-in for creatures without one.
      */
     public static float reiatsu(LivingEntity entity) {
-        return hasSoul(entity) ? get(entity).maxReiryoku() : entity.getMaxHealth();
+        if (!hasSoul(entity)) {
+            return entity.getMaxHealth();
+        }
+        SoulData data = get(entity);
+        return (float) (data.maxReiryoku() * QuincyArtsLogic.reiatsuFactor(data));
     }
 
     /**
@@ -286,13 +291,15 @@ public final class SoulLogic {
      * to the body and they wake alive; any other spiritually aware Human lingers as a Plus with a
      * fresh Chain of Fate; a Plus that dies loses part of its chain (an awakened Quincy Plus whose
      * chain that breaks is torn apart at once, as above). Everyone keeps their progress,
-     * but a Quincy loses their Blut and gathered reishi and half their Hollow poison.
+     * but a Quincy loses their Blut and gathered reishi and half their Hollow poison, a Letzt Stil
+     * burns out into the seal, and every Quincy form ends (see {@link QuincyArtsLogic#afterDeath}).
      */
     public static SoulData afterDeath(SoulData old) {
         SoulData next = old.copy();
         next.setReiatsuReleased(false);
         next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
-        QuincyProgress quincy = old.quincy().withBlut(BlutMode.OFF).withReishi(0.0F).withTornApart(false);
+        QuincyProgress quincy = old.quincy().withBlut(BlutMode.OFF).withReishi(0.0F).withTornApart(false)
+                .withArts(QuincyArtsLogic.afterDeath(old.quincy().arts()));
         if (old.isSoulDestroyed()) {
             return reformed(old, next, quincy);
         }

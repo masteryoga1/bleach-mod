@@ -1,6 +1,10 @@
 {
   "values": [
     "bleach:encroachment",
-    "bleach:soul_destruction"
+    "bleach:soul_destruction",
+    "bleach:heilig_pfeil_volley",
+    "bleach:heizen",
+    "bleach:sprenger",
+    "bleach:sklaverei"
   ]
 }

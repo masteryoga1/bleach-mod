@@ -5,14 +5,17 @@ import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -300,8 +303,22 @@ public final class HollowLogic {
             return true;
         }
         ItemStack weapon = source.getWeaponItem();
-        return weapon != null && weapon.is(BleachTags.ZANPAKUTO)
+        return weapon != null && weapon.is(BleachTags.ZANPAKUTO) && source.is(DamageTypeTags.IS_PLAYER_ATTACK)
                 && source.getEntity() != null && source.getDirectEntity() == source.getEntity();
+    }
+
+    /**
+     * Whether this killing blow destroys a Hollow's soul instead of letting it go on (when it does
+     * not purify): a technique that destroys souls, such as a Heilig Pfeil, or a melee swing of a
+     * formed Seele Schneider in the killer's own hand.
+     */
+    public static boolean destroysSouls(DamageSource source) {
+        if (source.is(BleachTags.DESTROYS_SOULS)) {
+            return true;
+        }
+        Entity cause = source.getEntity();
+        return cause != null && source.getDirectEntity() == cause && source.is(DamageTypeTags.IS_PLAYER_ATTACK)
+                && SeeleSchneiderItem.isFormed(source.getWeaponItem());
     }
 
     /**

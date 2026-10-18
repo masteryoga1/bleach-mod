@@ -7,20 +7,28 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.masteryoga1.bleach.advancement.Milestones;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
+import io.github.masteryoga1.bleach.quincy.GintoSpell;
+import io.github.masteryoga1.bleach.quincy.QuincyStage;
 import io.github.masteryoga1.bleach.registry.ModComponents;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyArts;
+import io.github.masteryoga1.bleach.soul.QuincyArtsEvents;
+import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
+import io.github.masteryoga1.bleach.soul.QuincyForms;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
+import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -39,6 +47,7 @@ import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -93,6 +102,10 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach quincy &lt;players&gt; reishi &lt;amount&gt;   (up to the soul's maximum)
  * /bleach quincy &lt;players&gt; poison &lt;0..100&gt;
  * /bleach quincy &lt;players&gt; blut &lt;off|vene|arterie&gt;   (skips the unlock, cost and poison checks; upkeep still applies)
+ * /bleach quincy &lt;players&gt; glove &lt;none|worn|mastered&gt;   (none takes it away and starts its days over; worn and mastered need tier 3)
+ * /bleach quincy &lt;players&gt; letzt &lt;start|seal|ready|restore|reset&gt;   (ready skips the sealed wait, restore every condition)
+ * /bleach quincy &lt;players&gt; vollstandig &lt;on|off&gt;   (on skips the unlock, cost and cooldown; restored power only)
+ * /bleach quincy &lt;players&gt; ginto &lt;gritz|wolke|heizen|sprenger&gt;   (the spell Gintō cast, known or not)
  * /bleach quincy &lt;players&gt; reset   (no Quincy power, and the bloodline is asked again)
  * </pre>
  */
@@ -106,6 +119,10 @@ public final class BleachCommand {
     private static final SuggestionProvider<CommandSourceStack> TYPES = suggest(ZanpakutoType.values());
     private static final SuggestionProvider<CommandSourceStack> BLOODLINES = suggest(Bloodline.values());
     private static final SuggestionProvider<CommandSourceStack> BLUT_MODES = suggest(BlutMode.values());
+    private static final SuggestionProvider<CommandSourceStack> GLOVE_SETTINGS = suggest(GloveSetting.values());
+    private static final SuggestionProvider<CommandSourceStack> LETZT_ACTIONS = suggest(LetztAction.values());
+    private static final SuggestionProvider<CommandSourceStack> TOGGLES = suggest(Toggle.values());
+    private static final SuggestionProvider<CommandSourceStack> GINTO_SPELLS = suggest(GintoSpell.values());
     /** The spirits the world loaded, read from the server's registry. */
     private static final SuggestionProvider<CommandSourceStack> SPIRITS = (context, builder) ->
             SharedSuggestionProvider.suggestResource(ZanpakutoSpirits.registry(context.getSource().getLevel())
@@ -219,6 +236,22 @@ public final class BleachCommand {
                                         .then(Commands.argument("blut", StringArgumentType.word())
                                                 .suggests(BLUT_MODES)
                                                 .executes(BleachCommand::setBlut)))
+                                .then(Commands.literal("glove")
+                                        .then(Commands.argument("glove", StringArgumentType.word())
+                                                .suggests(GLOVE_SETTINGS)
+                                                .executes(BleachCommand::setGlove)))
+                                .then(Commands.literal("letzt")
+                                        .then(Commands.argument("action", StringArgumentType.word())
+                                                .suggests(LETZT_ACTIONS)
+                                                .executes(BleachCommand::letzt)))
+                                .then(Commands.literal("vollstandig")
+                                        .then(Commands.argument("vollstandig", StringArgumentType.word())
+                                                .suggests(TOGGLES)
+                                                .executes(BleachCommand::setVollstandig)))
+                                .then(Commands.literal("ginto")
+                                        .then(Commands.argument("spell", StringArgumentType.word())
+                                                .suggests(GINTO_SPELLS)
+                                                .executes(BleachCommand::setGinto)))
                                 .then(Commands.literal("reset")
                                         .executes(BleachCommand::resetQuincy)))));
     }
@@ -275,7 +308,58 @@ public final class BleachCommand {
                         ? "commands.bleach.info.quincy.chosen" : "commands.bleach.info.quincy.undecided"),
                 quincy.training(), format(quincy.reishi()), format(QuincyLogic.maxReishi(data)),
                 format(quincy.poison()), quincy.blut().displayName(), quincy.destroyed()));
+        QuincyArts arts = quincy.arts();
+        SanreiProgress glove = arts.glove();
+        line.accept(Component.translatable("commands.bleach.info.quincy_arts", arts.stage().getSerializedName(),
+                gloveWord(glove), glove.days(), BleachConfig.get(BleachConfig.SANREI_DAYS_TO_MASTER),
+                QuincyArtsLogic.gloveToday(glove, now, player.level().getDayTime()),
+                artsClock(arts, now), formsWord(data), QuincyArtsLogic.formatTicks(arts.forms().vollReadyAt() - now),
+                QuincyArtsLogic.formatTicks(arts.forms().lichtRegenReadyAt() - now)));
         return 1;
+    }
+
+    /** The glove in a word for {@code /bleach info}: none, given, worn, mastered (on the hand) or torn (off it, after Letzt Stil). */
+    private static String gloveWord(SanreiProgress glove) {
+        if (glove.worn()) {
+            return glove.mastered() ? "mastered" : "worn";
+        }
+        if (glove.mastered()) {
+            return "torn";
+        }
+        return glove.given() ? "given" : "none";
+    }
+
+    /** The time Letzt Stil has left, or the time sealed against the wait before the power can return, or a dash. */
+    private static String artsClock(QuincyArts arts, long now) {
+        return switch (arts.stage()) {
+            case LETZT_STIL -> QuincyArtsLogic.formatTicks(arts.letztEndsAt() - now) + " left";
+            case SEALED -> QuincyArtsLogic.formatTicks(now - arts.stageSince()) + " / "
+                    + QuincyArtsLogic.formatTicks(QuincyArtsLogic.sealedWaitTicks()) + " sealed";
+            case UNTOUCHED, RESTORED -> "-";
+        };
+    }
+
+    /** Vollständig in a few words: on with what goes with it, off, or locked with the training left. */
+    private static String formsWord(SoulData data) {
+        QuincyForms forms = QuincyArtsLogic.arts(data).forms();
+        StringBuilder words = new StringBuilder();
+        if (forms.vollstandig()) {
+            words.append("on");
+            if (forms.sklaverei()) {
+                words.append(", Sklaverei");
+            }
+            if (forms.haloBroken()) {
+                words.append(", halo broken");
+            }
+        } else if (QuincyArtsLogic.isRestored(data) && !QuincyArtsLogic.vollUnlocked(data)) {
+            words.append("locked, ").append(QuincyArtsLogic.vollTrainingLeft(data)).append(" training to go");
+        } else {
+            words.append("off");
+        }
+        if (forms.landingGrace()) {
+            words.append(", landing cushioned");
+        }
+        return words.toString();
     }
 
     /** Reports the nearest Academy, like {@code /locate}, searching from the source or, outside the Overworld, from spawn. */
@@ -500,7 +584,10 @@ public final class BleachCommand {
         for (ServerPlayer player : players) {
             // What the old soul had released goes with it, so nothing it held lingers on the body.
             ShikaiEvents.forceSeal(player, SoulLogic.get(player), null);
-            player.setData(SoulAttachments.SOUL, new SoulData());
+            QuincyArtsEvents.endAll(player, SoulLogic.get(player));
+            SoulData fresh = new SoulData();
+            QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);
+            player.setData(SoulAttachments.SOUL, fresh);
             SoulEvents.refresh(player);
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.reset.success",
@@ -796,6 +883,199 @@ public final class BleachCommand {
         return players.size();
     }
 
+    /**
+     * Sets the Sanrei Glove. {@code none} takes it off the hand with no glove given back and starts
+     * its training over, though it still counts as handed down; {@code worn} puts it on, keeping its
+     * progress; {@code mastered} puts it on with every day counted. Both need a third-tier soul
+     * whose power is untouched, and skip whether it can use its power now.
+     */
+    private static int setGlove(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "glove");
+        GloveSetting setting = byName(GloveSetting.values(), name);
+        if (setting == null) {
+            context.getSource().sendFailure(Component.translatable("argument.enum.invalid", name));
+            return 0;
+        }
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            QuincyArts arts = QuincyArtsLogic.arts(data);
+            SanreiProgress glove = arts.glove();
+            if (setting == GloveSetting.NONE) {
+                glove = glove.withWorn(false).withDays(0).withToday(0).withMastered(false);
+            } else if (QuincyLogic.tier(data) < QuincyLogic.MAX_TIER) {
+                refuseArts(context.getSource(), player, Component.translatable("message.bleach.sanrei_glove.tier"));
+                continue;
+            } else if (arts.stage() != QuincyStage.UNTOUCHED) {
+                refuseArts(context.getSource(), player, Component.translatable("message.bleach.sanrei_glove.stage"));
+                continue;
+            } else {
+                glove = glove.withGiven(true).withWorn(true);
+                if (setting == GloveSetting.MASTERED) {
+                    glove = glove.withDays(BleachConfig.get(BleachConfig.SANREI_DAYS_TO_MASTER)).withMastered(true);
+                }
+            }
+            QuincyArtsLogic.setArts(data, arts.withGlove(glove));
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.glove",
+                    setting.getSerializedName(), count), true);
+        }
+        return count;
+    }
+
+    /**
+     * Moves the soul along the Letzt Stil path without the waits and rules: {@code start} tears the
+     * glove (worn or not) for an untouched power that works now; {@code seal} burns it out now, from
+     * Letzt Stil or straight from the untouched power; {@code ready} makes a sealed power able to
+     * return now, by the rite or by an arrow; {@code restore} brings it back now with no conditions;
+     * and {@code reset} ends every form and leaves the power untouched, with the glove still counted
+     * as handed down.
+     */
+    private static int letzt(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "action");
+        LetztAction action = byName(LetztAction.values(), name);
+        if (action == null) {
+            context.getSource().sendFailure(Component.translatable("argument.enum.invalid", name));
+            return 0;
+        }
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            Component refusal = letztFor(player, data, action, player.level().getGameTime());
+            if (refusal != null) {
+                refuseArts(context.getSource(), player, refusal);
+                continue;
+            }
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.letzt",
+                    action.getSerializedName(), count), true);
+        }
+        return count;
+    }
+
+    /** Does one {@code letzt} action for one player, or says why it cannot. */
+    @Nullable
+    private static Component letztFor(ServerPlayer player, SoulData data, LetztAction action, long now) {
+        QuincyArts arts = QuincyArtsLogic.arts(data);
+        QuincyStage stage = arts.stage();
+        switch (action) {
+            case START -> {
+                if (stage != QuincyStage.UNTOUCHED) {
+                    return Component.translatable("message.bleach.letzt_stil.once");
+                }
+                if (!QuincyLogic.canUsePowers(data) || !QuincyArtsEvents.startLetzt(player, data, now, true)) {
+                    return Component.translatable("message.bleach.letzt_stil.powerless");
+                }
+            }
+            case SEAL -> {
+                if (!QuincyLogic.isAwakened(data)) {
+                    return Component.translatable("message.bleach.letzt_stil.powerless");
+                }
+                if (stage == QuincyStage.SEALED) {
+                    return Component.translatable("message.bleach.letzt_stil.sealed");
+                }
+                if (stage == QuincyStage.RESTORED) {
+                    return Component.translatable("message.bleach.letzt_stil.once");
+                }
+                if (arts.glove().worn()) {
+                    // Straight from the untouched power, as if Letzt Stil had come and gone: the glove was torn.
+                    QuincyArtsLogic.setArts(data, arts.withGlove(arts.glove().withWorn(false)));
+                }
+                QuincyArtsEvents.seal(player, data, now);
+            }
+            case READY -> {
+                if (stage != QuincyStage.SEALED) {
+                    return Component.literal(stage.getSerializedName());
+                }
+                long wait = Math.max(QuincyArtsLogic.sealedTicksNeeded(false), QuincyArtsLogic.sealedTicksNeeded(true));
+                QuincyArtsLogic.setArts(data, arts.withStage(QuincyStage.SEALED, now - wait));
+            }
+            case RESTORE -> {
+                if (stage != QuincyStage.SEALED) {
+                    return Component.literal(stage.getSerializedName());
+                }
+                QuincyArtsEvents.restore(player, data, now, null);
+            }
+            case RESET -> {
+                QuincyArtsEvents.endAll(player, data);
+                QuincyArts ended = QuincyArtsLogic.arts(data);
+                // Only the glove's handing down stays, and a landing still to cushion, so a reset in the air does not hurt.
+                QuincyArtsLogic.setArts(data, QuincyArts.NONE
+                        .withGlove(SanreiProgress.NONE.withGiven(ended.glove().given()))
+                        .withForms(QuincyForms.NONE.withLandingGrace(ended.forms().landingGrace())));
+            }
+        }
+        return null;
+    }
+
+    /** Starts Vollständig for a restored power that works now, skipping the unlock, cost and cooldown, or ends it. */
+    private static int setVollstandig(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "vollstandig");
+        Toggle value = byName(Toggle.values(), name);
+        if (value == null) {
+            context.getSource().sendFailure(Component.translatable("argument.enum.invalid", name));
+            return 0;
+        }
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            long now = player.level().getGameTime();
+            if (value == Toggle.ON) {
+                if (!QuincyArtsLogic.isRestored(data)) {
+                    refuseArts(context.getSource(), player, Component.literal(QuincyArtsLogic.stage(data).getSerializedName()));
+                    continue;
+                }
+                if (!QuincyLogic.canUsePowers(data) || (!QuincyArtsLogic.inVollstandig(data)
+                        && !QuincyArtsEvents.startVollstandig(player, data, now, true))) {
+                    refuseArts(context.getSource(), player, Component.translatable("message.bleach.vollstandig.powerless"));
+                    continue;
+                }
+            } else if (QuincyArtsLogic.inVollstandig(data)) {
+                QuincyArtsEvents.endVollstandig(player, data, now, false);
+            }
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.vollstandig",
+                    value.getSerializedName(), count), true);
+        }
+        return count;
+    }
+
+    /** Chooses the spell Gintō cast, known or not: one not known yet casts the first known instead. */
+    private static int setGinto(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "spell");
+        GintoSpell spell = byName(GintoSpell.values(), name);
+        if (spell == null) {
+            context.getSource().sendFailure(Component.translatable("argument.enum.invalid", name));
+            return 0;
+        }
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            QuincyArtsLogic.setArts(data, QuincyArtsLogic.arts(data).withGinto(spell));
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.quincy.ginto",
+                spell.displayName(), players.size()), true);
+        return players.size();
+    }
+
+    /** Says a Quincy arts command was refused for this player, and why. */
+    private static void refuseArts(CommandSourceStack source, ServerPlayer player, Component reason) {
+        source.sendFailure(Component.translatable("commands.bleach.quincy.arts_refused", player.getDisplayName(), reason));
+    }
+
     /** Takes the Quincy power away and leaves the bloodline open, so the soul is asked about it again. */
     private static int resetQuincy(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
@@ -824,5 +1104,35 @@ public final class BleachCommand {
     private static SuggestionProvider<CommandSourceStack> suggest(StringRepresentable[] values) {
         return (context, builder) -> SharedSuggestionProvider.suggest(
                 Arrays.stream(values).map(StringRepresentable::getSerializedName), builder);
+    }
+
+    /** What {@code /bleach quincy <players> glove} sets the Sanrei Glove to. */
+    private enum GloveSetting implements StringRepresentable {
+        NONE, WORN, MASTERED;
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** What {@code /bleach quincy <players> letzt} does. */
+    private enum LetztAction implements StringRepresentable {
+        START, SEAL, READY, RESTORE, RESET;
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** On or off, for {@code /bleach quincy <players> vollstandig}. */
+    private enum Toggle implements StringRepresentable {
+        ON, OFF;
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
     }
 }

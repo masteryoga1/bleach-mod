@@ -8,7 +8,7 @@ The roadmap lives in [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Status
 
-Step 2 is done, step 3, the Shinigami path, is playable from the Academy to Shikai, and the first part of step 4, becoming a Quincy, is in. So far:
+Step 2 is done, step 3, the Shinigami path, is playable from the Academy to Shikai, and step 4 is under way: becoming a Quincy is in, and so is step 4b, the Quincy arts. So far:
 
 - Every player has a soul: a soul state (starting as a living Human), a reiryoku pool that regenerates (twice as fast while meditating or sleeping), and the Zankensoki stats, which level up by use.
 - Reiryoku grows by beating Hollows (more for purifying them with a zanpakutō), performing Konsō, surviving close calls (including a Totem of Undying save) and levelling stats.
@@ -36,6 +36,10 @@ Step 2 is done, step 3, the Shinigami path, is playable from the Academy to Shik
 - New players are asked once whether Quincy blood runs in them (Human, Quincy, or let fate decide). Quincy blood is Echt or Gemischt and comes with a Quincy Cross.
 - Hold use with the Cross until the Heilig Bogen forms, then draw and fire Heilig Pfeil arrows of reishi. They destroy Hollows instead of purifying them. Reishi refills by itself, and fast while meditating with the Cross, more in forests and near an open Garganta.
 - From Quincy tier 2, **V** does Hirenkyaku and you can stand on reishi. **N** calls Blut Vene (defence) and Blut Arterie (attack).
+- Train a week in the Sanrei Glove, handed down at tier 3, then tear it off for 90 seconds of Letzt Stil. It burns your power out; win it back through a rite of your own, or sooner with another Quincy's arrow just beside your heart.
+- Won back, the power becomes Ginrei Kojaku, which streams arrows and rains Licht Regen, with Seele Schneider blades to swing, fire from the bow and plant, and later Vollständig, with wings, a halo, flight and Sklaverei.
+- From tier 2, fill Gintō tubes with reishi and cast four spells from them: Gritz binds, Wolke cushions falls, Heizen (from tier 3) raises a pillar of light and Sprenger (once restored) sets off five Seele Schneider standing in a pentagon. Filled tubes work even while your power is sealed.
+- **H** is the Quincy Form key: it takes off or tears the glove, calls Licht Regen mid-draw, and starts or ends Vollständig (sneak and press it for Sklaverei).
 - Hollow attacks poison a Quincy, and at 100 the soul tears apart. An awakened Quincy comes back alive rather than as a Plus, and cannot take a Shinigami's power or enroll at the Academy.
 - The white Quincy garb, from the Tailoring Table.
 - A Bleach advancement tab, `/bleach` admin commands, a per-world server config (`serverconfig/bleach-server.toml`) and a client config (`config/bleach-client.toml`, for turning off footing on jump).
@@ -75,10 +79,14 @@ Admin commands (permission level 2):
 /bleach quincy <players> reishi <amount>
 /bleach quincy <players> poison <0..100>
 /bleach quincy <players> blut <off|vene|arterie>
+/bleach quincy <players> glove <none|worn|mastered>
+/bleach quincy <players> letzt <start|seal|ready|restore|reset>
+/bleach quincy <players> vollstandig <on|off>
+/bleach quincy <players> ginto <gritz|wolke|heizen|sprenger>
 /bleach quincy <players> reset
 ```
 
-`/bleach soul … shinigami` also grants the first Shinigami tier, `/bleach enroll` enrolls souls that have passed on (Rukongai souls) at the Academy, and `/bleach academy` shows where the nearest Academy is. `/bleach garganta` opens a tear now, ignoring the chance and caps (not on Peaceful), and `/bleach firsthollow` resets, skips or starts the Fishbone D encounter. `/bleach zanpakuto` sets the Asauchi bond, the hidden leaning (power, kidō or constant release) and the spirit, teaches the name as if the test was passed, and seals or resets the blade. `/bleach quincy` sets the bloodline (as if chosen, but quietly: no message and no Quincy Cross; an awakened Quincy can switch between Gemischt and Echt but cannot be left without Quincy blood until reset), Quincy training (raising the tier to match), reishi, Hollow poison and Blut, or resets the Quincy power and asks about the bloodline again.
+`/bleach soul … shinigami` also grants the first Shinigami tier, `/bleach enroll` enrolls souls that have passed on (Rukongai souls) at the Academy, and `/bleach academy` shows where the nearest Academy is. `/bleach garganta` opens a tear now, ignoring the chance and caps (not on Peaceful), and `/bleach firsthollow` resets, skips or starts the Fishbone D encounter. `/bleach zanpakuto` sets the Asauchi bond, the hidden leaning (power, kidō or constant release) and the spirit, teaches the name as if the test was passed, and seals or resets the blade. `/bleach quincy` sets the bloodline (as if chosen, but quietly: no message and no Quincy Cross; an awakened Quincy can switch between Gemischt and Echt but cannot be left without Quincy blood until reset), Quincy training (raising the tier to match), reishi, Hollow poison, Blut, the Sanrei Glove, the Letzt Stil stage, Vollständig and the Gintō spell, or resets the Quincy power and asks about the bloodline again. `letzt ready` and `letzt restore` skip the waits for testing: the first ends the sealed wait at once, and the second gives the power back with no other condition.
 
 ## Building
 
@@ -90,7 +98,7 @@ You need JDK 21.
 ./gradlew runGameTestServer # run the automated game tests on a headless server
 ```
 
-Every pull request is built on GitHub Actions, which also runs the game tests and a client smoke test (`./gradlew runClientSmokeTest`: it starts the game, makes a world, answers the bloodline question as a Human, plays through becoming a Plus, a Hollow and then a Shinigami who tailors, talks to an instructor, flash steps, stands on reishi footing and places an Academy, then summons each Hollow, strikes a mask, purifies a Hollow, sends a Plus on, opens a Garganta and checks what a soul just below the threshold sees, then sits in Jinzen with an Asauchi, picks the red ribbon, learns Zangetsu's name, releases it, fires a Getsuga Tenshō, opens the soul screen, then is born an Echt Quincy in the white garb, fires a Heilig Pfeil into the sky and another at a Hollow, calls Blut Vene, uses Hirenkyaku and opens the soul screen again, and quits). The built jar and the smoke test's screenshots can be downloaded from the run's **Artifacts** section.
+Every pull request is built on GitHub Actions, which also runs the game tests and a client smoke test (`./gradlew runClientSmokeTest`: it starts the game, makes a world, answers the bloodline question as a Human, plays through becoming a Plus, a Hollow and then a Shinigami who tailors, talks to an instructor, flash steps, stands on reishi footing and places an Academy, then summons each Hollow, strikes a mask, purifies a Hollow, sends a Plus on, opens a Garganta and checks what a soul just below the threshold sees, then sits in Jinzen with an Asauchi, picks the red ribbon, learns Zangetsu's name, releases it, fires a Getsuga Tenshō, opens the soul screen, then is born an Echt Quincy in the white garb, fires a Heilig Pfeil into the sky and another at a Hollow, calls Blut Vene, uses Hirenkyaku and opens the soul screen again, then masters the Sanrei Glove and looses its flank arrows, tears it off for Letzt Stil and fires a Letzt Pfeil, is sealed and cannot draw, is restored, streams arrows from Ginrei Kojaku and calls Licht Regen, forms a Seele Schneider and fires one from the bow, casts Wolke and then Heizen at a Hollow, takes Vollständig, flies, calls Sklaverei, lands unhurt after the form ends and opens the soul screen a last time, and quits about two minutes (2530 ticks) after the world loads). The built jar and the smoke test's screenshots can be downloaded from the run's **Artifacts** section.
 
 `tools/` holds the scripts that make the placeholder art and the structure templates. They need only Python 3, and `--check` confirms the committed files match what they make.
 

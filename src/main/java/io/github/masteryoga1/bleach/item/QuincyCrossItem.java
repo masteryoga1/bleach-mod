@@ -33,14 +33,14 @@ public final class QuincyCrossItem extends Item {
 
     /**
      * Starts drawing, unless the soul cannot draw at all. Both sides run the same check, on facts the
-     * client already has (blood, state, tiers and Shinigami power), so the client only starts drawing
-     * when the server will too; the server says why not. Whether there is reishi enough to fire is
-     * settled when the draw is let go.
+     * client already has (blood, state, tiers, Shinigami power and the arts, with the time for a
+     * sealed soul's rite), so the client only starts drawing when the server will too; the server
+     * says why not. Whether there is reishi enough to fire is settled when the draw is let go.
      */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        String refusal = QuincyLogic.drawRefusal(SoulLogic.get(player));
+        String refusal = QuincyLogic.drawRefusal(SoulLogic.get(player), level.getGameTime());
         if (refusal != null) {
             if (!level.isClientSide()) {
                 player.displayClientMessage(Component.translatable(refusal).withStyle(ChatFormatting.GRAY), true);

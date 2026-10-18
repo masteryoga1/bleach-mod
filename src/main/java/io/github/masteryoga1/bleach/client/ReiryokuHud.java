@@ -1,10 +1,15 @@
 package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
+import io.github.masteryoga1.bleach.soul.QuincyArts;
+import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
+import io.github.masteryoga1.bleach.soul.QuincyForms;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
+import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -29,8 +34,14 @@ import net.minecraft.world.item.ItemStack;
  * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in. A
  * Quincy gets a reishi gauge beside it instead, outlined blue under Blut Vene and red under Blut
  * Arterie, with Hollow poison filling it violet from the top (flickering once the poison brings
- * pangs) and a bar above it that fills as the Heilig Bogen is drawn. Quincy blood not yet awakened
- * shows only that bar, in grey. Placeholder look until real art exists.
+ * pangs) and a bar above it that fills as the Cross is drawn, over the form's draw time. That bar
+ * turns orange when a Letzt Stil draw is charged for a Letzt Pfeil, and pale gold while Licht Regen
+ * gathers. A thin bar beside the gauge follows the Quincy arts: the day's training in the Sanrei
+ * Glove (gold once mastered), the time Letzt Stil has left, the wait while the power is sealed
+ * (white once the power can return), and Vollständig (dimmed once the halo breaks) or its cooldown.
+ * While the power is sealed, the reishi gauge stands empty in a grey outline, and holding the Cross
+ * through the rite fills the bar above it. Quincy blood not yet awakened shows only the draw bar, in
+ * grey. Placeholder look until real art exists.
  */
 public final class ReiryokuHud {
     public static final ResourceLocation ID = BleachMod.id("reiryoku");
@@ -57,6 +68,22 @@ public final class ReiryokuHud {
     /** The Blut outline while a press is still waiting on the server. */
     private static final int BLUT_SETTLING_OUTLINE = 0xFF808080;
     private static final int LATENT_DRAW = 0xFF8090A0;
+    /** The draw bar once a Letzt Stil draw is charged, while Licht Regen gathers, and through the rite. */
+    private static final int LETZT_CHARGED_DRAW = 0xFFFFB060;
+    private static final int LICHT_GATHER_DRAW = 0xFFFFE8A0;
+    private static final int RITE_DRAW = 0xFFE8F4FF;
+    private static final int SEALED_OUTLINE = 0xFF7A7A7A;
+    /** The art bar, just right of the reishi gauge's outline. */
+    private static final int ART_WIDTH = 2;
+    private static final int ART_GAP = 2;
+    private static final int ART_GLOVE = 0xFFFFFFFF;
+    private static final int ART_GLOVE_MASTERED = 0xFFE0B040;
+    private static final int ART_LETZT = 0xFFFFC890;
+    private static final int ART_SEALED = 0xFF8A8A8A;
+    private static final int ART_RITE_OPEN = 0xFFFFFFFF;
+    private static final int ART_VOLL = 0xFFFFD86A;
+    private static final int ART_VOLL_HALO_BROKEN = 0xFFA89A6A;
+    private static final int ART_VOLL_COOLDOWN = 0xFF9A9A9A;
     /** Past the pang threshold the poison overlay is shown for this many ticks, then hidden as long. */
     private static final int POISON_FLICKER_TICKS = 10;
 
@@ -113,6 +140,8 @@ public final class ReiryokuHud {
         int rx = chainShown ? x + 2 * WIDTH + 8 : x + WIDTH + 6;
         if (QuincyLogic.canUsePowers(data)) {
             renderReishi(graphics, player, data, rx, y);
+        } else if (QuincyArtsLogic.isSealed(data)) {
+            renderSealed(graphics, player, data, rx, y);
         } else if (QuincyLogic.isLatent(data)) {
             float draw = QuincyClient.drawPower(player);
             if (draw > 0.0F) {
@@ -123,7 +152,7 @@ public final class ReiryokuHud {
 
     /**
      * A Quincy's reishi: the gauge, the Hollow poison over it, the Blut outline (grey while a press
-     * waits on the server), and the draw bar above it while the Heilig Bogen is drawn.
+     * waits on the server), the art bar beside it, and the draw bar above it while the Cross is drawn.
      */
     private static void renderReishi(GuiGraphics graphics, LocalPlayer player, SoulData data, int x, int y) {
         float max = QuincyLogic.maxReishi(data);
@@ -146,10 +175,80 @@ public final class ReiryokuHud {
                     blut == BlutMode.VENE ? VENE_OUTLINE : ARTERIE_OUTLINE);
         }
 
-        float draw = QuincyClient.drawPower(player);
-        if (draw > 0.0F) {
-            drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, draw, draw >= 1.0F ? GATHER_FULL : REISHI_FILL);
+        drawArtBar(graphics, data, x + WIDTH + ART_GAP, y, gameTime, player.level().getDayTime());
+
+        int drawY = y - GATHER_GAP - GATHER_HEIGHT;
+        if (QuincyClient.lichtGathering(player)) {
+            drawGather(graphics, x, drawY, QuincyClient.lichtGatherProgress(player), LICHT_GATHER_DRAW);
+        } else if (QuincyClient.letztChargeReady(player)) {
+            drawGather(graphics, x, drawY, 1.0F, LETZT_CHARGED_DRAW);
+        } else {
+            float draw = QuincyClient.drawPower(player);
+            if (draw > 0.0F) {
+                drawGather(graphics, x, drawY, draw, draw >= 1.0F ? GATHER_FULL : REISHI_FILL);
+            }
         }
+    }
+
+    /**
+     * A sealed Quincy: the reishi gauge stands empty in a grey outline, the art bar beside it counts
+     * down the wait, and the bar above it fills while the Cross is held through the rite.
+     */
+    private static void renderSealed(GuiGraphics graphics, LocalPlayer player, SoulData data, int x, int y) {
+        graphics.fill(x, y, x + WIDTH, y + HEIGHT, BACKGROUND);
+        graphics.renderOutline(x - 1, y - 1, WIDTH + 2, HEIGHT + 2, SEALED_OUTLINE);
+        long gameTime = player.level().getGameTime();
+        drawArtBar(graphics, data, x + WIDTH + ART_GAP, y, gameTime, player.level().getDayTime());
+        int held = QuincyClient.useTicks(player);
+        if (held > 0) {
+            int riteTicks = Math.max(1, BleachConfig.get(BleachConfig.RESTORE_RITE_TICKS));
+            drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, Math.min(1.0F, held / (float) riteTicks), RITE_DRAW);
+        }
+    }
+
+    /**
+     * The thin bar beside the reishi gauge for the Quincy arts, filling upwards, in the one state that
+     * applies: Vollständig or its cooldown, Letzt Stil's time left, the wait while sealed, or the
+     * Sanrei Glove's day. Nothing for a Quincy who has none of these.
+     */
+    private static void drawArtBar(GuiGraphics graphics, SoulData data, int x, int y, long now, long dayTime) {
+        QuincyArts arts = QuincyArtsLogic.arts(data);
+        QuincyForms forms = arts.forms();
+        SanreiProgress glove = arts.glove();
+        float fraction;
+        int colour;
+        if (QuincyArtsLogic.inVollstandig(data)) {
+            fraction = 1.0F;
+            colour = forms.haloBroken() ? ART_VOLL_HALO_BROKEN : ART_VOLL;
+        } else if (QuincyArtsLogic.isRestored(data) && now < forms.vollReadyAt()) {
+            fraction = 1.0F - share(forms.vollReadyAt() - now, BleachConfig.get(BleachConfig.VOLL_COOLDOWN_TICKS));
+            colour = ART_VOLL_COOLDOWN;
+        } else if (QuincyArtsLogic.inLetzt(data)) {
+            fraction = share(arts.letztEndsAt() - now, BleachConfig.get(BleachConfig.LETZT_DURATION_TICKS));
+            colour = ART_LETZT;
+        } else if (QuincyArtsLogic.isSealed(data)) {
+            fraction = share(now - arts.stageSince(), QuincyArtsLogic.sealedWaitTicks());
+            colour = QuincyArtsLogic.sealedWaitOver(data, now) ? ART_RITE_OPEN : ART_SEALED;
+        } else if (QuincyArtsLogic.gloveMastered(data)) {
+            fraction = 1.0F;
+            colour = ART_GLOVE_MASTERED;
+        } else if (QuincyArtsLogic.handicapped(data)) {
+            fraction = share(QuincyArtsLogic.gloveToday(glove, now, dayTime), BleachConfig.get(BleachConfig.SANREI_POINTS_PER_DAY));
+            colour = ART_GLOVE;
+        } else {
+            return;
+        }
+        graphics.fill(x, y, x + ART_WIDTH, y + HEIGHT, BACKGROUND);
+        int filled = Mth.ceil((HEIGHT - 2) * fraction);
+        if (filled > 0) {
+            int bottom = y + HEIGHT - 1;
+            graphics.fill(x, bottom - filled, x + ART_WIDTH, bottom, colour);
+        }
+    }
+
+    /** {@code part} of {@code whole}, from 0 to 1; all of it when the whole is nothing. */
+    private static float share(long part, long whole) {
+        return whole <= 0L ? 1.0F : Mth.clamp((float) part / (float) whole, 0.0F, 1.0F);
     }
 
     /** The gather bar: the same width as the gauge, filling upwards, and white once full. */

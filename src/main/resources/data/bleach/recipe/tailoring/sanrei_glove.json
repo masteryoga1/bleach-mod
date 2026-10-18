@@ -1,0 +1,13 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:white_wool"
+  },
+  "cloth_count": 2,
+  "trim": {
+    "item": "minecraft:string"
+  },
+  "result": {
+    "id": "bleach:sanrei_glove"
+  }
+}
