@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -71,6 +72,10 @@ public final class FlashStep {
             return;
         }
         if (now - data.lastFlashStepAt < ShinigamiLogic.flashStepCooldownTicks(data)) {
+            return;
+        }
+        if (player.hasEffect(ModEffects.GRITZ)) {
+            refuse(player, "message.bleach.gritz.bound");
             return;
         }
         if (!ShinigamiLogic.canFlashStep(data, now)) {

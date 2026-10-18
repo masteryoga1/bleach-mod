@@ -2,8 +2,11 @@ package io.github.masteryoga1.bleach.advancement;
 
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
+import io.github.masteryoga1.bleach.quincy.QuincyStage;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
+import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -73,6 +76,26 @@ public final class Milestones {
     public static final String QUINCY_GARB = "quincy_garb";
     /** Reached the third Quincy tier, the highest. */
     public static final String LAST_QUINCY = "last_quincy";
+    /** Put on the Sanrei Glove (and still counted once it has been torn off). */
+    public static final String SANREI_GLOVE = "sanrei_glove";
+    /** Trained in the Sanrei Glove on enough days to master it. */
+    public static final String SANREI_MASTERED = "sanrei_mastered";
+    /** Tore the mastered glove off and burned the power out in Letzt Stil (and counted ever after). */
+    public static final String LETZT_STIL = "letzt_stil";
+    /** Won the sealed power back as Ginrei Kojaku. */
+    public static final String RESTORED = "restored";
+    /** Cast a spell from a Gintō. Granted when it happens, as are the five below. */
+    public static final String GINTO = "ginto";
+    /** Rained a volley of arrows from Ginrei Kojaku. */
+    public static final String LICHT_REGEN = "licht_regen";
+    /** Formed a Seele Schneider's blade. */
+    public static final String SEELE_SCHNEIDER = "seele_schneider";
+    /** Set off five Seele Schneider with Sprenger. */
+    public static final String SPRENGER = "sprenger";
+    /** Took the full Quincy form. */
+    public static final String VOLLSTANDIG = "vollstandig";
+    /** Bent the reishi around them to their will with Sklaverei. */
+    public static final String SKLAVEREI = "sklaverei";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -139,6 +162,21 @@ public final class Milestones {
         }
         if (QuincyGarbItem.isFullSet(player)) {
             trigger.trigger(player, QUINCY_GARB);
+        }
+        QuincyArts arts = data.quincy().arts();
+        SanreiProgress glove = arts.glove();
+        // Every later stage comes through the glove, so it counts for a soul set past it by command too.
+        if (glove.worn() || glove.mastered() || arts.stage() != QuincyStage.UNTOUCHED) {
+            trigger.trigger(player, SANREI_GLOVE);
+        }
+        if (glove.mastered()) {
+            trigger.trigger(player, SANREI_MASTERED);
+        }
+        if (arts.stage() != QuincyStage.UNTOUCHED) {
+            trigger.trigger(player, LETZT_STIL);
+        }
+        if (arts.stage() == QuincyStage.RESTORED) {
+            trigger.trigger(player, RESTORED);
         }
     }
 

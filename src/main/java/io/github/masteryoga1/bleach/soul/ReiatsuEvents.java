@@ -210,6 +210,12 @@ public final class ReiatsuEvents {
                     .withStyle(ChatFormatting.GRAY), true);
             return;
         }
+        // A Quincy whose power burned out has no reiatsu of their own to let loose; a Shinigami's power still can.
+        if (QuincyArtsLogic.isSealed(data) && !ShinigamiLogic.hasShinigamiPower(data)) {
+            player.displayClientMessage(Component.translatable("message.bleach.letzt_stil.sealed_release")
+                    .withStyle(ChatFormatting.GRAY), true);
+            return;
+        }
         if (isSettling(player, data)) {
             player.displayClientMessage(Component.translatable("message.bleach.reiatsu_settling")
                     .withStyle(ChatFormatting.GRAY), true);
@@ -237,7 +243,8 @@ public final class ReiatsuEvents {
         pulse(player, data);
     }
 
-    private static void seal(ServerPlayer player, SoulData data) {
+    /** Holds the released reiatsu in again, with no word to the player. Also called when a Quincy's power is sealed. */
+    public static void seal(ServerPlayer player, SoulData data) {
         data.setReiatsuReleased(false);
         data.lastReleaseChangeTick = player.tickCount;
     }

@@ -13,6 +13,7 @@ import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
@@ -94,29 +95,29 @@ public final class QuincyTests {
     }
 
     /** The same soul moved into this state, with what the state brings (see {@link SoulLogic#changeState}). */
-    private static SoulData in(SoulState state, SoulData data) {
+    static SoulData in(SoulState state, SoulData data) {
         SoulLogic.changeState(data, state);
         return data;
     }
 
     /** The same soul with a Shinigami's first tier as well, as a Substitute has. */
-    private static SoulData withShinigamiPower(SoulData data) {
+    static SoulData withShinigamiPower(SoulData data) {
         data.setTier(PowerPath.SHINIGAMI, 1);
         return data;
     }
 
     /** A creature that stands where it is put and does nothing, not even fall or reel from a blow. */
-    private static <T extends Mob> T still(T mob) {
+    static <T extends Mob> T still(T mob) {
         mob.setNoAi(true);
         return mob;
     }
 
-    private static void assertNear(GameTestHelper helper, double actual, double expected, String what) {
+    static void assertNear(GameTestHelper helper, double actual, double expected, String what) {
         helper.assertTrue(Math.abs(actual - expected) < EPSILON, what + " is " + actual + ", not " + expected);
     }
 
     /** A mock Quincy standing on the floor at this spot in the box, to own the arrows a test looses. */
-    private static Player archer(GameTestHelper helper, SoulData data, double x, double z) {
+    static Player archer(GameTestHelper helper, SoulData data, double x, double z) {
         Player owner = ZanpakutoTests.mock(helper, data);
         Vec3 at = helper.absoluteVec(new Vec3(x, 2.0, z));
         owner.setPos(at.x, at.y, at.z);
@@ -124,7 +125,7 @@ public final class QuincyTests {
     }
 
     /** A mock Gemischt Quincy of the first tier with 200 reiryoku, at this spot in the box. */
-    private static Player archer(GameTestHelper helper, double x, double z) {
+    static Player archer(GameTestHelper helper, double x, double z) {
         return archer(helper, quincy(Bloodline.GEMISCHT, 1, 200.0F), x, z);
     }
 
@@ -132,14 +133,14 @@ public final class QuincyTests {
      * Looses a fully drawn arrow from a point in the world, along a direction in the box, dead
      * straight, with the damage, pierce and speed pinned.
      */
-    private static HeiligPfeil loose(GameTestHelper helper, LivingEntity owner, Vec3 from, Vec3 direction, float damage,
-                                     int pierce, float speed) {
+    static HeiligPfeil loose(GameTestHelper helper, LivingEntity owner, Vec3 from, Vec3 direction, float damage,
+                             int pierce, float speed) {
         Vec3 heading = helper.absoluteVec(direction).subtract(helper.absoluteVec(Vec3.ZERO));
         return HeiligPfeil.launch(helper.getLevel(), owner, from, heading, 1.0F, damage, pierce, speed, 0.0F);
     }
 
     /** Sends away every Hollow near this soul, so none left in the world by an earlier test stirs its blood. */
-    private static void clearHollowsNear(GameTestHelper helper, Player player) {
+    static void clearHollowsNear(GameTestHelper helper, Player player) {
         double range = QuincyLogic.AWAKENING_HOLLOW_RANGE + 1.0;
         for (Hollow hollow : helper.getLevel().getEntitiesOfClass(Hollow.class, player.getBoundingBox().inflate(range))) {
             hollow.discard();
@@ -151,7 +152,8 @@ public final class QuincyTests {
     @GameTest(template = "empty")
     public static void quincyProgressSurvivesSaving(GameTestHelper helper) {
         SoulData data = ShinigamiTests.soul(SoulState.HUMAN, 40.0F);
-        QuincyProgress progress = new QuincyProgress(Bloodline.ECHT, true, 77, 12.5F, 30.0F, BlutMode.VENE, 3, true);
+        QuincyProgress progress = new QuincyProgress(Bloodline.ECHT, true, 77, 12.5F, 30.0F, BlutMode.VENE, 3, true,
+                QuincyArts.NONE);
         data.setQuincy(progress);
 
         Tag saved = SoulData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();

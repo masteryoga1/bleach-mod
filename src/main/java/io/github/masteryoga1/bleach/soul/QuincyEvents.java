@@ -39,7 +39,6 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -110,6 +109,8 @@ public final class QuincyEvents {
             data.quincyReborn = false;
             player.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         }
+        // Before the bloodline below, which returns early for almost everyone.
+        QuincyArtsEvents.onRefresh(player, data, player.level().getGameTime());
         if (!player.isAlive() || !QuincyLogic.needsBloodlineChoice(data)) {
             return;
         }
@@ -190,6 +191,7 @@ public final class QuincyEvents {
 
     /** Takes the Quincy power and the bloodline away, so the soul is asked about its blood again. */
     public static void resetQuincy(ServerPlayer player) {
+        QuincyArtsEvents.endAll(player, SoulLogic.get(player));
         SoulData data = SoulLogic.get(player);
         data.setQuincy(QuincyProgress.NONE);
         data.setTier(PowerPath.QUINCY, 0);
@@ -207,6 +209,7 @@ public final class QuincyEvents {
      * @param meditating whether the player is meditating (crouched and still, or sitting in Jinzen)
      */
     public static void tick(ServerPlayer player, SoulData data, boolean meditating) {
+        QuincyArtsEvents.tick(player, data, player.level().getGameTime());
         QuincyProgress quincy = data.quincy();
         if (!QuincyLogic.isAwakened(data) && quincy.blut() == BlutMode.OFF && quincy.poison() <= 0.0F
                 && data.poisonStage == 0) {
@@ -261,12 +264,14 @@ public final class QuincyEvents {
     }
 
     /**
-     * A second's worth of reishi gathering, when the soul can gather: not while Blut runs, on reishi
-     * footing or as a spectator. Channelled reishi is seen drifting into the chest.
+     * A second's worth of reishi gathering, when the soul can gather: not while Blut runs or on reishi
+     * footing (unless Letzt Stil burns, which gathers through both), nor as a spectator. Channelled
+     * reishi is seen drifting into the chest.
      */
     private static void gather(ServerPlayer player, SoulData data, boolean channelling) {
-        if (!QuincyLogic.canUsePowers(data) || data.quincy().blut() != BlutMode.OFF || ReishiFooting.isActive(player)
-                || player.isSpectator() || !player.isAlive()) {
+        if (!QuincyLogic.canUsePowers(data) || player.isSpectator() || !player.isAlive()
+                || (!QuincyArtsLogic.gathersThroughEverything(data)
+                        && (data.quincy().blut() != BlutMode.OFF || ReishiFooting.isActive(player)))) {
             return;
         }
         float perSecond = QuincyLogic.gatherPerSecond(data, data.reishiDensity, channelling, QuincyGarbItem.isFullSet(player));
@@ -348,9 +353,10 @@ public final class QuincyEvents {
         player.playNotifySound(ModSounds.HOLLOW_POISON.get(), SoundSource.PLAYERS, 1.0F, 1.0F);
     }
 
-    /** Each meditation grant with a Cross in hand trains a Quincy, awakened or still able to awaken. */
+    /** Each meditation grant with a Cross in hand trains a Quincy, awakened or still able to awaken, but not while sealed. */
     public static void onMeditationGrant(Player player, SoulData data) {
-        if (QuincyLogic.holdsCross(player) && (QuincyLogic.isAwakened(data) || QuincyLogic.canAwaken(data))) {
+        if (QuincyLogic.holdsCross(player) && !QuincyArtsLogic.isSealed(data)
+                && (QuincyLogic.isAwakened(data) || QuincyLogic.canAwaken(data))) {
             train(player, data, QuincyLogic.MEDITATION_TRAINING);
         }
     }
@@ -358,8 +364,10 @@ public final class QuincyEvents {
     // ---- The Heilig Bogen ----
 
     /**
-     * Each tick the Cross is drawn, on the server. The draw is heard as it starts. Held past a full
-     * draw, the bow costs reishi to keep, and comes apart once there is none.
+     * Each tick the Cross is drawn, on the server. The arts come first (the rite, the glove's strain,
+     * Ginrei Kojaku's stream, Licht Regen; see {@link QuincyArtsEvents#onBowHeld}). The draw is heard
+     * as it starts. Held past a full draw, the bow costs reishi to keep (twice as much in the
+     * unmastered glove), and comes apart once there is none.
      *
      * @param ticksDrawn ticks since the draw started
      */
@@ -367,11 +375,14 @@ public final class QuincyEvents {
         if (!SoulLogic.hasSoul(player)) {
             return;
         }
+        SoulData data = SoulLogic.get(player);
+        if (QuincyArtsEvents.onBowHeld(player, data, ticksDrawn)) {
+            return;
+        }
         if (ticksDrawn == 1) {
             playToHolder(player, ModSounds.QUINCY_CROSS_DRAW.get(), 0.6F, 1.0F);
         }
-        SoulData data = SoulLogic.get(player);
-        if (ticksDrawn <= QuincyLogic.FULL_DRAW_TICKS || !QuincyLogic.canUsePowers(data)) {
+        if (ticksDrawn <= QuincyArtsLogic.drawTicks(data) || !QuincyLogic.canUsePowers(data)) {
             return;
         }
         float reishi = QuincyLogic.reishi(data);
@@ -380,7 +391,8 @@ public final class QuincyEvents {
             tell(player, Component.translatable("message.bleach.heilig_bogen.collapsed"));
             return;
         }
-        QuincyLogic.setReishi(data, reishi - QuincyLogic.HOLD_UPKEEP_PER_SECOND / 20.0F);
+        float upkeep = QuincyLogic.HOLD_UPKEEP_PER_SECOND * QuincyArtsLogic.holdUpkeepMultiplier(data);
+        QuincyLogic.setReishi(data, reishi - upkeep / 20.0F);
     }
 
     /**
@@ -395,7 +407,11 @@ public final class QuincyEvents {
             return;
         }
         SoulData data = SoulLogic.get(player);
-        float power = BowItem.getPowerForTime(ticksDrawn);
+        // The rite, a stream or a Licht Regen gather let go, or a Letzt Pfeil (see QuincyArtsEvents#onRelease).
+        if (QuincyArtsEvents.onRelease(player, data, ticksDrawn)) {
+            return;
+        }
+        float power = QuincyArtsLogic.drawPower(ticksDrawn, QuincyArtsLogic.drawTicks(data));
         if (QuincyLogic.canUsePowers(data)) {
             float paid = QuincyLogic.payForShot(data, power);
             if (paid < 0.0F) {
@@ -451,28 +467,45 @@ public final class QuincyEvents {
 
     /**
      * Looses a Heilig Pfeil drawn this far (already paid for) from just under the eyes, the way the
-     * player looks.
+     * player looks, as the soul's form shapes it; or a Seele Schneider from the other hand instead
+     * (see {@link QuincyArtsEvents#fireSeele}). The arts then add what goes with the shot (see
+     * {@link QuincyArtsEvents#afterFire}).
      */
     public static void fire(Player player, SoulData data, float power) {
         Level level = player.level();
         if (level.isClientSide()) {
             return;
         }
+        if (QuincyArtsEvents.fireSeele(player, data, power)) {
+            return;
+        }
         Vec3 from = player.getEyePosition().subtract(0.0, 0.1, 0.0);
-        HeiligPfeil.launch(level, player, from, player.getViewVector(1.0F), power, QuincyLogic.arrowDamage(data, power),
-                QuincyLogic.pierceFor(data, power), QuincyLogic.shotSpeed(power), QuincyLogic.shotInaccuracy(power));
+        Vec3 direction = player.getViewVector(1.0F);
+        float damage = QuincyLogic.arrowDamage(data, power);
+        float speed = QuincyLogic.shotSpeed(power) * QuincyArtsLogic.shotSpeedMultiplier(data);
+        float inaccuracy = QuincyLogic.shotInaccuracy(power);
+        HeiligPfeil.launch(level, player, from, direction, power, damage,
+                QuincyLogic.pierceFor(data, power) + QuincyArtsLogic.extraPierce(data, power), speed, inaccuracy);
         SpiritSenses.play(player, ModSounds.HEILIG_PFEIL_FIRE.get(), SoundSource.PLAYERS, 1.0F, 0.9F + 0.3F * power, false);
         player.awardStat(Stats.ITEM_USED.get(ModItems.QUINCY_CROSS.get()));
+        QuincyArtsEvents.afterFire(player, data, power, from, direction, damage, speed, inaccuracy);
     }
 
     /**
      * Adds Quincy training (see {@link QuincyLogic#addTraining}). With no points, this only brings
      * the tier up to the training. A tier gained is celebrated: a title, a sound, a word in chat, and
-     * word of any Blut the blood is now ready for.
+     * word of any Blut the blood is now ready for, and the third tier hands down the Sanrei Glove.
+     * Training enough since the power was restored opens Vollständig, which is said once.
      */
     public static void train(Player player, SoulData data, int points) {
         int before = QuincyLogic.tier(data);
-        if (QuincyLogic.addTraining(data, points) <= 0) {
+        boolean wasUnlocked = QuincyArtsLogic.vollUnlocked(data);
+        int gained = QuincyLogic.addTraining(data, points);
+        if (!wasUnlocked && QuincyArtsLogic.vollUnlocked(data)) {
+            player.sendSystemMessage(Component.translatable("message.bleach.vollstandig.unlocked",
+                    Component.keybind("key.bleach.quincy_form")).withStyle(ChatFormatting.AQUA));
+        }
+        if (gained <= 0) {
             return;
         }
         int tier = QuincyLogic.tier(data);
@@ -495,6 +528,7 @@ public final class QuincyEvents {
                         Component.keybind("key.bleach.blut")).withStyle(ChatFormatting.AQUA));
             }
         }
+        QuincyArtsEvents.onTierReached(player, data, before, tier);
     }
 
     // ---- Heilig Pfeil hits ----
@@ -524,6 +558,7 @@ public final class QuincyEvents {
         if (target.isAlive() && now - data.lastHitTrainingAt >= QuincyLogic.HIT_TRAINING_COOLDOWN_TICKS) {
             data.lastHitTrainingAt = now;
             train(player, data, maskStruck ? QuincyLogic.MASK_HIT_TRAINING : QuincyLogic.HIT_TRAINING);
+            QuincyArtsEvents.onArrowHit(player, data, target);
         }
     }
 
@@ -538,6 +573,7 @@ public final class QuincyEvents {
         SoulData data = SoulLogic.get(killer);
         data.setQuincy(data.quincy().withDestroyed(data.quincy().destroyed() + 1));
         train(killer, data, hollow instanceof FishboneD ? QuincyLogic.FISHBONE_D_TRAINING : QuincyLogic.DESTROY_TRAINING);
+        QuincyArtsEvents.onSoulDestroyed(killer, data);
         killer.displayClientMessage(Component.translatable("message.bleach.quincy.destroyed")
                 .withStyle(ChatFormatting.DARK_AQUA), true);
         if (!(hollow.level() instanceof ServerLevel level)) {
@@ -560,6 +596,7 @@ public final class QuincyEvents {
         if (killer != victim && SoulLogic.hasSoul(killer)) {
             SoulData data = SoulLogic.get(killer);
             data.setQuincy(data.quincy().withDestroyed(data.quincy().destroyed() + 1));
+            QuincyArtsEvents.onSoulDestroyed(killer, data);
         }
     }
 
@@ -662,17 +699,27 @@ public final class QuincyEvents {
     // ---- Blut ----
 
     /**
-     * The Blut key was pressed. Presses too close together are ignored. Sneaking, or the key's
-     * sneaking variant, lets Blut go; otherwise the key steps to the next Blut (see
-     * {@link QuincyLogic#nextBlut}).
+     * A Quincy key was pressed. The Quincy Form key, sneaking or not, is the arts' to answer (see
+     * {@link QuincyArtsEvents#onFormKey}). For the Blut key, presses too close together are ignored.
+     * Sneaking, or the key's sneaking variant, lets Blut go; otherwise the key steps to the next Blut
+     * (see {@link QuincyLogic#nextBlut}). A sealed power has no Blut to call on.
      */
     public static void onKey(ServerPlayer player, QuincyKey key) {
-        SoulData data = SoulLogic.get(player);
         long now = player.level().getGameTime();
+        if (key == QuincyKey.FORM || key == QuincyKey.FORM_SNEAK) {
+            // With its own debounce, apart from Blut's.
+            QuincyArtsEvents.onFormKey(player, key == QuincyKey.FORM_SNEAK, now);
+            return;
+        }
+        SoulData data = SoulLogic.get(player);
         if (now - data.lastBlutPressAt < QuincyLogic.BLUT_PRESS_DEBOUNCE_TICKS) {
             return;
         }
         data.lastBlutPressAt = now;
+        if (QuincyArtsLogic.isSealed(data)) {
+            tell(player, Component.translatable("message.bleach.letzt_stil.sealed"));
+            return;
+        }
         if (!QuincyLogic.canUsePowers(data)) {
             tell(player, Component.translatable("message.bleach.blut.untrained"));
             return;

@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.Hollow;
+import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import net.minecraft.core.registries.Registries;
@@ -67,6 +68,7 @@ public final class SoulEvents {
         ZanpakutoEvents.register(bus);
         ShikaiEvents.register(bus);
         QuincyEvents.register(bus);
+        QuincyArtsEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -178,8 +180,13 @@ public final class SoulEvents {
         return isZanjutsuWeapon(weapon) ? Stat.ZANJUTSU : null;
     }
 
+    /**
+     * Swords and the tagged blades train Zanjutsu. A Seele Schneider counts only with its blade
+     * formed: a bare hilt is no blade.
+     */
     public static boolean isZanjutsuWeapon(ItemStack stack) {
-        return stack.getItem() instanceof SwordItem || stack.is(ZANJUTSU_WEAPONS);
+        return (stack.getItem() instanceof SwordItem || stack.is(ZANJUTSU_WEAPONS))
+                && !(SeeleSchneiderItem.isSeele(stack) && !SeeleSchneiderItem.isFormed(stack));
     }
 
     /** Fires only for hits that got past shields and invulnerability frames. */

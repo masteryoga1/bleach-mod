@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/bow",
+  "textures": {
+    "layer0": "bleach:item/letzt_bogen_pulling_1"
+  }
+}

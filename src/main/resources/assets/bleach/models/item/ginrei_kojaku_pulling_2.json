@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/bow",
+  "textures": {
+    "layer0": "bleach:item/ginrei_kojaku_pulling_2"
+  }
+}

@@ -155,24 +155,42 @@ public final class QuincyLogic {
                 && (!ShinigamiLogic.hasShinigamiPower(data) || hybridsAllowed());
     }
 
-    /** Whether the soul can use its Quincy power now: awakened, and alive or a Shinigami. */
+    /**
+     * Whether the soul can use its Quincy power now: awakened, alive or a Shinigami, and not sealed
+     * after Letzt Stil. The seal switches off everything that asks this: the bow, Hirenkyaku,
+     * footing, Blut, gathering and Hollow poison taking hold.
+     */
     public static boolean canUsePowers(SoulData data) {
-        return isAwakened(data) && (data.state() == SoulState.HUMAN || data.state() == SoulState.SHINIGAMI);
+        return isAwakened(data) && (data.state() == SoulState.HUMAN || data.state() == SoulState.SHINIGAMI)
+                && !QuincyArtsLogic.isSealed(data);
     }
 
     /**
-     * Why this soul cannot draw on the Quincy Cross, as a message key, or null if it can. Only reads
-     * what the client knows as well as the server (the bloodline, state and tiers), so both agree on
-     * whether a draw starts.
+     * Why this soul cannot draw on the Quincy Cross, as a message key, or null if it can, with no
+     * time given: a sealed soul is always refused (see {@link #drawRefusal(SoulData, long)}).
      */
     @Nullable
     public static String drawRefusal(SoulData data) {
+        return drawRefusal(data, Long.MIN_VALUE / 2);
+    }
+
+    /**
+     * Why this soul cannot draw on the Quincy Cross now, as a message key, or null if it can. Only
+     * reads what the client knows as well as the server (the bloodline, state, tiers and arts), so
+     * both agree on whether a draw starts. A sealed soul may draw only once the solo rite is open to
+     * it, and then the draw is the rite.
+     */
+    @Nullable
+    public static String drawRefusal(SoulData data, long now) {
         if (bloodline(data) == Bloodline.NONE && tier(data) == 0) {
             return "message.bleach.quincy_cross.no_blood";
         }
         if (isAwakened(data)) {
-            return data.state() == SoulState.HUMAN || data.state() == SoulState.SHINIGAMI
-                    ? null : "message.bleach.quincy_cross.spirit";
+            if (data.state() != SoulState.HUMAN && data.state() != SoulState.SHINIGAMI) {
+                return "message.bleach.quincy_cross.spirit";
+            }
+            return QuincyArtsLogic.isSealed(data) && !QuincyArtsLogic.riteOpen(data, now)
+                    ? "message.bleach.letzt_stil.sealed" : null;
         }
         boolean shinigamiInTheWay = ShinigamiLogic.hasShinigamiPower(data) && !hybridsAllowed();
         if (data.state() != SoulState.HUMAN) {
@@ -231,12 +249,17 @@ public final class QuincyLogic {
     /**
      * The last part of the {@code screen.bleach.soul.next.*} key for a living Human who is not a
      * Substitute: {@code human} without blood that can awaken, {@code quincy.latent} for blood still
-     * waiting, {@code quincy.poisoned} for a Quincy that Hollow poison is getting to, and otherwise
-     * {@code quincy.} and the tier.
+     * waiting, {@code quincy.poisoned} for a Quincy that Hollow poison is getting to, {@code quincy.}
+     * and the tier below the third, and past it the step the arts have reached (see
+     * {@link QuincyArtsLogic#nextStepKey}).
      */
-    public static String nextStepKey(SoulData data) {
+    public static String nextStepKey(SoulData data, long now) {
         if (isAwakened(data)) {
-            return data.quincy().poison() >= POISON_BLOCK ? "quincy.poisoned" : "quincy." + tier(data);
+            if (data.quincy().poison() >= POISON_BLOCK) {
+                return "quincy.poisoned";
+            }
+            int tier = tier(data);
+            return tier < MAX_TIER ? "quincy." + tier : QuincyArtsLogic.nextStepKey(data, now);
         }
         return canAwaken(data) ? "quincy.latent" : "human";
     }
@@ -282,14 +305,17 @@ public final class QuincyLogic {
 
     // ---- Reishi ----
 
-    /** How much reishi the soul can hold: 30, 20 more a tier and a tenth of its maximum reiryoku, once awakened. */
+    /**
+     * How much reishi the soul can hold: 30, 20 more a tier and a tenth of its maximum reiryoku, once
+     * awakened, and more in Letzt Stil and Vollständig (see {@link QuincyArtsLogic#poolMultiplier}).
+     */
     public static float maxReishi(SoulData data) {
         if (!isAwakened(data)) {
             return 0.0F;
         }
-        return (float) (BleachConfig.get(BleachConfig.REISHI_BASE_MAX)
+        return (float) ((BleachConfig.get(BleachConfig.REISHI_BASE_MAX)
                 + BleachConfig.get(BleachConfig.REISHI_MAX_PER_TIER) * tier(data)
-                + REISHI_PER_MAX_REIRYOKU * data.maxReiryoku());
+                + REISHI_PER_MAX_REIRYOKU * data.maxReiryoku()) * QuincyArtsLogic.poolMultiplier(data));
     }
 
     /** The reishi the soul holds, never more than it can hold now. */
@@ -341,8 +367,9 @@ public final class QuincyLogic {
 
     /**
      * Reishi gathered each second: a trickle on its own, much more while meditating with the Cross in
-     * hand (channelling), more where reishi is dense and in the full Quincy garb, and less as Hollow
-     * poison builds. None for a soul that cannot use its Quincy power.
+     * hand (channelling), more where reishi is dense and in the full Quincy garb, less as Hollow
+     * poison builds, and as the arts make it (see {@link QuincyArtsLogic#gatherMultiplier}). None for
+     * a soul that cannot use its Quincy power.
      */
     public static float gatherPerSecond(SoulData data, double density, boolean channelling, boolean fullGarb) {
         if (!canUsePowers(data)) {
@@ -352,10 +379,12 @@ public final class QuincyLogic {
                 ? BleachConfig.get(BleachConfig.REISHI_CHANNEL_PER_SECOND)
                         * (1.0 + CHANNEL_PER_REIATSU_CONTROL_LEVEL * data.level(Stat.REIATSU_CONTROL))
                 : BleachConfig.get(BleachConfig.REISHI_PASSIVE_PER_SECOND);
+        density = QuincyArtsLogic.gatherDensity(data, density);
         rate *= Math.max(0.0, density);
         if (fullGarb) {
             rate *= 1.0 + BleachConfig.get(BleachConfig.QUINCY_GARB_GATHER_BONUS);
         }
+        rate *= QuincyArtsLogic.gatherMultiplier(data);
         return (float) (rate * poisonGatherMultiplier(data.quincy().poison()));
     }
 
@@ -414,9 +443,14 @@ public final class QuincyLogic {
         return (float) Math.min(BleachConfig.get(BleachConfig.BOGEN_MAX_DAMAGE), damage);
     }
 
-    /** What an arrow drawn this far (0 a tap, 1 a full draw) does: a quarter of full damage up to all of it. */
+    /**
+     * What an arrow drawn this far (0 a tap, 1 a full draw) does: a quarter of full damage up to all
+     * of it, then boosted by the soul's form (see {@link QuincyArtsLogic#boostDamage}).
+     * {@link #fullDamage} itself stays unboosted.
+     */
     public static float arrowDamage(SoulData data, float power) {
-        return fullDamage(data) * (TAP_DAMAGE_FRACTION + (1.0F - TAP_DAMAGE_FRACTION) * power);
+        float drawn = fullDamage(data) * (TAP_DAMAGE_FRACTION + (1.0F - TAP_DAMAGE_FRACTION) * power);
+        return QuincyArtsLogic.boostDamage(data, drawn);
     }
 
     /** A Hollow mob, or a player who is a Hollow or an Arrancar. */
@@ -506,8 +540,8 @@ public final class QuincyLogic {
     /**
      * Which dash the movement key does for this soul. A Quincy who knows Hirenkyaku uses it while
      * holding the Cross, or always if they cannot flash step; anyone who can flash step does that;
-     * a Quincy without a Shinigami's power is told Hirenkyaku is not ready; everyone else flash steps,
-     * or is told why not.
+     * a Quincy without a Shinigami's power is told Hirenkyaku is not ready (or, sealed, why it is
+     * gone); everyone else flash steps, or is told why not.
      */
     public static Movement movementFor(SoulData data, boolean holdsCross, long now) {
         boolean shunpo = ShinigamiLogic.canFlashStep(data, now);
@@ -517,7 +551,8 @@ public final class QuincyLogic {
         if (shunpo) {
             return Movement.SHUNPO;
         }
-        return canUsePowers(data) && !ShinigamiLogic.hasShinigamiPower(data) ? Movement.HIRENKYAKU : Movement.SHUNPO;
+        return (canUsePowers(data) || QuincyArtsLogic.isSealed(data)) && !ShinigamiLogic.hasShinigamiPower(data)
+                ? Movement.HIRENKYAKU : Movement.SHUNPO;
     }
 
     /** Hirenkyaku comes with the second tier. */
@@ -527,7 +562,8 @@ public final class QuincyLogic {
 
     /**
      * How far a Hirenkyaku goes, in blocks: more at the third tier and with Reiatsu Control, up to
-     * the cap. Slowness shortens it by a quarter per level, as it does Shunpo.
+     * the cap. Slowness shortens it by a quarter per level, as it does Shunpo, and Letzt Stil carries
+     * it past the cap (see {@link QuincyArtsLogic#hirenkyakuDistanceMultiplier}).
      *
      * @param slownessAmplifier the Slowness amplifier on the soul, or -1 for none
      */
@@ -539,19 +575,24 @@ public final class QuincyLogic {
         if (slownessAmplifier >= 0) {
             distance *= Math.max(0.0, 1.0 - 0.25 * (slownessAmplifier + 1));
         }
-        return distance;
+        return distance * QuincyArtsLogic.hirenkyakuDistanceMultiplier(data);
     }
 
-    /** Reishi a Hirenkyaku costs, less at the third tier. */
+    /** Reishi a Hirenkyaku costs, less at the third tier, and less again in Letzt Stil. */
     public static float hirenkyakuCost(SoulData data) {
-        return (float) BleachConfig.get(tier(data) >= MAX_TIER
-                ? BleachConfig.HIRENKYAKU_MASTER_COST : BleachConfig.HIRENKYAKU_COST);
+        return (float) (BleachConfig.get(tier(data) >= MAX_TIER
+                ? BleachConfig.HIRENKYAKU_MASTER_COST : BleachConfig.HIRENKYAKU_COST)
+                * QuincyArtsLogic.hirenkyakuCostMultiplier(data));
     }
 
-    /** Ticks between two dashes after a Hirenkyaku, fewer at the third tier. */
+    /**
+     * Ticks between two dashes after a Hirenkyaku, fewer at the third tier and fewer again in Letzt
+     * Stil, though never none unless the server sets none.
+     */
     public static int hirenkyakuCooldownTicks(SoulData data) {
-        return BleachConfig.get(tier(data) >= MAX_TIER
+        int base = BleachConfig.get(tier(data) >= MAX_TIER
                 ? BleachConfig.HIRENKYAKU_MASTER_COOLDOWN_TICKS : BleachConfig.HIRENKYAKU_COOLDOWN_TICKS);
+        return base == 0 ? 0 : Math.max(1, Math.round(base * QuincyArtsLogic.hirenkyakuCooldownMultiplier(data)));
     }
 
     /** A Quincy who knows Hirenkyaku also stands on reishi, unless Hollow poison clouds it. */

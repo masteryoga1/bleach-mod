@@ -69,7 +69,7 @@ public final class ShinigamiLogic {
             return "lent";
         }
         return switch (data.state()) {
-            case HUMAN -> isSubstitute(data) ? "substitute" + bondStep(data.zanpakuto()) : QuincyLogic.nextStepKey(data);
+            case HUMAN -> isSubstitute(data) ? "substitute" + bondStep(data.zanpakuto()) : QuincyLogic.nextStepKey(data, now);
             case RUKONGAI -> !data.shinigami().enrolled()
                     ? (QuincyLogic.blocksShinigamiPower(data) ? "quincy.rukongai" : "rukongai")
                     : data.zanpakuto().isFull() && !data.zanpakuto().named() ? "student.bonded" : "student";

@@ -9,8 +9,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * The mod's sound events. Their files are vanilla sounds, pitched and spread out in
  * {@code assets/bleach/sounds.json}. A Hollow's howl, Fishbone D's roar, the tearing sky, a Shikai
- * release, a loosed Getsuga Tenshō and a Quincy's awakening carry much further than a normal mob's
- * sounds, so they are fixed-range events; the rest reach as far as their volume takes them, as usual.
+ * release, a loosed Getsuga Tenshō, a Quincy's awakening and the great Quincy arts (Letzt Stil, the
+ * power's return, Heizen, Sprenger and Vollständig) carry much further than a normal mob's sounds, so
+ * they are fixed-range events; the rest reach as far as their volume takes them, as usual.
  */
 public final class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
@@ -51,6 +52,34 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> BLUT = variable("player.blut");
     /** The pounding heart of a Quincy deep in Hollow poison, played only to them. */
     public static final DeferredHolder<SoundEvent, SoundEvent> HOLLOW_POISON = variable("player.hollow_poison");
+    /** The Cross humming once a Letzt Stil draw is charged, or the rite has been held long enough. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> QUINCY_CROSS_CHARGED = variable("item.quincy_cross.charged");
+    /** The Sanrei Glove torn from the hand. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SANREI_GLOVE_TEAR = variable("item.sanrei_glove.tear");
+    /** A Quincy's power flaring up as Letzt Stil begins. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> PLAYER_LETZT_STIL = fixed("player.letzt_stil", 32.0F);
+    /** The power burning out into the seal. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> PLAYER_QUINCY_SEALED = variable("player.quincy_sealed");
+    /** The sealed power coming back as Ginrei Kojaku. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> PLAYER_QUINCY_RESTORED = fixed("player.quincy_restored", 24.0F);
+    /** A blade of reishi forming on a Seele Schneider hilt. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SEELE_SCHNEIDER_FORM = variable("item.seele_schneider.form");
+    /** A fired or planted Seele Schneider sticking fast. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SEELE_SCHNEIDER_STICK = variable("entity.seele_schneider.stick");
+    /** Reishi running into an empty Gintō. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GINTO_FILL = variable("item.ginto.fill");
+    /** A Gintō shattering as its spell is cast. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GINTO_CAST = variable("item.ginto.cast");
+    /** Heizen's pillar of light rising. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HEIZEN = fixed("entity.ginto.heizen", 24.0F);
+    /** Sprenger setting off the five blades. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SPRENGER = fixed("entity.ginto.sprenger", 32.0F);
+    /** Licht Regen loosing its volley. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> LICHT_REGEN = variable("player.licht_regen");
+    /** Wings of reishi unfolding as Vollständig is taken. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> PLAYER_VOLLSTANDIG = fixed("player.vollstandig", 32.0F);
+    /** Sklaverei starting to draw in the reishi around its user. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SKLAVEREI = variable("player.sklaverei");
 
     private ModSounds() {
     }

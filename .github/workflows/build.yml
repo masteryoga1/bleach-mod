@@ -97,9 +97,11 @@ jobs:
   # Academy, then summons each Hollow and a Plus, cracks a mask, purifies a Hollow, sends a Plus on, opens
   # a Garganta and checks what a soul just below the awareness threshold sees, sits in Jinzen, learns
   # Zangetsu's name, releases it and fires a Getsuga Tenshō, then becomes a Quincy, draws the Heilig Bogen,
-  # shoots a Hollow, calls Blut Vene and uses Hirenkyaku, with the camera behind the player, and quits.
-  # Game tests only run on a server, so this is what catches crashes in rendering, the HUD, the screens and
-  # the client mixins. Its screenshots are kept for review.
+  # shoots a Hollow, calls Blut Vene and uses Hirenkyaku, then masters the Sanrei Glove, tears it off for
+  # Letzt Stil, is sealed and restored, streams arrows from Ginrei Kojaku, calls Licht Regen, forms and
+  # fires a Seele Schneider, casts Wolke and Heizen, and flies in Vollständig with Sklaverei, with the
+  # camera behind the player, and quits. Game tests only run on a server, so this is what catches crashes
+  # in rendering, the HUD, the screens and the client mixins. Its screenshots are kept for review.
   client-smoke-test:
     runs-on: ubuntu-latest
     steps:

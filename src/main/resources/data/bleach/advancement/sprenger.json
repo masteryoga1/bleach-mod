@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:seele_schneider",
+  "display": {
+    "icon": {
+      "id": "bleach:ginto"
+    },
+    "title": {
+      "translate": "advancements.bleach.sprenger.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.sprenger.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "sprenger": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "sprenger"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:sanrei_mastered",
+  "display": {
+    "icon": {
+      "id": "bleach:quincy_cross"
+    },
+    "title": {
+      "translate": "advancements.bleach.letzt_stil.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.letzt_stil.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "letzt_stil": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "letzt_stil"
+      }
+    }
+  }
+}

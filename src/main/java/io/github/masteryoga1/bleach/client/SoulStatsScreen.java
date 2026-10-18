@@ -1,11 +1,17 @@
 package io.github.masteryoga1.bleach.client;
 
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
+import io.github.masteryoga1.bleach.quincy.GintoSpell;
+import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyArts;
+import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
+import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -14,6 +20,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,13 +32,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.StringUtil;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
  * The soul screen: state, reiryoku, the zanpakutō (or until it has a name, the Asauchi bond), Hollows
  * purified and slain and Pluses sent on, Quincy blood (its reishi and Blut, the Hollow poison in it,
- * souls destroyed and how rich the reishi is here), stats with training progress, awakened powers
- * and what comes next.
+ * souls destroyed and how rich the reishi is here, and how far its arts have come), stats with
+ * training progress, awakened powers and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -49,6 +57,8 @@ public final class SoulStatsScreen extends Screen {
     private static final int ENCROACHING = 0xFF5555;
     private static final int REISHI = 0xBFE6FF;
     private static final int POISONED = 0xC080E0;
+    private static final int LETZT = 0xFFC890;
+    private static final int VOLLSTANDIG = 0xFFD86A;
     private static final float TICKS_PER_SECOND = 20.0F;
     private static final int XP_BACKGROUND = 0xFF303030;
     private static final int XP_FILL = 0xFF6FBF4F;
@@ -186,11 +196,12 @@ public final class SoulStatsScreen extends Screen {
     }
 
     /**
-     * Up to two lines on Quincy blood, when the soul has it. Awakened: the blood, reishi held and the
+     * Up to four lines on Quincy blood, when the soul has it. Awakened: the blood, reishi held and the
      * most it can hold, and the Blut it is calling on; then the Hollow poison in it, souls its arrows
      * have destroyed, and how rich the reishi is where it stands (leaving out what other souls'
-     * reiatsu adds, which only the server weighs). Not yet awakened: just the blood. With no
-     * {@code graphics}, only counts them.
+     * reiatsu adds, which only the server weighs); then up to two on its arts (see
+     * {@link #artsLines}). Not yet awakened: just the blood. With no {@code graphics}, only counts
+     * them.
      *
      * @return the line below the last one drawn
      */
@@ -204,8 +215,9 @@ public final class SoulStatsScreen extends Screen {
                     left, y, GREY);
             return y + line;
         }
+        List<Component> arts = artsLines(data, player, player.level().getGameTime());
         if (graphics == null) {
-            return y + 2 * line;
+            return y + (2 + arts.size()) * line;
         }
         QuincyProgress quincy = data.quincy();
         graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy", bloodline.displayName(),
@@ -217,7 +229,66 @@ public final class SoulStatsScreen extends Screen {
         graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy.poison",
                 Math.round(quincy.poison()), quincy.destroyed(), density),
                 left, y, quincy.poison() >= QuincyLogic.POISON_BLOCK ? POISONED : GREY);
-        return y + line;
+        y += line;
+        for (Component art : arts) {
+            graphics.drawString(font, art, left, y, GREY);
+            y += line;
+        }
+        return y;
+    }
+
+    /**
+     * How far an awakened Quincy's arts have come, in up to two lines. First where the power stands:
+     * the Sanrei Glove's training or its mastery, the time Letzt Stil has left, the wait while sealed,
+     * or Ginrei Kojaku. Then, while a Gintō is in hand, the spell it casts; otherwise, once the power
+     * is restored, the way to Vollständig, or that it is ready (with its key) or taken.
+     */
+    private static List<Component> artsLines(SoulData data, Player player, long now) {
+        List<Component> lines = new ArrayList<>(2);
+        QuincyArts arts = QuincyArtsLogic.arts(data);
+        SanreiProgress glove = arts.glove();
+        switch (arts.stage()) {
+            case UNTOUCHED -> {
+                if (glove.worn() && glove.mastered()) {
+                    lines.add(Component.translatable("screen.bleach.soul.quincy.glove_mastered"));
+                } else if (glove.worn()) {
+                    lines.add(Component.translatable("screen.bleach.soul.quincy.glove", glove.days(),
+                            BleachConfig.get(BleachConfig.SANREI_DAYS_TO_MASTER), glove.today(),
+                            BleachConfig.get(BleachConfig.SANREI_POINTS_PER_DAY)));
+                }
+            }
+            case LETZT_STIL -> lines.add(Component.translatable("screen.bleach.soul.quincy.letzt",
+                    QuincyArtsLogic.formatTicks(arts.letztEndsAt() - now)).withColor(LETZT));
+            case SEALED -> lines.add(QuincyArtsLogic.sealedLongEnough(data, now, false)
+                    ? Component.translatable("screen.bleach.soul.quincy.sealed_ready")
+                    : Component.translatable("screen.bleach.soul.quincy.sealed", QuincyArtsLogic.formatTicks(
+                            arts.stageSince() + QuincyArtsLogic.sealedTicksNeeded(false) - now)));
+            case RESTORED -> lines.add(Component.translatable("screen.bleach.soul.quincy.ginrei").withColor(REISHI));
+        }
+
+        GintoSpell spell = QuincyArtsLogic.selectedSpell(data);
+        if (holdsGinto(player) && QuincyArtsLogic.knowsSpell(data, spell)) {
+            lines.add(Component.translatable("screen.bleach.soul.quincy.ginto", spell.displayName()));
+        } else if (QuincyArtsLogic.inVollstandig(data)) {
+            lines.add(Component.translatable("screen.bleach.soul.quincy.vollstandig_active").withColor(VOLLSTANDIG));
+        } else if (QuincyArtsLogic.vollUnlocked(data)) {
+            lines.add(Component.translatable("screen.bleach.soul.quincy.vollstandig_ready",
+                    QuincyClient.FORM_KEY.getTranslatedKeyMessage()));
+        } else if (QuincyArtsLogic.isRestored(data)) {
+            int needed = Math.max(0, BleachConfig.get(BleachConfig.VOLL_TRAINING_AFTER_RESTORE));
+            lines.add(Component.translatable("screen.bleach.soul.quincy.vollstandig_progress",
+                    Math.max(0, needed - QuincyArtsLogic.vollTrainingLeft(data)), needed));
+        }
+        return lines;
+    }
+
+    /** Whether a Gintō, filled or empty, is in either hand. */
+    private static boolean holdsGinto(Player player) {
+        return isGinto(player.getMainHandItem()) || isGinto(player.getOffhandItem());
+    }
+
+    private static boolean isGinto(ItemStack stack) {
+        return stack.is(ModItems.GINTO.get()) || stack.is(ModItems.EMPTY_GINTO.get());
     }
 
     /**

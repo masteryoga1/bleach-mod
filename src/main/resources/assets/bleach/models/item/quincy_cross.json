@@ -6,6 +6,13 @@
   "overrides": [
     {"predicate": {"bleach:pulling": 1}, "model": "bleach:item/heilig_bogen_pulling_0"},
     {"predicate": {"bleach:pulling": 1, "bleach:pull": 0.65}, "model": "bleach:item/heilig_bogen_pulling_1"},
-    {"predicate": {"bleach:pulling": 1, "bleach:pull": 0.9}, "model": "bleach:item/heilig_bogen_pulling_2"}
+    {"predicate": {"bleach:pulling": 1, "bleach:pull": 0.9}, "model": "bleach:item/heilig_bogen_pulling_2"},
+    {"predicate": {"bleach:style": 0.5, "bleach:pulling": 1}, "model": "bleach:item/letzt_bogen_pulling_0"},
+    {"predicate": {"bleach:style": 0.5, "bleach:pulling": 1, "bleach:pull": 0.65}, "model": "bleach:item/letzt_bogen_pulling_1"},
+    {"predicate": {"bleach:style": 0.5, "bleach:pulling": 1, "bleach:pull": 0.9}, "model": "bleach:item/letzt_bogen_pulling_2"},
+    {"predicate": {"bleach:style": 1}, "model": "bleach:item/quincy_zeichen"},
+    {"predicate": {"bleach:style": 1, "bleach:pulling": 1}, "model": "bleach:item/ginrei_kojaku_pulling_0"},
+    {"predicate": {"bleach:style": 1, "bleach:pulling": 1, "bleach:pull": 0.65}, "model": "bleach:item/ginrei_kojaku_pulling_1"},
+    {"predicate": {"bleach:style": 1, "bleach:pulling": 1, "bleach:pull": 0.9}, "model": "bleach:item/ginrei_kojaku_pulling_2"}
   ]
 }

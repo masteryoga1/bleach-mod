@@ -92,6 +92,19 @@ QUINCY_FOLD = rgb(206, 212, 224)
 QUINCY_BLUE = rgb(40, 84, 170)
 VEIN = rgb(90, 170, 255)
 VEIN_DIM = rgb(60, 120, 220)
+# The later arts: Letzt Stil's pale gold, Ginrei Kojaku's silver-blue, Vollständig's halo and its
+# translucent wings, the cloud of a Gintō spell, and the Sanrei Glove's blue cuff.
+LETZT = rgb(255, 214, 160)
+LETZT_CORE = rgb(255, 246, 228)
+LETZT_EDGE = rgb(240, 150, 70)
+GINREI = rgb(214, 226, 255)
+GINREI_EDGE = rgb(140, 160, 230)
+HALO = rgb(255, 232, 150)
+WING = (236, 244, 255, 200)
+WING_EDGE = (150, 196, 255, 235)
+CLOUD = (200, 232, 255, 110)
+CLOUD_EDGE = (110, 170, 230, 220)
+GLOVE_CUFF = QUINCY_BLUE
 
 
 class Canvas:
@@ -176,6 +189,21 @@ def cracked(base, points):
         crack(c, points)
         return c
     draw.__name__ = base.__name__ + "_cracked"
+    return draw
+
+
+def recoloured(base, mapping, name=None):
+    """A drawing function for base with each colour that is a key of mapping swapped for its value, in
+    one pass, so a swap never feeds another. Named after the base unless given a name."""
+    def draw():
+        c = base()
+        for y in range(c.height):
+            for x in range(c.width):
+                colour = c.get(x, y)
+                if colour in mapping:
+                    c.put(x, y, mapping[colour])
+        return c
+    draw.__name__ = name or base.__name__ + "_recoloured"
     return draw
 
 
@@ -699,6 +727,242 @@ def blut_vene():
     return c
 
 
+def sanrei_glove_icon():
+    """The Sanrei Glove: a white glove with a blue cuff and a small silver cross on its back."""
+    c = Canvas(16, 16)
+    c.rect(4, 6, 12, 13, QUINCY_WHITE)  # the palm
+    for x in (4, 6, 8, 10):             # the fingers
+        c.rect(x, 2, x + 1, 6, QUINCY_WHITE)
+    c.rect(2, 8, 4, 11, QUINCY_WHITE)   # the thumb
+    c.rect(4, 13, 12, 16, GLOVE_CUFF)   # the cuff
+    for x in (5, 7, 9, 11):             # folds between the fingers, and where the thumb meets the palm
+        c.put(x, 6, QUINCY_FOLD)
+    c.rect(4, 8, 5, 11, QUINCY_FOLD)
+    c.rect(7, 8, 9, 12, SILVER)         # the cross
+    c.rect(6, 9, 10, 11, SILVER)
+    return c
+
+
+def seele_schneider_icon():
+    """The Seele Schneider as everyone sees it: a silver hilt and a short guard, slanted like a sword,
+    with no blade."""
+    c = Canvas(16, 16)
+    line(c, 2, 13, 6, 9, SILVER)
+    line(c, 2, 14, 6, 10, SILVER_SHADE)
+    c.put(5, 8, GUARD)
+    c.put(7, 10, GUARD)
+    c.put(1, 14, SILVER_SHADE)          # the pommel
+    return c
+
+
+def seele_schneider_formed_icon():
+    """The Seele Schneider with its blade of reishi formed, which only those who see spirits see."""
+    c = seele_schneider_icon()
+    line(c, 7, 8, 14, 1, REISHI_EDGE)
+    line(c, 7, 7, 14, 0, REISHI_CORE)   # the upper-left side of the blade
+    c.put(15, 0, REISHI_CORE)           # the tip
+    return c
+
+
+def ginto_tube(inside):
+    """A Gintō tube upright: silver walls and caps around what it holds."""
+    c = Canvas(16, 16)
+    c.rect(6, 2, 7, 14, SILVER)
+    c.rect(9, 2, 10, 14, SILVER)
+    c.rect(7, 2, 9, 14, inside)
+    c.rect(6, 1, 10, 2, SILVER_SHADE)
+    c.rect(6, 14, 10, 15, SILVER_SHADE)
+    return c
+
+
+def empty_ginto_icon():
+    return ginto_tube(SILVER_SHADE)
+
+
+def ginto_icon():
+    """A filled Gintō: reishi to the top, with a bright streak down the glass."""
+    c = ginto_tube(REISHI)
+    c.rect(7, 2, 9, 3, REISHI_EDGE)     # the meniscus
+    c.rect(7, 3, 8, 7, REISHI_CORE)
+    return c
+
+
+def quincy_zeichen_icon():
+    """The restored Cross at rest: a silver ring round a five-point star of reishi, on a stub of chain."""
+    c = Canvas(16, 16)
+    for y in range(16):
+        for x in range(16):
+            r = math.hypot(x - 8, y - 8)
+            if 6.0 <= r < 7.0:
+                c.put(x, y, SILVER)
+            elif 5.0 <= r < 6.0:
+                c.put(x, y, SILVER_SHADE)
+    # Every second vertex of a pentagon in turn, so the lines cross into a star. Rounds half up.
+    star = [(math.floor(8 + 5 * math.cos(math.radians(-90 + 144 * k)) + 0.5),
+             math.floor(8 + 5 * math.sin(math.radians(-90 + 144 * k)) + 0.5)) for k in range(5)]
+    for (x0, y0), (x1, y1) in zip(star, star[1:] + star[:1]):
+        line(c, x0, y0, x1, y1, REISHI_EDGE)
+    c.put(8, 8, REISHI_CORE)
+    c.rect(8, 0, 9, 2, SILVER_SHADE)    # the chain
+    return c
+
+
+def letzt_bogen(stage):
+    """A drawing function for Letzt Stil's bow at a stage of the draw: the Heilig Bogen in pale gold."""
+    return recoloured(heilig_bogen(stage), {REISHI: LETZT, REISHI_EDGE: LETZT_EDGE, REISHI_CORE: LETZT_CORE},
+                      "letzt_bogen_%d" % stage)
+
+
+def ginrei_kojaku(stage):
+    """A drawing function for Ginrei Kojaku at a stage of the draw: the Heilig Bogen in silver-blue,
+    with a silver pentacle in the corner the bow curves round."""
+    base = recoloured(heilig_bogen(stage), {REISHI: GINREI, REISHI_EDGE: GINREI_EDGE})
+
+    def draw():
+        c = base()
+        for x, y in [(1, 13), (2, 12), (3, 13), (2, 14)]:
+            c.put(x, y, SILVER)
+        c.put(2, 13, REISHI_CORE)
+        return c
+    draw.__name__ = "ginrei_kojaku_%d" % stage
+    return draw
+
+
+def gritz_cross(c, ox, oy, size):
+    """Gritz's cross with its top left corner at (ox, oy), drawn as on the 18-pixel effect icon and
+    scaled to size: reishi in a 1-pixel outline, brightest where the arms meet."""
+    def scaled(x0, y0, x1, y1):
+        return [math.floor(v * size / 18 + 0.5) for v in (x0, y0, x1, y1)]
+    cross = set()
+    for x0, y0, x1, y1 in (scaled(8, 2, 10, 16), scaled(3, 6, 15, 8)):
+        cross.update((x, y) for y in range(y0, y1) for x in range(x0, x1))
+    for y in range(size):
+        for x in range(size):
+            if (x, y) in cross:
+                c.put(ox + x, oy + y, REISHI)
+            elif any((x + dx, y + dy) in cross for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                c.put(ox + x, oy + y, REISHI_EDGE)
+    x0, y0, x1, y1 = scaled(8, 6, 10, 8)
+    c.rect(ox + x0, oy + y0, ox + x1, oy + y1, REISHI_CORE)
+
+
+def gritz_icon():
+    """The Gritz effect's icon."""
+    c = Canvas(18, 18)
+    gritz_cross(c, 0, 0, 18)
+    return c
+
+
+def sanrei_glove_layer():
+    """The glove on the player's hand (SanreiGloveModel, one 4x6x4 box): white, with a blue cuff along
+    the top row at the wrist, a line of knuckles low on the front, and a silver cross on the back."""
+    c = Canvas(32, 16)
+    box(c, 0, 0, 4, 6, 4, QUINCY_WHITE)
+    c.rect(0, 4, 16, 5, GLOVE_CUFF)
+    c.rect(4, 9, 8, 10, QUINCY_FOLD)
+    c.rect(13, 5, 15, 9, SILVER)
+    c.rect(12, 6, 16, 7, SILVER)
+    return c
+
+
+def letzt_stil():
+    """Letzt Stil's glow, in the player skin layout and drawn lit over the player's model: thin upright
+    lines of pale gold, brighter every fourth row, over the front and back of the body and the fronts
+    of both arms. Every second column, so the slim arms get the same lines; the rest, the outer layer
+    included, stays clear."""
+    c = Canvas(64, 64)
+    for x0, y0, x1, y1 in [(20, 20, 28, 32), (32, 20, 40, 32), (44, 20, 48, 32), (36, 52, 40, 64)]:
+        for y in range(y0, y1):
+            for x in range(x0, x1, 2):
+                c.put(x, y, LETZT_CORE if (y - y0) % 4 == 0 else LETZT)
+    return c
+
+
+def letzt_pfeil():
+    """Letzt Stil's great arrow, in heilig_pfeil's layout: a shaft of pale gold, brightest along its
+    middle, and a small diamond for the end cap. The same from either end, like the Heilig Pfeil."""
+    c = Canvas(32, 32)
+    for y, colour in enumerate([LETZT_EDGE, LETZT, LETZT_CORE, LETZT, LETZT_EDGE]):
+        c.rect(0, y, 16, y + 1, colour)
+    for dy in range(-2, 3):
+        for dx in range(-2, 3):
+            if abs(dx) + abs(dy) <= 2:
+                c.put(2 + dx, 7 + dy, LETZT)
+    c.put(2, 7, LETZT_CORE)
+    return c
+
+
+def seele_schneider_entity():
+    """The Seele Schneider fired or stuck, in heilig_pfeil's layout. ArrowRenderer draws the right end
+    of the shaft (x 16) forward, so the blade is on the right, leading in flight and buried when
+    stuck; then the guard and the hilt. The end cap, at the back, is the pommel."""
+    c = Canvas(32, 32)
+    for y, (hilt, blade) in enumerate([(SILVER_SHADE, REISHI_EDGE), (SILVER, REISHI), (SILVER, REISHI_CORE),
+                                       (SILVER, REISHI), (SILVER_SHADE, REISHI_EDGE)]):
+        c.rect(0, y, 5, y + 1, hilt)
+        c.rect(6, y, 16, y + 1, blade)
+    c.rect(5, 0, 6, 5, GUARD)
+    for dy in range(-2, 3):
+        for dx in range(-2, 3):
+            distance = dx * dx + dy * dy
+            if distance <= 5:  # a round 5x5 disc, its outer ring shaded
+                c.put(2 + dx, 7 + dy, SILVER_SHADE if distance >= 4 else SILVER)
+    return c
+
+
+def halo_ring(c, left, top, gaps=()):
+    """A ring of light on a 12x12 face of the halo, with these spans of angle (degrees, clockwise from
+    the right as drawn) left clear."""
+    cx, cy = left + 6, top + 6
+    for y in range(top, top + 12):
+        for x in range(left, left + 12):
+            dx, dy = x + 0.5 - cx, y + 0.5 - cy
+            angle = math.degrees(math.atan2(dy, dx)) % 360
+            if 4.5 <= math.hypot(dx, dy) < 6.0 and not any(start <= angle < end for start, end in gaps):
+                c.put(x, y, HALO)
+
+
+def vollstandig():
+    """Vollständig's wings and halo (VollstandigModel). Each wing is one flat 16x24 box, front face
+    (0,0)-(16,24) and back face (16,0)-(32,24). On both faces, and on both wings (the left one is
+    mirrored), the root by the shoulder is at the side where the faces meet, so five feather spines
+    fan down and out from there and the far edge is drawn in full. The halo is a flat 12x12 box, its
+    two faces drawn the same way up, so the gaps of the broken halo line up above and below."""
+    c = Canvas(64, 64)
+    c.rect(0, 0, 32, 24, WING)
+    for k in range(5):
+        line(c, 14, 1, 12 - 3 * k, 23, WING_EDGE)  # front face
+        line(c, 17, 1, 19 + 3 * k, 23, WING_EDGE)  # back face, its mirror image
+    c.rect(0, 0, 1, 24, WING_EDGE)
+    c.rect(31, 0, 32, 24, WING_EDGE)
+    for left in (12, 24):
+        halo_ring(c, left, 32)
+        halo_ring(c, left, 48, gaps=((20, 60), (200, 230)))
+    return c
+
+
+def ginto_cast():
+    """A Gintō spell's shapes, where GintoCastRenderer samples them: a disc of cloud for Wolke and
+    Sprenger's ring (u 0..0.5, v 0..0.5), a column of reishi fading as it rises for Heizen and
+    Sprenger (u 0.5..0.75, v 0..1), and Gritz's cross (u 0.75..1, v 0..0.25)."""
+    c = Canvas(64, 64)
+    for y in range(32):
+        for x in range(32):
+            r = math.hypot(x + 0.5 - 16, y + 0.5 - 16)
+            if 14.0 <= r < 15.5:
+                c.put(x, y, CLOUD_EDGE)
+            elif r < 15.0:
+                c.put(x, y, CLOUD)
+    for y in range(64):
+        alpha = round(40 + (230 - 40) * y / 63)  # the bottom row is the column's foot
+        for x in range(32, 48):
+            out = abs(x + 0.5 - 40) / 8          # 0 at the middle, 1 at the edges
+            mixed = (round(core + (edge - core) * out) for core, edge in zip(REISHI_CORE[:3], REISHI_EDGE[:3]))
+            c.put(x, y, (*mixed, alpha))
+    gritz_cross(c, 48, 0, 16)
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -739,6 +1003,25 @@ TEXTURES = {
     "models/armor/quincy_garb_layer_2.png": quincy_armor_layer_2,
     "entity/heilig_pfeil.png": heilig_pfeil,
     "entity/blut_vene.png": blut_vene,
+    "item/sanrei_glove.png": sanrei_glove_icon,
+    "item/seele_schneider.png": seele_schneider_icon,
+    "item/seele_schneider_formed.png": seele_schneider_formed_icon,
+    "item/empty_ginto.png": empty_ginto_icon,
+    "item/ginto.png": ginto_icon,
+    "item/quincy_zeichen.png": quincy_zeichen_icon,
+    "item/letzt_bogen_pulling_0.png": letzt_bogen(0),
+    "item/letzt_bogen_pulling_1.png": letzt_bogen(1),
+    "item/letzt_bogen_pulling_2.png": letzt_bogen(2),
+    "item/ginrei_kojaku_pulling_0.png": ginrei_kojaku(0),
+    "item/ginrei_kojaku_pulling_1.png": ginrei_kojaku(1),
+    "item/ginrei_kojaku_pulling_2.png": ginrei_kojaku(2),
+    "mob_effect/gritz.png": gritz_icon,
+    "entity/sanrei_glove.png": sanrei_glove_layer,
+    "entity/letzt_stil.png": letzt_stil,
+    "entity/letzt_pfeil.png": letzt_pfeil,
+    "entity/seele_schneider.png": seele_schneider_entity,
+    "entity/vollstandig.png": vollstandig,
+    "entity/ginto_cast.png": ginto_cast,
 }
 
 

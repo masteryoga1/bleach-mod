@@ -5,12 +5,15 @@ import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
+import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
@@ -24,8 +27,8 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * The mod's entity types: Shinigami NPCs, Hollows, Pluses, the Garganta, zanpakutō techniques and the
- * Quincy's arrows.
+ * The mod's entity types: Shinigami NPCs, Hollows, Pluses, the Garganta, zanpakutō techniques, and the
+ * Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -160,6 +163,47 @@ public final class ModEntities {
                     .updateInterval(20)
                     .noSave()
                     .build(BleachMod.id("heilig_pfeil").toString()));
+
+    /**
+     * A Seele Schneider loosed from Ginrei Kojaku, or planted in the ground. It flies as a Heilig Pfeil
+     * does, then sticks where it lands to be picked up again or set off by Sprenger, so it is saved.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<SeeleSchneiderPfeil>> SEELE_SCHNEIDER =
+            ENTITY_TYPES.register("seele_schneider", () -> EntityType.Builder
+                    .<SeeleSchneiderPfeil>of(SeeleSchneiderPfeil::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .eyeHeight(0.13F)
+                    .clientTrackingRange(4)
+                    .updateInterval(20)
+                    .build(BleachMod.id("seele_schneider").toString()));
+
+    /**
+     * Letzt Stil's charged shot: a great arrow that pierces ten and carves through soft blocks. It
+     * lives a second or so and is never saved.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<LetztPfeil>> LETZT_PFEIL =
+            ENTITY_TYPES.register("letzt_pfeil", () -> EntityType.Builder
+                    .<LetztPfeil>of(LetztPfeil::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F)
+                    .eyeHeight(0.25F)
+                    .clientTrackingRange(6)
+                    .updateInterval(20)
+                    .noSave()
+                    .build(BleachMod.id("letzt_pfeil").toString()));
+
+    /**
+     * A Gintō spell where it was cast: Gritz's light, Wolke's cloud, Heizen's pillar or Sprenger's
+     * ring. It stays where it was cast, fades within seconds and is never saved.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<GintoCast>> GINTO_CAST =
+            ENTITY_TYPES.register("ginto_cast", () -> EntityType.Builder
+                    .<GintoCast>of(GintoCast::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .noSave()
+                    .fireImmune()
+                    .clientTrackingRange(8)
+                    .updateInterval(20)
+                    .build(BleachMod.id("ginto_cast").toString()));
 
     private ModEntities() {
     }

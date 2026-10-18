@@ -17,7 +17,14 @@ public enum QuincyKey {
      */
     BLUT,
     /** The Blut key pressed while sneaking: let Blut go. */
-    BLUT_OFF;
+    BLUT_OFF,
+    /**
+     * The Quincy Form key (H); the server decides what it means, see
+     * {@link io.github.masteryoga1.bleach.soul.QuincyArtsEvents#onFormKey}.
+     */
+    FORM,
+    /** The same pressed while sneaking. */
+    FORM_SNEAK;
 
     private static final IntFunction<QuincyKey> BY_ID =
             ByIdMap.continuous(QuincyKey::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

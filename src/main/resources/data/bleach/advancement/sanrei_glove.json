@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:last_quincy",
+  "display": {
+    "icon": {
+      "id": "bleach:sanrei_glove"
+    },
+    "title": {
+      "translate": "advancements.bleach.sanrei_glove.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.sanrei_glove.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "sanrei_glove": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "sanrei_glove"
+      }
+    }
+  }
+}
