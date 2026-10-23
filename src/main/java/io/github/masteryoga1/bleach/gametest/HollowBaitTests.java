@@ -214,6 +214,14 @@ public final class HollowBaitTests {
         helper.assertFalse(MaskFragments.onFreshCrack(mock, fishbone, now + 300L), "one Hollow gave two fragments");
         carried = QuincyArtsTests.carried(mock, ModItems.MASK_FRAGMENT.get());
         helper.assertTrue(carried == 1, "after a second crack the soul carries " + carried + " fragments");
+
+        // The roll is saved with the Hollow, so reloading it gives no second chance.
+        FishboneD reloaded = ModEntities.FISHBONE_D.get().create(helper.getLevel());
+        helper.assertTrue(reloaded != null, "no Fishbone D could be made to reload into");
+        reloaded.load(fishbone.saveWithoutId(new CompoundTag()));
+        helper.assertFalse(MaskFragments.onFreshCrack(mock, reloaded, now + 600L), "a reloaded Hollow gave a second fragment");
+        carried = QuincyArtsTests.carried(mock, ModItems.MASK_FRAGMENT.get());
+        helper.assertTrue(carried == 1, "after a reload the soul carries " + carried + " fragments");
         fishbone.discard();
         helper.succeed();
     }

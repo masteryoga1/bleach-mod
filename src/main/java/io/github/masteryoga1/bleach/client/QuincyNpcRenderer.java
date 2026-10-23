@@ -31,7 +31,7 @@ public final class QuincyNpcRenderer<T extends QuincyNpc> extends HumanoidMobRen
                 new HumanoidArmorModel<>(context.bakeLayer(ModelLayers.PLAYER_INNER_ARMOR)),
                 new HumanoidArmorModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()));
-        addLayer(new QuincyNpcVeneLayer<>(this));
+        addLayer(new QuincyNpcVeneLayer<>(this, context.getModelSet()));
     }
 
     /**

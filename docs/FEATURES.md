@@ -91,8 +91,8 @@ The first playable slice: become a Shinigami, awaken your zanpakutō and hunt Ho
   - *A proud young Quincy Hunter sometimes turns up at Garganta arrivals (one in ten, or surely after ten Hollows). He fights with Heilig Pfeil, Hirenkyaku and Blut Vene, and challenges Shinigami and Quincy to a six-minute contest: whoever destroys more Hollows, for a Hollow Bait.*
   - *Both are living Humans, seen by everyone, and their arrows hit only Hollows.*
 - [x] **Ransōtengai** [Canon] *(optional)*: reishi threads that keep you fighting when your body would give out. *Learned in the Elder's trial: bound, you free yourself by weaving threads of reishi for five seconds. Afterwards, sneak and press H when your body is failing (a quarter health, or slowed, weakened or fatigued).*
-  - *While woven: those effects are cleared and blocked (reiatsu pressure included), you cannot be knocked back, and nothing heals. It costs 2.5% of your maximum reiryoku a second (more for hybrids).*
-  - *Letting go leaves you slowed and weakened for 10 seconds, with three minutes before it holds again.*
+  - *While woven: those effects are cleared and blocked (reiatsu pressure included), you cannot be knocked back (by blows, arrows or blasts), and nothing heals, natural regeneration included, which then uses no food. It costs 2.5% of your maximum reiryoku a second (more for hybrids).*
+  - *Letting go leaves you slowed and weakened for 10 seconds, with three minutes before it holds again. Logging out while woven skips the collapse but not the wait.*
 
 ## Step 4: Hollows and Arrancar
 

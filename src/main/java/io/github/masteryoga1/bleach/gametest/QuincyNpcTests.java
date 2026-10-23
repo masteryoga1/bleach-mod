@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -48,6 +49,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Husk;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
@@ -236,6 +238,7 @@ public final class QuincyNpcTests {
 
         Map<String, Boolean> passes = new LinkedHashMap<>();
         passes.put("the Hunter's arrow a player", SpiritProjectiles.mayStrike(hunter, mock));
+        passes.put("the Elder's arrow a player", SpiritProjectiles.mayStrike(elder, mock));
         passes.put("the Hunter's arrow a zombie", SpiritProjectiles.mayStrike(hunter, zombie));
         passes.put("the Hunter's arrow Fishbone D", SpiritProjectiles.mayStrike(hunter, fishbone));
         passes.put("the Elder's arrow a Plus", SpiritProjectiles.mayStrike(elder, plus));
@@ -246,27 +249,66 @@ public final class QuincyNpcTests {
     }
 
     /**
-     * The Hunter's AI finds a Hollow and shoots it. Its own batch, so no Hollow of another test is
-     * near enough for him to pick instead.
+     * A creature that is no Hollow, standing still on a line of fire, so a shot that should pass
+     * through it shows whether it did. A husk, as it neither burns by day nor would be quarry.
+     */
+    private static Husk inTheWay(GameTestHelper helper, int x, int z) {
+        return QuincyTests.still(helper.spawn(EntityType.HUSK, x, 2, z));
+    }
+
+    /** Every tick, notes how far north (the least z) this owner's arrows have flown, in the world's coordinates. */
+    private static double[] watchHowFarNorth(GameTestHelper helper, Entity owner) {
+        double[] least = {Double.MAX_VALUE};
+        helper.onEachTick(() -> {
+            for (HeiligPfeil arrow : shotsOf(helper, owner)) {
+                least[0] = Math.min(least[0], arrow.getZ());
+            }
+        });
+        return least;
+    }
+
+    /** Every tick, notes how far south (the greatest z) this owner's arrows have flown, in the world's coordinates. */
+    private static double[] watchHowFarSouth(GameTestHelper helper, Entity owner) {
+        double[] most = {-Double.MAX_VALUE};
+        helper.onEachTick(() -> {
+            for (HeiligPfeil arrow : shotsOf(helper, owner)) {
+                most[0] = Math.max(most[0], arrow.getZ());
+            }
+        });
+        return most;
+    }
+
+    /**
+     * The Hunter's AI finds a Hollow and shoots it, through a creature in the way that is no Hollow,
+     * which his arrows pass without harm. Its own batch, so no Hollow of another test is near enough
+     * for him to pick instead.
      */
     @GameTest(template = "field", batch = "quincy_npc", timeoutTicks = 200)
     public static void hunterShootsAHollow(GameTestHelper helper) {
         wall(helper, 14);
         QuincyHunter hunter = helper.spawn(ModEntities.QUINCY_HUNTER.get(), 2, 2, 2);
         SpiderHollow spider = QuincyTests.still(helper.spawn(ModEntities.SPIDER_HOLLOW.get(), 2, 2, 12));
-        Player bystander = QuincyTests.archer(helper, QuincyTests.quincy(Bloodline.ECHT, 1, 100.0F), 4.5, 7.0);
-        float health = bystander.getHealth();
+        Husk husk = inTheWay(helper, 2, 7);
+        float health = husk.getHealth();
         keepShotsInside(helper, hunter);
+        double[] reached = watchHowFarSouth(helper, hunter);
         helper.succeedWhen(() -> {
             helper.assertTrue(!spider.isAlive() || spider.getHealth() < spider.getMaxHealth(),
                     "the Hunter never struck the Spider Hollow");
-            helper.assertTrue(bystander.getHealth() == health, "a player beside the line was hurt");
+            helper.assertTrue(reached[0] > husk.getZ() + 1.0, "no arrow of the Hunter's got past the husk in the way");
+            helper.assertTrue(husk.getHealth() == health, "the Hunter's arrows hurt the husk in the way, to " + husk.getHealth());
             QuincyArtsTests.discardAll(shotsOf(helper, hunter));
             hunter.discard();
             spider.discard();
+            husk.discard();
         });
     }
 
+    /**
+     * The Elder's shot at a soul whose power is not sealed restores nothing, and goes by a creature
+     * standing between them without harm. The soul is a mock, not in the world, so whether his
+     * arrows can harm a player is left to {@link #npcArrowsStrikeOnlyHollows}.
+     */
     @GameTest(template = "field", timeoutTicks = 120)
     public static void elderMissDoesNoHarm(GameTestHelper helper) {
         wall(helper, 1);
@@ -275,16 +317,19 @@ public final class QuincyNpcTests {
         SoulData data = QuincyArtsTests.thirdTier();
         Player mock = QuincyTests.archer(helper, data, 8.5, 4.5);
         QuincyArtsTests.face(mock, elder.getEyePosition());
-        float health = mock.getHealth();
+        Husk husk = inTheWay(helper, 8, 7);
+        float health = husk.getHealth();
         helper.assertFalse(elder.beginRestore(mock, helper.getLevel().getGameTime()),
                 "the Elder set about restoring a power that is not sealed");
         keepShotsInside(helper, elder);
+        double[] reached = watchHowFarNorth(helper, elder);
         elder.loose(mock);
         helper.runAfterDelay(60, () -> {
-            helper.assertTrue(mock.getHealth() == health, "the Elder's shot left the mock at " + mock.getHealth());
-            helper.assertFalse(QuincyArtsLogic.isRestored(data), "the Elder's shot restored a power that was never sealed");
+            helper.assertTrue(reached[0] < husk.getZ() - 1.0, "the Elder's arrow never got past the husk in the way");
+            helper.assertTrue(husk.getHealth() == health, "the Elder's arrow hurt the husk in the way, to " + husk.getHealth());
             QuincyArtsTests.discardAll(shotsOf(helper, elder));
             elder.discard();
+            husk.discard();
             helper.succeed();
         });
     }
@@ -373,6 +418,15 @@ public final class QuincyNpcTests {
         helper.assertTrue(placed.lifetime() == QuincyNpc.PERMANENT && placed.isPermanent(),
                 "data with no lifetime loaded with " + placed.lifetime());
 
+        // A Hunter who stays keeps the contest he runs, and that he has offered his one.
+        UUID site = UUID.randomUUID();
+        hunter.setContestSite(site);
+        hunter.setContestOffered(true);
+        QuincyHunter contesting = created(helper, ModEntities.QUINCY_HUNTER.get());
+        contesting.load(hunter.saveWithoutId(new CompoundTag()));
+        helper.assertTrue(site.equals(contesting.contestSite()) && contesting.contestOffered(),
+                "a Hunter's contest loaded as " + contesting.contestSite() + ", offered " + contesting.contestOffered());
+
         CompoundTag elderTag = created(helper, ModEntities.QUINCY_ELDER.get()).saveWithoutId(new CompoundTag());
         elderTag.remove("Invulnerable");
         QuincyElder summoned = created(helper, ModEntities.QUINCY_ELDER.get());
@@ -383,6 +437,19 @@ public final class QuincyNpcTests {
         mortal.load(elderTag);
         helper.assertFalse(mortal.isInvulnerable(), "an Elder saved as mortal loaded invulnerable");
         helper.succeed();
+    }
+
+    /** A Hunter saved with a contest that ended while his ground was unloaded lets it go, but not his offer. */
+    @GameTest(template = "field", timeoutTicks = 60)
+    public static void hunterLetsAnEndedContestGo(GameTestHelper helper) {
+        QuincyHunter hunter = QuincyTests.still(helper.spawn(ModEntities.QUINCY_HUNTER.get(), 8, 2, 8));
+        hunter.setContestSite(UUID.randomUUID());
+        hunter.setContestOffered(true);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(hunter.contestSite() == null, "the Hunter still runs a contest that has ended");
+            helper.assertTrue(hunter.contestOffered(), "letting an ended contest go let him offer another");
+            hunter.discard();
+        });
     }
 
     /** A soul with no Quincy blood, or a Hollow, is turned away by {@code elderMayVisit} (see {@link #elderViewsByVisitor}). */

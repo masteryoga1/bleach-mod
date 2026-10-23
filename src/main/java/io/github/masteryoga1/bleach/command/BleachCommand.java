@@ -801,6 +801,7 @@ public final class BleachCommand {
             // What the old soul had released goes with it, so nothing it held lingers on the body.
             ShikaiEvents.forceSeal(player, SoulLogic.get(player), null);
             QuincyArtsEvents.endAll(player, SoulLogic.get(player));
+            QuincyRansotengai.closeTrial(player, SoulLogic.get(player));
             SoulData fresh = new SoulData();
             QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);
             player.setData(SoulAttachments.SOUL, fresh);
@@ -1313,9 +1314,9 @@ public final class BleachCommand {
                     if (QuincyRansotengai.isWoven(data)) {
                         QuincyRansotengai.end(player, data, now, QuincyRansotengai.End.COMMAND);
                     }
-                    // Read again: letting the weave go changed the record.
-                    data.setQuincy(data.quincy().withTeaching(data.quincy().teaching()
-                            .withRansotengaiKnown(false).withTrialUntil(QuincyTeaching.NEVER)));
+                    QuincyRansotengai.closeTrial(player, data);
+                    // Read again: letting the weave go and closing the trial changed the record.
+                    data.setQuincy(data.quincy().withTeaching(data.quincy().teaching().withRansotengaiKnown(false)));
                 }
                 case START -> {
                     if (!QuincyRansotengai.start(player, data, now, true)) {

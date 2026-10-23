@@ -15,10 +15,12 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -69,9 +71,22 @@ public final class RansotengaiTests {
         return (long) BleachConfig.get(BleachConfig.RANSOTENGAI_COOLDOWN_SECONDS) * TICKS_PER_SECOND;
     }
 
+    /** Whether either hold against knockback is on the body: from blows and arrows, or from blasts. */
     private static boolean holdsAgainstKnockback(Player player) {
-        AttributeInstance knockback = player.getAttribute(Attributes.KNOCKBACK_RESISTANCE);
-        return knockback != null && knockback.hasModifier(QuincyRansotengai.KNOCKBACK_ID);
+        for (Holder<Attribute> attribute : QuincyRansotengai.HELD_AGAINST) {
+            AttributeInstance held = player.getAttribute(attribute);
+            if (held != null && held.hasModifier(QuincyRansotengai.KNOCKBACK_ID)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Runs the soul's hunger and natural regeneration for this many ticks, as a player's tick would. */
+    private static void tickFood(Player player, int ticks) {
+        for (int i = 0; i < ticks; i++) {
+            player.getFoodData().tick(player);
+        }
     }
 
     private static void assertEffect(GameTestHelper helper, Player player, MobEffectInstance expected, String what) {
@@ -159,10 +174,30 @@ public final class RansotengaiTests {
         helper.assertFalse(mock.hasEffect(MobEffects.WEAKNESS), "Weakness took hold of a woven body");
         double knockback = mock.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE);
         helper.assertTrue(knockback >= 1.0, "a woven body resists knockback only " + knockback);
+        double blast = mock.getAttributeValue(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE);
+        helper.assertTrue(blast >= 1.0, "a woven body resists a blast's knockback only " + blast);
         mock.setHealth(10.0F);
         mock.heal(4.0F);
         helper.assertTrue(Math.abs(mock.getHealth() - 10.0F) < EPSILON, "a woven body healed to " + mock.getHealth());
         helper.assertFalse(SoulEvents.mayRegenerate(mock, data), "a woven body's reiryoku refills");
+
+        // Natural regeneration does not run at all, so it burns no food on heals that never land.
+        mock.getFoodData().setFoodLevel(20);
+        mock.getFoodData().setSaturation(5.0F);
+        mock.getFoodData().setExhaustion(0.0F);
+        tickFood(mock, 40);
+        helper.assertTrue(Math.abs(mock.getFoodData().getSaturationLevel() - 5.0F) < EPSILON
+                        && mock.getFoodData().getExhaustionLevel() < EPSILON,
+                "a woven body's regeneration burned its food: saturation " + mock.getFoodData().getSaturationLevel()
+                        + ", exhaustion " + mock.getFoodData().getExhaustionLevel());
+        helper.assertTrue(Math.abs(mock.getHealth() - 10.0F) < EPSILON, "a woven body regenerated to " + mock.getHealth());
+
+        Player unwoven = ZanpakutoTests.mock(helper, knownThirdTier());
+        unwoven.setHealth(10.0F);
+        unwoven.getFoodData().setFoodLevel(20);
+        unwoven.getFoodData().setSaturation(5.0F);
+        tickFood(unwoven, 40);
+        helper.assertTrue(unwoven.getHealth() > 10.0F, "a body not woven did not regenerate: " + unwoven.getHealth());
         helper.succeed();
     }
 
@@ -215,6 +250,25 @@ public final class RansotengaiTests {
         helper.assertTrue(sealedMock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "the seal tore the threads away with no collapse");
         helper.assertTrue(readyAt(sealed) == NOW + 1L + cooldownTicks(), "the seal set no wait: " + readyAt(sealed));
 
+        SoulData left = knownThirdTier();
+        Player leftMock = ZanpakutoTests.mock(helper, left);
+        helper.assertTrue(QuincyRansotengai.start(leftMock, left, NOW, false), "the threads were not woven");
+        QuincyRansotengai.end(leftMock, left, NOW + 5L, QuincyRansotengai.End.LOGOUT);
+        helper.assertFalse(QuincyRansotengai.isWoven(left), "logging out left the threads woven");
+        helper.assertFalse(leftMock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "logging out brought the collapse");
+        helper.assertTrue(readyAt(left) == NOW + 5L + cooldownTicks(),
+                "logging out woven set the wait until " + readyAt(left) + ", not " + (NOW + 5L + cooldownTicks()));
+
+        SoulData unheld = knownThirdTier();
+        Player unheldMock = ZanpakutoTests.mock(helper, unheld);
+        helper.assertTrue(QuincyRansotengai.start(unheldMock, unheld, NOW, false), "the threads were not woven");
+        AttributeInstance blast = unheldMock.getAttribute(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE);
+        helper.assertTrue(blast != null && blast.hasModifier(QuincyRansotengai.KNOCKBACK_ID), "the weave did not hold against blasts");
+        blast.removeModifier(QuincyRansotengai.KNOCKBACK_ID);
+        QuincyRansotengai.tick(unheldMock, unheld, NOW + 1L);
+        helper.assertFalse(QuincyRansotengai.isWoven(unheld), "a weave that lost its hold against blasts went on");
+        helper.assertFalse(holdsAgainstKnockback(unheldMock), "a weave let go for its lost hold left the other hold on");
+
         SoulData voll = knownThirdTier();
         Player vollMock = ZanpakutoTests.mock(helper, voll);
         helper.assertTrue(QuincyRansotengai.start(vollMock, voll, NOW, false), "the threads were not woven");
@@ -246,6 +300,44 @@ public final class RansotengaiTests {
         helper.assertFalse(mock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN) || mock.hasEffect(MobEffects.WEAKNESS),
                 "passing the trial brought the collapse");
         helper.assertTrue(readyAt(data) == waitBefore, "passing the trial set a wait until " + readyAt(data));
+        helper.succeed();
+    }
+
+    /**
+     * The trial's binding lasts as long as the trial and no longer: milk does not lift it while the
+     * trial is open, and a trial that ran out while the soul was away (the mock's effects never run
+     * down, as an absent player's do not) or that a command closed takes it off.
+     */
+    @GameTest(template = "empty")
+    public static void trialBindingLastsOnlyWhileTheTrialDoes(GameTestHelper helper) {
+        SoulData data = QuincyArtsTests.thirdTier();
+        Player mock = ZanpakutoTests.mock(helper, data);
+        QuincyRansotengai.beginTrial(mock, data, NOW);
+        MobEffectInstance bound = mock.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
+        helper.assertTrue(bound != null && bound.getAmplifier() == 3 && bound.getDuration() <= QuincyRansotengai.BIND_TICKS,
+                "the trial bound the body with " + bound);
+        mock.removeAllEffects();
+        QuincyRansotengai.tick(mock, data, NOW + 1L);
+        MobEffectInstance slowed = mock.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
+        MobEffectInstance weakened = mock.getEffect(MobEffects.WEAKNESS);
+        helper.assertTrue(slowed != null && slowed.getAmplifier() == 3 && weakened != null && weakened.getAmplifier() == 1,
+                "after milk the trial's binding is " + slowed + " and " + weakened);
+
+        long trial = (long) BleachConfig.get(BleachConfig.RANSOTENGAI_TRIAL_SECONDS) * TICKS_PER_SECOND;
+        QuincyRansotengai.tick(mock, data, NOW + trial);
+        helper.assertFalse(QuincyRansotengai.trialOpen(data, NOW + trial), "the trial is still open after it ran out");
+        helper.assertFalse(mock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN) || mock.hasEffect(MobEffects.WEAKNESS),
+                "the binding outlasted a trial that ran out");
+
+        SoulData cut = QuincyArtsTests.thirdTier();
+        Player cutMock = ZanpakutoTests.mock(helper, cut);
+        QuincyRansotengai.beginTrial(cutMock, cut, NOW);
+        QuincyRansotengai.closeTrial(cutMock, cut);
+        helper.assertFalse(QuincyRansotengai.trialOpen(cut, NOW), "closing the trial left it open");
+        helper.assertFalse(cutMock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN) || cutMock.hasEffect(MobEffects.WEAKNESS),
+                "the binding outlasted a trial that was closed");
+        QuincyRansotengai.tick(cutMock, cut, NOW + 1L);
+        helper.assertFalse(cutMock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "a closed trial bound the body again");
         helper.succeed();
     }
 

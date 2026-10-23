@@ -23,6 +23,7 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -38,13 +39,17 @@ import org.joml.Vector3f;
  * puppet's. While woven, slowness, fatigue and weakness are shaken off and kept off (reiatsu
  * pressure included), the body cannot be knocked back and nothing heals it, and the weave costs a
  * share of the maximum reiryoku every second, which does not refill meanwhile. Letting it go, or
- * running dry, leaves the body slowed and weakened, with a wait before the threads hold again.
+ * running dry, leaves the body slowed and weakened, with a wait before the threads hold again;
+ * slipping out of it by leaving the world brings the wait without the collapse.
  * A Quincy Elder teaches it in a trial: bound, the soul must weave the threads unbroken for a few
  * seconds. Sneak and press the Quincy Form key to weave it (see {@link QuincyArtsEvents#onFormKey}).
  * Server side; every method takes a {@link Player}, so game tests can drive it with mock players.
  */
 public final class QuincyRansotengai {
+    /** The hold against knockback, on both kinds: from blows and arrows, and from blasts. */
     public static final ResourceLocation KNOCKBACK_ID = BleachMod.id("ransotengai_knockback");
+    public static final List<Holder<Attribute>> HELD_AGAINST = List.of(Attributes.KNOCKBACK_RESISTANCE,
+            Attributes.EXPLOSION_KNOCKBACK_RESISTANCE);
     /** The effects the threads shake off and keep off: slowness, mining fatigue and weakness. */
     public static final TagKey<MobEffect> FREES = BleachTags.RANSOTENGAI_FREES;
     public static final int PARTICLE_INTERVAL = 4, DRAIN_INTERVAL = 20;
@@ -57,6 +62,11 @@ public final class QuincyRansotengai {
     private static final float DRY_BELOW = 0.5F;
     /** The trial binds the body this hard: Slowness IV and Weakness II. */
     private static final int TRIAL_SLOWNESS = 3, TRIAL_WEAKNESS = 1;
+    /**
+     * The binding is laid on this long at a time, and laid on again once it has half that left, for
+     * as long as the trial is open and the threads are not woven; never past the trial's end.
+     */
+    public static final int BIND_TICKS = 40;
     /** The collapse after the threads let go: Slowness II and Weakness II. */
     private static final int COLLAPSE_SLOWNESS = 1, COLLAPSE_WEAKNESS = 1;
     /** How far from the soul passing the trial an Elder still notices it, and cuts his visit short. */
@@ -83,6 +93,14 @@ public final class QuincyRansotengai {
                 default -> false;
             };
         }
+
+        /**
+         * Whether the wait follows: after a collapse, and after leaving the world woven, so the threads
+         * cannot be let go for free by logging out and back in.
+         */
+        public boolean waits() {
+            return collapses() || this == LOGOUT;
+        }
     }
 
     public static void register(IEventBus bus) {
@@ -92,27 +110,30 @@ public final class QuincyRansotengai {
 
     /** Slowness, fatigue and weakness cannot take hold of a woven body. */
     private static void onEffectApplicable(MobEffectEvent.Applicable event) {
-        LivingEntity entity = event.getEntity();
         MobEffectInstance effect = event.getEffectInstance();
-        if (!entity.level().isClientSide() && entity instanceof Player player && effect != null
-                && effect.getEffect().is(FREES) && SoulLogic.hasSoul(player) && isWoven(SoulLogic.get(player))) {
+        if (effect != null && effect.getEffect().is(FREES) && woven(event.getEntity())) {
             event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
         }
     }
 
     /**
      * Nothing heals a woven body: it is the threads that move it. A Totem of Undying still saves it,
-     * as it sets the health rather than healing.
+     * as it sets the health rather than healing. Natural regeneration does not even start, so it
+     * burns no food for nothing (see {@code FoodDataMixin}).
      */
     private static void onHeal(LivingHealEvent event) {
-        LivingEntity entity = event.getEntity();
-        if (!entity.level().isClientSide() && entity instanceof Player player && SoulLogic.hasSoul(player)
-                && isWoven(SoulLogic.get(player))) {
+        if (woven(event.getEntity())) {
             event.setCanceled(true);
         }
     }
 
     // ---- Queries ----
+
+    /** Whether this is a player whose body the threads move now. Server side; false on the client. */
+    public static boolean woven(LivingEntity entity) {
+        return !entity.level().isClientSide() && entity instanceof Player player && SoulLogic.hasSoul(player)
+                && isWoven(SoulLogic.get(player));
+    }
 
     public static boolean isWoven(SoulData d) {
         return QuincyArtsLogic.arts(d).forms().ransotengaiSince() != NEVER;
@@ -249,9 +270,11 @@ public final class QuincyRansotengai {
             return false;
         }
         setForms(d, QuincyArtsLogic.arts(d).forms().withRansotengaiSince(now));
-        AttributeInstance knockback = p.getAttribute(Attributes.KNOCKBACK_RESISTANCE);
-        if (knockback != null && !knockback.hasModifier(KNOCKBACK_ID)) {
-            knockback.addTransientModifier(new AttributeModifier(KNOCKBACK_ID, 1.0, AttributeModifier.Operation.ADD_VALUE));
+        for (Holder<Attribute> attribute : HELD_AGAINST) {
+            AttributeInstance held = p.getAttribute(attribute);
+            if (held != null && !held.hasModifier(KNOCKBACK_ID)) {
+                held.addTransientModifier(new AttributeModifier(KNOCKBACK_ID, 1.0, AttributeModifier.Operation.ADD_VALUE));
+            }
         }
         free(p);
         p.displayClientMessage(Component.translatable("message.bleach.ransotengai.woven").withStyle(ChatFormatting.AQUA), true);
@@ -266,7 +289,8 @@ public final class QuincyRansotengai {
      * Lets the threads go. The hold against knockback comes off and the weave is marked ended first,
      * so the collapse can take hold: Slowness II and Weakness II for a while, and a wait before the
      * threads will hold again, for every end the body pays for (see {@link End#collapses}). The rest
-     * end quietly. Nothing happens for a soul that is not woven, beyond making sure the hold is off.
+     * end quietly, though leaving the world still brings the wait (see {@link End#waits}). Nothing
+     * happens for a soul that is not woven, beyond making sure the hold is off.
      */
     public static void end(Player p, SoulData d, long now, End why) {
         removeKnockback(p);
@@ -275,7 +299,7 @@ public final class QuincyRansotengai {
             return;
         }
         QuincyForms ended = forms.withRansotengaiSince(NEVER);
-        if (why.collapses()) {
+        if (why.waits()) {
             ended = ended.withRansotengaiReadyAt(now + cooldownTicks());
         }
         setForms(d, ended);
@@ -297,10 +321,12 @@ public final class QuincyRansotengai {
 
     /**
      * Runs every tick for every living player, from {@link QuincyArtsEvents#tick}: closes a trial
-     * that ran out unwoven, and keeps a weave going or ends it. A woven body sheds what it is freed
+     * that ran out unwoven, keeps the binding on while the trial is open and the threads are not
+     * woven, and keeps a weave going or ends it. A woven body sheds what it is freed
      * from, passes the trial once it has held long enough, pays a second of the weave every twenty
      * ticks (running dry ends it), and shows its threads to those who see spirits. A weave found
-     * without its hold on the body (after a relog, or a crash) is let go quietly.
+     * without its hold on the body (after a crash, say) is let go as a logout lets it go: no
+     * collapse, but the wait.
      */
     public static void tick(Player p, SoulData d, long now) {
         if (p.level().isClientSide()) {
@@ -308,23 +334,25 @@ public final class QuincyRansotengai {
         }
         QuincyTeaching teaching = d.quincy().teaching();
         if (teaching.trialUntil() != NEVER && now >= teaching.trialUntil() && !isWoven(d)) {
-            d.setQuincy(d.quincy().withTeaching(teaching.withTrialUntil(NEVER)));
+            closeTrial(p, d);
             p.sendSystemMessage(Component.translatable("message.bleach.ransotengai.trial_failed").withStyle(ChatFormatting.GRAY));
             sync(p, d);
         }
-        AttributeInstance knockback = p.getAttribute(Attributes.KNOCKBACK_RESISTANCE);
         if (!isWoven(d)) {
             // A soul reset or replaced while woven leaves the hold behind; it goes with the weave.
-            if (knockback != null && knockback.hasModifier(KNOCKBACK_ID)) {
-                knockback.removeModifier(KNOCKBACK_ID);
+            removeKnockback(p);
+            if (trialOpen(d, now) && p.isAlive()) {
+                bind(p, d.quincy().teaching().trialUntil() - now);
             }
             return;
         }
         if (!p.isAlive() || p.isRemoved()) {
             return;
         }
-        if (knockback != null && !knockback.hasModifier(KNOCKBACK_ID)) {
+        if (!holdsAgainstKnockback(p)) {
             end(p, d, now, End.LOGOUT);
+            // Unlike a real logout, the soul is still here to be told.
+            sync(p, d);
             return;
         }
         End ends = ends(p, d);
@@ -371,10 +399,10 @@ public final class QuincyRansotengai {
     }
 
     /**
-     * The Elder's trial, from his TEACH offer: the soul is bound (Slowness IV and Weakness II for as
-     * long as the trial lasts) and must free itself by weaving the threads unbroken for a few
-     * seconds before it closes. Not for a soul that already knows the art; refused (with the reason
-     * on the action bar) as {@link #trialRefusal} says.
+     * The Elder's trial, from his TEACH offer: the soul is bound (Slowness IV and Weakness II, for as
+     * long as the trial lasts and the threads are not woven; see {@link #tick}) and must free itself
+     * by weaving the threads unbroken for a few seconds before it closes. Not for a soul that already
+     * knows the art; refused (with the reason on the action bar) as {@link #trialRefusal} says.
      */
     public static void beginTrial(Player p, SoulData d, long now) {
         if (p.level().isClientSide() || isKnown(d)) {
@@ -387,8 +415,7 @@ public final class QuincyRansotengai {
         }
         int ticks = trialTicks();
         d.setQuincy(d.quincy().withTeaching(d.quincy().teaching().withTrialUntil(now + ticks)));
-        p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ticks, TRIAL_SLOWNESS));
-        p.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, ticks, TRIAL_WEAKNESS));
+        bind(p, ticks);
         p.sendSystemMessage(Component.translatable("message.bleach.ransotengai.trial_open", Component.keybind(FORM_KEY))
                 .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         sync(p, d);
@@ -414,7 +441,59 @@ public final class QuincyRansotengai {
         }
     }
 
+    /**
+     * Closes the Elder's trial unpassed, if it is open, and takes its binding off with it: a trial
+     * that ran out while the soul was away, or that a command or a reset cut short, leaves no binding
+     * that no threads could shake off any more.
+     */
+    public static void closeTrial(Player p, SoulData d) {
+        QuincyTeaching teaching = d.quincy().teaching();
+        if (teaching.trialUntil() == NEVER) {
+            return;
+        }
+        d.setQuincy(d.quincy().withTeaching(teaching.withTrialUntil(NEVER)));
+        unbind(p, MobEffects.MOVEMENT_SLOWDOWN, TRIAL_SLOWNESS);
+        unbind(p, MobEffects.WEAKNESS, TRIAL_WEAKNESS);
+    }
+
     // ---- Helpers ----
+
+    /** Lays the trial's binding on again where it is wearing thin, for no longer than {@code left} ticks. */
+    private static void bind(Player p, long left) {
+        int ticks = (int) Math.min(BIND_TICKS, left);
+        if (ticks <= 0) {
+            return;
+        }
+        bind(p, MobEffects.MOVEMENT_SLOWDOWN, TRIAL_SLOWNESS, ticks);
+        bind(p, MobEffects.WEAKNESS, TRIAL_WEAKNESS, ticks);
+    }
+
+    private static void bind(Player p, Holder<MobEffect> effect, int amplifier, int ticks) {
+        MobEffectInstance on = p.getEffect(effect);
+        if (on == null || on.getAmplifier() < amplifier
+                || (on.getAmplifier() == amplifier && on.getDuration() < Math.min(ticks, BIND_TICKS / 2))) {
+            p.addEffect(new MobEffectInstance(effect, ticks, amplifier));
+        }
+    }
+
+    /** Takes off the binding's own effect: as strong as it binds, and no longer than it is laid on. */
+    private static void unbind(Player p, Holder<MobEffect> effect, int amplifier) {
+        MobEffectInstance on = p.getEffect(effect);
+        if (on != null && on.getAmplifier() == amplifier && on.getDuration() <= BIND_TICKS) {
+            p.removeEffect(effect);
+        }
+    }
+
+    /** Whether the hold against both kinds of knockback is on the body. */
+    public static boolean holdsAgainstKnockback(Player p) {
+        for (Holder<Attribute> attribute : HELD_AGAINST) {
+            AttributeInstance held = p.getAttribute(attribute);
+            if (held != null && !held.hasModifier(KNOCKBACK_ID)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /** Takes off every effect the threads free from. */
     private static void free(Player p) {
@@ -431,9 +510,11 @@ public final class QuincyRansotengai {
     }
 
     private static void removeKnockback(Player p) {
-        AttributeInstance knockback = p.getAttribute(Attributes.KNOCKBACK_RESISTANCE);
-        if (knockback != null) {
-            knockback.removeModifier(KNOCKBACK_ID);
+        for (Holder<Attribute> attribute : HELD_AGAINST) {
+            AttributeInstance held = p.getAttribute(attribute);
+            if (held != null && held.hasModifier(KNOCKBACK_ID)) {
+                held.removeModifier(KNOCKBACK_ID);
+            }
         }
     }
 

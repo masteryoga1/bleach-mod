@@ -172,7 +172,7 @@ public final class BleachClient {
                 playerRenderer.addLayer(new SoulLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new SayaLayer<>(playerRenderer,
                         player -> SheathLook.forModel(ClientSouls.appearance(player).sheathModel())));
-                playerRenderer.addLayer(new BlutLayer(playerRenderer));
+                playerRenderer.addLayer(new BlutLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new SanreiGloveLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new LetztStilLayer(playerRenderer));
                 playerRenderer.addLayer(new VollstandigLayer(playerRenderer, event.getEntityModels()));

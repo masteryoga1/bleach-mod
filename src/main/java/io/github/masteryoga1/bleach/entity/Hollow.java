@@ -139,7 +139,7 @@ public abstract class Hollow extends Monster {
     @Nullable
     private Vec3 baitCentre;
     private boolean baitFinale;
-    /** Whether a blow to the mask has already had its one chance at a fragment. Not saved. */
+    /** Whether a blow to the mask has already had its one chance at a fragment. Saved, so a reload cannot re-roll it. */
     private boolean fragmentRolled;
     /** What the villager this Hollow once was looked like, for the soul that rises when it is purified. */
     @Nullable
@@ -759,6 +759,9 @@ public abstract class Hollow extends Monster {
                     .ifPresent(saved -> tag.put("FormerVillager", saved));
         }
         tag.putBoolean("FromPlus", fromPlus);
+        if (fragmentRolled) {
+            tag.putBoolean("FragmentRolled", true);
+        }
     }
 
     @Override
@@ -773,5 +776,6 @@ public abstract class Hollow extends Monster {
                     .ifPresent(data -> formerVillager = data);
         }
         fromPlus = tag.getBoolean("FromPlus");
+        fragmentRolled = tag.getBoolean("FragmentRolled");
     }
 }

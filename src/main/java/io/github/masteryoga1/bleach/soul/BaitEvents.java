@@ -28,6 +28,7 @@ import net.minecraft.world.BossEvent;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
@@ -242,10 +243,17 @@ public final class BaitEvents {
         site.setFrozenTicks(0);
         site.setActiveTicks(site.activeTicks() + STEP_TICKS);
         sites.setDirty();
-        // The Hunter is not saved: once his ground is loaded and he is not there, he is gone.
-        if (site.contest() && !(rivalOf(level, site) instanceof QuincyHunter)) {
-            settleContest(level, sites, site, null, true);
-            return;
+        if (site.contest()) {
+            // A visiting Hunter is not saved: once his ground is loaded and he is not there, he is gone.
+            if (!(rivalOf(level, site) instanceof QuincyHunter hunter)) {
+                settleContest(level, sites, site, null, true);
+                return;
+            }
+            // One who stays and was saved before he took this contest up still runs it.
+            if (hunter.contestSite() == null) {
+                hunter.setContestSite(site.id());
+                hunter.setContestOffered(true);
+            }
         }
         boolean finale = site.inFinale();
         Vec3 centre = Vec3.atBottomCenterOf(site.centre());
@@ -533,7 +541,7 @@ public final class BaitEvents {
                 case VOID -> Component.translatable("message.bleach.contest.void").withStyle(ChatFormatting.GRAY);
             };
             if (outcome == BaitLogic.Outcome.WIN) {
-                owner.getInventory().placeItemBackInInventory(new ItemStack(ModItems.HOLLOW_BAIT.get()));
+                givePrize(level, owner, new ItemStack(ModItems.HOLLOW_BAIT.get()));
                 Milestones.grant(owner, Milestones.RIVAL_BESTED);
             }
             if ((outcome == BaitLogic.Outcome.WIN || outcome == BaitLogic.Outcome.LOSS) && SoulLogic.hasSoul(owner)) {
@@ -546,6 +554,21 @@ public final class BaitEvents {
             owner.sendSystemMessage(result);
         }
         end(level, sites, site, BaitLogic.End.CONTEST);
+    }
+
+    /**
+     * Hands the winner the Hunter's prize. A challenger still on the death screen has already dropped what
+     * they carried, and an inventory filled now would not survive the respawn unless inventories are
+     * kept, so the prize is otherwise left by their body with the rest.
+     */
+    private static void givePrize(ServerLevel level, ServerPlayer owner, ItemStack prize) {
+        if (owner.isAlive() || level.getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY)) {
+            owner.getInventory().placeItemBackInInventory(prize);
+            return;
+        }
+        ItemEntity dropped = new ItemEntity(level, owner.getX(), owner.getY() + 0.5, owner.getZ(), prize);
+        dropped.setDefaultPickUpDelay();
+        level.addFreshEntity(dropped);
     }
 
     /** Whether this point is inside a site's reach, where the sky does not tear for anyone on top of its waves. */

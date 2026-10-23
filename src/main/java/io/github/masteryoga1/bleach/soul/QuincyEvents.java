@@ -193,6 +193,7 @@ public final class QuincyEvents {
     public static void resetQuincy(ServerPlayer player) {
         QuincyArtsEvents.endAll(player, SoulLogic.get(player));
         SoulData data = SoulLogic.get(player);
+        QuincyRansotengai.closeTrial(player, data);
         QuincyArts ended = QuincyArtsLogic.arts(data);
         data.setQuincy(QuincyProgress.NONE);
         QuincyArtsLogic.keepLandingGrace(ended, data);

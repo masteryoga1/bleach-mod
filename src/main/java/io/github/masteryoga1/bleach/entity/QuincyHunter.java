@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -65,11 +66,13 @@ public final class QuincyHunter extends QuincyNpc {
     /** How often he looks around for a Hollow upon him, and for his visitor to greet. */
     private static final int DODGE_CHECK_TICKS = 4;
     private static final int GREET_CHECK_TICKS = 10;
+    /** How often he checks that the contest he was saved with still runs. */
+    private static final int CONTEST_CHECK_TICKS = 20;
     /** A dodge turns up to this far either side of straight away from the threat. */
     private static final float DODGE_SPREAD_DEGREES = 45.0F;
     private static final float REGEN_AMOUNT = 1.0F;
 
-    // Server-side, not saved: a visiting Hunter is never saved, and a contest does not outlive a reload.
+    // Server-side. Saved, though only a Hunter who stays is ever saved: his contest outlives a reload.
     @Nullable
     private UUID contestSite;
     private boolean contestOffered;
@@ -369,6 +372,10 @@ public final class QuincyHunter extends QuincyNpc {
         if (!greeted && tickCount % GREET_CHECK_TICKS == 0) {
             greet();
         }
+        // A contest given up while his ground was unloaded ended without him; he lets it go.
+        if (contestSite != null && tickCount % CONTEST_CHECK_TICKS == 0 && contest() == null) {
+            contestSite = null;
+        }
     }
 
     /** The nearest living Hollow within {@link #DODGE_TRIGGER} blocks that is hunting him, if any. */
@@ -409,6 +416,22 @@ public final class QuincyHunter extends QuincyNpc {
         if (key != null) {
             visitor.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         }
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        if (contestSite != null) {
+            tag.putUUID("ContestSite", contestSite);
+        }
+        tag.putBoolean("ContestOffered", contestOffered);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        contestSite = tag.hasUUID("ContestSite") ? tag.getUUID("ContestSite") : null;
+        contestOffered = tag.getBoolean("ContestOffered");
     }
 
     /** Any contest he runs ends with him, on the tally; struck down by a player, it is off. */
