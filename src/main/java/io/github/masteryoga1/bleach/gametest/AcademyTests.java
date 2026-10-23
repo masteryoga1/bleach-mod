@@ -131,7 +131,12 @@ public final class AcademyTests {
                 case STUDENT -> List.of(NpcAction.GRADUATE, NpcAction.ASAUCHI);
                 case SUBSTITUTE, SHINIGAMI -> List.of(NpcAction.ASAUCHI);
                 case OFFER_POWER -> List.of(NpcAction.ACCEPT_POWER);
-                case LIVING, HOLLOW, RESTING, QUINCY -> List.of();
+                case ELDER_GREETING, ELDER_LESSON -> List.of(NpcAction.LESSON);
+                case ELDER_TEACH -> List.of(NpcAction.RANSOTENGAI);
+                case ELDER_RESTORE -> List.of(NpcAction.RESTORE);
+                case HUNTER_CHALLENGE, HUNTER_RIVALRY -> List.of(NpcAction.CONTEST);
+                case LIVING, HOLLOW, RESTING, QUINCY, ELDER_TRIAL, ELDER_IDLE, ELDER_STRANGER, ELDER_HOLLOW,
+                        HUNTER_CONTEST, HUNTER_RESTING, HUNTER_PLAIN, HUNTER_HOLLOW -> List.of();
             };
             helper.assertTrue(offered.equals(expected), view + " offers " + offered);
         }
