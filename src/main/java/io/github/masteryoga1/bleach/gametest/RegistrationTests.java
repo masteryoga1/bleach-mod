@@ -35,6 +35,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -244,6 +245,38 @@ public final class RegistrationTests {
                 "player.vollstandig", "player.sklaverei")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");
         }
+        helper.succeed();
+    }
+
+    /**
+     * The Quincy in the world: the mask fragment and the Hollow Bait, the Wandenreich uniform and its
+     * armour material, the two Quincy NPCs' eggs, the bait's recipe, and the tag of hindrances that
+     * Ransōtengai's threads move a body through.
+     */
+    @GameTest(template = "empty")
+    public static void quincyWorldPartsAreRegistered(GameTestHelper helper) {
+        Map<String, Item> items = Map.of(
+                "mask_fragment", ModItems.MASK_FRAGMENT.get(),
+                "hollow_bait", ModItems.HOLLOW_BAIT.get(),
+                "wandenreich_cap", ModItems.WANDENREICH_CAP.get(),
+                "wandenreich_coat", ModItems.WANDENREICH_COAT.get(),
+                "wandenreich_trousers", ModItems.WANDENREICH_TROUSERS.get(),
+                "wandenreich_boots", ModItems.WANDENREICH_BOOTS.get(),
+                "quincy_elder_spawn_egg", ModItems.QUINCY_ELDER_SPAWN_EGG.get(),
+                "quincy_hunter_spawn_egg", ModItems.QUINCY_HUNTER_SPAWN_EGG.get());
+        items.forEach((name, item) -> helper.assertTrue(BuiltInRegistries.ITEM.containsKey(BleachMod.id(name))
+                        && BuiltInRegistries.ITEM.get(BleachMod.id(name)) == item,
+                "bleach:" + name + " is not its item"));
+        for (String name : List.of("wandenreich_cap", "wandenreich_coat", "wandenreich_trousers", "wandenreich_boots")) {
+            helper.assertTrue(BuiltInRegistries.ITEM.get(BleachMod.id(name)) instanceof QuincyGarbItem,
+                    "bleach:" + name + " is not a piece of Quincy garb");
+        }
+        helper.assertTrue(BuiltInRegistries.ARMOR_MATERIAL.containsKey(BleachMod.id("wandenreich")),
+                "the Wandenreich uniform's armour material is not registered");
+        helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("hollow_bait")).isPresent(),
+                "the Hollow Bait has no recipe");
+        helper.assertTrue(MobEffects.MOVEMENT_SLOWDOWN.is(BleachTags.RANSOTENGAI_FREES),
+                "slowness is not in #bleach:ransotengai_frees, so Ransōtengai would not free a slowed body");
         helper.succeed();
     }
 
