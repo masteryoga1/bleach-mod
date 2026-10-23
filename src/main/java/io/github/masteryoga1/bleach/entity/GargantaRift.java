@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.SpawnSpots;
@@ -37,6 +38,11 @@ import net.neoforged.neoforge.event.EventHooks;
  * around a Hollow that is leaving and takes it. Its timeline runs on game time from when it opens, so a
  * client that starts watching late sees the same tear, and an arrival may wait, dormant, until its time.
  * Never saved: a tear whose chunk unloads is gone, and so are the Hollows it held.
+ * <p>
+ * A tear drawn by a Hollow Bait belongs to its site ({@link #baitSite()}): its Hollows belong to the
+ * site too, and the site is told how many came through. Such a tear may be quiet, sounding to no
+ * pager. The bait's finale opens a great tear in the sky ({@link #sky}) that stays open for a while
+ * ({@link #hold()}) before it closes.
  */
 public class GargantaRift extends Entity {
     private static final EntityDataAccessor<Long> DATA_OPEN_AT =
@@ -45,6 +51,9 @@ public class GargantaRift extends Entity {
             SynchedEntityData.defineId(GargantaRift.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> DATA_SIZE =
             SynchedEntityData.defineId(GargantaRift.class, EntityDataSerializers.FLOAT);
+    /** Extra ticks the tear stays fully open before it closes: 0 but for the sky's. */
+    private static final EntityDataAccessor<Integer> DATA_HOLD =
+            SynchedEntityData.defineId(GargantaRift.class, EntityDataSerializers.INT);
 
     /** Ticks after opening: fully open, a departing Hollow taken, the Hollows dropped, closing, gone. */
     public static final int GROW_TICKS = 10;
@@ -64,6 +73,8 @@ public class GargantaRift extends Entity {
     /** The size of the drawn tear at size 1, for culling: 2 blocks wide and 4 high. */
     private static final double DRAWN_WIDTH = 2.0;
     private static final double DRAWN_HEIGHT = 4.0;
+    /** The sky's tear opens at least this far below the top of the world. */
+    private static final int SKY_TOP_MARGIN = 8;
 
     private final List<HollowKind> pending = new ArrayList<>();
     /** The soul whose reiatsu drew the Hollows, if any. */
@@ -74,6 +85,11 @@ public class GargantaRift extends Entity {
     private UUID leaving;
     private boolean opened;
     private boolean dropped;
+    /** The Hollow Bait site that drew this tear, if any. Server only. */
+    @Nullable
+    private UUID baitSite;
+    /** Whether the tear opens without sounding to pagers or to the Quincy senses. Server only. */
+    private boolean quiet;
 
     public GargantaRift(EntityType<? extends GargantaRift> type, Level level) {
         super(type, level);
@@ -96,6 +112,19 @@ public class GargantaRift extends Entity {
         return rift;
     }
 
+    /**
+     * The great tear above a Hollow Bait in its finale: it opens at {@code openAt}, stays open for
+     * {@code holdTicks} ticks more than any other and drops nothing. Opened no higher than eight blocks
+     * below the top of the world. It is not yet in the world: the caller adds it.
+     */
+    public static GargantaRift sky(ServerLevel level, Vec3 pos, long openAt, float size, int holdTicks, UUID site) {
+        double y = Math.min(pos.y, level.getMaxBuildHeight() - SKY_TOP_MARGIN);
+        GargantaRift rift = arrival(level, new Vec3(pos.x, y, pos.z), openAt, List.of(), null, size);
+        rift.entityData.set(DATA_HOLD, Math.max(0, holdTicks));
+        rift.baitSite = site;
+        return rift;
+    }
+
     /** A small tear that opens now around a Hollow and takes it. It is not yet in the world: the caller adds it. */
     public static GargantaRift departure(ServerLevel level, Hollow leaving) {
         GargantaRift rift = new GargantaRift(ModEntities.GARGANTA.get(), level);
@@ -112,6 +141,7 @@ public class GargantaRift extends Entity {
         builder.define(DATA_OPEN_AT, 0L);
         builder.define(DATA_DEPARTURE, false);
         builder.define(DATA_SIZE, 1.0F);
+        builder.define(DATA_HOLD, 0);
     }
 
     public long openAt() {
@@ -124,6 +154,40 @@ public class GargantaRift extends Entity {
 
     public float size() {
         return entityData.get(DATA_SIZE);
+    }
+
+    /** Extra ticks this tear stays fully open: 0 but for the sky's. */
+    public int hold() {
+        return entityData.get(DATA_HOLD);
+    }
+
+    /** The age at which the tear starts to close. */
+    public int closeAge() {
+        return CLOSE_AGE + hold();
+    }
+
+    /** The age at which the tear is gone. */
+    public int endAge() {
+        return END_AGE + hold();
+    }
+
+    /** The Hollow Bait site that drew this tear, if any. Known on the server only. */
+    @Nullable
+    public UUID baitSite() {
+        return baitSite;
+    }
+
+    public void setBaitSite(@Nullable UUID site) {
+        baitSite = site;
+    }
+
+    /** Whether the tear opens without sounding to pagers or to the Quincy senses. Known on the server only. */
+    public boolean isQuiet() {
+        return quiet;
+    }
+
+    public void setQuiet(boolean value) {
+        quiet = value;
     }
 
     /** Ticks since the tear opened; below 0 while it is still dormant. */
@@ -140,10 +204,11 @@ public class GargantaRift extends Entity {
         if (age < GROW_TICKS) {
             return age / GROW_TICKS;
         }
-        if (age < CLOSE_AGE) {
+        int closeAge = closeAge();
+        if (age < closeAge) {
             return 1.0F;
         }
-        return Mth.clamp(1.0F - (age - CLOSE_AGE) / (END_AGE - CLOSE_AGE), 0.0F, 1.0F);
+        return Mth.clamp(1.0F - (age - closeAge) / (endAge() - closeAge), 0.0F, 1.0F);
     }
 
     /** The Hollows still to drop, for tests. */
@@ -193,7 +258,7 @@ public class GargantaRift extends Entity {
             dropped = true;
             drop(server);
         }
-        if (age >= END_AGE) {
+        if (age >= endAge()) {
             discard();
         }
     }
@@ -201,13 +266,15 @@ public class GargantaRift extends Entity {
     /**
      * Drops the Hollows, each a little way from the middle if there is room there, turned toward the
      * soul that drew them. They hunt that soul if it is here and still prey, and Fishbone D takes it as
-     * its quarry. Hollows fall the few blocks to the ground unharmed.
+     * its quarry. Hollows fall the few blocks to the ground unharmed. Those a Hollow Bait drew belong to
+     * its site, which is told how many came.
      */
     private void drop(ServerLevel server) {
         ServerPlayer target = drawer != null ? server.getServer().getPlayerList().getPlayer(drawer) : null;
         if (target != null && target.level() != server) {
             target = null;
         }
+        int landed = 0;
         for (HollowKind kind : pending) {
             EntityType<? extends Hollow> type = ModEntities.hollowType(kind);
             Hollow hollow = type.create(server);
@@ -224,6 +291,7 @@ public class GargantaRift extends Entity {
             EventHooks.finalizeMobSpawn(hollow, server, server.getCurrentDifficultyAt(BlockPos.containing(at)),
                     MobSpawnType.EVENT, null);
             hollow.setDrawer(drawer);
+            hollow.setBaitSite(baitSite);
             FishboneD fishbone = hollow instanceof FishboneD fish && target != null ? fish : null;
             if (fishbone != null) {
                 fishbone.hunt(target);
@@ -231,6 +299,7 @@ public class GargantaRift extends Entity {
             if (!server.addFreshEntity(hollow)) {
                 continue;
             }
+            landed++;
             if (fishbone != null) {
                 GargantaEvents.onFirstHollowLanded(target, fishbone);
             }
@@ -245,6 +314,9 @@ public class GargantaRift extends Entity {
                     hollow.getZ(), 10, 0.4, 0.4, 0.4, 0.02);
         }
         pending.clear();
+        if (baitSite != null) {
+            BaitEvents.onArrived(server, baitSite, landed);
+        }
     }
 
     /**

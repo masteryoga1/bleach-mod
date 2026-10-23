@@ -12,7 +12,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ByIdMap;
 
 /**
- * What a visitor can ask a Shinigami NPC for, and in which {@link DialogueView}s. The server checks
+ * What a visitor can ask an NPC for, and in which {@link DialogueView}s. The server checks
  * the view again before doing anything, so a client cannot ask for what it was never offered.
  * Sent by ordinal, so new actions go last.
  */
@@ -21,7 +21,15 @@ public enum NpcAction {
     ENROLL(DialogueView.SOUL),
     GRADUATE(DialogueView.STUDENT),
     ASAUCHI(DialogueView.SUBSTITUTE, DialogueView.STUDENT, DialogueView.SHINIGAMI),
-    ACCEPT_POWER(DialogueView.OFFER_POWER);
+    ACCEPT_POWER(DialogueView.OFFER_POWER),
+    /** A lesson from the Quincy Elder, once a day. */
+    LESSON(DialogueView.ELDER_GREETING, DialogueView.ELDER_LESSON),
+    /** The Elder's Ransōtengai trial. */
+    RANSOTENGAI(DialogueView.ELDER_TEACH),
+    /** The Elder's arrow beside the heart, which brings a sealed power back. */
+    RESTORE(DialogueView.ELDER_RESTORE),
+    /** The Quincy Hunter's contest: whoever destroys more Hollows. */
+    CONTEST(DialogueView.HUNTER_CHALLENGE, DialogueView.HUNTER_RIVALRY);
 
     private static final IntFunction<NpcAction> BY_ID =
             ByIdMap.continuous(NpcAction::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

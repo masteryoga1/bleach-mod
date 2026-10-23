@@ -40,14 +40,15 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * {@link GargantaRift}'s.
  */
 public final class GargantaEvents {
-    private static final double SPOT_MIN_DISTANCE = 12.0;
-    private static final double SPOT_MAX_DISTANCE = 24.0;
-    private static final int SPOT_TRIES = 12;
+    // The spot rules are shared with the Hollow Bait's waves (see BaitEvents).
+    static final double SPOT_MIN_DISTANCE = 12.0;
+    static final double SPOT_MAX_DISTANCE = 24.0;
+    static final int SPOT_TRIES = 12;
     /** Arrivals land at most this far above or below the soul, which keeps them out of caves. */
-    private static final int SPOT_MAX_RISE = 12;
+    static final int SPOT_MAX_RISE = 12;
     /** How high above its landing spot a rift opens, at most. */
-    private static final int RIFT_MAX_HEIGHT = 6;
-    private static final float ARRIVAL_SIZE = 1.0F;
+    static final int RIFT_MAX_HEIGHT = 6;
+    static final float ARRIVAL_SIZE = 1.0F;
     private static final float FIRST_HOLLOW_SIZE = 1.5F;
     /** No wounded Shinigami comes ahead of the first Hollow while another is this close. */
     private static final double WOUNDED_EXCLUSION_RANGE = 128.0;
@@ -98,6 +99,10 @@ public final class GargantaEvents {
         if (HollowLogic.awaitsFirstHollow(data) || !HollowLogic.arrivalCooledDown(data.hunt(), now)) {
             return;
         }
+        // A Hollow Bait draws its own; the sky does not tear for them on top of its waves.
+        if (BaitEvents.insideActiveSite(level, player.position())) {
+            return;
+        }
         if (player.getRandom().nextDouble() < HollowLogic.arrivalChancePerCheck(data, level.isNight())) {
             openArrival(player, data, null, now, false);
         }
@@ -128,7 +133,8 @@ public final class GargantaEvents {
     /**
      * Opens a Garganta near the soul, with the Hollows it drew: of a kind picked by its reiatsu, or the
      * one given. Stronger souls draw Hound packs and second Hollows, never more than the cap allows.
-     * A command ignores the cap and leaves the cooldown alone.
+     * A command ignores the cap and leaves the cooldown alone. The young Quincy Hunter may follow a
+     * natural arrival (see {@link QuincyNpcEvents#onNaturalArrival}).
      *
      * @return false, changing nothing, if there was no open ground for the Hollows to land on
      */
@@ -156,6 +162,9 @@ public final class GargantaEvents {
         }
         if (!byCommand) {
             data.setHunt(data.hunt().withLastArrivalAt(now));
+        }
+        if (QuincyNpcLogic.hunterMayCome(kind, byCommand)) {
+            QuincyNpcEvents.onNaturalArrival(player, data, kind, now);
         }
         return true;
     }
@@ -242,7 +251,9 @@ public final class GargantaEvents {
      * Called by a rift as it tears open: a scream across the sky, black ink and a swirl of portal
      * light for those who can see it, the milestone for aware souls nearby, a beep on every
      * Denreishinki in range, and a chill in the blood of Quincy in range (see
-     * {@link QuincyEvents#senseHollows}). The first Hollow's rift also carries Fishbone D's roar.
+     * {@link QuincyEvents#senseHollows}). The first Hollow's rift also carries Fishbone D's roar. A
+     * quiet rift, one of a Hollow Bait's that follows another closely, neither beeps nor chills, so a
+     * bait's waves do not flood every pager and Quincy in range.
      */
     public static void onRiftOpened(ServerLevel level, GargantaRift rift) {
         double x = rift.getX();
@@ -266,8 +277,10 @@ public final class GargantaEvents {
         for (ServerPlayer witness : SpiritSenses.awareNear(level, rift.position(), WITNESS_RANGE)) {
             Milestones.grant(witness, Milestones.GARGANTA);
         }
-        pingPagers(level, rift.position(), "message.bleach.denreishinki.arrival");
-        QuincyEvents.senseHollows(level, rift.position());
+        if (!rift.isQuiet()) {
+            pingPagers(level, rift.position(), "message.bleach.denreishinki.arrival");
+            QuincyEvents.senseHollows(level, rift.position());
+        }
     }
 
     /** Fishbone D has landed and taken up the hunt: the soul it hunts remembers it, so nothing else comes meanwhile. */
@@ -338,6 +351,11 @@ public final class GargantaEvents {
         double range = HollowLogic.PLUS_NEARBY_RANGE;
         return !level.getEntitiesOfClass(PlusSpirit.class, player.getBoundingBox().inflate(range),
                 plus -> plus.isAlive() && plus.distanceToSqr(player) <= range * range).isEmpty();
+    }
+
+    /** Whether the soul is still in its grace after joining, respawning or changing dimension (see {@link #grace}). */
+    static boolean inGrace(ServerPlayer player) {
+        return player.level().getGameTime() < SoulLogic.get(player).arrivalGraceUntil;
     }
 
     private static void grace(ServerPlayer player) {

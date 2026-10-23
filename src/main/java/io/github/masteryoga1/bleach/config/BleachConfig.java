@@ -106,6 +106,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue MASK_DAMAGE_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue HOLLOW_REGEN_PER_SECOND;
     public static final ModConfigSpec.IntValue MASK_REGEN_PAUSE_SECONDS;
+    public static final ModConfigSpec.DoubleValue MASK_FRAGMENT_CHANCE;
     public static final ModConfigSpec.BooleanValue HUNT_UNAWARE;
     public static final ModConfigSpec.BooleanValue HUNT_HOLLOW_PLAYERS;
     public static final ModConfigSpec.IntValue HOLLOW_LEAVE_AFTER_MINUTES;
@@ -297,6 +298,46 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SKLAVEREI_PROJECTILE_GAIN;
     public static final ModConfigSpec.DoubleValue SKLAVEREI_MAX_GAIN_PER_PULSE;
     public static final ModConfigSpec.DoubleValue SKLAVEREI_POISON_PER_HOLLOW;
+    public static final ModConfigSpec.BooleanValue ELDER_VISITS;
+    public static final ModConfigSpec.IntValue ELDER_COOLDOWN_MINUTES;
+    public static final ModConfigSpec.IntValue ELDER_LESSON_TRAINING;
+    public static final ModConfigSpec.IntValue ELDER_MAX_LESSONS;
+    public static final ModConfigSpec.IntValue ELDER_RESTORE_AFTER_TICKS;
+    public static final ModConfigSpec.DoubleValue ELDER_ARROW_DAMAGE;
+    public static final ModConfigSpec.BooleanValue HUNTER_ENABLED;
+    public static final ModConfigSpec.DoubleValue HUNTER_CHANCE;
+    public static final ModConfigSpec.IntValue HUNTER_GUARANTEE_KILLS;
+    public static final ModConfigSpec.IntValue HUNTER_COOLDOWN_MINUTES;
+    public static final ModConfigSpec.DoubleValue HUNTER_ARROW_DAMAGE;
+    public static final ModConfigSpec.DoubleValue HUNTER_IN_BAIT_CHANCE;
+    public static final ModConfigSpec.BooleanValue HOLLOWS_HUNT_HUNTER;
+    public static final ModConfigSpec.DoubleValue RANSOTENGAI_DRAIN_PERCENT;
+    public static final ModConfigSpec.DoubleValue RANSOTENGAI_MIN_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue RANSOTENGAI_FAILING_HEALTH;
+    public static final ModConfigSpec.IntValue RANSOTENGAI_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue RANSOTENGAI_COLLAPSE_SECONDS;
+    public static final ModConfigSpec.IntValue RANSOTENGAI_TRIAL_SECONDS;
+    public static final ModConfigSpec.IntValue RANSOTENGAI_TRIAL_HOLD_SECONDS;
+    public static final ModConfigSpec.DoubleValue RANSOTENGAI_HYBRID_DRAIN;
+
+    public static final ModConfigSpec.BooleanValue BAIT_ENABLED;
+    public static final ModConfigSpec.IntValue BAIT_DURATION_MINUTES;
+    public static final ModConfigSpec.IntValue BAIT_RADIUS;
+    public static final ModConfigSpec.IntValue BAIT_MAX_SITES;
+    public static final ModConfigSpec.IntValue BAIT_SITE_SPACING;
+    public static final ModConfigSpec.IntValue BAIT_FINALE_ARRIVALS;
+    public static final ModConfigSpec.IntValue BAIT_FIRST_WAVE_SECONDS;
+    public static final ModConfigSpec.IntValue BAIT_INTERVAL_START_SECONDS;
+    public static final ModConfigSpec.IntValue BAIT_INTERVAL_END_SECONDS;
+    public static final ModConfigSpec.IntValue BAIT_MAX_ALIVE;
+    public static final ModConfigSpec.IntValue BAIT_ALIVE_PER_SOUL;
+    public static final ModConfigSpec.IntValue BAIT_ALIVE_CAP;
+    public static final ModConfigSpec.DoubleValue BAIT_LURE_START;
+    public static final ModConfigSpec.DoubleValue BAIT_LURE_GAIN;
+    public static final ModConfigSpec.IntValue BAIT_FINALE_MIN_SECONDS;
+    public static final ModConfigSpec.IntValue BAIT_FINALE_MAX_SECONDS;
+    public static final ModConfigSpec.IntValue BAIT_ABANDON_MINUTES;
+    public static final ModConfigSpec.IntValue CONTEST_MINUTES;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -590,6 +631,9 @@ public final class BleachConfig {
         MASK_REGEN_PAUSE_SECONDS = builder
                 .comment("Seconds a Hollow cannot heal after a blow to its mask.")
                 .defineInRange("mask_regeneration_pause_seconds", 10, 0, 600);
+        MASK_FRAGMENT_CHANCE = builder
+                .comment("Chance that a player's blow which freshly cracks a Hollow's mask knocks a fragment loose, once in each Hollow's life. Fishbone D always gives one.")
+                .defineInRange("mask_fragment_chance", 0.25, 0.0, 1.0);
         HUNT_UNAWARE = builder
                 .comment("Whether Hollows hunt players who cannot see them.")
                 .define("hunt_unaware", false);
@@ -1205,6 +1249,132 @@ public final class BleachConfig {
                 .comment("Hollow poison the user takes for each Hollow a pulse draws on.")
                 .defineInRange("poison_per_hollow", 1.0, 0.0, 100.0);
         builder.pop();
+
+        builder.push("npcs");
+        ELDER_VISITS = builder
+                .comment("Whether a Quincy Elder sometimes visits players with Quincy blood, to give lessons, teach Ransōtengai and bring a sealed power back.")
+                .define("elder_visits", true);
+        ELDER_COOLDOWN_MINUTES = builder
+                .comment("Minutes that pass at least between two of the Elder's visits to the same soul. A new world has none until this has passed.")
+                .defineInRange("elder_cooldown_minutes", 10, 1, 1_440);
+        ELDER_LESSON_TRAINING = builder
+                .comment("Quincy training each of the Elder's lessons gives.")
+                .defineInRange("elder_lesson_training", 10, 0, 1_000);
+        ELDER_MAX_LESSONS = builder
+                .comment("How many lessons the Elder gives a soul in all, never more than one a day.")
+                .defineInRange("elder_max_lessons", 12, 0, 1_000);
+        ELDER_RESTORE_AFTER_TICKS = builder
+                .comment("Ticks a Quincy's power must have been sealed before the Elder comes to bring it back.")
+                .defineInRange("elder_restore_after_ticks", 24_000, 0, 10_000_000);
+        ELDER_ARROW_DAMAGE = builder
+                .comment("Damage of the Elder's Heilig Pfeil.")
+                .defineInRange("elder_arrow_damage", 9.0, 0.0, 100.0);
+        HUNTER_ENABLED = builder
+                .comment("Whether a young Quincy Hunter sometimes turns up where a Garganta opens, or at a Hollow Bait, and challenges souls to a contest.")
+                .define("hunter_enabled", true);
+        HUNTER_CHANCE = builder
+                .comment("Chance the Hunter follows a Garganta that opens near a soul of its own accord.")
+                .defineInRange("hunter_chance", 0.1, 0.0, 1.0);
+        HUNTER_GUARANTEE_KILLS = builder
+                .comment("Hollows a soul must have purified or slain before the Hunter surely follows its next Garganta, until they have met.")
+                .defineInRange("hunter_guarantee_kills", 10, 0, 10_000);
+        HUNTER_COOLDOWN_MINUTES = builder
+                .comment("Minutes that pass at least between two of the Hunter's arrivals near the same soul. A Hollow Bait ignores this.")
+                .defineInRange("hunter_cooldown_minutes", 20, 0, 1_440);
+        HUNTER_ARROW_DAMAGE = builder
+                .comment("Damage of the Hunter's Heilig Pfeil.")
+                .defineInRange("hunter_arrow_damage", 7.0, 0.0, 100.0);
+        HUNTER_IN_BAIT_CHANCE = builder
+                .comment("Chance the Hunter comes to fight a Hollow Bait's Hollows at its third wave.")
+                .defineInRange("hunter_in_bait_chance", 0.25, 0.0, 1.0);
+        HOLLOWS_HUNT_HUNTER = builder
+                .comment("Whether Hollows hunt the Hunter as they hunt players. Nothing can hunt the Elder.")
+                .define("hollows_hunt_hunter", true);
+        builder.pop();
+
+        builder.push("ransotengai");
+        RANSOTENGAI_DRAIN_PERCENT = builder
+                .comment("Share of maximum reiryoku Ransōtengai drains each second, in percent (2.5 = 2.5%).")
+                .defineInRange("drain_percent_per_second", 2.5, 0.0, 100.0);
+        RANSOTENGAI_MIN_REIRYOKU = builder
+                .comment("Share of maximum reiryoku a soul needs to weave the threads.")
+                .defineInRange("min_reiryoku_fraction", 0.2, 0.0, 1.0);
+        RANSOTENGAI_FAILING_HEALTH = builder
+                .comment("Share of maximum health at which a body counts as failing, so sneak and the Quincy Form key weave the threads. Slowness, mining fatigue and weakness count as failing too.")
+                .defineInRange("failing_health_fraction", 0.25, 0.0, 1.0);
+        RANSOTENGAI_COOLDOWN_SECONDS = builder
+                .comment("Seconds after the threads let go, other than quietly, before they will hold again.")
+                .defineInRange("cooldown_seconds", 180, 0, 3_600);
+        RANSOTENGAI_COLLAPSE_SECONDS = builder
+                .comment("Seconds of Slowness and Weakness after the threads let go, as the body gives out.")
+                .defineInRange("collapse_seconds", 10, 0, 600);
+        RANSOTENGAI_TRIAL_SECONDS = builder
+                .comment("Seconds the Elder's Ransōtengai trial stays open.")
+                .defineInRange("trial_seconds", 30, 5, 600);
+        RANSOTENGAI_TRIAL_HOLD_SECONDS = builder
+                .comment("Seconds the threads must hold unbroken in the trial for the art to be learned.")
+                .defineInRange("trial_hold_seconds", 5, 1, 60);
+        RANSOTENGAI_HYBRID_DRAIN = builder
+                .comment("How many times over the drain costs a Quincy who also has a Shinigami's power.")
+                .defineInRange("hybrid_drain_multiplier", 1.5, 0.0, 10.0);
+        builder.pop();
+        builder.pop();
+
+        builder.push("hollow_bait");
+        BAIT_ENABLED = builder
+                .comment("Whether Hollow Bait can be crushed to draw Hollows.")
+                .define("enabled", true);
+        BAIT_DURATION_MINUTES = builder
+                .comment("Minutes a crushed bait draws Hollows, counting only the time its ground is loaded.")
+                .defineInRange("duration_minutes", 20, 1, 120);
+        BAIT_RADIUS = builder
+                .comment("Radius of a bait site in blocks. Souls a little beyond it are hunted and see its bar too.")
+                .defineInRange("radius", 64, 16, 128);
+        BAIT_MAX_SITES = builder
+                .comment("Most bait sites open at once in the world.")
+                .defineInRange("max_sites", 4, 1, 16);
+        BAIT_SITE_SPACING = builder
+                .comment("No bait can be crushed this close, in blocks, to the centre of another.")
+                .defineInRange("site_spacing", 128, 32, 512);
+        BAIT_FINALE_ARRIVALS = builder
+                .comment("Hollows that must come through before the sky above the bait cracks.")
+                .defineInRange("arrivals_for_finale", 30, 5, 200);
+        BAIT_FIRST_WAVE_SECONDS = builder
+                .comment("Seconds after the crush before the first wave.")
+                .defineInRange("first_wave_seconds", 10, 1, 300);
+        BAIT_INTERVAL_START_SECONDS = builder
+                .comment("Seconds between waves at first. The gap moves towards wave_interval_end_seconds as more Hollows arrive.")
+                .defineInRange("wave_interval_start_seconds", 30, 5, 600);
+        BAIT_INTERVAL_END_SECONDS = builder
+                .comment("Seconds between waves just before the sky cracks. It may be longer than the first gap.")
+                .defineInRange("wave_interval_end_seconds", 12, 5, 600);
+        BAIT_MAX_ALIVE = builder
+                .comment("Most of a site's Hollows about at once, counting those still to come through, while one soul is hunted.")
+                .defineInRange("max_alive", 6, 1, 64);
+        BAIT_ALIVE_PER_SOUL = builder
+                .comment("More Hollows allowed about for each hunted soul past the first.")
+                .defineInRange("max_alive_per_extra_soul", 2, 0, 16);
+        BAIT_ALIVE_CAP = builder
+                .comment("Most of a site's Hollows about at once, however many souls are hunted.")
+                .defineInRange("max_alive_cap", 12, 1, 64);
+        BAIT_LURE_START = builder
+                .comment("Reiatsu the bait draws Hollows as at first, or the hunted soul's own when that is stronger.")
+                .defineInRange("lure_reiatsu_start", 40.0, 0.0, 10_000.0);
+        BAIT_LURE_GAIN = builder
+                .comment("Reiatsu the lure gains by the time the sky cracks, so later waves bring stronger Hollows.")
+                .defineInRange("lure_reiatsu_gain", 60.0, 0.0, 10_000.0);
+        BAIT_FINALE_MIN_SECONDS = builder
+                .comment("Fewest seconds the cracked sky holds open while the Hollows gather beneath it.")
+                .defineInRange("finale_seconds_min", 15, 1, 120);
+        BAIT_FINALE_MAX_SECONDS = builder
+                .comment("Most seconds the cracked sky holds open.")
+                .defineInRange("finale_seconds_max", 20, 1, 120);
+        BAIT_ABANDON_MINUTES = builder
+                .comment("Minutes a site can stay frozen, with its ground unloaded or no Hollows able to come, before it is given up.")
+                .defineInRange("abandon_minutes", 20, 1, 1_440);
+        CONTEST_MINUTES = builder
+                .comment("Minutes the Quincy Hunter's contest lasts: whoever destroys more Hollows in that time wins.")
+                .defineInRange("contest_minutes", 6, 1, 60);
         builder.pop();
 
         SPEC = builder.build();

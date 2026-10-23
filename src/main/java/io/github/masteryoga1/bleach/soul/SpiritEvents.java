@@ -46,12 +46,14 @@ public final class SpiritEvents {
 
     /**
      * Whether this creature belongs to the mundane world and cannot sense the target: neither is a
-     * player, the creature is no spirit, and the target is a spirit mob. Players in a spirit state
+     * player, the creature is no spirit and does not see spirits (as the living Quincy NPCs do, see
+     * {@link SoulLogic#SPIRIT_SIGHTED}), and the target is a spirit mob. Players in a spirit state
      * still have bodies the mundane world can reach.
      */
     public static boolean blindToSpirit(LivingEntity creature, @Nullable LivingEntity target) {
         return target != null && !(creature instanceof Player) && !(target instanceof Player)
-                && !SoulLogic.isSpirit(creature) && SoulLogic.isSpirit(target);
+                && !SoulLogic.isSpirit(creature) && SoulLogic.isSpirit(target)
+                && !creature.getType().is(SoulLogic.SPIRIT_SIGHTED);
     }
 
     private static void onAttack(AttackEntityEvent event) {

@@ -31,7 +31,7 @@ import net.minecraft.world.level.Level;
  * spiritually aware. Using one opens a dialogue chosen from the visitor's soul
  * ({@link DialogueView}), whose buttons come back as {@link NpcAction}s.
  */
-public abstract class ShinigamiNpc extends PathfinderMob {
+public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc {
     /** How close a visitor must stay for their answer to count, squared: 8 blocks. */
     private static final double TALK_RANGE_SQR = 64.0;
     /** The Zankensoki in the order the exams list them. */
@@ -70,6 +70,7 @@ public abstract class ShinigamiNpc extends PathfinderMob {
     public abstract DialogueView viewFor(SoulData visitor, long now);
 
     /** The part of {@code screen.bleach.dialogue.<npc>.<view>} that names this NPC. */
+    @Override
     public abstract String dialogueKey();
 
     /** This NPC's maximum reiryoku, which sets its reiatsu. */
@@ -118,14 +119,17 @@ public abstract class ShinigamiNpc extends PathfinderMob {
         List<Integer> required = EXAMINED_ARTS.stream()
                 .map(art -> ShinigamiLogic.graduationRequirements().get(art))
                 .toList();
-        BleachNetwork.openDialogue(visitor, this, viewFor(data, now), required,
-                ShinigamiEvents.mayReceiveAsauchi(visitor, data, now));
+        // A new Asauchi is offered greyed out until the visitor may have one.
+        List<NpcAction> unready = ShinigamiEvents.mayReceiveAsauchi(visitor, data, now)
+                ? List.of() : List.of(NpcAction.ASAUCHI);
+        BleachNetwork.openDialogue(visitor, this, viewFor(data, now), required, unready, List.of());
     }
 
     /**
      * Does what a visitor asked for in the dialogue, if they may still ask for it: the NPC is alive,
      * the visitor is close and aware, and what they asked for is offered to a soul like theirs now.
      */
+    @Override
     public void perform(Player visitor, NpcAction action) {
         if (!isAlive() || visitor.isSpectator() || distanceToSqr(visitor) > TALK_RANGE_SQR || !SoulLogic.hasSoul(visitor)) {
             return;

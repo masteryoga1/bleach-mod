@@ -2,7 +2,6 @@ package io.github.masteryoga1.bleach.network;
 
 import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.NpcAction;
-import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
 import io.github.masteryoga1.bleach.quincy.QuincyKey;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
@@ -10,6 +9,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenPage;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import java.util.List;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -17,7 +17,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class BleachNetwork {
     /** Bump when a payload changes shape, so mismatched clients are refused instead of breaking. */
-    private static final String VERSION = "8";
+    private static final String VERSION = "9";
 
     private BleachNetwork() {
     }
@@ -60,13 +60,23 @@ public final class BleachNetwork {
         PacketDistributor.sendToPlayer(viewer, new SoulAppearancePayload(target.getId(), appearance));
     }
 
-    /** Opens a Shinigami NPC's dialogue for one player. See {@link OpenDialoguePayload}. */
-    public static void openDialogue(ServerPlayer visitor, ShinigamiNpc npc, DialogueView view, List<Integer> required,
-                                    boolean asauchiReady) {
-        PacketDistributor.sendToPlayer(visitor, new OpenDialoguePayload(npc.getId(), view, required, asauchiReady));
+    /**
+     * Opens an NPC's dialogue for one player. See {@link OpenDialoguePayload}. Lists longer than the
+     * payload carries are cut short here, since the codec would refuse them on the way out.
+     */
+    public static void openDialogue(ServerPlayer visitor, Entity npc, DialogueView view, List<Integer> required,
+                                    List<NpcAction> unready, List<Component> notes) {
+        PacketDistributor.sendToPlayer(visitor, new OpenDialoguePayload(npc.getId(), view,
+                first(required, OpenDialoguePayload.MAX_REQUIRED), first(unready, OpenDialoguePayload.MAX_UNREADY),
+                first(notes, OpenDialoguePayload.MAX_NOTES)));
     }
 
-    /** Sends the answer the player picked in a Shinigami NPC's dialogue. */
+    /** At most the first {@code max} entries of a list. */
+    private static <T> List<T> first(List<T> list, int max) {
+        return list.size() <= max ? list : list.subList(0, max);
+    }
+
+    /** Sends the answer the player picked in an NPC's dialogue. */
     public static void requestNpcAction(int entityId, NpcAction action) {
         PacketDistributor.sendToServer(new NpcActionPayload(entityId, action));
     }

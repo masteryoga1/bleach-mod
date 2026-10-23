@@ -13,6 +13,9 @@ import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.entity.QuincyElder;
+import io.github.masteryoga1.bleach.entity.QuincyHunter;
+import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
@@ -27,8 +30,8 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * The mod's entity types: Shinigami NPCs, Hollows, Pluses, the Garganta, zanpakutō techniques, and the
- * Quincy's arrows, blades and Gintō spells.
+ * The mod's entity types: Shinigami and Quincy NPCs, Hollows, Pluses, the Garganta, zanpakutō
+ * techniques, and the Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -49,6 +52,33 @@ public final class ModEntities {
                     .eyeHeight(1.62F)
                     .clientTrackingRange(10)
                     .build(BleachMod.id("wounded_shinigami").toString()));
+
+    // ---- Living Quincy (see QuincyNpc): seen by everyone, and seeing spirits themselves ----
+
+    /**
+     * The old Quincy who visits those of his blood: lessons, the Ransōtengai trial, and an arrow beside
+     * the heart for a sealed power. He cannot be hurt. A visiting Elder is never saved; one placed by
+     * an egg or {@code /summon} stays.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<QuincyElder>> QUINCY_ELDER =
+            ENTITY_TYPES.register("quincy_elder", () -> EntityType.Builder
+                    .<QuincyElder>of(QuincyElder::new, MobCategory.MISC)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("quincy_elder").toString()));
+
+    /**
+     * The proud young Quincy who turns up where Hollows come through and challenges souls to a
+     * contest. Saved on the same terms as the Elder.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<QuincyHunter>> QUINCY_HUNTER =
+            ENTITY_TYPES.register("quincy_hunter", () -> EntityType.Builder
+                    .<QuincyHunter>of(QuincyHunter::new, MobCategory.MISC)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("quincy_hunter").toString()));
 
     // ---- Hollows (see HollowKind for their stats) ----
 
@@ -223,6 +253,8 @@ public final class ModEntities {
     public static void onAttributes(EntityAttributeCreationEvent event) {
         event.put(ACADEMY_INSTRUCTOR.get(), ShinigamiNpc.createAttributes().build());
         event.put(WOUNDED_SHINIGAMI.get(), ShinigamiNpc.createAttributes().build());
+        event.put(QUINCY_ELDER.get(), QuincyNpc.createAttributes().build());
+        event.put(QUINCY_HUNTER.get(), QuincyHunter.createHunterAttributes().build());
         event.put(SPIDER_HOLLOW.get(), SpiderHollow.createAttributes().build());
         event.put(HEXAPODUS.get(), Hexapodus.createAttributes().build());
         event.put(HOUND_HOLLOW.get(), HoundHollow.createAttributes().build());

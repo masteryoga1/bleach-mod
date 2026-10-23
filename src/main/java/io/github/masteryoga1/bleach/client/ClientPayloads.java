@@ -1,9 +1,11 @@
 package io.github.masteryoga1.bleach.client;
 
-import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
+import io.github.masteryoga1.bleach.entity.DialogueNpc;
 import io.github.masteryoga1.bleach.network.OpenDialoguePayload;
 import io.github.masteryoga1.bleach.network.OpenJinzenPayload;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 
 /**
  * Client halves of payload handlers that need client-only classes. Common code may call these, but
@@ -13,10 +15,12 @@ public final class ClientPayloads {
     private ClientPayloads() {
     }
 
+    /** Opens the dialogue with the NPC the payload names, if this client still knows it as one that talks. */
     public static void openDialogue(OpenDialoguePayload payload) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level != null && minecraft.level.getEntity(payload.entityId()) instanceof ShinigamiNpc npc) {
-            minecraft.setScreen(new ShinigamiDialogueScreen(npc, payload));
+        Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(payload.entityId());
+        if (entity instanceof LivingEntity living && entity instanceof DialogueNpc) {
+            minecraft.setScreen(new NpcDialogueScreen(living, payload));
         }
     }
 

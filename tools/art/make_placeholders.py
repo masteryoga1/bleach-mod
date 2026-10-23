@@ -92,6 +92,19 @@ QUINCY_FOLD = rgb(206, 212, 224)
 QUINCY_BLUE = rgb(40, 84, 170)
 VEIN = rgb(90, 170, 255)
 VEIN_DIM = rgb(60, 120, 220)
+# The Wandenreich uniform, white with black bands and silver buttons; a fragment of a Hollow's mask;
+# and the Hollow Bait, a pale wafer with a dark red heart.
+WANDENREICH_WHITE = rgb(240, 240, 236)
+WANDENREICH_BLACK = rgb(34, 34, 40)
+WANDENREICH_SILVER = rgb(176, 184, 196)
+WANDENREICH_FOLD = rgb(206, 206, 200)
+MASK_BONE = rgb(234, 230, 218)
+MASK_SHADE = rgb(188, 182, 168)
+MASK_LINE = rgb(92, 88, 82)
+BAIT_WHITE = rgb(226, 220, 206)
+BAIT_EDGE = rgb(150, 140, 124)
+BAIT_RED = rgb(150, 30, 36)
+BAIT_CORE = rgb(70, 14, 18)
 # The later arts: Letzt Stil's pale gold, Ginrei Kojaku's silver-blue, Vollständig's halo and its
 # translucent wings, the cloud of a Gintō spell, and the Sanrei Glove's blue cuff.
 LETZT = rgb(255, 214, 160)
@@ -690,6 +703,142 @@ def quincy_armor_layer_2():
     return c
 
 
+def wandenreich_cap_icon():
+    c = Canvas(16, 16)
+    c.rect(3, 4, 13, 9, WANDENREICH_WHITE)    # crown
+    c.rect(3, 8, 13, 10, WANDENREICH_BLACK)   # band
+    c.rect(2, 10, 10, 12, WANDENREICH_BLACK)  # peak
+    for x, y in [(8, 5), (7, 6), (8, 6), (9, 6), (8, 7)]:  # a silver plus on the front
+        c.put(x, y, WANDENREICH_SILVER)
+    return c
+
+
+def wandenreich_coat_icon():
+    c = Canvas(16, 16)
+    c.rect(4, 2, 12, 15, WANDENREICH_WHITE)   # body
+    c.rect(1, 3, 4, 11, WANDENREICH_WHITE)    # sleeves, with black cuffs
+    c.rect(12, 3, 15, 11, WANDENREICH_WHITE)
+    c.rect(1, 10, 4, 11, WANDENREICH_BLACK)
+    c.rect(12, 10, 15, 11, WANDENREICH_BLACK)
+    c.rect(5, 1, 11, 3, WANDENREICH_BLACK)    # collar
+    c.rect(8, 3, 9, 15, WANDENREICH_BLACK)    # the opening down the front
+    for x, y in [(6, 5), (6, 8), (6, 11), (10, 5), (10, 8), (10, 11)]:  # two rows of buttons
+        c.put(x, y, WANDENREICH_SILVER)
+    c.rect(4, 14, 12, 15, WANDENREICH_BLACK)  # hem
+    return c
+
+
+def wandenreich_trousers_icon():
+    c = Canvas(16, 16)
+    c.rect(4, 2, 12, 4, WANDENREICH_WHITE)    # waist, with a black belt
+    c.rect(4, 3, 12, 4, WANDENREICH_BLACK)
+    c.rect(4, 4, 7, 15, WANDENREICH_WHITE)    # legs
+    c.rect(9, 4, 12, 15, WANDENREICH_WHITE)
+    c.rect(7, 4, 9, 6, WANDENREICH_WHITE)     # crotch
+    c.rect(4, 6, 5, 15, WANDENREICH_BLACK)    # stripes down the outer seams
+    c.rect(11, 6, 12, 15, WANDENREICH_BLACK)
+    return c
+
+
+def wandenreich_boots_icon():
+    c = Canvas(16, 16)
+    for left in (2, 9):
+        c.rect(left, 6, left + 5, 13, WANDENREICH_WHITE)  # shaft
+        c.rect(left, 6, left + 5, 7, WANDENREICH_BLACK)   # top band
+        c.rect(left, 13, left + 5, 14, WANDENREICH_BLACK)  # sole
+        c.put(left + 2, 9, WANDENREICH_FOLD)               # lace
+    return c
+
+
+def wandenreich_armor_layer_1():
+    """The cap on the head, the coat on the body and arms, and the boots on the legs (the boots use
+    this layer)."""
+    c = Canvas(64, 32)
+    # Head: the top face is the crown; each side face is white for three rows above a black band,
+    # the rest left clear so the face shows; the front also has the peak and a silver plus.
+    c.rect(8, 0, 16, 8, WANDENREICH_WHITE)
+    c.rect(0, 8, 32, 11, WANDENREICH_WHITE)
+    c.rect(0, 11, 32, 12, WANDENREICH_BLACK)
+    c.rect(8, 11, 16, 12, WANDENREICH_BLACK)
+    for x, y in [(12, 8), (11, 9), (12, 9), (13, 9), (12, 10)]:
+        c.put(x, y, WANDENREICH_SILVER)
+    # Body: a long white coat with a black collar, a black opening down the front between two rows of
+    # silver buttons, folds at the sides and a black hem.
+    c.rect(20, 16, 36, 20, WANDENREICH_WHITE)
+    c.rect(16, 20, 40, 32, WANDENREICH_WHITE)
+    c.rect(20, 20, 28, 21, WANDENREICH_BLACK)
+    c.rect(24, 21, 25, 32, WANDENREICH_BLACK)
+    for x, y in [(22, 23), (22, 26), (22, 29), (26, 23), (26, 26), (26, 29)]:
+        c.put(x, y, WANDENREICH_SILVER)
+    c.rect(16, 31, 40, 32, WANDENREICH_BLACK)
+    c.rect(17, 22, 18, 31, WANDENREICH_FOLD)
+    c.rect(33, 22, 34, 31, WANDENREICH_FOLD)
+    # Arms: sleeves to the wrist, with black cuffs.
+    c.rect(44, 16, 48, 20, WANDENREICH_WHITE)
+    c.rect(40, 20, 56, 32, WANDENREICH_WHITE)
+    c.rect(40, 30, 56, 32, WANDENREICH_BLACK)
+    # Legs: white boots over the bottom five rows, a black band at the top and a black sole.
+    c.rect(0, 27, 16, 32, WANDENREICH_WHITE)
+    c.rect(0, 31, 16, 32, WANDENREICH_BLACK)
+    c.rect(8, 16, 12, 20, WANDENREICH_BLACK)
+    c.rect(0, 27, 16, 28, WANDENREICH_BLACK)
+    return c
+
+
+def wandenreich_armor_layer_2():
+    """The trousers, from a belted waist to the tops of the boots, with black stripes."""
+    c = Canvas(64, 32)
+    c.rect(16, 27, 40, 32, WANDENREICH_WHITE)  # the waist, low on the body
+    c.rect(16, 27, 40, 28, WANDENREICH_BLACK)  # belt
+    c.rect(4, 16, 8, 20, WANDENREICH_WHITE)    # top of the legs
+    c.rect(0, 20, 16, 29, WANDENREICH_WHITE)
+    c.rect(0, 20, 1, 29, WANDENREICH_BLACK)    # stripes
+    c.rect(8, 20, 9, 29, WANDENREICH_BLACK)
+    c.rect(6, 21, 7, 29, WANDENREICH_FOLD)     # creases
+    c.rect(14, 21, 15, 29, WANDENREICH_FOLD)
+    return c
+
+
+def mask_fragment_icon():
+    """A jagged shard of bone with a crack across it. The shade falls on its lower right: the
+    right-most pixel of each row, and the bottom-most of each column."""
+    c = Canvas(16, 16)
+    rows = [(3, 7, 10), (4, 6, 11), (5, 5, 12), (6, 5, 13), (7, 4, 13), (8, 4, 12), (9, 5, 12), (10, 5, 11),
+            (11, 6, 10), (12, 7, 9)]
+    for y, x0, x1 in rows:
+        c.rect(x0, y, x1, y + 1, MASK_BONE)
+    # Found on the plain shard first, so shading one edge never moves another.
+    shaded = {(x1 - 1, y) for y, x0, x1 in rows}
+    for x in range(c.width):
+        bone = [y for y in range(c.height) if c.get(x, y) == MASK_BONE]
+        if bone:
+            shaded.add((x, max(bone)))
+    for x, y in shaded:
+        c.put(x, y, MASK_SHADE)
+    line(c, 7, 4, 9, 8, MASK_LINE)
+    line(c, 9, 8, 8, 11, MASK_LINE)
+    return c
+
+
+def hollow_bait_icon():
+    """A round wafer, pale with a darker rim, a dark red heart and a few red specks."""
+    c = Canvas(16, 16)
+    for y in range(16):
+        for x in range(16):
+            d2 = (x - 7.5) ** 2 + (y - 7.5) ** 2
+            if d2 <= 1.5:
+                c.put(x, y, BAIT_CORE)
+            elif d2 <= 5:
+                c.put(x, y, BAIT_RED)
+            elif d2 <= 20:
+                c.put(x, y, BAIT_WHITE)
+            elif d2 <= 30:
+                c.put(x, y, BAIT_EDGE)
+    for x, y in [(5, 6), (10, 9), (6, 10)]:
+        c.put(x, y, BAIT_RED)
+    return c
+
+
 def heilig_pfeil():
     """The arrow of reishi, laid out where vanilla's ArrowRenderer samples: the shaft from x 0..16 and
     y 0..5, the end cap from x 0..5 and y 5..10. It is a spindle, the same from either end, so it
@@ -1001,6 +1150,14 @@ TEXTURES = {
     "item/quincy_shoes.png": quincy_shoes_icon,
     "models/armor/quincy_garb_layer_1.png": quincy_armor_layer_1,
     "models/armor/quincy_garb_layer_2.png": quincy_armor_layer_2,
+    "item/wandenreich_cap.png": wandenreich_cap_icon,
+    "item/wandenreich_coat.png": wandenreich_coat_icon,
+    "item/wandenreich_trousers.png": wandenreich_trousers_icon,
+    "item/wandenreich_boots.png": wandenreich_boots_icon,
+    "models/armor/wandenreich_layer_1.png": wandenreich_armor_layer_1,
+    "models/armor/wandenreich_layer_2.png": wandenreich_armor_layer_2,
+    "item/mask_fragment.png": mask_fragment_icon,
+    "item/hollow_bait.png": hollow_bait_icon,
     "entity/heilig_pfeil.png": heilig_pfeil,
     "entity/blut_vene.png": blut_vene,
     "item/sanrei_glove.png": sanrei_glove_icon,

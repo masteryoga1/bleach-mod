@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.FishboneD;
+import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import java.util.List;
 import net.minecraft.ChatFormatting;
@@ -51,12 +52,13 @@ public final class ReiatsuEvents {
     }
 
     /**
-     * Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC
-     * and Fishbone D, who has come for one soul and does not back down.
+     * Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC,
+     * a Quincy NPC, who stands their ground, and Fishbone D, who has come for one soul and does not
+     * back down.
      */
     private static void onEntityJoin(EntityJoinLevelEvent event) {
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob && !(mob instanceof ShinigamiNpc)
-                && !(mob instanceof FishboneD)
+                && !(mob instanceof QuincyNpc) && !(mob instanceof FishboneD)
                 && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
             mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
         }
@@ -149,12 +151,12 @@ public final class ReiatsuEvents {
     }
 
     /**
-     * Who the aura reaches: not the releaser, what they ride or carry, or their own pets; not players
-     * in creative or spectator mode; and not players they could not hurt (PvP off, or a team with
-     * friendly fire off).
+     * Who the aura reaches: not the releaser, what they ride or carry, or their own pets; nothing that
+     * cannot be hurt (an Academy instructor, the Quincy Elder); not players in creative or spectator
+     * mode; and not players they could not hurt (PvP off, or a team with friendly fire off).
      */
     private static boolean isAffected(ServerPlayer releaser, LivingEntity entity) {
-        if (entity.getRootVehicle() == releaser.getRootVehicle()) {
+        if (entity.isInvulnerable() || entity.getRootVehicle() == releaser.getRootVehicle()) {
             return false;
         }
         if (entity instanceof OwnableEntity pet && releaser.getUUID().equals(pet.getOwnerUUID())) {

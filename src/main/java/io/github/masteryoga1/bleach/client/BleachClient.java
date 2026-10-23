@@ -8,6 +8,8 @@ import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.QuincyElder;
+import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
@@ -100,8 +102,9 @@ public final class BleachClient {
     }
 
     /**
-     * The NPCs wear two of the game's default player skins until the mod has its own. Hollows use the
-     * vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
+     * The NPCs wear four of the game's default player skins until the mod has its own, no two alike:
+     * the Academy's instructor, the wounded Shinigami, the Quincy Elder and the Quincy Hunter. Hollows
+     * use the vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
      * Zanpakutō techniques and Gintō spells are drawn from plain shapes and the mod's placeholder
      * textures, and the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
      * in the mod's own textures.
@@ -114,6 +117,12 @@ public final class BleachClient {
                 context -> new ShinigamiNpcRenderer<AcademyInstructor>(context, instructor));
         event.registerEntityRenderer(ModEntities.WOUNDED_SHINIGAMI.get(),
                 context -> new ShinigamiNpcRenderer<WoundedShinigami>(context, wounded));
+        ResourceLocation elder = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/zuri.png");
+        ResourceLocation hunter = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/efe.png");
+        event.registerEntityRenderer(ModEntities.QUINCY_ELDER.get(),
+                context -> new QuincyNpcRenderer<QuincyElder>(context, elder));
+        event.registerEntityRenderer(ModEntities.QUINCY_HUNTER.get(),
+                context -> new QuincyNpcRenderer<QuincyHunter>(context, hunter));
         // Spiders end on their backs when they die; the rest fall on their sides.
         event.registerEntityRenderer(ModEntities.SPIDER_HOLLOW.get(),
                 context -> new HollowRenderer<SpiderHollow, SpiderModel<SpiderHollow>>(context,

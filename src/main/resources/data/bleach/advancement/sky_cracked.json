@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:hollow_bait",
+  "display": {
+    "icon": {
+      "id": "bleach:hollow_bait"
+    },
+    "title": {
+      "translate": "advancements.bleach.sky_cracked.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.sky_cracked.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "sky_cracked": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "sky_cracked"
+      }
+    }
+  }
+}

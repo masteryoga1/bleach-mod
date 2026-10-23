@@ -28,6 +28,12 @@ public final class ModArmorMaterials {
      */
     public static final DeferredHolder<ArmorMaterial, ArmorMaterial> QUINCY_GARB = cloth("quincy_garb");
 
+    /**
+     * The Wandenreich uniform, white with black bands, cloth like the rest. Textures are
+     * {@code textures/models/armor/wandenreich_layer_1.png} (cap, coat and boots) and {@code _2} (trousers).
+     */
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> WANDENREICH = cloth("wandenreich");
+
     private ModArmorMaterials() {
     }
 

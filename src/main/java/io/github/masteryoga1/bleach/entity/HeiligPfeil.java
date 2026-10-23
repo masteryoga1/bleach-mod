@@ -63,7 +63,8 @@ import net.neoforged.neoforge.event.EventHooks;
  * ({@link #damageType}, {@link #sticks}, {@link #onStuck}, {@link #fade}, {@link #isSpent}); each
  * hook's default is what this arrow has always done. A plain full-draw arrow from a third-tier
  * Quincy that would pass just beside a sealed Quincy's heart gives them their power back instead of
- * striking (see {@link #heartTarget}).
+ * striking (see {@link #heartTarget}). So does the Quincy Elder's heart shot, at the one soul he is
+ * restoring ({@link QuincyElder#restoreTarget()}).
  */
 public class HeiligPfeil extends AbstractArrow {
     public static final ResourceKey<DamageType> DAMAGE_TYPE =
@@ -177,10 +178,12 @@ public class HeiligPfeil extends AbstractArrow {
      * would pass just beside the heart of, or null: another living player, not a spectator, whose power
      * can come back by an arrow now ({@link QuincyArtsLogic#restorable}), whose box (grown as for a
      * point-blank shot) holds the start or meets the path, and whom the path crosses beside the heart
-     * ({@link QuincyArtsLogic#besideTheHeart}). It asks nothing of the shooter; the arrow does.
+     * ({@link QuincyArtsLogic#besideTheHeart}). It asks nothing of the shooter, a player or the Quincy
+     * Elder; the arrow does.
      */
     @Nullable
-    public static Player heartTarget(Player owner, Vec3 from, Vec3 to, Iterable<? extends Player> candidates, long now) {
+    public static Player heartTarget(@Nullable Entity owner, Vec3 from, Vec3 to, Iterable<? extends Player> candidates,
+                                     long now) {
         Vec3 heading = to.subtract(from);
         Player best = null;
         double bestDistance = Double.MAX_VALUE;
@@ -267,8 +270,9 @@ public class HeiligPfeil extends AbstractArrow {
      * this level ends ({@link #fade}) before it can strike anything without its owner's rules. A plain
      * full-draw arrow from a Quincy who can restore others that would pass beside a sealed Quincy's
      * heart this tick gives their power back and goes, harming no one, before anything else can
-     * meet it (see {@link #heartTarget}). The first tick strikes the creatures the arrow starts
-     * inside, which vanilla's search along the path cannot see (a shot pressed against a foe). A tick
+     * meet it (see {@link #heartTarget}); so does the Quincy Elder's, at the soul he is restoring. The
+     * first tick strikes the creatures the arrow starts inside, which vanilla's search along the path
+     * cannot see (a shot pressed against a foe). A tick
      * whose flight met a creature and flew on still bursts on the block that ended its path: vanilla's
      * flight forgets that block once it has met a creature, and would carry the arrow into or through
      * it (see {@link #checkInsideBlocks}).
@@ -287,7 +291,8 @@ public class HeiligPfeil extends AbstractArrow {
                 return;
             }
             if (getClass() == HeiligPfeil.class && !volley && charge() >= QuincyArtsLogic.RESTORE_CHARGE
-                    && owner instanceof Player shooter && QuincyArtsLogic.canRestoreOthers(shooter) && restoreAhead(shooter)) {
+                    && (owner instanceof Player shooter && QuincyArtsLogic.canRestoreOthers(shooter) && restoreAhead(shooter)
+                        || owner instanceof QuincyElder elder && restoreAheadByElder(elder))) {
                 discard();
                 return;
             }
@@ -326,6 +331,27 @@ public class HeiligPfeil extends AbstractArrow {
         long now = level().getGameTime();
         Player target = heartTarget(shooter, from, to, level().players(), now);
         return target != null && QuincyArtsEvents.tryRestoreByArrow(shooter, target, now);
+    }
+
+    /**
+     * Whether this tick's path, up to the first block in its way, passes beside the heart of the soul
+     * the Elder is restoring, whose power then comes back. Server side. A shot that never does simply
+     * flies on: the Elder's arrows strike only Hollows (see {@link SpiritProjectiles#mayStrike}).
+     */
+    private boolean restoreAheadByElder(QuincyElder elder) {
+        Player target = elder.restoreTarget();
+        if (target == null) {
+            return false;
+        }
+        Vec3 from = position();
+        Vec3 to = from.add(getDeltaMovement());
+        BlockHitResult wall = level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        if (wall.getType() != HitResult.Type.MISS) {
+            to = wall.getLocation();
+        }
+        long now = level().getGameTime();
+        return heartTarget(elder, from, to, List.of(target), now) != null
+                && QuincyArtsEvents.tryRestoreByElder(elder, target, now);
     }
 
     /**

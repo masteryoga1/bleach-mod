@@ -1,0 +1,13 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:leather"
+  },
+  "cloth_count": 3,
+  "trim": {
+    "item": "minecraft:black_dye"
+  },
+  "result": {
+    "id": "bleach:wandenreich_boots"
+  }
+}

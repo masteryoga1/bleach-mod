@@ -345,7 +345,7 @@ public final class ClientSmokeTest {
                 }
             }
             case 340 -> {
-                expect(minecraft, minecraft.screen instanceof ShinigamiDialogueScreen,
+                expect(minecraft, minecraft.screen instanceof NpcDialogueScreen,
                         "talking to the instructor did not open the dialogue");
                 minecraft.setScreen(null);
                 dashFrom = player.position();

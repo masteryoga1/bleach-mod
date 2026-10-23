@@ -2,6 +2,9 @@
   "values": [
     "bleach:quincy_tunic",
     "bleach:quincy_trousers",
-    "bleach:quincy_shoes"
+    "bleach:quincy_shoes",
+    "bleach:wandenreich_coat",
+    "bleach:wandenreich_trousers",
+    "bleach:wandenreich_boots"
   ]
 }

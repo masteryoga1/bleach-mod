@@ -9,6 +9,7 @@ import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyForms;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
+import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -38,7 +39,8 @@ import net.minecraft.world.item.ItemStack;
  * turns orange when a Letzt Stil draw is charged for a Letzt Pfeil, and pale gold while Licht Regen
  * gathers. A thin bar beside the gauge follows the Quincy arts: the day's training in the Sanrei
  * Glove (gold once mastered), the time Letzt Stil has left, the wait while the power is sealed
- * (white once the power can return), and Vollständig (dimmed once the halo breaks) or its cooldown.
+ * (white once the power can return), Vollständig (dimmed once the halo breaks) or its cooldown, and
+ * while Ransōtengai is woven, in pale blue, the reiryoku left to pay for the threads.
  * While the power is sealed, the reishi gauge stands empty in a grey outline, and holding the Cross
  * through the rite fills the bar above it. Quincy blood not yet awakened shows only the draw bar, in
  * grey. Placeholder look until real art exists.
@@ -84,6 +86,7 @@ public final class ReiryokuHud {
     private static final int ART_VOLL = 0xFFFFD86A;
     private static final int ART_VOLL_HALO_BROKEN = 0xFFA89A6A;
     private static final int ART_VOLL_COOLDOWN = 0xFF9A9A9A;
+    private static final int ART_RANSOTENGAI = 0xFFBFE6FF;
     /** Past the pang threshold the poison overlay is shown for this many ticks, then hidden as long. */
     private static final int POISON_FLICKER_TICKS = 10;
 
@@ -208,8 +211,9 @@ public final class ReiryokuHud {
 
     /**
      * The thin bar beside the reishi gauge for the Quincy arts, filling upwards, in the one state that
-     * applies: Vollständig or its cooldown, Letzt Stil's time left, the wait while sealed, or the
-     * Sanrei Glove's day. Nothing for a Quincy who has none of these.
+     * applies: Ransōtengai's reiryoku while it is woven, since the threads draw on it every second and
+     * snap when it runs dry; Vollständig or its cooldown; Letzt Stil's time left; the wait while
+     * sealed; or the Sanrei Glove's day. Nothing for a Quincy who has none of these.
      */
     private static void drawArtBar(GuiGraphics graphics, SoulData data, int x, int y, long now, long dayTime) {
         QuincyArts arts = QuincyArtsLogic.arts(data);
@@ -217,7 +221,10 @@ public final class ReiryokuHud {
         SanreiProgress glove = arts.glove();
         float fraction;
         int colour;
-        if (QuincyArtsLogic.inVollstandig(data)) {
+        if (QuincyRansotengai.isWoven(data)) {
+            fraction = Mth.clamp(data.reiryokuFraction(), 0.0F, 1.0F);
+            colour = ART_RANSOTENGAI;
+        } else if (QuincyArtsLogic.inVollstandig(data)) {
             fraction = 1.0F;
             colour = forms.haloBroken() ? ART_VOLL_HALO_BROKEN : ART_VOLL;
         } else if (QuincyArtsLogic.isRestored(data) && now < forms.vollReadyAt()) {
