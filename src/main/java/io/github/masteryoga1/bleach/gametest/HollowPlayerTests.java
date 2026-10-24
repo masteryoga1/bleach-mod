@@ -517,7 +517,8 @@ public final class HollowPlayerTests {
         FoodData food = player.getFoodData();
         food.setFoodLevel(3);
         food.addExhaustion(4.0F);
-        helper.assertTrue(HollowBody.feedsOnSouls(player, food), "a Hollow fed on food");
+        // Through vanilla's own food tick, which the mixin hands to the soul hunger.
+        food.tick(player);
         helper.assertTrue(food.getFoodLevel() == 20, "a Hollow's food bar was left at " + food.getFoodLevel());
         assertClose(helper, food.getSaturationLevel(), 0.0, "a Hollow's saturation");
         assertClose(helper, food.getExhaustionLevel(), 0.0, "a Hollow's exhaustion");
@@ -525,7 +526,7 @@ public final class HollowPlayerTests {
         assertClose(helper, HollowBody.satiety(data), peaceful(helper) ? 60.0 : 57.6, "the hunger after the effort");
 
         HollowBody.setSatiety(data, 0.0F);
-        HollowBody.feedsOnSouls(player, food);
+        food.tick(player);
         helper.assertTrue(food.getFoodLevel() == HollowPlayerLogic.STARVING_FOOD_LEVEL,
                 "a starving Hollow's food bar is at " + food.getFoodLevel());
 

@@ -818,7 +818,9 @@ public final class ClientSmokeTest {
     private static void checkHollowPlayer(Minecraft minecraft, LocalPlayer player, SoulData soul) {
         if (expectWithin(minecraft, 3250, 3300,
                 () -> soul.state() == SoulState.HOLLOW && soul.hollow().hungerStarted() && armourShed(player)
-                        && player.hasEffect(MobEffects.NIGHT_VISION) && player.getFoodData().getFoodLevel() == 20,
+                        && player.hasEffect(MobEffects.NIGHT_VISION) && player.getFoodData().getFoodLevel() == 20
+                        // Peaceful filled the saturation earlier in the run: only the pin empties it.
+                        && player.getFoodData().getSaturationLevel() == 0.0F,
                 "the Hollow body never came on: soul hunger, the uniform shed, Hollow sight and a held food bar")) {
             shot(minecraft, "hollow_player");
         }

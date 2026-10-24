@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
@@ -15,7 +16,8 @@ import net.minecraft.client.renderer.RenderType;
  * A Hollow player's bone mask: a face plate and a jaw, with tusks, horns or a beak by shape (see
  * {@code HollowPlayerLogic#maskVariant}). Built in head space (the head spans -4 to 4 across, -8 to 0
  * down and -4 to 4 deep, its face at -4), so it only has to follow the posed head to be worn. The plate
- * stands a pixel off the face, half a pixel clear of the hat layer, so neither flickers through it.
+ * stands a pixel off the face, half a pixel clear of the hat layer in front, and the plate and jaw are
+ * grown a hair so that none of their faces shares a plane with the hat or the head, which would flicker.
  */
 public final class HollowMaskModel extends Model {
     /** Where the jaw hangs, shut, and how far it drops and swings its lower edge forward while devouring. */
@@ -24,6 +26,12 @@ public final class HollowMaskModel extends Model {
     private static final float JAW_OPEN_X_ROT = -0.35F;
     /** How far each horn leans out from the top of the plate. */
     private static final float HORN_LEAN = 0.35F;
+    /**
+     * How far the plate and jaw grow past their boxes: the plate's sides and top then stand outside the
+     * hat layer's and its back inside the head; the jaw grows less, so the plate's front stays ahead of it.
+     */
+    private static final CubeDeformation PLATE_GROWTH = new CubeDeformation(0.05F);
+    private static final CubeDeformation JAW_GROWTH = new CubeDeformation(0.03F);
 
     private static final int FANGED = 1;
     private static final int HORNED = 2;
@@ -57,9 +65,9 @@ public final class HollowMaskModel extends Model {
         MeshDefinition mesh = new MeshDefinition();
         PartDefinition root = mesh.getRoot();
         root.addOrReplaceChild("plate", CubeListBuilder.create().texOffs(0, 0)
-                .addBox(-4.5F, -8.5F, -5.0F, 9.0F, 7.0F, 1.0F), PartPose.ZERO);
+                .addBox(-4.5F, -8.5F, -5.0F, 9.0F, 7.0F, 1.0F, PLATE_GROWTH), PartPose.ZERO);
         PartDefinition jaw = root.addOrReplaceChild("jaw", CubeListBuilder.create().texOffs(0, 8)
-                .addBox(-3.5F, 0.0F, -1.0F, 7.0F, 2.0F, 1.0F), PartPose.offset(0.0F, JAW_SHUT_Y, -4.0F));
+                .addBox(-3.5F, 0.0F, -1.0F, 7.0F, 2.0F, 1.0F, JAW_GROWTH), PartPose.offset(0.0F, JAW_SHUT_Y, -4.0F));
         jaw.addOrReplaceChild("left_tusk", CubeListBuilder.create().texOffs(20, 5)
                 .addBox(-0.5F, 0.0F, -0.5F, 1.0F, 3.0F, 1.0F), PartPose.offset(2.5F, 2.0F, -0.5F));
         jaw.addOrReplaceChild("right_tusk", CubeListBuilder.create().texOffs(20, 5).mirror()
