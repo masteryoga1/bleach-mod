@@ -1312,7 +1312,7 @@ public final class BleachConfig {
                 .comment("Seconds the Elder's Ransōtengai trial stays open, and always at least 5 more than trial_hold_seconds.")
                 .defineInRange("trial_seconds", 30, 5, 600);
         RANSOTENGAI_TRIAL_HOLD_SECONDS = builder
-                .comment("Seconds the threads must hold unbroken in the trial for the art to be learned.")
+                .comment("Seconds the threads must hold unbroken in the trial for the art to be learned. In the trial they never run dry.")
                 .defineInRange("trial_hold_seconds", 5, 1, 60);
         RANSOTENGAI_HYBRID_DRAIN = builder
                 .comment("How many times over the drain costs a Quincy who also has a Shinigami's power.")

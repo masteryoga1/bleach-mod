@@ -333,7 +333,8 @@ public final class QuincyRansotengai {
      * that ran out unwoven, keeps the binding on while the trial is open and the threads are not
      * woven, and keeps a weave going or ends it. A woven body sheds what it is freed
      * from, passes the trial once it has held long enough, pays a second of the weave every twenty
-     * ticks (running dry ends it), and shows its threads to those who see spirits. A weave found
+     * ticks (running dry ends it, except in the Elder's trial, where the threads hold on what is
+     * left), and shows its threads to those who see spirits. A weave found
      * without its hold on the body (after a crash, say) is let go as a logout lets it go: no
      * collapse, but the wait.
      */
@@ -380,7 +381,10 @@ public final class QuincyRansotengai {
         boolean running = p.level().tickRateManager().runsNormally();
         if (running && woven > 0L && woven % DRAIN_INTERVAL == 0L) {
             float left = d.reiryoku() - drainPerSecond(d);
-            if (left < DRY_BELOW) {
+            if (left < DRY_BELOW && trialOpen(d, now)) {
+                // In the trial the threads hold on what is left, so a hold no pool could pay for can still pass.
+                d.setReiryoku(Math.max(0.0F, left));
+            } else if (left < DRY_BELOW) {
                 // Paid here rather than through SoulLogic.drain, whose exhaustion the threads would
                 // only shed: the collapse stands in for it.
                 d.setReiryoku(0.0F);

@@ -287,7 +287,10 @@ public final class RansotengaiTests {
         helper.succeed();
     }
 
-    /** The trial's wait is waived: the threads hold at once, even in the wait after a collapse. */
+    /**
+     * The trial's wait is waived: the threads hold at once, even in the wait after a collapse, and
+     * they do not run dry while the trial lasts.
+     */
     @GameTest(template = "empty")
     public static void trialTeachesAfterAHundredTicks(GameTestHelper helper) {
         SoulData data = QuincyArtsTests.thirdTier();
@@ -300,6 +303,11 @@ public final class RansotengaiTests {
         long waitBefore = readyAt(data);
 
         helper.assertTrue(QuincyRansotengai.start(mock, data, NOW, false), "the threads were not woven in the trial");
+        // In the trial the threads hold on what is left rather than running dry.
+        data.setReiryoku(1.0F);
+        QuincyRansotengai.tick(mock, data, NOW + 20L);
+        helper.assertTrue(QuincyRansotengai.isWoven(data) && data.reiryoku() == 0.0F,
+                "the trial's weave ran dry, or left " + data.reiryoku() + " reiryoku");
         long hold = (long) BleachConfig.get(BleachConfig.RANSOTENGAI_TRIAL_HOLD_SECONDS) * TICKS_PER_SECOND;
         QuincyRansotengai.tick(mock, data, NOW + hold);
         helper.assertTrue(QuincyRansotengai.isKnown(data), "the trial did not teach Ransōtengai");
