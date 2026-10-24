@@ -471,6 +471,16 @@ public final class QuincyArtsLogic {
                 && elapsed(now, arts.stageSince()) >= sealedTicksNeeded(byArrow);
     }
 
+    /**
+     * How long until the seal has lasted {@link #sealedTicksNeeded}, from its own start, which a death
+     * in Letzt Stil puts when the Letzt Stil would have ended, so it can still lie ahead.
+     */
+    public static long sealedTicksLeft(SoulData data, long now, boolean byArrow) {
+        long since = arts(data).stageSince();
+        long wait = sealedTicksNeeded(byArrow);
+        return since >= now ? wait + (since - now) : Math.max(0L, wait - (now - since));
+    }
+
     /** Whether a sealed soul may hold the Cross for the solo rite now (the draw itself is allowed). */
     public static boolean riteOpen(SoulData data, long now) {
         return isSealed(data) && BleachConfig.get(BleachConfig.RESTORE_SOLO_RITE) && sealedLongEnough(data, now, false);

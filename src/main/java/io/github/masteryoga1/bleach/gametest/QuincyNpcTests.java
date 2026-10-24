@@ -44,6 +44,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -484,6 +485,38 @@ public final class QuincyNpcTests {
             QuincyArtsTests.discardAll(List.of(onLedge, landward, inOpen, behind));
             helper.succeed();
         });
+    }
+
+    /** The Elder's notes on a restoration say what it still waits for: the seal's time, a worn-down body, or both. */
+    @GameTest(template = "empty")
+    public static void elderRestoreNotesSayWhatIsMissing(GameTestHelper helper) {
+        QuincyElder elder = Objects.requireNonNull(ModEntities.QUINCY_ELDER.get().create(helper.getLevel()));
+        long arrow = QuincyArtsLogic.sealedTicksNeeded(true);
+        String waits = "screen.bleach.dialogue.note.restore_wait";
+        String needs = "screen.bleach.dialogue.note.restore_needs";
+        SoulData young = QuincyArtsTests.sealed(QuincyArtsTests.thirdTier(), NOW - 100L);
+        Player body = ZanpakutoTests.mock(helper, young);
+        List<Component> notes = elder.notesFor(body, young, DialogueView.ELDER_RESTORE, NOW);
+        assertNotes(helper, notes, List.of(waits, needs), "a young seal in a body still strong");
+        Object left = ((TranslatableContents) notes.get(0).getContents()).getArgs()[0];
+        helper.assertTrue(QuincyArtsLogic.formatTicks(arrow - 100L).equals(left), "the seal must hold another " + left);
+        body.setHealth(body.getMaxHealth() * 0.1F);
+        body.getFoodData().setFoodLevel(0);
+        assertNotes(helper, elder.notesFor(body, young, DialogueView.ELDER_RESTORE, NOW), List.of(waits),
+                "a young seal in a worn-down body");
+        SoulData old = QuincyArtsTests.sealed(QuincyArtsTests.thirdTier(), NOW - arrow);
+        assertNotes(helper, elder.notesFor(body, old, DialogueView.ELDER_RESTORE, NOW), List.of(),
+                "a seal long enough in a worn-down body");
+        Player strong = ZanpakutoTests.mock(helper, old);
+        assertNotes(helper, elder.notesFor(strong, old, DialogueView.ELDER_RESTORE, NOW), List.of(needs),
+                "a seal long enough in a body still strong");
+        helper.succeed();
+    }
+
+    private static void assertNotes(GameTestHelper helper, List<Component> notes, List<String> keys, String what) {
+        List<String> found = notes.stream().<String>map(note -> note.getContents() instanceof TranslatableContents contents
+                ? contents.getKey() : note.getString()).toList();
+        helper.assertTrue(found.equals(keys), "for " + what + " the Elder notes " + found + ", not " + keys);
     }
 
     /** A soul with no Quincy blood, or a Hollow, is turned away by {@code elderMayVisit} (see {@link #elderViewsByVisitor}). */

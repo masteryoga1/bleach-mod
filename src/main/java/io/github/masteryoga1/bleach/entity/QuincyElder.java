@@ -203,7 +203,12 @@ public final class QuincyElder extends QuincyNpc {
                 }
             }
             case ELDER_RESTORE -> {
-                if (!QuincyArtsLogic.restorable(visitor, data, now, true)) {
+                // Whatever the arrow still waits for: a seal that has lasted long enough, a worn-down body, or both.
+                if (QuincyArtsLogic.isSealed(data) && !QuincyArtsLogic.sealedLongEnough(data, now, true)) {
+                    notes.add(Component.translatable("screen.bleach.dialogue.note.restore_wait",
+                            QuincyArtsLogic.formatTicks(QuincyArtsLogic.sealedTicksLeft(data, now, true))));
+                }
+                if (!QuincyArtsLogic.exhausted(visitor)) {
                     notes.add(Component.translatable("screen.bleach.dialogue.note.restore_needs",
                             Math.round(BleachConfig.get(BleachConfig.RESTORE_MAX_HEALTH_FRACTION) * 100.0),
                             BleachConfig.get(BleachConfig.RESTORE_MAX_FOOD) + 1));

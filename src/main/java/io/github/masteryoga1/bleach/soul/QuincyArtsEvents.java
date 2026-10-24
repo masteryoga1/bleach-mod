@@ -703,10 +703,7 @@ public final class QuincyArtsEvents {
 
     /** How long until a sealed power can return the way its wait counts towards (see {@link QuincyArtsLogic#waitsForArrow}). */
     private static long sealedTicksLeft(SoulData d, long now) {
-        // From the seal's own start, which a death in Letzt Stil puts when the Letzt Stil would have ended.
-        long since = QuincyArtsLogic.arts(d).stageSince();
-        long wait = QuincyArtsLogic.sealedWaitTicks();
-        return since >= now ? wait + (since - now) : Math.max(0L, wait - (now - since));
+        return QuincyArtsLogic.sealedTicksLeft(d, now, QuincyArtsLogic.waitsForArrow());
     }
 
     // ---- Restoration ----
