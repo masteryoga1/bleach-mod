@@ -31,6 +31,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -61,6 +62,8 @@ public final class BaitEvents {
     public static final int RETRY_TICKS = 100;
     /** A site's hold on its Hollows lasts this long after each step, so it lapses soon after the site ends. */
     public static final int HOLD_TICKS = 60;
+    /** A contest whose Hunter cannot be found on this many steps in a row ends without him. */
+    public static final int RIVAL_MISSING_STEPS = 2;
     /** Souls are hunted, and see the bar, this far past the radius; site Hollows are held this far past it. */
     public static final double HUNTED_EXTRA = 16.0, HOLD_EXTRA = 32.0;
     /** A held Hollow with no prey walks back once it strays this far from the centre; in the finale, to within this. */
@@ -230,7 +233,9 @@ public final class BaitEvents {
      * sky runs on, or cracks; the time runs out; and the next wave comes nearer, or comes.
      */
     public static void step(ServerLevel level, BaitSites sites, BaitSite site, long now) {
-        if (!level.isPositionEntityTicking(site.centre()) || quiet(level)) {
+        // A chunk can tick before the creatures saved in it are back: the site waits for them too.
+        if (!level.isPositionEntityTicking(site.centre()) || !level.areEntitiesLoaded(ChunkPos.asLong(site.centre()))
+                || quiet(level)) {
             site.setFrozenTicks(site.frozenTicks() + STEP_TICKS);
             sites.setDirty();
             if (site.frozenTicks() >= BleachConfig.get(BleachConfig.BAIT_ABANDON_MINUTES) * TICKS_PER_MINUTE) {
@@ -245,10 +250,17 @@ public final class BaitEvents {
         sites.setDirty();
         if (site.contest()) {
             // A visiting Hunter is not saved: once his ground is loaded and he is not there, he is gone.
+            // Once missed is not enough, as one who stays may have strolled into a chunk still loading.
             if (!(rivalOf(level, site) instanceof QuincyHunter hunter)) {
-                settleContest(level, sites, site, null, true);
+                site.setRivalMissing(site.rivalMissing() + 1);
+                if (site.rivalMissing() >= RIVAL_MISSING_STEPS) {
+                    settleContest(level, sites, site, null, true);
+                } else {
+                    showBar(level, sites, site);
+                }
                 return;
             }
+            site.setRivalMissing(0);
             // One who stays and was saved before he took this contest up still runs it.
             if (hunter.contestSite() == null) {
                 hunter.setContestSite(site.id());

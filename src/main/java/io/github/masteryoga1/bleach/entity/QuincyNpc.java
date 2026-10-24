@@ -509,10 +509,14 @@ public abstract class QuincyNpc extends PathfinderMob implements RangedAttackMob
 
     // ---- Saving and the world ----
 
-    /** A visiting Quincy is never saved: it is gone when its chunk unloads or the world closes. */
+    /**
+     * A visiting Quincy is never written down: it is gone when its chunk unloads or the world closes.
+     * It still counts as one to save, so an unloading chunk takes it away with the rest rather than
+     * leaving it behind, frozen, to come back when the chunk loads again.
+     */
     @Override
-    public boolean shouldBeSaved() {
-        return lifetime < 0 && super.shouldBeSaved();
+    public boolean saveAsPassenger(CompoundTag tag) {
+        return isPermanent() && super.saveAsPassenger(tag);
     }
 
     @Override

@@ -48,9 +48,13 @@ import net.minecraft.world.level.Level;
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
+    /** Where the title sits in the full and compact layouts, and in the tight one. */
+    private static final int TOP = 16, TIGHT_TOP = 6;
     private static final int LINE = 12;
     /** The rows' spacing on a screen too short for the full layout, which also drops the gaps between sections. */
     private static final int COMPACT_LINE = 10;
+    /** The rows' spacing, a line of text each, when even the compact rows would reach the Done button. */
+    private static final int TIGHT_LINE = 9;
     /** The space between sections in the full layout. */
     private static final int GAP = 6;
     /** How far above the bottom the Done button's top edge is. */
@@ -88,11 +92,18 @@ public final class SoulStatsScreen extends Screen {
         }
         SoulData data = player.getData(SoulAttachments.SOUL);
         List<FormattedCharSequence> next = font.split(nextStep(player, data), PANEL_WIDTH);
-        // Everything stays above the Done button: when the next step would reach it, the rows close up,
-        // and on a screen too short even then, what still does not fit of the next step is left out.
+        // Everything stays above the Done button: when the next step would reach it, the rows close up;
+        // when even the closed-up rows would, they close up to a line of text each and start higher;
+        // and what still does not fit of the next step is left out.
         int bottom = height - DONE_TOP - 4;
-        boolean compact = drawRows(null, player, data, LINE, GAP) + next.size() * font.lineHeight > bottom;
-        int y = compact ? drawRows(graphics, player, data, COMPACT_LINE, 0) : drawRows(graphics, player, data, LINE, GAP);
+        int y;
+        if (drawRows(null, player, data, TOP, LINE, GAP) + next.size() * font.lineHeight <= bottom) {
+            y = drawRows(graphics, player, data, TOP, LINE, GAP);
+        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0) <= bottom) {
+            y = drawRows(graphics, player, data, TOP, COMPACT_LINE, 0);
+        } else {
+            y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0);
+        }
         int left = width / 2 - PANEL_WIDTH / 2;
         for (FormattedCharSequence text : next) {
             if (y + font.lineHeight > bottom) {
@@ -104,14 +115,14 @@ public final class SoulStatsScreen extends Screen {
     }
 
     /**
-     * Every row above the next step, {@code line} apart with {@code gap} more between sections; with no
-     * {@code graphics}, only measures them.
+     * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
+     * more between sections; with no {@code graphics}, only measures them.
      *
      * @return where the next step starts
      */
-    private int drawRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int line, int gap) {
+    private int drawRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int top, int line, int gap) {
         int left = width / 2 - PANEL_WIDTH / 2;
-        int y = 16;
+        int y = top;
 
         if (graphics != null) {
             graphics.drawCenteredString(font, title, width / 2, y, WHITE);

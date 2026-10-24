@@ -57,6 +57,8 @@ public final class BaitSite {
     private int finaleTicks;
     private boolean plusLost;
     private long lastPingAt;
+    // Not saved: active steps in a row that a contest has found no Hunter.
+    private int rivalMissing;
 
     /**
      * @param id          the site's own id, which its Hollows and rifts carry
@@ -169,6 +171,15 @@ public final class BaitSite {
 
     public int frozenTicks() {
         return frozenTicks;
+    }
+
+    /** Active steps in a row this contest has found no Hunter, while his entity may still be loading. Not saved. */
+    public int rivalMissing() {
+        return rivalMissing;
+    }
+
+    public void setRivalMissing(int value) {
+        rivalMissing = Math.max(0, value);
     }
 
     public void setFrozenTicks(int value) {

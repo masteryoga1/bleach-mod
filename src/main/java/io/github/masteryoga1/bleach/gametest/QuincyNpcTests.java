@@ -402,9 +402,10 @@ public final class QuincyNpcTests {
     public static void npcsAreSavedOnlyWhenPlaced(GameTestHelper helper) {
         QuincyHunter hunter = created(helper, ModEntities.QUINCY_HUNTER.get());
         hunter.setLifetime(QuincyNpcLogic.VISIT_LIFETIME);
-        helper.assertFalse(hunter.shouldBeSaved(), "a visiting Hunter would be saved");
+        helper.assertTrue(hunter.shouldBeSaved(), "a visiting Hunter would be left behind when his chunk unloads");
+        helper.assertFalse(hunter.save(new CompoundTag()), "a visiting Hunter would be saved");
         hunter.setLifetime(QuincyNpc.PERMANENT);
-        helper.assertTrue(hunter.shouldBeSaved(), "a Hunter who stays would not be saved");
+        helper.assertTrue(hunter.save(new CompoundTag()), "a Hunter who stays would not be saved");
 
         hunter.setLifetime(4321);
         CompoundTag tag = hunter.saveWithoutId(new CompoundTag());
