@@ -368,7 +368,10 @@ public final class QuincyRansotengai {
             passTrial(p, d, now);
             return;
         }
-        if (woven > 0L && woven % DRAIN_INTERVAL == 0L) {
+        // On whole seconds of the weave, timed off game time, which stands still under /tick freeze
+        // while players still tick.
+        boolean running = p.level().tickRateManager().runsNormally();
+        if (running && woven > 0L && woven % DRAIN_INTERVAL == 0L) {
             float left = d.reiryoku() - drainPerSecond(d);
             if (left < DRY_BELOW) {
                 // Paid here rather than through SoulLogic.drain, whose exhaustion the threads would
@@ -379,7 +382,7 @@ public final class QuincyRansotengai {
             }
             d.setReiryoku(left);
         }
-        if (woven % PARTICLE_INTERVAL == 0L && p.level() instanceof ServerLevel level) {
+        if (running && woven % PARTICLE_INTERVAL == 0L && p.level() instanceof ServerLevel level) {
             threads(level, p);
         }
     }

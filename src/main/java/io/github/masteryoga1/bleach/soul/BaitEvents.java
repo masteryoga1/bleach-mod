@@ -603,10 +603,21 @@ public final class BaitEvents {
         level.addFreshEntity(dropped);
     }
 
-    /** Whether this point is inside a site's reach, where the sky does not tear for anyone on top of its waves. */
+    /**
+     * Whether this point is inside the reach of a site that is running, where the sky does not tear
+     * for anyone on top of its waves. A frozen site sends none, so it holds nothing off; it counts
+     * as frozen from the step that froze it to the step that wakes it.
+     */
     public static boolean insideActiveSite(ServerLevel level, Vec3 pos) {
-        return level.dimension() == Level.OVERWORLD
-                && BaitSites.get(level.getServer()).containing(pos, HUNTED_EXTRA) != null;
+        if (level.dimension() != Level.OVERWORLD) {
+            return false;
+        }
+        for (BaitSite site : BaitSites.get(level.getServer()).all()) {
+            if (site.frozenTicks() == 0 && site.contains(pos, HUNTED_EXTRA)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ---- The site's Hollows and its bar ----

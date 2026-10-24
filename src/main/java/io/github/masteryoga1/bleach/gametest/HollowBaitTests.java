@@ -522,8 +522,10 @@ public final class HollowBaitTests {
     }
 
     /**
-     * A site frozen too long is given up, a contest called off and its Hunter let go. Game tests
-     * have no mob spawning, so every step of a site here is a frozen one.
+     * A frozen site holds off no other arrivals, and one frozen too long is given up, a contest
+     * called off and its Hunter let go. Game tests have no mob spawning, so every step of a site
+     * here is a frozen one. The sites lie far off, out of every other test's way: a site's centre
+     * need not be loaded for any of this.
      */
     @GameTest(template = "field", timeoutTicks = 20)
     public static void frozenSitesAreGivenUp(GameTestHelper helper) {
@@ -531,15 +533,20 @@ public final class HollowBaitTests {
         QuincyHunter hunter = QuincyTests.still(helper.spawn(ModEntities.QUINCY_HUNTER.get(), 12, 2, 12));
         hunter.setLifetime(QuincyNpcLogic.VISIT_LIFETIME);
         BaitSites sites = BaitSites.get(level.getServer());
-        BaitSite bait = BaitSite.create(UUID.randomUUID(), helper.absolutePos(new BlockPos(4, 2, 4)), false, null, 0);
-        BaitSite contest = BaitSite.create(UUID.randomUUID(), helper.absolutePos(new BlockPos(12, 2, 12)), true,
-                hunter.getUUID(), 0);
+        BlockPos far = helper.absolutePos(new BlockPos(8, 2, 8)).offset(20_000, 0, 0);
+        BaitSite bait = BaitSite.create(UUID.randomUUID(), far, false, null, 0);
+        BaitSite contest = BaitSite.create(UUID.randomUUID(), far.offset(8, 0, 8), true, hunter.getUUID(), 0);
         int limit = BleachConfig.get(BleachConfig.BAIT_ABANDON_MINUTES) * 1200;
         try {
+            Vec3 near = Vec3.atBottomCenterOf(bait.centre()).add(BaitSite.radius(), 0.0, 0.0);
             for (BaitSite site : List.of(bait, contest)) {
                 sites.add(site);
+            }
+            helper.assertTrue(BaitEvents.insideActiveSite(level, near), "a running site held off no arrivals at its edge");
+            for (BaitSite site : List.of(bait, contest)) {
                 site.setFrozenTicks(limit - 2 * BaitEvents.STEP_TICKS);
             }
+            helper.assertFalse(BaitEvents.insideActiveSite(level, near), "a frozen site held off arrivals");
             hunter.setContestSite(contest.id());
             long now = level.getGameTime();
             for (BaitSite site : List.of(bait, contest)) {
