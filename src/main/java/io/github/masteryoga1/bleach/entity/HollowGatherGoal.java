@@ -9,6 +9,8 @@ import net.minecraft.world.phys.Vec3;
  * Keeps a Hollow that a Hollow Bait holds near the bait: one with no prey that has strayed more than
  * 16 blocks walks back until it is within 8. While the sky cracks it drops its prey and gathers
  * within 4 blocks of the spot below the tear, and stays there, so the tear can take them all up.
+ * Distances are across only, as a site's are: a bait crushed below ground holds the Hollows on the
+ * ground above it.
  */
 public final class HollowGatherGoal extends Goal {
     /** Farther than this from the bait, squared, a Hollow with no prey heads back: 16 blocks. */
@@ -35,7 +37,7 @@ public final class HollowGatherGoal extends Goal {
         if (centre == null) {
             return false;
         }
-        return hollow.isBaitFinale() || hollow.getTarget() == null && hollow.distanceToSqr(centre) > STRAY_SQR;
+        return hollow.isBaitFinale() || hollow.getTarget() == null && acrossSqr(centre) > STRAY_SQR;
     }
 
     @Override
@@ -44,7 +46,14 @@ public final class HollowGatherGoal extends Goal {
         if (centre == null) {
             return false;
         }
-        return hollow.isBaitFinale() || hollow.getTarget() == null && hollow.distanceToSqr(centre) > BACK_SQR;
+        return hollow.isBaitFinale() || hollow.getTarget() == null && acrossSqr(centre) > BACK_SQR;
+    }
+
+    /** How far the Hollow is from this point across, leaving height out, squared. */
+    private double acrossSqr(Vec3 point) {
+        double dx = hollow.getX() - point.x;
+        double dz = hollow.getZ() - point.z;
+        return dx * dx + dz * dz;
     }
 
     /** Where the holding bait lies, or null when no bait holds this Hollow or it cannot walk now. */
@@ -76,9 +85,7 @@ public final class HollowGatherGoal extends Goal {
         if (finale) {
             // The finale holds them from fighting (see Hollow.canAttack); this lets go of the prey at once.
             hollow.setTarget(null);
-            double dx = hollow.getX() - centre.x;
-            double dz = hollow.getZ() - centre.z;
-            if (dx * dx + dz * dz <= FINALE_RADIUS * FINALE_RADIUS) {
+            if (acrossSqr(centre) <= FINALE_RADIUS * FINALE_RADIUS) {
                 hollow.getNavigation().stop();
                 return;
             }

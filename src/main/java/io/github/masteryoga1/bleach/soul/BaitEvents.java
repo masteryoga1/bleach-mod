@@ -34,6 +34,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
@@ -487,7 +488,9 @@ public final class BaitEvents {
     private static GargantaRift openSky(ServerLevel level, BaitSites sites, BaitSite site, long now, int hold,
                                         boolean quiet) {
         BlockPos centre = site.centre();
-        Vec3 at = new Vec3(centre.getX() + 0.5, centre.getY() + SKY_HEIGHT, centre.getZ() + 0.5);
+        // Over the open sky: a bait crushed underground still cracks the sky above the ground over it.
+        int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centre.getX(), centre.getZ());
+        Vec3 at = new Vec3(centre.getX() + 0.5, Math.max(centre.getY(), ground) + SKY_HEIGHT, centre.getZ() + 0.5);
         GargantaRift sky = GargantaRift.sky(level, at, now, SKY_SIZE, hold, site.id());
         sky.setQuiet(quiet);
         if (!level.addFreshEntity(sky)) {
@@ -593,23 +596,31 @@ public final class BaitEvents {
 
     /** The site's own Hollows within its hold, alive and not leaving. */
     private static List<Hollow> siteHollows(ServerLevel level, BaitSite site) {
-        double reach = BaitSite.radius() + HOLD_EXTRA;
-        Vec3 centre = Vec3.atBottomCenterOf(site.centre());
-        return level.getEntitiesOfClass(Hollow.class, new AABB(centre, centre).inflate(reach),
+        return level.getEntitiesOfClass(Hollow.class, column(level, site, BaitSite.radius() + HOLD_EXTRA),
                 hollow -> hollow.isAlive() && !hollow.isDeparting() && site.id().equals(hollow.baitSite())
                         && site.contains(hollow.position(), HOLD_EXTRA));
     }
 
     /** Hollows still to drop from the site's open rifts. */
     private static int pendingFor(ServerLevel level, BaitSite site) {
-        double reach = BaitSite.radius() + HOLD_EXTRA;
-        Vec3 centre = Vec3.atBottomCenterOf(site.centre());
         int pending = 0;
-        for (GargantaRift rift : level.getEntitiesOfClass(GargantaRift.class, new AABB(centre, centre).inflate(reach),
+        AABB hold = column(level, site, BaitSite.radius() + HOLD_EXTRA);
+        for (GargantaRift rift : level.getEntitiesOfClass(GargantaRift.class, hold,
                 rift -> !rift.isDeparture() && site.id().equals(rift.baitSite()))) {
             pending += rift.pending().size();
         }
         return pending;
+    }
+
+    /**
+     * The whole height of the world within {@code reach} of a site's centre, across: a site reaches
+     * as far up and down as it likes, as {@link BaitSite#contains} does, so a bait crushed deep below
+     * still holds the Hollows that come down on the ground above it.
+     */
+    private static AABB column(ServerLevel level, BaitSite site, double reach) {
+        Vec3 centre = Vec3.atBottomCenterOf(site.centre());
+        return new AABB(centre.x - reach, level.getMinBuildHeight(), centre.z - reach,
+                centre.x + reach, level.getMaxBuildHeight(), centre.z + reach);
     }
 
     @Nullable
