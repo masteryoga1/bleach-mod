@@ -1307,6 +1307,8 @@ public final class BleachCommand {
             long now = player.level().getGameTime();
             switch (action) {
                 case LEARN -> {
+                    // Learned outright: an open trial has nothing left to teach, so it closes and lets go.
+                    QuincyRansotengai.closeTrial(player, data);
                     data.setQuincy(data.quincy().withTeaching(data.quincy().teaching().withRansotengaiKnown(true)));
                     Milestones.check(player, data);
                 }

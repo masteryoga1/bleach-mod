@@ -292,10 +292,18 @@ public abstract class Hollow extends Monster {
         }
     }
 
-    /** Counts the time without prey, and leaves through a tear of its own when there has been too much. */
+    /**
+     * Gives up its prey while a bait's finale draws it under the tear: one set straight on it (by the
+     * rift it came through, or a pack's call) is not let go by the target goals, which no longer run.
+     * Otherwise counts the time without prey, and leaves through a tear of its own when there has
+     * been too much.
+     */
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
+        if (isBaitFinale() && getTarget() != null) {
+            setTarget(null);
+        }
         if (getTarget() != null) {
             idleTicks = 0;
             return;

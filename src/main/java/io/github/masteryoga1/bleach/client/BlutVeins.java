@@ -13,10 +13,10 @@ import net.minecraft.world.item.ArmorItem;
 
 /**
  * Draws Blut Vene's glowing veins over a posed humanoid, flaring white for a moment each time a blow
- * lands. On a bare body they lie on the skin. Armour on the chest or legs would hide them, garb
- * included, so then they go on a thin shell just outside it ({@link BleachModelLayers#VEIN_SHELL}),
- * which reads the same skin-layout texture: the left arm shows the right arm's veins, mirrored, as
- * armour does.
+ * lands. On a bare chest they lie on the skin (trousers hide only their lower ends, as clothes
+ * would). Armour on the chest, garb included, would hide them all, so then they go on a thin shell
+ * just outside it ({@link BleachModelLayers#VEIN_SHELL}), which reads the same skin-layout texture:
+ * the left arm shows the right arm's veins, mirrored, as armour does.
  */
 final class BlutVeins<T extends LivingEntity> {
     private static final RenderType TYPE = RenderType.eyes(BlutLayer.TEXTURE);
@@ -45,9 +45,8 @@ final class BlutVeins<T extends LivingEntity> {
                 entity.hurtTime > 0 ? VEINS_STRUCK : VEINS);
     }
 
-    /** Whether armour that the game draws over the body, on the chest or the legs, would hide veins on the skin. */
+    /** Whether armour the game draws over the chest and arms would hide veins on the skin. */
     private static boolean covered(LivingEntity entity) {
-        return entity.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof ArmorItem
-                || entity.getItemBySlot(EquipmentSlot.LEGS).getItem() instanceof ArmorItem;
+        return entity.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof ArmorItem;
     }
 }

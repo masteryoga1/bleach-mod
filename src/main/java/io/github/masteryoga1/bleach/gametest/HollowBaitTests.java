@@ -40,8 +40,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Husk;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -408,6 +410,25 @@ public final class HollowBaitTests {
             helper.assertFalse(spider.isBaitHeld(), "the hold outlasted " + BaitEvents.HOLD_TICKS + " ticks with no renewal");
             spider.discard();
             helper.succeed();
+        });
+    }
+
+    /**
+     * A Hollow gathered for the finale gives up prey set straight on it, as the rift it came through
+     * sets it, which no target goal would let go of once the finale stops them running.
+     */
+    @GameTest(template = "field", timeoutTicks = 40)
+    public static void finaleHollowsGiveUpTheirPrey(GameTestHelper helper) {
+        SpiderHollow spider = helper.spawn(ModEntities.SPIDER_HOLLOW.get(), 8, 2, 8);
+        Husk prey = QuincyTests.still(helper.spawn(EntityType.HUSK, 3, 2, 8));
+        spider.setBaitSite(UUID.randomUUID());
+        spider.setTarget(prey);
+        helper.assertTrue(spider.getTarget() == prey, "the Hollow did not take the husk as its prey");
+        spider.holdForBait(spider.position(), helper.getLevel().getGameTime(), true);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(spider.getTarget() == null, "a Hollow gathered for the finale still hunts " + spider.getTarget());
+            spider.discard();
+            prey.discard();
         });
     }
 

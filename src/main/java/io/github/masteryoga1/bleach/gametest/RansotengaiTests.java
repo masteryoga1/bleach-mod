@@ -259,6 +259,16 @@ public final class RansotengaiTests {
         helper.assertTrue(readyAt(left) == NOW + 5L + cooldownTicks(),
                 "logging out woven set the wait until " + readyAt(left) + ", not " + (NOW + 5L + cooldownTicks()));
 
+        // Killed while woven and gone from the death screen: the death took the threads, with no wait.
+        SoulData fallen = knownThirdTier();
+        Player fallenMock = ZanpakutoTests.mock(helper, fallen);
+        helper.assertTrue(QuincyRansotengai.start(fallenMock, fallen, NOW, false), "the threads were not woven");
+        long fallenBefore = readyAt(fallen);
+        fallenMock.setHealth(0.0F);
+        QuincyRansotengai.end(fallenMock, fallen, NOW + 5L, QuincyRansotengai.End.LOGOUT);
+        helper.assertFalse(QuincyRansotengai.isWoven(fallen), "logging out dead left the threads woven");
+        helper.assertTrue(readyAt(fallen) == fallenBefore, "logging out dead set a wait until " + readyAt(fallen));
+
         SoulData unheld = knownThirdTier();
         Player unheldMock = ZanpakutoTests.mock(helper, unheld);
         helper.assertTrue(QuincyRansotengai.start(unheldMock, unheld, NOW, false), "the threads were not woven");

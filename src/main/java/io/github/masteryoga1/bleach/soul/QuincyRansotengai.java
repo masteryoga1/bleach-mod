@@ -96,7 +96,8 @@ public final class QuincyRansotengai {
 
         /**
          * Whether the wait follows: after a collapse, and after leaving the world woven, so the threads
-         * cannot be let go for free by logging out and back in.
+         * cannot be let go for free by logging out and back in (unless the soul left dead, see
+         * {@link #end}).
          */
         public boolean waits() {
             return collapses() || this == LOGOUT;
@@ -299,7 +300,8 @@ public final class QuincyRansotengai {
             return;
         }
         QuincyForms ended = forms.withRansotengaiSince(NEVER);
-        if (why.waits()) {
+        // A soul that leaves the world dead lost the threads to its death, which brings no wait.
+        if (why.waits() && (why != End.LOGOUT || p.isAlive())) {
             ended = ended.withRansotengaiReadyAt(now + cooldownTicks());
         }
         setForms(d, ended);
