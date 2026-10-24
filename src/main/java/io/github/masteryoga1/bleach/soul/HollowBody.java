@@ -237,9 +237,12 @@ public final class HollowBody {
             data.hollowBodyApplied = false;
             return;
         }
+        // Grown is either claw modifier on: a server may turn the claws' damage off and keep their speed.
         AttributeInstance damage = player.getAttribute(Attributes.ATTACK_DAMAGE);
-        boolean clawed = player.getMainHandItem().isEmpty()
-                && (growClaws || damage != null && damage.getModifier(CLAWS_ID) != null);
+        AttributeInstance speed = player.getAttribute(Attributes.ATTACK_SPEED);
+        boolean grown = damage != null && damage.getModifier(CLAWS_ID) != null
+                || speed != null && speed.getModifier(CLAW_SPEED_ID) != null;
+        boolean clawed = player.getMainHandItem().isEmpty() && (growClaws || grown);
         setModifier(player, Attributes.ATTACK_DAMAGE, CLAWS_ID, clawed ? HollowPlayerLogic.clawBonus(data) : 0.0,
                 AttributeModifier.Operation.ADD_VALUE);
         setModifier(player, Attributes.ATTACK_SPEED, CLAW_SPEED_ID, clawed ? HollowPlayerLogic.clawSpeedModifier() : 0.0,

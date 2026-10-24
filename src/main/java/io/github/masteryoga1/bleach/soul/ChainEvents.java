@@ -207,7 +207,7 @@ public final class ChainEvents {
     }
 
     /** Whether vanilla respawned the player at a respawn anchor, which spends one of its charges. */
-    private static boolean respawnedAtAnchor(ServerPlayer player) {
+    static boolean respawnedAtAnchor(ServerPlayer player) {
         BlockPos anchor = player.getRespawnPosition();
         return anchor != null && !player.isRespawnForced()
                 && player.level().dimension() == player.getRespawnDimension()
@@ -215,8 +215,8 @@ public final class ChainEvents {
                 && player.position().closerThan(Vec3.atCenterOf(anchor), 3.0);
     }
 
-    /** The Plus never used the anchor it would have respawned at, so it gets back the charge. */
-    private static void refundAnchorCharge(ServerLevel level, @Nullable BlockPos anchor) {
+    /** The soul never used the anchor it would have respawned at, so it gets back the charge. */
+    static void refundAnchorCharge(ServerLevel level, @Nullable BlockPos anchor) {
         if (anchor == null) {
             return;
         }

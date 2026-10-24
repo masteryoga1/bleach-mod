@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -149,7 +150,7 @@ public final class HollowPlayerEvents {
 
     /**
      * A Hollow that a purifying blow killed wakes as a soul, and is sent on to the Academy as Konsō
-     * would send it, if the server does that.
+     * would send it, if the server does that. A respawn anchor it never stayed at gets its charge back.
      */
     private static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !SoulLogic.hasSoul(player)
@@ -159,7 +160,11 @@ public final class HollowPlayerEvents {
         player.sendSystemMessage(Component.translatable("message.bleach.hollow_player.cleansed")
                 .withStyle(ChatFormatting.AQUA));
         if (BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY)) {
-            AcademyLocator.sendTo(player);
+            ServerLevel respawnLevel = player.serverLevel();
+            boolean usedAnchor = ChainEvents.respawnedAtAnchor(player);
+            if (AcademyLocator.sendTo(player) && usedAnchor) {
+                ChainEvents.refundAnchorCharge(respawnLevel, player.getRespawnPosition());
+            }
         }
         Milestones.grant(player, Milestones.CLEANSED);
     }
