@@ -531,8 +531,11 @@ public final class HollowTests {
 
         helper.assertTrue(HollowLogic.arrivalChancePerMinute(hunted(SoulState.HUMAN, 20.0F), true) == 0.0,
                 "a Garganta may open for an unaware soul");
-        helper.assertTrue(HollowLogic.arrivalChancePerMinute(hunted(SoulState.HOLLOW, 40.0F), true) == 0.0,
-                "a Garganta may open for a Hollow");
+        helper.assertTrue(HollowLogic.arrivalChancePerMinute(hunted(SoulState.ARRANCAR, 40.0F), true) == 0.0,
+                "a Garganta may open for an Arrancar");
+        // A Hollow player draws Garganta as a Human of the same reiatsu would (times a multiplier of 1).
+        assertClose(helper, HollowLogic.arrivalChancePerMinute(hunted(SoulState.HOLLOW, 40.0F), true),
+                HollowLogic.arrivalChancePerMinute(hunted(SoulState.HUMAN, 40.0F), true), "the chance for a Hollow");
         helper.assertTrue(HollowLogic.arrivalChancePerMinute(ShinigamiTests.soul(SoulState.HUMAN, 40.0F), true) == 0.0,
                 "a Garganta may open before the first Hollow");
         helper.succeed();

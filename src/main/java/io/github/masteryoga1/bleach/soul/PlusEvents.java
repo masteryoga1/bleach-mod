@@ -14,6 +14,7 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -46,9 +47,9 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * Plus spirits in the world: the souls villagers leave when they die, those that wander near aware
- * souls, what happens when a Hollow devours one or anything else strikes one down, a Plus turning
- * Hollow when its chain runs out, and the soul that rises from a purified Hollow. The Plus itself
- * is {@link PlusSpirit}; Konsō on one is in {@link ShinigamiEvents#konsoPlus}.
+ * souls, what happens when a Hollow (mob or player) devours one or anything else strikes one down, a
+ * Plus turning Hollow when its chain runs out, and the soul that rises from a purified Hollow. The
+ * Plus itself is {@link PlusSpirit}; Konsō on one is in {@link ShinigamiEvents#konsoPlus}.
  */
 public final class PlusEvents {
     /** A villager's Plus stays this close to its home, workplace or the spot it died on. */
@@ -64,6 +65,8 @@ public final class PlusEvents {
     private static final float BABY_SCALE = 0.5F;
     /** Ticks a Plus that pulled itself back together cannot be hurt again. */
     private static final int REFORM_INVULNERABLE_TICKS = 40;
+    /** The Devour key, named in the hint so each player sees their own binding. */
+    private static final String DEVOUR_KEY = "key.bleach.devour";
 
     private PlusEvents() {
     }
@@ -148,9 +151,9 @@ public final class PlusEvents {
 
     /**
      * A Plus, spirit or player, killed by a Hollow is devoured: the Hollow heals and its reiatsu grows.
-     * Anything else that strikes a Plus spirit down only tears its soul, which pulls itself back
-     * together at the cost of some of its chain. Only what kills outright, such as /kill or the void,
-     * ends one without a Hollow.
+     * One a Hollow player devours (see {@link DevourEvents#complete}) is gone too. Anything else that
+     * strikes a Plus spirit down only tears its soul, which pulls itself back together at the cost of
+     * some of its chain. Only what kills outright, such as /kill or the void, ends one without a Hollow.
      */
     private static void onDeath(LivingDeathEvent event) {
         LivingEntity victim = event.getEntity();
@@ -158,7 +161,9 @@ public final class PlusEvents {
             return;
         }
         DamageSource source = event.getSource();
-        if (source.getEntity() instanceof Hollow hollow && hollow.isAlive()) {
+        if (DevourLogic.isDevoured(source) && source.getEntity() instanceof LivingEntity devourer) {
+            devoured(level, devourer, victim);
+        } else if (source.getEntity() instanceof Hollow hollow && hollow.isAlive()) {
             devoured(level, hollow, victim);
         } else if (victim instanceof PlusSpirit plus && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             event.setCanceled(true);
@@ -174,17 +179,26 @@ public final class PlusEvents {
                 && SoulLogic.get(player).state() == SoulState.PLUS;
     }
 
-    private static void devoured(ServerLevel level, Hollow hollow, LivingEntity victim) {
-        hollow.devour(victim);
-        BaitEvents.onDevoured(hollow);
+    /**
+     * A Plus was devoured. A Hollow heals and grows on it; a Hollow player was fed in
+     * {@link DevourEvents#reward}, and its jaws already threw up the ink. Either way a bait site loses
+     * the Plus, and the aware nearby are told, all but the Plus and whoever devoured it.
+     */
+    private static void devoured(ServerLevel level, LivingEntity devourer, LivingEntity victim) {
+        if (devourer instanceof Hollow hollow) {
+            hollow.devour(victim);
+            BaitEvents.onDevoured(hollow);
+            SpiritSenses.particles(level, ParticleTypes.SQUID_INK, victim.getX(), victim.getY(0.5), victim.getZ(),
+                    12, 0.3, 0.4, 0.3, 0.02);
+        } else {
+            BaitEvents.onPlusDevoured(level, victim.position(), null);
+        }
         for (ServerPlayer witness : SpiritSenses.awareNear(level, victim.position(), HollowLogic.AWARE_NEAR_RANGE)) {
-            if (witness != victim) {
+            if (witness != victim && witness != devourer) {
                 witness.sendSystemMessage(Component.translatable("message.bleach.plus_devoured")
                         .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
             }
         }
-        SpiritSenses.particles(level, ParticleTypes.SQUID_INK, victim.getX(), victim.getY(0.5), victim.getZ(),
-                12, 0.3, 0.4, 0.3, 0.02);
     }
 
     private static void reform(ServerLevel level, PlusSpirit plus, DamageSource source) {
@@ -196,8 +210,11 @@ public final class PlusEvents {
         SpiritSenses.particles(level, ParticleTypes.SOUL, plus.getX(), plus.getY(0.5), plus.getZ(),
                 6, 0.25, 0.4, 0.25, 0.02);
         if (source.getEntity() instanceof Player attacker) {
-            attacker.displayClientMessage(Component.translatable("message.bleach.plus.reformed")
-                    .withStyle(ChatFormatting.GRAY), true);
+            // A Hollow's claws only tore it: the jaws are what keep a Plus down.
+            MutableComponent message = HollowPlayerLogic.isHollowPlayer(attacker)
+                    ? Component.translatable("message.bleach.devour.plus_hint", Component.keybind(DEVOUR_KEY))
+                    : Component.translatable("message.bleach.plus.reformed");
+            attacker.displayClientMessage(message.withStyle(ChatFormatting.GRAY), true);
         }
     }
 

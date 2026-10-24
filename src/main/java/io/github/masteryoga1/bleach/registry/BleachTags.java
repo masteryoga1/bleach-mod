@@ -23,6 +23,10 @@ public final class BleachTags {
     public static final TagKey<Item> QUINCY_GARB = TagKey.create(Registries.ITEM, BleachMod.id("quincy_garb"));
     /** The pieces of the Wandenreich uniform: cap, coat, trousers and boots. */
     public static final TagKey<Item> WANDENREICH_UNIFORM = TagKey.create(Registries.ITEM, BleachMod.id("wandenreich_uniform"));
+    /** Food a Hollow player can still eat. Empty: a Hollow feeds on souls. Packs may add to it. */
+    public static final TagKey<Item> HOLLOW_EDIBLE = TagKey.create(Registries.ITEM, BleachMod.id("hollow_edible"));
+    /** What a Hollow player can wear though its hide refuses armour: elytra, carved pumpkins and heads. */
+    public static final TagKey<Item> HOLLOW_WEARABLE = TagKey.create(Registries.ITEM, BleachMod.id("hollow_wearable"));
 
     /** Every kind of Academy a soul can be sent to. */
     public static final TagKey<Structure> ACADEMY = TagKey.create(Registries.STRUCTURE, BleachMod.id("academy"));

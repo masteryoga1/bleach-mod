@@ -63,6 +63,7 @@ public final class SoulEvents {
         ReiatsuEvents.register(bus);
         ShinigamiEvents.register(bus);
         HollowEvents.register(bus);
+        HollowPlayerEvents.register(bus);
         GargantaEvents.register(bus);
         PlusEvents.register(bus);
         ZanpakutoEvents.register(bus);
@@ -150,14 +151,20 @@ public final class SoulEvents {
                 && !data.isShikaiActive() && !QuincyRansotengai.isWoven(data);
     }
 
-    /** Zanjutsu and Hakuda make melee hits stronger. Training happens once a hit lands, in {@link #onDamageTaken}. */
+    /**
+     * Zanjutsu and Hakuda make melee hits stronger (Zanjutsu never in a Hollow's hand). Training happens
+     * once a hit lands, in {@link #onDamageTaken}.
+     */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
         ServerPlayer attacker = meleeAttacker(event.getSource());
-        Stat stat = attacker == null ? null : meleeStat(attacker.getMainHandItem());
-        if (stat == null) {
+        if (attacker == null) {
             return;
         }
         SoulData data = SoulLogic.get(attacker);
+        Stat stat = meleeStat(data, attacker.getMainHandItem());
+        if (stat == null) {
+            return;
+        }
         if (stat == Stat.HAKUDA) {
             event.setAmount(event.getAmount() + SoulLogic.hakudaBonus(data));
         } else {
@@ -175,12 +182,16 @@ public final class SoulEvents {
         return null;
     }
 
-    /** The stat a melee hit with this item uses: Hakuda bare-handed, Zanjutsu with a sword, else null. */
-    private static Stat meleeStat(ItemStack weapon) {
+    /**
+     * The stat a melee hit with this item uses: Hakuda bare-handed, Zanjutsu with a sword, else null.
+     * A Hollow knows nothing of swordsmanship: a blade in its claws deals its plain damage and trains
+     * nothing, though its bare-handed blows still use Hakuda.
+     */
+    private static Stat meleeStat(SoulData data, ItemStack weapon) {
         if (weapon.isEmpty()) {
             return Stat.HAKUDA;
         }
-        return isZanjutsuWeapon(weapon) ? Stat.ZANJUTSU : null;
+        return isZanjutsuWeapon(weapon) && !HollowPlayerLogic.isHollow(data) ? Stat.ZANJUTSU : null;
     }
 
     /**
@@ -205,14 +216,17 @@ public final class SoulEvents {
 
     private static void trainFromLandedHit(LivingDamageEvent.Post event) {
         ServerPlayer attacker = meleeAttacker(event.getSource());
-        Stat stat = attacker == null ? null : meleeStat(attacker.getMainHandItem());
+        if (attacker == null) {
+            return;
+        }
+        SoulData data = SoulLogic.get(attacker);
+        Stat stat = meleeStat(data, attacker.getMainHandItem());
         // Damage soaked by absorption hearts still counts as a hit that landed.
         boolean landed = event.getNewDamage() > 0.0F
                 || event.getReduction(DamageContainer.Reduction.ABSORPTION) > 0.0F;
         if (stat == null || !landed || event.getEntity() == attacker) {
             return;
         }
-        SoulData data = SoulLogic.get(attacker);
         // One grant per swing at most, so sweeping several mobs or spam-clicking does not train faster.
         // A Hollow is worth more than a mundane creature, and its mask more still.
         if (attacker.tickCount - data.lastCombatXpTick >= COMBAT_XP_COOLDOWN_TICKS) {

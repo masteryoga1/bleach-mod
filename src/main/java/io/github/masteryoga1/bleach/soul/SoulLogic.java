@@ -177,21 +177,24 @@ public final class SoulLogic {
     }
 
     /**
-     * Applies the stats that map onto vanilla attributes. The modifiers are transient, so this runs
-     * again whenever the player logs in, respawns or a stat changes.
+     * Applies the stats that map onto vanilla attributes, and a Hollow player's body (its claws, hide
+     * and sight, or their removal for anyone else: see {@link HollowBody#reconcile}). The modifiers are
+     * transient, so this runs again whenever the player logs in, respawns or a stat changes.
      */
     public static void applyStatModifiers(LivingEntity entity, SoulData data) {
         AttributeInstance speed = entity.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (speed == null) {
-            return;
+        if (speed != null) {
+            int hoho = data.level(Stat.HOHO);
+            if (hoho <= 0) {
+                speed.removeModifier(HOHO_SPEED_ID);
+            } else {
+                speed.addOrUpdateTransientModifier(new AttributeModifier(HOHO_SPEED_ID,
+                        hoho * BleachConfig.get(BleachConfig.HOHO_SPEED_PER_LEVEL),
+                        AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+            }
         }
-        int hoho = data.level(Stat.HOHO);
-        if (hoho <= 0) {
-            speed.removeModifier(HOHO_SPEED_ID);
-        } else {
-            speed.addOrUpdateTransientModifier(new AttributeModifier(HOHO_SPEED_ID,
-                    hoho * BleachConfig.get(BleachConfig.HOHO_SPEED_PER_LEVEL),
-                    AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+        if (entity instanceof Player player) {
+            HollowBody.reconcile(player, data);
         }
     }
 
@@ -297,7 +300,9 @@ public final class SoulLogic {
      * holds their soul together and they become a Shinigami; an awakened Quincy's blood holds theirs
      * to the body and they wake alive; any other spiritually aware Human lingers as a Plus with a
      * fresh Chain of Fate; a Plus that dies loses part of its chain (an awakened Quincy Plus whose
-     * chain that breaks is torn apart at once, as above). Everyone keeps their progress,
+     * chain that breaks is torn apart at once, as above); a Hollow stays a Hollow, still hungry and a
+     * quarter of its souls lighter, unless a purifying blade freed it, when it wakes as a soul (see
+     * {@link HollowBody#afterDeath}). Everyone keeps their progress,
      * but a Quincy loses their Blut and gathered reishi and half their Hollow poison, a Letzt Stil
      * burns out into the seal, and every Quincy form ends (see {@link QuincyArtsLogic#afterDeath}).
      */
@@ -311,6 +316,10 @@ public final class SoulLogic {
             return reformed(old, next, quincy);
         }
         next.setQuincy(quincy.withPoison(old.quincy().poison() * 0.5F));
+        if (old.state() == SoulState.HOLLOW) {
+            // A Hollow is never a Human or a Plus, so nothing below touches it.
+            HollowBody.afterDeath(old, next);
+        }
         boolean intoSpirit = old.state() == SoulState.HUMAN && BleachConfig.get(BleachConfig.DEATH_INTO_PLUS);
         if (intoSpirit && old.tier(PowerPath.SHINIGAMI) > 0) {
             next.setState(SoulState.SHINIGAMI);
@@ -335,13 +344,17 @@ public final class SoulLogic {
         return next;
     }
 
-    /** A torn soul knits itself together as a living Human, with less reiryoku and no Hollow poison. */
+    /**
+     * A torn soul knits itself together as a living Human, with less reiryoku, no Hollow poison, and
+     * none of a Hollow's hunger or souls (its diet is remembered).
+     */
     private static SoulData reformed(SoulData old, SoulData next, QuincyProgress quincy) {
         next.setState(SoulState.HUMAN);
         next.clearChain();
         next.setMaxReiryoku((float) (old.maxReiryoku() * QuincyLogic.DESTROYED_REIRYOKU_FRACTION));
         next.setReiryoku(next.maxReiryoku() * (float) BleachConfig.get(BleachConfig.RESPAWN_REIRYOKU_FRACTION));
         next.setQuincy(quincy.withPoison(0.0F));
+        next.setHollow(old.hollow().restarted());
         next.soulReformed = true;
         return next;
     }

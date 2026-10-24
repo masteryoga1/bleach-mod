@@ -101,7 +101,8 @@ jobs:
   # Letzt Stil, is sealed and restored, streams arrows from Ginrei Kojaku, calls Licht Regen, forms and
   # fires a Seele Schneider, casts Wolke and Heizen, flies in Vollständig with Sklaverei, then meets a
   # Quincy Elder and Hunter, passes the Ransōtengai trial, wears the Wandenreich uniform, pages the
-  # Tailoring Table, draws a bait wave and cracks the sky, with the camera behind the player, and quits.
+  # Tailoring Table, draws a bait wave and cracks the sky, becomes a Hollow, sheds the uniform and devours
+  # a Plus, nearly all with the camera behind the player, and quits.
   # Game tests only run on a server, so this is what catches crashes in rendering, the HUD, the screens and
   # the client mixins. Its screenshots are kept for review.
   client-smoke-test:

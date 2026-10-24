@@ -114,6 +114,59 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue MASK_HIT_STAT_XP_BONUS;
     public static final ModConfigSpec.IntValue PURIFICATION_ZANJUTSU_XP;
 
+    // Hollow players
+    public static final ModConfigSpec.DoubleValue SATIETY_START;
+    public static final ModConfigSpec.DoubleValue SATIETY_DRAIN_PER_MINUTE;
+    public static final ModConfigSpec.DoubleValue SATIETY_PER_EXHAUSTION;
+    public static final ModConfigSpec.DoubleValue SATIETY_RESPAWN_FLOOR;
+    public static final ModConfigSpec.DoubleValue PEACEFUL_SATIETY_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue RAVENOUS_BELOW;
+    public static final ModConfigSpec.DoubleValue RAVENOUS_REGEN_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue RAVENOUS_CLAW_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue HUNGRY_REIRYOKU_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue STARVING_DAMAGE;
+    public static final ModConfigSpec.IntValue STARVING_INTERVAL_TICKS;
+    public static final ModConfigSpec.DoubleValue HOLLOW_REGEN_BASE;
+    public static final ModConfigSpec.DoubleValue HOLLOW_REGEN_PER_100;
+    public static final ModConfigSpec.DoubleValue HOLLOW_REGEN_MAX;
+    public static final ModConfigSpec.DoubleValue REGEN_SATIETY_PER_HEALTH;
+    public static final ModConfigSpec.DoubleValue CLAW_DAMAGE_BASE;
+    public static final ModConfigSpec.DoubleValue CLAW_DAMAGE_PER_SQRT;
+    public static final ModConfigSpec.DoubleValue CLAW_DAMAGE_MAX;
+    public static final ModConfigSpec.DoubleValue CLAW_ATTACKS_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue HIDE_ARMOR_BASE;
+    public static final ModConfigSpec.DoubleValue HIDE_ARMOR_PER_SQRT;
+    public static final ModConfigSpec.DoubleValue HIDE_ARMOR_MAX;
+    public static final ModConfigSpec.BooleanValue HOLLOW_WEARS_ARMOR;
+    public static final ModConfigSpec.BooleanValue HOLLOW_NIGHT_SIGHT;
+    public static final ModConfigSpec.DoubleValue HOLLOW_SAFE_FALL;
+    public static final ModConfigSpec.BooleanValue VILLAGERS_TRADE_WITH_HOLLOWS;
+    public static final ModConfigSpec.IntValue DEVOUR_HOLD_TICKS;
+    public static final ModConfigSpec.IntValue DEVOUR_PLUS_HOLD_TICKS;
+    public static final ModConfigSpec.IntValue DEVOUR_COOLDOWN_TICKS;
+    public static final ModConfigSpec.DoubleValue DEVOUR_HEALTH_FRACTION;
+    public static final ModConfigSpec.DoubleValue DEVOUR_CRACKED_HEALTH_FRACTION;
+    public static final ModConfigSpec.DoubleValue DEVOUR_REIATSU_RATIO;
+    public static final ModConfigSpec.BooleanValue DEVOUR_PLAYERS;
+    public static final ModConfigSpec.DoubleValue DEVOUR_HEAL_FRACTION;
+    public static final ModConfigSpec.DoubleValue DEVOUR_REIRYOKU_FRACTION;
+    public static final ModConfigSpec.DoubleValue DEVOUR_GROWTH_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue PLUS_SATIETY;
+    public static final ModConfigSpec.DoubleValue MEAL_SATIETY_BASE;
+    public static final ModConfigSpec.DoubleValue MEAL_SATIETY_PER_REIATSU;
+    public static final ModConfigSpec.DoubleValue MEAL_SATIETY_MAX;
+    public static final ModConfigSpec.DoubleValue REIATSU_PER_SOUL;
+    public static final ModConfigSpec.DoubleValue DEATH_SOUL_LOSS_FRACTION;
+    public static final ModConfigSpec.DoubleValue GNAW_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue HOLLOW_ARRIVAL_MULTIPLIER;
+    public static final ModConfigSpec.BooleanValue RIVALS_HUNT_DRAWER;
+    public static final ModConfigSpec.IntValue SCENT_RANGE;
+    public static final ModConfigSpec.IntValue SCENT_INTERVAL_SECONDS;
+    public static final ModConfigSpec.DoubleValue SCENT_BELOW;
+    public static final ModConfigSpec.BooleanValue PURIFICATION_FREES;
+    public static final ModConfigSpec.BooleanValue INSTRUCTOR_PURIFIES;
+    public static final ModConfigSpec.DoubleValue HOLLOW_PLAYER_MASK_DAMAGE_MULTIPLIER;
+
     public static final ModConfigSpec.BooleanValue FIRST_HOLLOW;
     public static final ModConfigSpec.IntValue FIRST_HOLLOW_DELAY_MINUTES;
     public static final ModConfigSpec.IntValue FIRST_HOLLOW_RETRY_MINUTES;
@@ -652,6 +705,162 @@ public final class BleachConfig {
         PURIFICATION_ZANJUTSU_XP = builder
                 .comment("Zanjutsu XP for purifying a Hollow.")
                 .defineInRange("purification_zanjutsu_xp", 5, 0, 1_000);
+        builder.pop();
+
+        builder.push("hollow_player");
+        SATIETY_START = builder
+                .comment("Soul hunger a Hollow starts at, out of 100.")
+                .defineInRange("satiety_start", 60.0, 0.0, 100.0);
+        SATIETY_DRAIN_PER_MINUTE = builder
+                .comment("Soul hunger a Hollow loses each minute, doing nothing.")
+                .defineInRange("drain_per_minute", 2.0, 0.0, 100.0);
+        SATIETY_PER_EXHAUSTION = builder
+                .comment("Soul hunger lost per point of vanilla exhaustion (sprinting, jumping, fighting).")
+                .defineInRange("satiety_per_exhaustion", 0.6, 0.0, 10.0);
+        SATIETY_RESPAWN_FLOOR = builder
+                .comment("A Hollow comes back from death with at least this much soul hunger.")
+                .defineInRange("respawn_floor", 30.0, 0.0, 100.0);
+        PEACEFUL_SATIETY_PER_SECOND = builder
+                .comment("Soul hunger a Hollow regains each second on Peaceful.")
+                .defineInRange("peaceful_refill_per_second", 1.0, 0.0, 100.0);
+        RAVENOUS_BELOW = builder
+                .comment("Below this soul hunger a Hollow is ravenous.")
+                .defineInRange("ravenous_below", 30.0, 0.0, 100.0);
+        RAVENOUS_REGEN_MULTIPLIER = builder
+                .comment("Multiplier on a ravenous Hollow's regeneration.")
+                .defineInRange("ravenous_regeneration_multiplier", 0.5, 0.0, 1.0);
+        RAVENOUS_CLAW_MULTIPLIER = builder
+                .comment("Multiplier on the claws of a ravenous or starving Hollow.")
+                .defineInRange("ravenous_claw_multiplier", 1.2, 1.0, 5.0);
+        HUNGRY_REIRYOKU_MULTIPLIER = builder
+                .comment("Multiplier on reiryoku regeneration while ravenous or starving.")
+                .defineInRange("hungry_reiryoku_multiplier", 0.5, 0.0, 1.0);
+        STARVING_DAMAGE = builder
+                .comment("Damage a starving Hollow takes each interval (with vanilla's floors by difficulty).")
+                .defineInRange("starving_damage", 1.0, 0.0, 100.0);
+        STARVING_INTERVAL_TICKS = builder
+                .comment("Ticks between two starving hurts.")
+                .defineInRange("starving_interval_ticks", 80, 1, 1_200);
+        HOLLOW_REGEN_BASE = builder
+                .comment("Health a Hollow player heals each second, at any reiryoku.")
+                .defineInRange("regeneration_base", 1.0, 0.0, 100.0);
+        HOLLOW_REGEN_PER_100 = builder
+                .comment("Extra health a second for each 100 maximum reiryoku.")
+                .defineInRange("regeneration_per_100_reiryoku", 0.25, 0.0, 100.0);
+        HOLLOW_REGEN_MAX = builder
+                .comment("Most health a Hollow player heals each second.")
+                .defineInRange("regeneration_max", 4.0, 0.0, 100.0);
+        REGEN_SATIETY_PER_HEALTH = builder
+                .comment("Soul hunger each healed point of health costs.")
+                .defineInRange("regeneration_satiety_per_health", 1.5, 0.0, 100.0);
+        CLAW_DAMAGE_BASE = builder
+                .comment("Bare-handed damage a Hollow's claws add.")
+                .defineInRange("claw_damage_base", 3.0, 0.0, 100.0);
+        CLAW_DAMAGE_PER_SQRT = builder
+                .comment("Claw damage added per square root of maximum reiryoku.")
+                .defineInRange("claw_damage_per_sqrt_reiryoku", 0.25, 0.0, 10.0);
+        CLAW_DAMAGE_MAX = builder
+                .comment("Most damage the claws add.")
+                .defineInRange("claw_damage_max", 12.0, 0.0, 1_000.0);
+        CLAW_ATTACKS_PER_SECOND = builder
+                .comment("Bare-handed attack speed of a Hollow.")
+                .defineInRange("claw_attacks_per_second", 2.0, 0.25, 20.0);
+        HIDE_ARMOR_BASE = builder
+                .comment("Armour a Hollow's hide gives.")
+                .defineInRange("hide_armor_base", 4.0, 0.0, 30.0);
+        HIDE_ARMOR_PER_SQRT = builder
+                .comment("Hide armour added per square root of maximum reiryoku.")
+                .defineInRange("hide_armor_per_sqrt_reiryoku", 0.4, 0.0, 10.0);
+        HIDE_ARMOR_MAX = builder
+                .comment("Most armour the hide gives.")
+                .defineInRange("hide_armor_max", 16.0, 0.0, 30.0);
+        HOLLOW_WEARS_ARMOR = builder
+                .comment("Whether Hollow players can wear armour (elytra, carved pumpkins and skulls always can).")
+                .define("wears_armor", false);
+        HOLLOW_NIGHT_SIGHT = builder
+                .comment("Whether Hollow players see in the dark (each can turn it off with Sneak + Devour).")
+                .define("night_sight", true);
+        HOLLOW_SAFE_FALL = builder
+                .comment("Extra blocks a Hollow player can fall unharmed.")
+                .defineInRange("safe_fall_extra", 3.0, 0.0, 64.0);
+        VILLAGERS_TRADE_WITH_HOLLOWS = builder
+                .comment("Whether villagers and wandering traders trade with Hollow players.")
+                .define("villagers_trade", false);
+        DEVOUR_HOLD_TICKS = builder
+                .comment("Ticks the Devour key must be held on a Hollow or a player.")
+                .defineInRange("devour_hold_ticks", 40, 1, 600);
+        DEVOUR_PLUS_HOLD_TICKS = builder
+                .comment("Ticks the Devour key must be held on a Plus.")
+                .defineInRange("devour_plus_hold_ticks", 20, 1, 600);
+        DEVOUR_COOLDOWN_TICKS = builder
+                .comment("Ticks after a hold ends before the next can start.")
+                .defineInRange("devour_cooldown_ticks", 20, 0, 1_200);
+        DEVOUR_HEALTH_FRACTION = builder
+                .comment("A Hollow or player can be devoured at or below this share of its health.")
+                .defineInRange("devour_health_fraction", 0.3, 0.0, 1.0);
+        DEVOUR_CRACKED_HEALTH_FRACTION = builder
+                .comment("The same share for a Hollow whose mask is cracked.")
+                .defineInRange("devour_cracked_health_fraction", 0.5, 0.0, 1.0);
+        DEVOUR_REIATSU_RATIO = builder
+                .comment("Prey with more than this many times the devourer's reiatsu cannot be devoured.")
+                .defineInRange("devour_reiatsu_ratio", 3.0, 0.0, 100.0);
+        DEVOUR_PLAYERS = builder
+                .comment("Whether Hollow players can devour other players (PvP and team rules still apply).")
+                .define("devour_players", true);
+        DEVOUR_HEAL_FRACTION = builder
+                .comment("Share of maximum health a meal heals.")
+                .defineInRange("devour_heal_fraction", 0.25, 0.0, 1.0);
+        DEVOUR_REIRYOKU_FRACTION = builder
+                .comment("Share of maximum reiryoku a meal refills.")
+                .defineInRange("devour_reiryoku_fraction", 0.2, 0.0, 1.0);
+        DEVOUR_GROWTH_MULTIPLIER = builder
+                .comment("Reiryoku growth from a meal, as a multiple of slaying the same soul.")
+                .defineInRange("devour_growth_multiplier", 2.0, 0.0, 100.0);
+        PLUS_SATIETY = builder
+                .comment("Soul hunger a devoured Plus restores.")
+                .defineInRange("plus_satiety", 30.0, 0.0, 100.0);
+        MEAL_SATIETY_BASE = builder
+                .comment("Soul hunger any other meal restores, before its reiatsu.")
+                .defineInRange("meal_satiety_base", 15.0, 0.0, 100.0);
+        MEAL_SATIETY_PER_REIATSU = builder
+                .comment("Soul hunger restored per point of the prey's reiatsu.")
+                .defineInRange("meal_satiety_per_reiatsu", 0.4, 0.0, 10.0);
+        MEAL_SATIETY_MAX = builder
+                .comment("Most soul hunger one meal restores.")
+                .defineInRange("meal_satiety_max", 60.0, 0.0, 100.0);
+        REIATSU_PER_SOUL = builder
+                .comment("Prey reiatsu per soul taken in (at least one).")
+                .defineInRange("reiatsu_per_soul", 10.0, 1.0, 1_000.0);
+        DEATH_SOUL_LOSS_FRACTION = builder
+                .comment("Share of its souls a Hollow loses when it dies (taken by whoever devoured it).")
+                .defineInRange("death_soul_loss_fraction", 0.25, 0.0, 1.0);
+        GNAW_MULTIPLIER = builder
+                .comment("How much faster a Plus's chain erodes while it gnaws at it. 1 turns gnawing off.")
+                .defineInRange("gnaw_multiplier", 40.0, 1.0, 1_000.0);
+        HOLLOW_ARRIVAL_MULTIPLIER = builder
+                .comment("Multiplier on the Garganta chance for Hollow players. 0 turns their arrivals off.")
+                .defineInRange("arrival_multiplier", 1.0, 0.0, 10.0);
+        RIVALS_HUNT_DRAWER = builder
+                .comment("Whether Hollows that come for a Hollow player hunt it.")
+                .define("rivals_hunt_drawer", true);
+        SCENT_RANGE = builder
+                .comment("Blocks a hungry Hollow can smell a soul from. 0 turns the scent off.")
+                .defineInRange("scent_range", 48, 0, 256);
+        SCENT_INTERVAL_SECONDS = builder
+                .comment("Seconds between two scents.")
+                .defineInRange("scent_interval_seconds", 15, 1, 600);
+        SCENT_BELOW = builder
+                .comment("A Hollow smells souls only below this soul hunger.")
+                .defineInRange("scent_below", 50.0, 0.0, 100.0);
+        PURIFICATION_FREES = builder
+                .comment("Whether a Hollow player killed by a purifying blow comes back as a soul.")
+                .define("purification_frees", true);
+        INSTRUCTOR_PURIFIES = builder
+                .comment("Whether the Academy's instructor offers to purify a Hollow player.")
+                .define("instructor_purifies", true);
+        HOLLOW_PLAYER_MASK_DAMAGE_MULTIPLIER = builder
+                .comment("Damage multiplier for a blow that strikes a Hollow player's mask.")
+                .defineInRange("mask_damage_multiplier", 1.5, 1.0, 10.0);
         builder.pop();
 
         builder.push("first_hollow");

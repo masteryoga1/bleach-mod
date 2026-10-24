@@ -92,8 +92,9 @@ QUINCY_FOLD = rgb(206, 212, 224)
 QUINCY_BLUE = rgb(40, 84, 170)
 VEIN = rgb(90, 170, 255)
 VEIN_DIM = rgb(60, 120, 220)
-# The Wandenreich uniform, white with black bands and silver buttons; a fragment of a Hollow's mask;
-# and the Hollow Bait, a pale wafer with a dark red heart.
+# The Wandenreich uniform, white with black bands and silver buttons; a fragment of a Hollow's mask,
+# and the red glow in a ravenous Hollow player's eyes; and the Hollow Bait, a pale wafer with a dark
+# red heart.
 WANDENREICH_WHITE = rgb(240, 240, 236)
 WANDENREICH_BLACK = rgb(34, 34, 40)
 WANDENREICH_SILVER = rgb(176, 184, 196)
@@ -101,6 +102,7 @@ WANDENREICH_FOLD = rgb(206, 206, 200)
 MASK_BONE = rgb(234, 230, 218)
 MASK_SHADE = rgb(188, 182, 168)
 MASK_LINE = rgb(92, 88, 82)
+EYE_RED = rgb(230, 40, 40)
 BAIT_WHITE = rgb(226, 220, 206)
 BAIT_EDGE = rgb(150, 140, 124)
 BAIT_RED = rgb(150, 30, 36)
@@ -1112,6 +1114,105 @@ def ginto_cast():
     return c
 
 
+def hole(c, x, y):
+    """A hole four pixels across at x..x+3, y..y+3, its corners rounded off into a dark rim around it."""
+    c.rect(x - 1, y - 1, x + 5, y + 5, HOLLOW_SHADE)
+    c.rect(x, y, x + 4, y + 4, VOID)
+    for dx, dy in ((0, 0), (3, 0), (0, 3), (3, 3)):
+        c.put(x + dx, y + dy, HOLLOW_SHADE)
+    for dx, dy in ((-1, -1), (4, -1), (-1, 4), (4, 4)):
+        c.put(x + dx, y + dy, CLEAR)
+
+
+def forearm(c, u, v, front):
+    """The lower half of an arm (or sleeve) whose net starts at u, v: dark all round, a bone plate on the front
+    and three claw tips on the front's last row. The columns used fit the wide and the slim arm alike."""
+    c.rect(u, v + 10, u + 16, v + 16, HOLLOW_BLACK)
+    mottle(c, u, v + 10, u + 16, v + 16, HOLLOW_SHADE, 5, seed=u)
+    c.rect(front, v + 10, front + 3, v + 13, BONE)
+    c.rect(front, v + 13, front + 3, v + 14, BONE_SHADE)
+    c.put(front, v + 15, BONE)
+    c.put(front + 1, v + 15, VOID)
+    c.put(front + 2, v + 15, BONE)
+
+
+def hollow_player():
+    """A Hollow player's body over its skin, in the player skin layout: a hole through the chest, front and back,
+    on the body and on the jacket layer; dark forearms with bone plates and claws, on the arms and the sleeves.
+    Everything else stays clear, so the skin shows through."""
+    c = Canvas(64, 64)
+    for x, y in ((22, 23), (34, 23), (22, 39), (34, 39)):  # body front, body back, jacket front, jacket back
+        hole(c, x, y)
+    # Right arm, right sleeve, left arm, left sleeve: where each net starts, and the first column of its front.
+    for u, v, front in ((40, 16, 44), (40, 32, 44), (32, 48, 36), (48, 48, 52)):
+        forearm(c, u, v, front)
+    return c
+
+
+def hollow_player_mask():
+    """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
+    between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
+    other three shapes."""
+    c = Canvas(64, 32)
+    box(c, 0, 0, 9, 7, 1, BONE)          # plate: front x 1-9, y 1-7
+    c.rect(11, 1, 20, 8, BONE_SHADE)     # the plate's back, against the face
+    box(c, 0, 8, 7, 2, 1, BONE_SHADE)    # jaw: front x 1-7, y 9-10
+    box(c, 20, 5, 1, 3, 1, TOOTH)        # a fang (both fangs share the net)
+    box(c, 20, 0, 1, 4, 1, BONE_SHADE)   # a horn (both horns share the net)
+    c.put(21, 0, BONE)                   # the horn's tip (its top face)
+    box(c, 24, 0, 3, 2, 3, BONE)         # beak
+    c.rect(27, 3, 30, 5, BONE_SHADE)     # the beak's front
+    c.rect(2, 3, 4, 5, VOID)             # eye holes, two pixels square, either side of x 5
+    c.rect(7, 3, 9, 5, VOID)
+    c.put(5, 1, MASK_LINE)               # a ridge down the brow
+    c.put(5, 2, MASK_LINE)
+    for x in (2, 4, 6, 8):               # gaps between the upper teeth, on the plate's last row
+        c.put(x, 7, VOID)
+    for x in (2, 4, 6):                  # and between the lower ones, on the jaw's top row
+        c.put(x, 9, VOID)
+    return c
+
+
+def hollow_player_mask_eyes():
+    """The ravenous glow: the mask's eye holes in red, drawn emissive over the mask. The rest stays clear."""
+    c = Canvas(64, 32)
+    c.rect(2, 3, 4, 5, EYE_RED)
+    c.rect(7, 3, 9, 5, EYE_RED)
+    return c
+
+
+def mask_edge_reach(x, y):
+    """Where a pixel of the edge lies against the oval a Hollow sees through: above 1 is outside it."""
+    return ((x + 0.5 - 32) / 29) ** 2 + ((y + 0.5 - 16) / 13) ** 2
+
+
+def hollow_mask_edge():
+    """The inside of a Hollow's mask, seen in first person over the whole screen: bone outside an oval, shaded
+    where it meets it, a bridge between the eye holes at the top middle and the ridge of the nose at the bottom.
+    The middle stays clear."""
+    c = Canvas(64, 32)
+    for y in range(32):
+        for x in range(64):
+            reach = mask_edge_reach(x, y)
+            if reach > 1.15:
+                c.put(x, y, BONE)
+            elif reach > 1.0:
+                c.put(x, y, BONE_SHADE)
+    c.rect(30, 0, 34, 5, BONE_SHADE)     # the bridge between the eye holes
+    c.rect(31, 0, 33, 4, BONE)
+    c.rect(30, 27, 34, 32, BONE_SHADE)   # the ridge of the nose
+    c.rect(31, 28, 33, 32, BONE)
+    return c
+
+
+def hollow_mask_edge_cracked():
+    """The same edge, cracked across the top left and the bottom right."""
+    c = hollow_mask_edge()
+    crack(c, [(3, 1), (7, 3), (10, 3), (13, 2)])
+    crack(c, [(60, 30), (56, 28), (53, 30)])
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -1179,6 +1280,12 @@ TEXTURES = {
     "entity/seele_schneider.png": seele_schneider_entity,
     "entity/vollstandig.png": vollstandig,
     "entity/ginto_cast.png": ginto_cast,
+    "entity/hollow_player.png": hollow_player,
+    "entity/hollow_player_mask.png": hollow_player_mask,
+    "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
+    "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,
+    "misc/hollow_mask_edge.png": hollow_mask_edge,
+    "misc/hollow_mask_edge_cracked.png": hollow_mask_edge_cracked,
 }
 
 

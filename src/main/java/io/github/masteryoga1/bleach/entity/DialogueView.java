@@ -56,7 +56,9 @@ public enum DialogueView {
     /** Anyone else, the unaware included, whom the Hunter sends home. */
     HUNTER_PLAIN,
     /** A Hollow or an Arrancar, whom the Hunter warns off. */
-    HUNTER_HOLLOW;
+    HUNTER_HOLLOW,
+    /** The instructor offers to cleanse a Hollow player with his blade. */
+    HOLLOW_PURIFY;
 
     private static final IntFunction<DialogueView> BY_ID =
             ByIdMap.continuous(DialogueView::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

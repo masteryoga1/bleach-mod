@@ -265,9 +265,9 @@ public class GargantaRift extends Entity {
 
     /**
      * Drops the Hollows, each a little way from the middle if there is room there, turned toward the
-     * soul that drew them. They hunt that soul if it is here and still prey, and Fishbone D takes it as
-     * its quarry. Hollows fall the few blocks to the ground unharmed. Those a Hollow Bait drew belong to
-     * its site, which is told how many came.
+     * soul that drew them. They hunt that soul if it is here and still their prey (a Hollow that drew
+     * them is their rival), and Fishbone D takes it as its quarry. Hollows fall the few blocks to the
+     * ground unharmed. Those a Hollow Bait drew belong to its site, which is told how many came.
      */
     private void drop(ServerLevel server) {
         ServerPlayer target = drawer != null ? server.getServer().getPlayerList().getPlayer(drawer) : null;
@@ -307,7 +307,7 @@ public class GargantaRift extends Entity {
                 hollow.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, HEAVY_LANDING_TICKS, SLOWNESS_IV,
                         false, false));
             }
-            if (target != null && HollowLogic.isPrey(target)) {
+            if (target != null && HollowLogic.isPreyFor(hollow, target)) {
                 hollow.setTarget(target);
             }
             SpiritSenses.particles(server, ParticleTypes.LARGE_SMOKE, hollow.getX(), hollow.getY() + hollow.getBbHeight() * 0.5,

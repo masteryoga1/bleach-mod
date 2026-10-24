@@ -6,12 +6,14 @@ import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.registry.ModSounds;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -24,10 +26,11 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 
 /**
- * Fighting Hollows on the server: blows to the mask, a Hollow's bite on a Plus's chain, and what a
- * Hollow's death means, purified or slain. It also settles the first Hollow, Fishbone D, when it
- * dies or its quarry does. The rules themselves are in {@link HollowLogic}. What can be done without
- * a connection takes a {@link Player}, so game tests can use mock players.
+ * Fighting Hollows on the server: blows to the mask (a Hollow player's too), a Hollow's bite on a
+ * Plus's chain, and what a Hollow's death means, purified or slain. It also settles the first Hollow,
+ * Fishbone D, when it dies or its quarry does. A soul devoured by a Hollow player is neither: the
+ * devourer was fed already (see {@link DevourEvents}). The rules themselves are in {@link HollowLogic}.
+ * What can be done without a connection takes a {@link Player}, so game tests can use mock players.
  */
 public final class HollowEvents {
     /** A hit after this many ticks of invulnerability is a fresh one; vanilla only lets it through if it hits harder. */
@@ -45,6 +48,7 @@ public final class HollowEvents {
         bus.addListener(HollowEvents::onIncomingDamage);
         bus.addListener(HollowEvents::onDamageTaken);
         bus.addListener(HollowEvents::onDeath);
+        DevourEvents.register(bus);
     }
 
     /**
@@ -52,13 +56,28 @@ public final class HollowEvents {
      * the mask, stops the Hollow healing and makes it reel, and if the mask was whole, a player's blow
      * may knock a fragment off it (see {@link MaskFragments}). The event fires before the
      * invulnerability check, so a hit inside the invulnerability frames gets the damage but none of
-     * the rest. What does no harm, such as a snowball, does nothing to the mask.
+     * the rest. What does no harm, such as a snowball, does nothing to the mask, and neither do the
+     * jaws of a Hollow player devouring a soul. A Hollow player's mask is struck in the same way (see
+     * {@link #strikePlayerMask}).
      */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
-        if (!(event.getEntity() instanceof Hollow hollow) || hollow.level().isClientSide() || event.getAmount() <= 0.0F
-                || !HollowMask.struck(hollow, event.getSource())) {
+        LivingEntity victim = event.getEntity();
+        DamageSource source = event.getSource();
+        if (DevourLogic.isDevoured(source) || victim.level().isClientSide() || event.getAmount() <= 0.0F) {
             return;
         }
+        if (victim instanceof Hollow hollow) {
+            if (HollowMask.struck(hollow, source)) {
+                strikeMask(event, hollow);
+            }
+        } else if (victim instanceof Player player && HollowPlayerLogic.isHollowPlayer(player)
+                && HollowMask.struckPlayer(player, source)) {
+            strikePlayerMask(event, player);
+        }
+    }
+
+    /** A blow landed on a Hollow mob's mask. See {@link #onIncomingDamage}. */
+    private static void strikeMask(LivingIncomingDamageEvent event, Hollow hollow) {
         event.setAmount(event.getAmount() * (float) BleachConfig.get(BleachConfig.MASK_DAMAGE_MULTIPLIER));
         if (hollow.invulnerableTime <= FRESH_HIT_INVULNERABLE_TICKS) {
             long now = hollow.level().getGameTime();
@@ -75,9 +94,30 @@ public final class HollowEvents {
         }
     }
 
-    /** Fires only for hits that got past shields and invulnerability frames. Hit XP is given in {@link SoulEvents}. */
+    /**
+     * A blow landed on a Hollow player's mask: it hits harder, though less so than on a Hollow mob's. A
+     * fresh one on a whole mask also cracks it, stops the Hollow regenerating for a while, and is heard,
+     * and counts as a strike to the mask for whoever landed it. No fragment breaks off a player's mask.
+     */
+    private static void strikePlayerMask(LivingIncomingDamageEvent event, Player victim) {
+        event.setAmount(event.getAmount() * (float) BleachConfig.get(BleachConfig.HOLLOW_PLAYER_MASK_DAMAGE_MULTIPLIER));
+        if (victim.invulnerableTime > FRESH_HIT_INVULNERABLE_TICKS
+                || !HollowBody.onMaskStruck(SoulLogic.get(victim), victim.level().getGameTime())) {
+            return;
+        }
+        SpiritSenses.play(victim, ModSounds.MASK_CRACK.get(), SoundSource.PLAYERS, 1.0F, 1.0F, false);
+        if (event.getSource().getEntity() instanceof ServerPlayer attacker) {
+            Milestones.grant(attacker, Milestones.MASK_STRIKE);
+        }
+    }
+
+    /**
+     * Fires only for hits that got past shields and invulnerability frames. Hit XP is given in
+     * {@link SoulEvents}. The jaws of a devouring Hollow player bite no chain and count no blow.
+     */
     private static void onDamageTaken(LivingDamageEvent.Post event) {
-        if (event.getNewDamage() <= 0.0F || event.getEntity().level().isClientSide()) {
+        if (event.getNewDamage() <= 0.0F || event.getEntity().level().isClientSide()
+                || DevourLogic.isDevoured(event.getSource())) {
             return;
         }
         LivingEntity victim = event.getEntity();
@@ -125,8 +165,9 @@ public final class HollowEvents {
 
     /**
      * After {@link PlusEvents}, which may have saved a Plus. A Hollow killed by a player is purified or
-     * slain; Fishbone D's death settles its quarry's first Hollow; a player's death may end the first
-     * Hollow too, and a Hollow player killed by another is worth reiryoku like a Hollow mob.
+     * slain, unless a Hollow player devoured it; Fishbone D's death settles its quarry's first Hollow; a
+     * player's death may end the first Hollow too, and a Hollow player killed by another is worth
+     * reiryoku like a Hollow mob.
      */
     private static void onDeath(LivingDeathEvent event) {
         LivingEntity victim = event.getEntity();
@@ -145,7 +186,8 @@ public final class HollowEvents {
     }
 
     private static void onHollowDeath(Hollow hollow, DamageSource source) {
-        if (source.getEntity() instanceof Player killer && !hollow.isPurifying()) {
+        // A devoured Hollow is eaten, not purified or slain: its devourer was fed in DevourEvents.
+        if (!DevourLogic.isDevoured(source) && source.getEntity() instanceof Player killer && !hollow.isPurifying()) {
             if (!SoulLogic.hasSoul(killer)) {
                 // No soul to grow, but the experience a Hollow is worth is still the killer's.
                 killer.giveExperiencePoints(hollow.kind().xp);
@@ -206,10 +248,12 @@ public final class HollowEvents {
     /**
      * A Hollow or Arrancar player killed by another player is worth as much as a Hollow of their
      * reiatsu, but grows the killer's reiryoku only once in a while: they come back as they were. A
-     * Quincy's arrow counts the soul as destroyed.
+     * Quincy's arrow counts the soul as destroyed. A Hollow purified by the blow comes back as a soul
+     * (see {@link HollowBody#markPurifiedOnDeath}). One devoured counts for nothing here: its devourer
+     * was fed already, and it is never purified.
      */
     private static void onHollowPlayerDeath(Player victim, DamageSource source) {
-        if (!(source.getEntity() instanceof Player killer) || killer == victim
+        if (DevourLogic.isDevoured(source) || !(source.getEntity() instanceof Player killer) || killer == victim
                 || !SoulLogic.hasSoul(killer) || !SoulLogic.hasSoul(victim)) {
             return;
         }
@@ -220,6 +264,9 @@ public final class HollowEvents {
         SoulData data = SoulLogic.get(killer);
         long now = killer.level().getGameTime();
         boolean purified = HollowLogic.purifies(source, data, now);
+        if (purified) {
+            HollowBody.markPurifiedOnDeath(victimData);
+        }
         HuntRecord hunt = data.hunt();
         if (HollowLogic.playerKillGrows(hunt, now)) {
             SoulLogic.grow(data, HollowLogic.killGrowth(victimData.maxReiryoku(), data.maxReiryoku(), purified));

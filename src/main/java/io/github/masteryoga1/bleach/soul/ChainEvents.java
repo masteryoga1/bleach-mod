@@ -31,13 +31,16 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * Death and the Chain of Fate: an aware Human who dies lingers as a Plus where they fell, their
  * chain wears away (more slowly with a Shinigami nearby), Encroachment sets in near the end, and a
  * Plus whose chain runs out becomes a Hollow, or, if it is an awakened Quincy, is torn apart (see
- * {@link QuincyEvents#destroySoul}). Konsō, from a Shinigami, sends a Plus on before that (see
- * {@link ShinigamiEvents#konso}).
+ * {@link QuincyEvents#destroySoul}). A Plus can also gnaw at its own chain with the Devour key, and it
+ * wears away many times faster while it does (see {@link DevourLogic#gnawSpeed}). Konsō, from a
+ * Shinigami, sends a Plus on before that (see {@link ShinigamiEvents#konso}).
  */
 public final class ChainEvents {
     public static final ResourceKey<DamageType> ENCROACHMENT =
             ResourceKey.create(Registries.DAMAGE_TYPE, BleachMod.id("encroachment"));
 
+    /** The Devour key, named in the hints so each player sees their own binding. */
+    private static final String DEVOUR_KEY = "key.bleach.devour";
     /** Ticks between Encroachment pangs. */
     private static final int PANG_INTERVAL_TICKS = 600;
     private static final double SHINIGAMI_RANGE = 16.0;
@@ -74,6 +77,8 @@ public final class ChainEvents {
         if (data.nearShinigami) {
             speed *= BleachConfig.get(BleachConfig.NEAR_SHINIGAMI_EROSION_MULTIPLIER);
         }
+        // 1 unless the Plus is gnawing at its chain (DevourEvents starts and stops that, and hurts it as it goes).
+        speed *= DevourLogic.gnawSpeed(data);
         if (SoulLogic.erodeChain(data, speed)) {
             if (QuincyLogic.isAwakened(data) && !QuincyEvents.canDestroySoulNow(player)) {
                 // Nothing can hurt the player right now (between dimensions): the chain stays broken,
@@ -92,6 +97,11 @@ public final class ChainEvents {
         if (encroaching && !data.wasEncroaching) {
             player.sendSystemMessage(Component.translatable("message.bleach.encroachment_begins")
                     .withStyle(ChatFormatting.DARK_RED));
+            // The hunger stirring shows the quicker way, unless the gnaw would be refused or is already under way.
+            if (DevourLogic.gnawRefusal(player, data) == DevourLogic.Gnaw.GNAWING && !DevourLogic.gnawing(data)) {
+                player.sendSystemMessage(Component.translatable("message.bleach.gnaw.hint", Component.keybind(DEVOUR_KEY))
+                        .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+            }
         }
         data.wasEncroaching = encroaching;
         if (encroaching) {
@@ -139,12 +149,19 @@ public final class ChainEvents {
                 .getHolderOrThrow(ENCROACHMENT));
     }
 
+    /**
+     * The chain broke: the soul becomes a Hollow, with a roar, and is told how a Hollow feeds. Its
+     * hunger and its body come on with its next tick (see {@link HollowBody#tickBody}), and a gnaw under
+     * way ends by itself now that it is no Plus.
+     */
     private static void hollowfy(ServerPlayer player, SoulData data) {
         SoulLogic.hollowfy(player, data);
         player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
                 SoundEvents.RAVAGER_ROAR, SoundSource.PLAYERS, 1.5F, 0.6F);
         player.sendSystemMessage(Component.translatable("message.bleach.hollowfied")
                 .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD));
+        player.sendSystemMessage(Component.translatable("message.bleach.hollow_player.hint", Component.keybind(DEVOUR_KEY))
+                .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
     }
 
     /** A Human who just became a Plus comes back where they fell, if that spot is safe to stand in. */

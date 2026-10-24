@@ -13,10 +13,13 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Everything the mod knows about one soul: its state, its spiritual energy, its stats, which
- * powers have awakened, its record against Hollows, its bond with its zanpakutō and its Quincy
- * blood. Stored as the {@link SoulAttachments#SOUL} attachment on players and on spirit mobs
- * (Shinigami NPCs, Hollows, Pluses) and saved with them.
+ * powers have awakened, its record against Hollows, its bond with its zanpakutō, its Quincy
+ * blood and its life as a Hollow. Stored as the {@link SoulAttachments#SOUL} attachment on players
+ * and on spirit mobs (Shinigami NPCs, Hollows, Pluses) and saved with them.
  * A player's own soul is also sent to their client so the HUD and stats screen can show it.
+ *
+ * <p>The codec holds 16 fields, the most {@code RecordCodecBuilder} takes: a new field goes inside one of
+ * the nested records ({@link HollowProgress} has room).
  */
 public final class SoulData {
     private static final long NEVER = Long.MIN_VALUE / 2;
@@ -45,7 +48,8 @@ public final class SoulData {
                     .forGetter(SoulData::shinigami),
             HuntRecord.CODEC.lenientOptionalFieldOf("hunt", HuntRecord.NONE).forGetter(SoulData::hunt),
             ZanpakutoBond.CODEC.lenientOptionalFieldOf("zanpakuto", ZanpakutoBond.NONE).forGetter(SoulData::zanpakuto),
-            QuincyProgress.CODEC.lenientOptionalFieldOf("quincy", QuincyProgress.NONE).forGetter(SoulData::quincy)
+            QuincyProgress.CODEC.lenientOptionalFieldOf("quincy", QuincyProgress.NONE).forGetter(SoulData::quincy),
+            HollowProgress.CODEC.lenientOptionalFieldOf("hollow", HollowProgress.NONE).forGetter(SoulData::hollow)
     ).apply(instance, SoulData::new));
 
     private SoulState state = SoulState.HUMAN;
@@ -70,6 +74,8 @@ public final class SoulData {
     private ZanpakutoBond zanpakuto = ZanpakutoBond.NONE;
     /** Quincy blood, training, reishi, Hollow poison and Blut: see {@link QuincyLogic}. */
     private QuincyProgress quincy = QuincyProgress.NONE;
+    /** Soul hunger, the souls devoured and the Hollow sight: see {@link HollowPlayerLogic}. */
+    private HollowProgress hollow = HollowProgress.NONE;
 
     // Server-side bookkeeping. Not saved or synced; it starts over when the player logs in or respawns.
     private boolean dirty = true;
@@ -176,6 +182,40 @@ public final class SoulData {
     /** The Licht Regen volley still falling, or null. Lost on logging out, as a volley is short. */
     @Nullable
     LichtVolley lichtVolley;
+    /** Game time this Hollow last took damage above zero, for the wait before it regenerates. */
+    long hollowHurtAt = NEVER;
+    /** A blow to this Hollow's mask stops it regenerating until this game time. */
+    long hollowRegenPausedUntil = NEVER;
+    /** This Hollow's mask is drawn cracked until this game time. */
+    long hollowCrackedUntil = NEVER;
+    /** Soul hunger spent and not yet taken off the saved value, so it is not re-sent every tick. */
+    float hollowSatietyDebt;
+    /** Ticks this Hollow has spent starving since its last starving hurt. */
+    int hollowStarveTicks;
+    /** Game time of the last heartbeat of soul hunger. */
+    long lastHungerPangAt = NEVER;
+    /** Game time this hungry Hollow last smelled for souls. */
+    long lastScentAt = NEVER;
+    /** Game time this Hollow was last told its hide sheds armour. */
+    long lastShedMessageAt = NEVER;
+    /** Game time of the last refusal-type message (devouring, food, villagers), so they are not spammed. */
+    long lastHollowMessageAt = NEVER;
+    /** The {@link HollowPlayerLogic.Band} this Hollow was last in, by position, or -1 before the first look. */
+    int lastHollowBand = -1;
+    /** Whether the Hollow body (claws, hide, leap and sight) is on this player, so leaving it takes them off. */
+    boolean hollowBodyApplied;
+    /** Set on the respawned copy when a purifying blow freed this Hollow, for the respawn to say so. */
+    boolean hollowCleansed;
+    /** The entity this Hollow is devouring, by id, or -1. */
+    int devourTargetId = -1;
+    /** Ticks the Devour key has been held on the prey. */
+    int devourHeldTicks;
+    /** No hold can start before this game time. */
+    long devourReadyAt = NEVER;
+    /** Game time this Plus started gnawing at its own chain, or {@link #NEVER} when it is not. */
+    long gnawStartedAt = NEVER;
+    /** Ticks this Plus has gnawed at its chain in this hold. */
+    int gnawTicks;
 
     public SoulData() {
     }
@@ -183,7 +223,8 @@ public final class SoulData {
     private SoulData(SoulState state, boolean initialized, float reiryoku, float maxReiryoku,
                      Map<Stat, Integer> levels, Map<Stat, Integer> xp, Map<PowerPath, Integer> tiers,
                      long lastCloseCallTime, int chainTicks, int chainMaxTicks, boolean reiatsuReleased,
-                     ShinigamiProgress shinigami, HuntRecord hunt, ZanpakutoBond zanpakuto, QuincyProgress quincy) {
+                     ShinigamiProgress shinigami, HuntRecord hunt, ZanpakutoBond zanpakuto, QuincyProgress quincy,
+                     HollowProgress hollow) {
         this.state = state;
         this.initialized = initialized;
         this.maxReiryoku = Math.max(0.0F, maxReiryoku);
@@ -199,6 +240,7 @@ public final class SoulData {
         this.hunt = hunt;
         this.zanpakuto = zanpakuto;
         this.quincy = quincy;
+        this.hollow = hollow;
     }
 
     /** A map keyed by enum name that skips names it does not recognise when reading. */
@@ -423,6 +465,17 @@ public final class SoulData {
         }
     }
 
+    public HollowProgress hollow() {
+        return hollow;
+    }
+
+    public void setHollow(HollowProgress progress) {
+        if (!progress.equals(hollow)) {
+            hollow = progress;
+            markDirty();
+        }
+    }
+
     /**
      * Whether this soul is being torn apart by Hollow poison or a broken chain. Saved, so a death that
      * waits on the death screen through a logout or a restart still knows.
@@ -505,7 +558,7 @@ public final class SoulData {
     /** A copy of the saved data, without the server-side bookkeeping. */
     public SoulData copy() {
         return new SoulData(state, initialized, reiryoku, maxReiryoku, levels, xp, tiers, lastCloseCallTime,
-                chainTicks, chainMaxTicks, reiatsuReleased, shinigami, hunt, zanpakuto, quincy);
+                chainTicks, chainMaxTicks, reiatsuReleased, shinigami, hunt, zanpakuto, quincy, hollow);
     }
 
     /**

@@ -69,6 +69,9 @@ import net.minecraft.world.phys.Vec3;
  * <p>The mask is its weak point (see {@link HollowMask}). A zanpakutō's killing blow purifies it instead
  * of destroying it: it turns white and dissolves into light, and the soul it once was rises and passes on.
  *
+ * <p>A Hollow player may seize a weakened one in its jaws and devour it ({@link #seize}): held, it
+ * cannot move, bite or heal.
+ *
  * <p>One drawn by a Hollow Bait belongs to its site ({@link #baitSite()}). While the site keeps it
  * ({@link #isBaitHeld()}) it never leaves, despawns or flees, and wanders back towards the bait; while
  * the sky cracks it stops fighting and gathers below the tear.
@@ -127,6 +130,8 @@ public abstract class Hollow extends Monster {
     boolean departing;
     private long lastHurtByMobAt = NEVER;
     private int departTicks;
+    /** Held in a Hollow player's jaws until this game time. 0 is never: game time is never below it. */
+    private long seizedUntil;
 
     /** The soul whose reiatsu drew this Hollow through a Garganta, if any. */
     @Nullable
@@ -369,9 +374,9 @@ public abstract class Hollow extends Monster {
         return true;
     }
 
-    /** Whether the kind's time between bites has passed since the last one. */
+    /** Whether the kind's time between bites has passed since the last one. A seized Hollow cannot bite. */
     boolean attackReady() {
-        return tickCount - lastAttackTick >= kind().attackInterval;
+        return tickCount - lastAttackTick >= kind().attackInterval && !isSeized();
     }
 
     /**
@@ -484,6 +489,26 @@ public abstract class Hollow extends Monster {
             soul.setMaxReiryoku(soul.maxReiryoku() + gain);
             soul.setReiryoku(soul.reiryoku() + gain);
         }
+    }
+
+    /**
+     * A Hollow player has this one in its jaws: until {@code until} it cannot move, bite or heal. The
+     * devourer renews it every tick of the hold, so it lapses by itself soon after the hold ends.
+     */
+    public void seize(long until) {
+        seizedUntil = Math.max(seizedUntil, until);
+        regenPausedUntil = Math.max(regenPausedUntil, until);
+        getNavigation().stop();
+    }
+
+    /** The jaws let go. */
+    public void release() {
+        seizedUntil = 0L;
+    }
+
+    /** Whether a Hollow player holds this one in its jaws. Known on the server only. */
+    public boolean isSeized() {
+        return level().getGameTime() < seizedUntil;
     }
 
     @Nullable
@@ -663,10 +688,10 @@ public abstract class Hollow extends Monster {
     }
 
     /**
-     * Hollows go only after their prey ({@link HollowLogic#isPrey}), and strike back at whoever just hurt
-     * them, unless that is a player in creative or spectator mode. Every goal asks this, so prey that
-     * stops being prey is dropped. While the sky cracks above a bait, a Hollow it holds goes after no
-     * one.
+     * Hollows go only after their prey ({@link HollowLogic#isPreyFor}: what every Hollow hunts, and the
+     * Hollow player whose reiatsu drew this one), and strike back at whoever just hurt them, unless that
+     * is a player in creative or spectator mode. Every goal asks this, so prey that stops being prey is
+     * dropped. While the sky cracks above a bait, a Hollow it holds goes after no one.
      */
     @Override
     public boolean canAttack(LivingEntity target) {
@@ -676,7 +701,7 @@ public abstract class Hollow extends Monster {
         if (!super.canAttack(target)) {
             return false;
         }
-        if (HollowLogic.isPrey(target)) {
+        if (HollowLogic.isPreyFor(this, target)) {
             return true;
         }
         return target == getLastHurtByMob() && !(target instanceof Player player && (player.isCreative() || player.isSpectator()));
@@ -746,10 +771,10 @@ public abstract class Hollow extends Monster {
         return false;
     }
 
-    /** Frozen while the mask forms and while a tear takes it. */
+    /** Frozen while the mask forms, while a tear takes it, and while a Hollow player's jaws hold it. */
     @Override
     protected boolean isImmobile() {
-        return super.isImmobile() || isMaskForming() || departing;
+        return super.isImmobile() || isMaskForming() || departing || isSeized();
     }
 
     @Override

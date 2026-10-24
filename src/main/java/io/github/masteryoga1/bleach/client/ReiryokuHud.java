@@ -4,6 +4,8 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyForms;
@@ -32,18 +34,21 @@ import net.minecraft.world.item.ItemStack;
  * offhand slot or the hotbar attack indicator is on that side. It gets a white outline while
  * reiatsu is released, and a wider one in the blade's colour while the player holds their own
  * released zanpakutō, with a small bar above it that fills while a technique gathers. A Plus gets a
- * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in. A
- * Quincy gets a reishi gauge beside it instead, outlined blue under Blut Vene and red under Blut
- * Arterie, with Hollow poison filling it violet from the top (flickering once the poison brings
- * pangs) and a bar above it that fills as the Cross is drawn, over the form's draw time. That bar
- * turns orange when a Letzt Stil draw is charged for a Letzt Pfeil, and pale gold while Licht Regen
- * gathers. A thin bar beside the gauge follows the Quincy arts: the day's training in the Sanrei
- * Glove (gold once mastered), the time Letzt Stil has left, the wait while the power is sealed
- * (white once the power can return), Vollständig (dimmed once the halo breaks) or its cooldown, and
- * while Ransōtengai is woven, in pale blue, the reiryoku left to pay for the threads.
- * While the power is sealed, the reishi gauge stands empty in a grey outline, and holding the Cross
- * through the rite fills the bar above it. Quincy blood not yet awakened shows only the draw bar, in
- * grey. Placeholder look until real art exists.
+ * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in, and is
+ * outlined red while the Plus gnaws at it with the Devour key. A Hollow gets a soul hunger gauge in
+ * the chain's place: bone while fed, amber while ravenous, and empty with a flashing red outline
+ * while starving, with a bar above it that fills while the Devour key is held on prey. A Quincy gets
+ * a reishi gauge beside the reiryoku bar instead (or beyond the chain or hunger gauge), outlined blue
+ * under Blut Vene and red under Blut Arterie, with Hollow poison filling it violet from the top
+ * (flickering once the poison brings pangs) and a bar above it that fills as the Cross is drawn, over
+ * the form's draw time. That bar turns orange when a Letzt Stil draw is charged for a Letzt Pfeil,
+ * and pale gold while Licht Regen gathers. A thin bar beside the gauge follows the Quincy arts: the
+ * day's training in the Sanrei Glove (gold once mastered), the time Letzt Stil has left, the wait
+ * while the power is sealed (white once the power can return), Vollständig (dimmed once the halo
+ * breaks) or its cooldown, and while Ransōtengai is woven, in pale blue, the reiryoku left to pay for
+ * the threads. While the power is sealed, the reishi gauge stands empty in a grey outline, and
+ * holding the Cross through the rite fills the bar above it. Quincy blood not yet awakened shows only
+ * the draw bar, in grey. Placeholder look until real art exists.
  */
 public final class ReiryokuHud {
     public static final ResourceLocation ID = BleachMod.id("reiryoku");
@@ -89,6 +94,15 @@ public final class ReiryokuHud {
     private static final int ART_RANSOTENGAI = 0xFFBFE6FF;
     /** Past the pang threshold the poison overlay is shown for this many ticks, then hidden as long. */
     private static final int POISON_FLICKER_TICKS = 10;
+    /** Soul hunger: bone while fed, amber while ravenous, and a red outline around the empty gauge while starving. */
+    private static final int HUNGER_FED = 0xFFE8E4D6;
+    private static final int HUNGER_RAVENOUS = 0xFFD08A30;
+    private static final int HUNGER_STARVING = 0xFFB03030;
+    /** The starving outline is shown for this many ticks, then hidden as long. */
+    private static final int HUNGER_FLASH_TICKS = 10;
+    private static final int DEVOUR_FILL = 0xFFE8E4D6;
+    /** Around the chain gauge while a Plus gnaws at its own chain. */
+    private static final int GNAW_OUTLINE = 0xFFB03030;
 
     private ReiryokuHud() {
     }
@@ -134,13 +148,20 @@ public final class ReiryokuHud {
         }
 
         boolean chainShown = data.state() == SoulState.PLUS && data.chainMaxTicks() > 0;
+        boolean hungerShown = data.state() == SoulState.HOLLOW && data.hollow().hungerStarted();
+        int sx = x + WIDTH + 2;
         if (chainShown) {
-            drawGauge(graphics, x + WIDTH + 2, y, data.chainFraction(),
+            drawGauge(graphics, sx, y, data.chainFraction(),
                     SoulLogic.isEncroaching(data) ? CHAIN_FILL_ENCROACHING : CHAIN_FILL);
+            if (HollowKeys.gnawing()) {
+                graphics.renderOutline(sx - 1, y - 1, WIDTH + 2, HEIGHT + 2, GNAW_OUTLINE);
+            }
+        } else if (hungerShown) {
+            renderHunger(graphics, player, data, sx, y, deltaTracker.getGameTimeDeltaPartialTick(false));
         }
 
-        // The reishi gauge goes beyond the chain one, should a soul ever have both.
-        int rx = chainShown ? x + 2 * WIDTH + 8 : x + WIDTH + 6;
+        // The reishi gauge goes beyond the chain or hunger one, should a soul ever have both.
+        int rx = chainShown || hungerShown ? x + 2 * WIDTH + 8 : x + WIDTH + 6;
         if (QuincyLogic.canUsePowers(data)) {
             renderReishi(graphics, player, data, rx, y);
         } else if (QuincyArtsLogic.isSealed(data)) {
@@ -150,6 +171,30 @@ public final class ReiryokuHud {
             if (draw > 0.0F) {
                 drawGather(graphics, rx, y - GATHER_GAP - GATHER_HEIGHT, draw, LATENT_DRAW);
             }
+        }
+    }
+
+    /**
+     * A Hollow's soul hunger, filling with what it has left out of a hundred: bone while fed and amber
+     * while ravenous; empty while starving, with a red outline that flashes. Above it, the bar of the
+     * devour hold while the Devour key is held on prey, white once the prey should be swallowed.
+     */
+    private static void renderHunger(GuiGraphics graphics, LocalPlayer player, SoulData data, int x, int y,
+                                     float partialTick) {
+        float satiety = data.hollow().satiety();
+        HollowPlayerLogic.Band band = HollowPlayerLogic.band(satiety);
+        if (band == HollowPlayerLogic.Band.STARVING) {
+            drawGauge(graphics, x, y, 0.0F, HUNGER_STARVING);
+            if ((player.level().getGameTime() / HUNGER_FLASH_TICKS) % 2 == 0) {
+                graphics.renderOutline(x - 1, y - 1, WIDTH + 2, HEIGHT + 2, HUNGER_STARVING);
+            }
+        } else {
+            drawGauge(graphics, x, y, Mth.clamp(satiety / HollowProgress.MAX_SATIETY, 0.0F, 1.0F),
+                    band == HollowPlayerLogic.Band.FED ? HUNGER_FED : HUNGER_RAVENOUS);
+        }
+        float hold = HollowKeys.holdProgress(partialTick);
+        if (hold > 0.0F) {
+            drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, hold, hold >= 1.0F ? GATHER_FULL : DEVOUR_FILL);
         }
     }
 

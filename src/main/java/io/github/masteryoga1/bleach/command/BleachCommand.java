@@ -25,6 +25,9 @@ import io.github.masteryoga1.bleach.soul.BaitLogic;
 import io.github.masteryoga1.bleach.soul.BaitSite;
 import io.github.masteryoga1.bleach.soul.BaitSites;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
+import io.github.masteryoga1.bleach.soul.HollowBody;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
@@ -106,6 +109,9 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
  * /bleach garganta &lt;players&gt; [spider|hexapodus|hound|serpent|fishbone_d]   (a tear now; not on Peaceful)
  * /bleach firsthollow &lt;players&gt; &lt;reset|skip|start&gt;   (the Fishbone D encounter)
+ * /bleach hollow &lt;players&gt; satiety &lt;0..100&gt;   (soul hunger, started if it had not; Hollow players only)
+ * /bleach hollow &lt;players&gt; souls &lt;0..100000&gt;   (the souls devoured, for any soul)
+ * /bleach hollow &lt;players&gt; reset   (the Hollow record starts over; a Hollow's hunger starts again on its next tick)
  * /bleach bait &lt;players&gt; &lt;start|stop|wave|finale|status&gt;   (start skips every refusal but the world and Peaceful, and counts as a crush)
  * /bleach bait list
  * /bleach npc &lt;players&gt; &lt;elder|hunter&gt;   (a visit now, with no gates, chance or cooldown)
@@ -132,6 +138,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 public final class BleachCommand {
     /** The most Quincy training the command sets. */
     private static final int MAX_TRAINING = 100000;
+    /** The most souls devoured the command sets. */
+    private static final int MAX_SOULS = 100000;
     private static final SuggestionProvider<CommandSourceStack> STATES = suggest(SoulState.values());
     private static final SuggestionProvider<CommandSourceStack> STATS = suggest(Stat.values());
     private static final SuggestionProvider<CommandSourceStack> PATHS = suggest(PowerPath.values());
@@ -216,6 +224,17 @@ public final class BleachCommand {
                                                 hunt -> hunt.withFirstHollowDone(true))))
                                 .then(Commands.literal("start")
                                         .executes(BleachCommand::startFirstHollow))))
+                .then(Commands.literal("hollow")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.literal("satiety")
+                                        .then(Commands.argument("satiety",
+                                                        FloatArgumentType.floatArg(0.0F, HollowProgress.MAX_SATIETY))
+                                                .executes(BleachCommand::setSatiety)))
+                                .then(Commands.literal("souls")
+                                        .then(Commands.argument("souls", IntegerArgumentType.integer(0, MAX_SOULS))
+                                                .executes(BleachCommand::setSouls)))
+                                .then(Commands.literal("reset")
+                                        .executes(BleachCommand::resetHollow))))
                 .then(Commands.literal("bait")
                         .then(Commands.literal("list")
                                 .executes(context -> baitList(context.getSource())))
@@ -336,6 +355,9 @@ public final class BleachCommand {
         line.accept(Component.translatable("commands.bleach.info.hunt", hunt.purified(), hunt.slain(), hunt.sentOn(),
                 Component.translatable(hunt.firstHollowDone()
                         ? "commands.bleach.info.first_hollow.done" : "commands.bleach.info.first_hollow.pending")));
+        if (!data.hollow().equals(HollowProgress.NONE)) {
+            line.accept(hollowLine(data));
+        }
         ZanpakutoBond bond = data.zanpakuto();
         line.accept(Component.translatable("commands.bleach.info.zanpakuto", bond.bond(), ZanpakutoBond.FULL,
                 bond.spirit().map(ResourceLocation::toString).orElse("-"),
@@ -360,6 +382,20 @@ public final class BleachCommand {
                 artsClock(arts, now), formsWord(data), QuincyArtsLogic.formatTicks(arts.forms().vollReadyAt() - now),
                 QuincyArtsLogic.formatTicks(arts.forms().lichtRegenReadyAt() - now)));
         return 1;
+    }
+
+    /**
+     * The Hollow record for {@code /bleach info}: soul hunger as it stands now, less what is still owed,
+     * and its band (or a dash and "not started"), the souls devoured, the diet and the sight.
+     */
+    private static Component hollowLine(SoulData data) {
+        HollowProgress hollow = data.hollow();
+        float satiety = HollowBody.satiety(data);
+        String band = hollow.hungerStarted() ? HollowPlayerLogic.band(satiety).name().toLowerCase(Locale.ROOT) : "unset";
+        return Component.translatable("commands.bleach.info.hollow", hollow.hungerStarted() ? format(satiety) : "-",
+                Component.translatable("commands.bleach.info.hollow.band." + band), hollow.souls(), hollow.pluses(),
+                hollow.totalHollows(), hollow.players(), Component.translatable(hollow.sight()
+                        ? "commands.bleach.info.hollow.sight.on" : "commands.bleach.info.hollow.sight.off"));
     }
 
     /** The glove in a word for {@code /bleach info}: none, given, worn, mastered (on the hand) or torn (off it, after Letzt Stil). */
@@ -505,6 +541,68 @@ public final class BleachCommand {
         }
         source.sendFailure(Component.translatable("commands.bleach.garganta.peaceful"));
         return true;
+    }
+
+    // ---- /bleach hollow ----
+
+    /**
+     * Sets a Hollow's soul hunger, starting it if it had not started, with nothing still owed. Anyone
+     * who is not a Hollow is left alone, and if no one is, the command fails. The band and its
+     * messages follow on the next tick.
+     */
+    private static int setSatiety(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        float satiety = FloatArgumentType.getFloat(context, "satiety");
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            if (!HollowPlayerLogic.isHollow(data)) {
+                continue;
+            }
+            HollowBody.setSatiety(data, satiety);
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        if (changed == 0) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.hollow.not_hollow"));
+            return 0;
+        }
+        int count = changed;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.hollow.satiety.success",
+                format(satiety), count), true);
+        return count;
+    }
+
+    /** Sets the count of souls devoured, for any soul, so the milestones it gates can be tried. */
+    private static int setSouls(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int souls = IntegerArgumentType.getInteger(context, "souls");
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            data.setHollow(data.hollow().withSouls(souls));
+            Milestones.check(player, data);
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.hollow.souls.success",
+                souls, players.size()), true);
+        return players.size();
+    }
+
+    /**
+     * Starts the Hollow record over: no hunger, no souls, no meals, sight on. A Hollow's hunger starts
+     * again at the start value on its next tick.
+     */
+    private static int resetHollow(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            // Settle what is still owed first, so none of it comes off the fresh hunger.
+            HollowBody.flushDebt(data);
+            data.setHollow(HollowProgress.NONE);
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.hollow.reset.success",
+                players.size()), true);
+        return players.size();
     }
 
     // ---- /bleach bait ----

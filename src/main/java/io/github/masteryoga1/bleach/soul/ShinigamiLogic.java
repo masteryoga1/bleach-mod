@@ -38,9 +38,14 @@ public final class ShinigamiLogic {
 
     // ---- The path ----
 
-    /** Whether this soul holds a Shinigami's power: a Shinigami, or anyone with a Shinigami tier. */
+    /**
+     * Whether this soul holds a Shinigami's power: a Shinigami, or anyone with a Shinigami tier. A
+     * Hollow's Shinigami power is lost under the mask; a Visored (a Shinigami with a Hollow tier)
+     * keeps it.
+     */
     public static boolean hasShinigamiPower(SoulData data) {
-        return data.state() == SoulState.SHINIGAMI || data.tier(PowerPath.SHINIGAMI) > 0;
+        return data.state() != SoulState.HOLLOW
+                && (data.state() == SoulState.SHINIGAMI || data.tier(PowerPath.SHINIGAMI) > 0);
     }
 
     /** A living Human holding a Shinigami's power. */
@@ -62,7 +67,8 @@ public final class ShinigamiLogic {
      * The last part of the {@code screen.bleach.soul.next.*} key that says what this soul can do next.
      * A Shinigami, Substitute or student whose Asauchi bond is full hears {@code .bonded} (sit in
      * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it). A
-     * Quincy who has passed on and whom the Academy will not take hears {@code quincy.rukongai}.
+     * Quincy who has passed on and whom the Academy will not take hears {@code quincy.rukongai}. A
+     * Hollow hears {@code hollow} until it has devoured a soul, and {@code hollow.fed} after.
      */
     public static String nextStepKey(SoulData data, long now) {
         if (isPowerLent(data, now)) {
@@ -74,6 +80,7 @@ public final class ShinigamiLogic {
                     ? (QuincyLogic.blocksShinigamiPower(data) ? "quincy.rukongai" : "rukongai")
                     : data.zanpakuto().isFull() && !data.zanpakuto().named() ? "student.bonded" : "student";
             case SHINIGAMI -> "shinigami" + bondStep(data.zanpakuto());
+            case HOLLOW -> HollowPlayerLogic.nextStepKey(data);
             default -> data.state().getSerializedName();
         };
     }
@@ -298,7 +305,8 @@ public final class ShinigamiLogic {
 
     /**
      * How fast this soul regenerates compared with normal: faster in the full Shihakushō for those
-     * it suits, slower while its power is lent or Hollow poison is in a Quincy's blood.
+     * it suits, slower while its power is lent, while Hollow poison is in a Quincy's blood, or while
+     * a Hollow is ravenous or starving.
      */
     public static double regenMultiplier(LivingEntity entity, SoulData data, long now) {
         double multiplier = 1.0;
@@ -308,7 +316,7 @@ public final class ShinigamiLogic {
         if (isPowerLent(data, now)) {
             multiplier *= BleachConfig.get(BleachConfig.LENT_REGEN_MULTIPLIER);
         }
-        return multiplier * QuincyLogic.poisonRegenMultiplier(data);
+        return multiplier * QuincyLogic.poisonRegenMultiplier(data) * HollowPlayerLogic.reiryokuRegenMultiplier(data);
     }
 
     /** Whether the Shihakushō's set bonus works for this soul: Shinigami power, or an Academy student. */

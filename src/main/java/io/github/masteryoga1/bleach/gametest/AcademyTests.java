@@ -105,7 +105,8 @@ public final class AcademyTests {
                 ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F), new DialogueView[] {DialogueView.SOUL, DialogueView.RESTING},
                 ShinigamiTests.student(40.0F), new DialogueView[] {DialogueView.STUDENT, DialogueView.RESTING},
                 ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F), new DialogueView[] {DialogueView.SHINIGAMI, DialogueView.RESTING},
-                ShinigamiTests.soul(SoulState.HOLLOW, 40.0F), new DialogueView[] {DialogueView.HOLLOW, DialogueView.HOLLOW},
+                ShinigamiTests.soul(SoulState.HOLLOW, 40.0F),
+                new DialogueView[] {DialogueView.HOLLOW_PURIFY, DialogueView.HOLLOW},
                 ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F), new DialogueView[] {DialogueView.HOLLOW, DialogueView.HOLLOW});
         expected.forEach((soul, views) -> {
             String who = soul.state() + (ShinigamiLogic.isSubstitute(soul) ? " (Substitute)" : "")
@@ -135,6 +136,7 @@ public final class AcademyTests {
                 case ELDER_TEACH -> List.of(NpcAction.RANSOTENGAI);
                 case ELDER_RESTORE -> List.of(NpcAction.RESTORE);
                 case HUNTER_CHALLENGE, HUNTER_RIVALRY -> List.of(NpcAction.CONTEST);
+                case HOLLOW_PURIFY -> List.of(NpcAction.PURIFY);
                 case LIVING, HOLLOW, RESTING, QUINCY, ELDER_TRIAL, ELDER_IDLE, ELDER_STRANGER, ELDER_HOLLOW,
                         HUNTER_CONTEST, HUNTER_RESTING, HUNTER_PLAIN, HUNTER_HOLLOW -> List.of();
             };

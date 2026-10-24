@@ -745,18 +745,26 @@ public final class BaitEvents {
         }
     }
 
-    /**
-     * A Hollow devoured a Plus: the site that drew it, or failing that the one it is in, has lost
-     * one, and its finale will not count as seen through without loss.
-     */
+    /** A Hollow devoured a Plus: see {@link #onPlusDevoured}, with the site that drew it and where it stands. */
     public static void onDevoured(Hollow hollow) {
-        if (!(hollow.level() instanceof ServerLevel level) || level.dimension() != Level.OVERWORLD) {
+        if (hollow.level() instanceof ServerLevel level) {
+            onPlusDevoured(level, hollow.position(), hollow.baitSite());
+        }
+    }
+
+    /**
+     * A Plus was devoured, by a Hollow or a Hollow player: the site with this id (the one that drew the
+     * Hollow), or failing that the one containing the spot, has lost one, and its finale will not count
+     * as seen through without loss.
+     */
+    public static void onPlusDevoured(ServerLevel level, Vec3 at, @Nullable UUID siteId) {
+        if (level.dimension() != Level.OVERWORLD) {
             return;
         }
         BaitSites sites = BaitSites.get(level.getServer());
-        BaitSite site = hollow.baitSite() != null ? sites.find(hollow.baitSite()) : null;
+        BaitSite site = siteId != null ? sites.find(siteId) : null;
         if (site == null) {
-            site = sites.containing(hollow.position(), HUNTED_EXTRA);
+            site = sites.containing(at, HUNTED_EXTRA);
         }
         if (site != null && !site.plusLost()) {
             site.setPlusLost(true);

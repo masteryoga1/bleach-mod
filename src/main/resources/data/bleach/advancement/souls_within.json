@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:cannibal",
+  "display": {
+    "icon": {
+      "id": "minecraft:soul_lantern"
+    },
+    "title": {
+      "translate": "advancements.bleach.souls_within.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.souls_within.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "souls_within": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "souls_within"
+      }
+    }
+  }
+}

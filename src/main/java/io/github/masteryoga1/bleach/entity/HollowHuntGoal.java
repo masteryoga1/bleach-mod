@@ -7,12 +7,14 @@ import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 /**
  * Picks the most tempting prey in sight rather than the nearest: strong souls, the soul that drew the
  * Hollow and, for some kinds, Pluses are worth going further for (see {@link HollowLogic#preyScore}).
+ * A Hollow player that drew this Hollow through a Garganta is its rival, and prey too (see
+ * {@link HollowLogic#isPreyFor}).
  */
 final class HollowHuntGoal extends NearestAttackableTargetGoal<LivingEntity> {
     private final Hollow hollow;
 
     HollowHuntGoal(Hollow hollow) {
-        super(hollow, LivingEntity.class, 10, true, false, HollowLogic::isPrey);
+        super(hollow, LivingEntity.class, 10, true, false, target -> HollowLogic.isPreyFor(hollow, target));
         this.hollow = hollow;
     }
 

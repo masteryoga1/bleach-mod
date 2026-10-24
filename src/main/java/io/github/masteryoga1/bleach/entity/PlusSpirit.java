@@ -69,6 +69,7 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>Konsō sends one on: it sinks away into the light. The soul that rises from a purified Hollow is a
  * Plus too, rising as it passes on. A departing Plus is never saved, cannot be hurt, and is no one's prey.
+ * A Hollow player can seize one in its jaws and devour it ({@link #seize}); held, it cannot move.
  */
 public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
     private static final EntityDataAccessor<Float> DATA_CHAIN =
@@ -118,6 +119,8 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
     @Nullable
     private BlockPos home;
     private int homeRadius;
+    /** Held in a Hollow player's jaws until this game time. 0 is never: game time is never below it. Not saved. */
+    private long seizedUntil;
 
     public PlusSpirit(EntityType<? extends PlusSpirit> type, Level level) {
         super(type, level);
@@ -253,6 +256,25 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
             case SINKING -> SINK_TICKS;
             default -> 0;
         };
+    }
+
+    /**
+     * A Hollow player has this Plus in its jaws: until {@code until} it cannot move or flee. The devourer
+     * renews it every tick of the hold, so it lapses by itself soon after the hold ends.
+     */
+    public void seize(long until) {
+        seizedUntil = Math.max(seizedUntil, until);
+        getNavigation().stop();
+    }
+
+    /** The jaws let go. */
+    public void release() {
+        seizedUntil = 0L;
+    }
+
+    /** Whether a Hollow player holds this Plus in its jaws. Known on the server only. */
+    public boolean isSeized() {
+        return level().getGameTime() < seizedUntil;
     }
 
     /** Keeps the Plus within {@code radius} blocks of {@code pos}, now and after it is loaded again. */
@@ -437,9 +459,10 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
         return false;
     }
 
+    /** Frozen while it leaves, and while a Hollow player's jaws hold it. */
     @Override
     protected boolean isImmobile() {
-        return super.isImmobile() || isDeparting();
+        return super.isImmobile() || isDeparting() || isSeized();
     }
 
     @Override

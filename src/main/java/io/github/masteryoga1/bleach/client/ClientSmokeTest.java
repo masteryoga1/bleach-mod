@@ -27,6 +27,7 @@ import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
@@ -103,13 +104,19 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * dialogue opens too. In the Wandenreich uniform the player opens the Tailoring Table on its
  * second page. A Hollow Bait site is opened by command, its wave comes through a Garganta, and its
  * finale cracks the sky, which closes again when the site is stopped. Ransōtengai is woven once more
- * and let go with the key, so the collapse follows. The soul screen is opened a last time, and the
- * run quits.
+ * and let go with the key, so the collapse follows, and the soul screen is opened again.
  *
- * <p>All of it is seen with the camera behind the player, so the chain, mask, garb, saya, NPCs,
- * Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts and
- * HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's
- * client code fails the run, and so does anything that did not reach the client as expected.
+ * <p>Last of all the player becomes a Hollow while still in the Wandenreich uniform, which the hide
+ * sheds into the inventory; Hollow sight comes on and the food bar is held full. Holding the real
+ * Devour key on a summoned Plus opens the mask's jaw and devours it, and Sneak with the key turns the
+ * sight off. The soul screen is opened a last time, and a look in first person, bare-handed, shows the
+ * claws and the edge of the mask before the run quits.
+ *
+ * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
+ * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
+ * Hollow body and HUD are drawn, and screenshots of the main moments are saved for review. Any crash
+ * in the mod's client code fails the run, and so does anything that did not reach the client as
+ * expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -286,6 +293,7 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 1686, 1720, () -> soul.quincy().blut() == BlutMode.OFF, "Blut never ended");
         checkArts(minecraft, player, soul);
         checkQuincyWorld(minecraft, player, soul);
+        checkHollowPlayer(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -699,7 +707,41 @@ public final class ClientSmokeTest {
             case 3205 -> minecraft.setScreen(new SoulStatsScreen());
             case 3210 -> shot(minecraft, "stats_quincy_world");
             case 3225 -> minecraft.setScreen(null);
+            // The Hollow player. The Wandenreich uniform is still on, so the hide has to shed it.
             case 3245 -> {
+                command(minecraft, "effect clear @s");
+                command(minecraft, "bleach soul @s hollow");
+            }
+            case 3305 -> command(minecraft, "summon bleach:plus ~ ~ ~-2 " + STILL);
+            // The real key, held on the Plus: it is seized, the jaw opens, and it is devoured.
+            case 3325 -> {
+                subject = nearest(minecraft, PlusSpirit.class, 4.0, LivingEntity::isAlive);
+                expect(minecraft, subject != null, "the summoned Plus never reached the client");
+                if (subject != null) {
+                    look(minecraft, subject.getBoundingBox().getCenter());
+                }
+                HollowKeys.DEVOUR.setDown(true);
+            }
+            // Sneak with the key turns the Hollow sight off.
+            case 3382 -> {
+                HollowKeys.DEVOUR.setDown(false);
+                minecraft.options.keyShift.setDown(true);
+            }
+            case 3384 -> HollowKeys.DEVOUR.setDown(true);
+            case 3388 -> {
+                HollowKeys.DEVOUR.setDown(false);
+                minecraft.options.keyShift.setDown(false);
+            }
+            case 3412 -> minecraft.setScreen(new SoulStatsScreen());
+            case 3417 -> shot(minecraft, "stats_hollow");
+            // A last look in first person, bare-handed: the claws and the edge of the mask.
+            case 3420 -> {
+                minecraft.setScreen(null);
+                command(minecraft, "item replace entity @s weapon.mainhand with minecraft:air");
+            }
+            case 3422 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            case 3432 -> shot(minecraft, "hollow_first_person");
+            case 3440 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -770,6 +812,39 @@ public final class ClientSmokeTest {
                 "letting Ransōtengai go did not bring the collapse")) {
             shot(minecraft, "ransotengai_collapse");
         }
+    }
+
+    /** The checks of the Hollow player, each window from the step it follows. */
+    private static void checkHollowPlayer(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (expectWithin(minecraft, 3250, 3300,
+                () -> soul.state() == SoulState.HOLLOW && soul.hollow().hungerStarted() && armourShed(player)
+                        && player.hasEffect(MobEffects.NIGHT_VISION) && player.getFoodData().getFoodLevel() == 20,
+                "the Hollow body never came on: soul hunger, the uniform shed, Hollow sight and a held food bar")) {
+            shot(minecraft, "hollow_player");
+        }
+        if (expectWithin(minecraft, 3327, 3345,
+                () -> (ClientSouls.appearance(player).hollowLook() & HollowPlayerLogic.LOOK_DEVOURING) != 0,
+                "holding Devour on the Plus never opened the mask's jaw")) {
+            shot(minecraft, "devour");
+        }
+        // The Plus's health reaches the client at once; its body goes 20 ticks later, which this does not wait for.
+        expectWithin(minecraft, 3346, 3380,
+                () -> subject instanceof PlusSpirit plus && (!plus.isAlive() || plus.isRemoved())
+                        && soul.hollow().pluses() >= 1,
+                "holding Devour did not devour the Plus");
+        expectWithin(minecraft, 3389, 3410,
+                () -> !soul.hollow().sight() && !player.hasEffect(MobEffects.NIGHT_VISION),
+                "Sneak and Devour did not turn the Hollow sight off");
+    }
+
+    /** Whether every armour slot is empty. */
+    private static boolean armourShed(LocalPlayer player) {
+        for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)) {
+            if (!player.getItemBySlot(slot).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** The bait finale's cracked sky on the client, once it is at least mostly open, or null. */

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:devoured",
+  "display": {
+    "icon": {
+      "id": "bleach:mask_fragment"
+    },
+    "title": {
+      "translate": "advancements.bleach.cannibal.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.cannibal.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "cannibal": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "cannibal"
+      }
+    }
+  }
+}
