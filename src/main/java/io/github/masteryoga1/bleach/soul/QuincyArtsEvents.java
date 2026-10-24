@@ -227,9 +227,10 @@ public final class QuincyArtsEvents {
     // ---- Logging in and respawning ----
 
     /**
-     * Runs on every refresh, from {@link QuincyEvents#onRefresh}: puts the saved clocks back in reach
-     * of the game time, hands down a glove an old save is owed, ends a saved Vollständig whose flight
-     * did not survive the relog, and burns out a Letzt Stil whose time ran out meanwhile.
+     * Runs on every refresh, from {@link QuincyEvents#onRefresh}: puts the saved clocks (the Elder's
+     * trial's among them) back in reach of the game time, hands down a glove an old save is owed,
+     * ends a saved Vollständig whose flight did not survive the relog, and burns out a Letzt Stil
+     * whose time ran out meanwhile.
      */
     public static void onRefresh(Player p, SoulData d, long now) {
         QuincyArts arts = QuincyArtsLogic.arts(d);
@@ -237,6 +238,7 @@ public final class QuincyArtsEvents {
         if (!normal.equals(arts)) {
             QuincyArtsLogic.setArts(d, normal);
         }
+        QuincyRansotengai.normaliseTrial(d, now);
         if (p.isAlive() && owedGlove(d)) {
             giveGlove(p, d);
         }

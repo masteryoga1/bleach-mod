@@ -316,7 +316,8 @@ public final class RansotengaiTests {
     /**
      * The trial's binding lasts as long as the trial and no longer: milk does not lift it while the
      * trial is open, and a trial that ran out while the soul was away (the mock's effects never run
-     * down, as an absent player's do not) or that a command closed takes it off.
+     * down, as an absent player's do not) or that a command closed takes it off. A trial saved in a
+     * world whose clock ran further is brought back within one trial's length at refresh.
      */
     @GameTest(template = "empty")
     public static void trialBindingLastsOnlyWhileTheTrialDoes(GameTestHelper helper) {
@@ -348,6 +349,15 @@ public final class RansotengaiTests {
                 "the binding outlasted a trial that was closed");
         QuincyRansotengai.tick(cutMock, cut, NOW + 1L);
         helper.assertFalse(cutMock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "a closed trial bound the body again");
+
+        SoulData moved = QuincyArtsTests.thirdTier();
+        Player movedMock = ZanpakutoTests.mock(helper, moved);
+        QuincyRansotengai.beginTrial(movedMock, moved, NOW + 2_000_000L);
+        QuincyArtsEvents.onRefresh(movedMock, moved, NOW);
+        long until = moved.quincy().teaching().trialUntil();
+        helper.assertTrue(until == NOW + trial, "a trial from a later clock ends at " + until + ", not " + (NOW + trial));
+        QuincyArtsEvents.onRefresh(movedMock, moved, NOW + 1L);
+        helper.assertTrue(moved.quincy().teaching().trialUntil() == until, "a refresh moved a trial already in reach");
         helper.succeed();
     }
 

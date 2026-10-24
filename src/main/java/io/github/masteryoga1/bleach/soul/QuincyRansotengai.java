@@ -461,6 +461,19 @@ public final class QuincyRansotengai {
         unbind(p, MobEffects.WEAKNESS, TRIAL_WEAKNESS);
     }
 
+    /**
+     * Puts a saved trial's end back in reach of the game time, as {@link QuincyArtsLogic#normalise}
+     * does the forms' waits: a soul brought from a world whose clock ran further would otherwise stay
+     * in the trial, and bound, until this world's clock caught up.
+     */
+    public static void normaliseTrial(SoulData d, long now) {
+        QuincyTeaching teaching = d.quincy().teaching();
+        long latest = now + trialTicks();
+        if (teaching.trialUntil() != NEVER && teaching.trialUntil() > latest) {
+            d.setQuincy(d.quincy().withTeaching(teaching.withTrialUntil(latest)));
+        }
+    }
+
     // ---- Helpers ----
 
     /** Lays the trial's binding on again where it is wearing thin, for no longer than {@code left} ticks. */
