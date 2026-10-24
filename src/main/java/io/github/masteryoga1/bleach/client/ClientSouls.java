@@ -27,7 +27,7 @@ public final class ClientSouls {
             // The devouring and cracked bits live only on the server, which sends them to the owner too.
             int sent = self.hasData(SoulAttachments.APPEARANCE)
                     ? self.getData(SoulAttachments.APPEARANCE).hollowLook() & (HollowPlayerLogic.LOOK_DEVOURING
-                            | HollowPlayerLogic.LOOK_DEVOURING_QUICK | HollowPlayerLogic.LOOK_MASK_CRACKED)
+                            | HollowPlayerLogic.LOOK_DEVOURING_PLUS | HollowPlayerLogic.LOOK_MASK_CRACKED)
                     : 0;
             return sent == 0 ? own : own.withHollowLook(own.hollowLook() | sent);
         }

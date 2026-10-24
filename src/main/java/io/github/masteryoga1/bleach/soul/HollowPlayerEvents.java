@@ -122,7 +122,8 @@ public final class HollowPlayerEvents {
 
     /**
      * Just before a blow, the claws are put right for what is in hand now, so a hotbar swap since the last
-     * tick never carries the claws onto a sword, or leaves a bare hand without them.
+     * tick never carries the claws onto a sword. A hand just emptied gets them on the next tick instead
+     * (see {@link HollowBody#reconcileBeforeBlow}).
      */
     private static void onAttackEntity(AttackEntityEvent event) {
         Player player = event.getEntity();
@@ -131,7 +132,7 @@ public final class HollowPlayerEvents {
         }
         SoulData data = SoulLogic.get(player);
         if (HollowPlayerLogic.isHollow(data) || data.hollowBodyApplied) {
-            HollowBody.reconcile(player, data);
+            HollowBody.reconcileBeforeBlow(player, data);
         }
     }
 

@@ -36,8 +36,8 @@ public final class HollowPlayerLogic {
     public static final int LOOK_MASK_CRACKED = 2;
     /** The eyes burn red: the Hollow is ravenous or starving. */
     public static final int LOOK_RAVENOUS = 4;
-    /** With {@link #LOOK_DEVOURING}: the prey is a Plus, so the hold is the quicker one (its owner's devour bar reads it). */
-    public static final int LOOK_DEVOURING_QUICK = 128;
+    /** With {@link #LOOK_DEVOURING}: the prey is a Plus, so the hold is a Plus's (its owner's devour bar reads it). */
+    public static final int LOOK_DEVOURING_PLUS = 128;
     /** How many mask shapes there are: 0 skull, 1 fanged, 2 horned, 3 beaked. */
     public static final int MASK_VARIANTS = 4;
     /** The food level a starving Hollow is held at: exactly the client's own limit for sprinting. */
@@ -148,6 +148,19 @@ public final class HollowPlayerLogic {
         };
     }
 
+    /**
+     * How much one starving hurt takes at this health: the configured damage, but on Easy and Normal never
+     * more than takes the health to the floor, or one point where that is less, as vanilla's one point does.
+     * So only Hard starves a Hollow to death, whatever the configured damage.
+     */
+    public static float starvingHurt(Difficulty difficulty, float health, float damage) {
+        return switch (difficulty) {
+            case EASY -> Math.min(damage, Math.max(1.0F, health - 10.0F));
+            case NORMAL -> Math.min(damage, Math.max(1.0F, health - 1.0F));
+            default -> damage;
+        };
+    }
+
     /** Soul hunger lost each tick doing nothing. */
     public static float drainPerTick() {
         return (float) (BleachConfig.get(BleachConfig.SATIETY_DRAIN_PER_MINUTE) / 1200.0);
@@ -214,13 +227,13 @@ public final class HollowPlayerLogic {
 
     /**
      * Every look bit, with those only the server knows: the jaw open while devouring (and whether the
-     * hold is a Plus's quick one) and the mask cracked after a blow. On a client's copy those are at
+     * prey is a Plus, whose hold has its own length) and the mask cracked after a blow. On a client's copy those are at
      * their defaults and add nothing.
      */
     public static int hollowLook(SoulData data, long now) {
         int look = hollowLook(data);
         if (data.devourTargetId >= 0) {
-            look |= data.devourQuick ? LOOK_DEVOURING | LOOK_DEVOURING_QUICK : LOOK_DEVOURING;
+            look |= data.devourPlus ? LOOK_DEVOURING | LOOK_DEVOURING_PLUS : LOOK_DEVOURING;
         }
         if (now < data.hollowCrackedUntil) {
             look |= LOOK_MASK_CRACKED;

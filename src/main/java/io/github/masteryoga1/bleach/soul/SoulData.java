@@ -210,13 +210,16 @@ public final class SoulData {
     int devourTargetId = -1;
     /** Ticks the Devour key has been held on the prey. */
     int devourHeldTicks;
-    /** Whether the prey takes the quicker hold (a Plus), for the devourer's own devour bar. */
-    boolean devourQuick;
+    /** Whether the prey is a Plus, which takes a Plus's hold, for the devourer's own devour bar. */
+    boolean devourPlus;
     /** No hold can start before this game time. */
     long devourReadyAt = NEVER;
     /** Game time this Plus started gnawing at its own chain, or {@link #NEVER} when it is not. */
     long gnawStartedAt = NEVER;
-    /** Ticks this Plus has gnawed at its chain in this hold. */
+    /**
+     * Ticks this Plus has gnawed at its chain, counted on across presses, so letting go and pressing again
+     * never dodges the pains.
+     */
     int gnawTicks;
 
     public SoulData() {

@@ -322,6 +322,19 @@ public final class HollowPlayerTests {
         helper.assertTrue(HollowPlayerLogic.starves(Difficulty.NORMAL, 1.5F), "starving spares 1.5 health on Normal");
         helper.assertFalse(HollowPlayerLogic.starves(Difficulty.NORMAL, 1.0F), "starving goes below half a heart on Normal");
         helper.assertTrue(HollowPlayerLogic.starves(Difficulty.HARD, 0.5F), "starving spares the last half heart on Hard");
+        // A harder configured hurt still stops at the floor, or one point past it as vanilla's does.
+        assertClose(helper, HollowPlayerLogic.starvingHurt(Difficulty.NORMAL, 20.0F, 1.0F), 1.0,
+                "a default hurt at 20 health");
+        assertClose(helper, HollowPlayerLogic.starvingHurt(Difficulty.NORMAL, 20.0F, 2.0F), 2.0, "a hurt of 2 at 20 health");
+        assertClose(helper, HollowPlayerLogic.starvingHurt(Difficulty.NORMAL, 2.5F, 2.0F), 1.5,
+                "a hurt of 2 at 2.5 on Normal");
+        assertClose(helper, HollowPlayerLogic.starvingHurt(Difficulty.NORMAL, 1.5F, 2.0F), 1.0,
+                "a hurt of 2 at 1.5 on Normal");
+        assertClose(helper, HollowPlayerLogic.starvingHurt(Difficulty.NORMAL, 1.5F, 0.5F), 0.5,
+                "a hurt of 0.5 at 1.5 on Normal");
+        assertClose(helper, HollowPlayerLogic.starvingHurt(Difficulty.EASY, 10.5F, 11.0F), 1.0,
+                "a hurt of 11 at 10.5 on Easy");
+        assertClose(helper, HollowPlayerLogic.starvingHurt(Difficulty.HARD, 1.0F, 5.0F), 5.0, "a hurt of 5 at 1 on Hard");
 
         SoulData data = hollowSoul(90.0F, 60.0F);
         helper.assertTrue(HollowPlayerLogic.hollowLook(data) == 0,
@@ -390,8 +403,9 @@ public final class HollowPlayerTests {
         assertModifier(helper, player, Attributes.SAFE_FALL_DISTANCE, HollowBody.LEAP_ID, 3.0,
                 AttributeModifier.Operation.ADD_VALUE, "the leap");
 
+        // A blow struck in the same tick as the swap to a sword already has no claws.
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_SWORD));
-        HollowBody.reconcile(player, data);
+        HollowBody.reconcileBeforeBlow(player, data);
         helper.assertTrue(modifier(player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID) == null,
                 "the claws stayed on a sword");
         helper.assertTrue(modifier(player, Attributes.ATTACK_SPEED, HollowBody.CLAW_SPEED_ID) == null,
@@ -399,11 +413,18 @@ public final class HollowPlayerTests {
         helper.assertTrue(modifier(player, Attributes.ARMOR, HollowBody.HIDE_ID) != null,
                 "the hide came off with a sword in hand");
 
+        // One struck in the same tick as the hand empties waits for the claws, as the sword still lends its damage.
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        HollowBody.reconcileBeforeBlow(player, data);
+        helper.assertTrue(modifier(player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID) == null,
+                "the claws grew on a hand emptied in the tick of the blow");
         HollowBody.setSatiety(data, 20.0F);
         HollowBody.reconcile(player, data);
         assertModifier(helper, player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID, 6.446,
                 AttributeModifier.Operation.ADD_VALUE, "the ravenous claws");
+        HollowBody.reconcileBeforeBlow(player, data);
+        assertModifier(helper, player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID, 6.446,
+                AttributeModifier.Operation.ADD_VALUE, "the claws before a bare-handed blow");
 
         Player human = soulPlayer(helper, GameType.SURVIVAL, SoulState.HUMAN, 90.0F, DEVOURER_SPOT);
         HollowBody.reconcile(human, SoulLogic.get(human));
@@ -836,8 +857,8 @@ public final class HollowPlayerTests {
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, "the devourer's slowness");
         helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_DEVOURING) != 0,
                 "the jaw does not hang open during the hold");
-        helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_DEVOURING_QUICK) != 0,
-                "the hold on a Plus does not say it is the quick one");
+        helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_DEVOURING_PLUS) != 0,
+                "the hold on a Plus does not say it is on a Plus");
         start = DevourEvents.startDevour(player, data, plus, now);
         helper.assertTrue(start == null, "a second press on the held Plus was refused as " + start);
         helper.assertTrue(plus.isSeized()
@@ -850,7 +871,7 @@ public final class HollowPlayerTests {
         helper.assertTrue(modifier(player, Attributes.MOVEMENT_SPEED, DevourLogic.DEVOURING_ID) == null,
                 "the devourer stayed slow after letting go");
         helper.assertTrue((HollowPlayerLogic.hollowLook(data, now)
-                        & (HollowPlayerLogic.LOOK_DEVOURING | HollowPlayerLogic.LOOK_DEVOURING_QUICK)) == 0,
+                        & (HollowPlayerLogic.LOOK_DEVOURING | HollowPlayerLogic.LOOK_DEVOURING_PLUS)) == 0,
                 "the jaw still hangs open after letting go");
         helper.assertFalse(plus.isSeized(), "the Plus stayed seized after letting go");
         start = DevourEvents.startDevour(player, data, plus, now + 5);

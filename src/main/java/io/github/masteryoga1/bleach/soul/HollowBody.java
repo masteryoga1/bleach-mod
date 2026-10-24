@@ -220,6 +220,20 @@ public final class HollowBody {
      * attributes are not re-sent every tick. Server side.
      */
     public static void reconcile(Player player, SoulData data) {
+        reconcile(player, data, true);
+    }
+
+    /**
+     * Puts the body right as a blow is struck, for a hand changed since the last tick: the claws come off
+     * a hand that now holds something, but a hand only just emptied grows them on the next tick. Until
+     * vanilla's equipment check that tick, the weapon it held still lends its own damage, and the claws
+     * would stack on it.
+     */
+    public static void reconcileBeforeBlow(Player player, SoulData data) {
+        reconcile(player, data, false);
+    }
+
+    private static void reconcile(Player player, SoulData data, boolean growClaws) {
         if (player.level().isClientSide()) {
             return;
         }
@@ -228,10 +242,12 @@ public final class HollowBody {
             data.hollowBodyApplied = false;
             return;
         }
-        boolean bare = player.getMainHandItem().isEmpty();
-        setModifier(player, Attributes.ATTACK_DAMAGE, CLAWS_ID, bare ? HollowPlayerLogic.clawBonus(data) : 0.0,
+        AttributeInstance damage = player.getAttribute(Attributes.ATTACK_DAMAGE);
+        boolean clawed = player.getMainHandItem().isEmpty()
+                && (growClaws || damage != null && damage.getModifier(CLAWS_ID) != null);
+        setModifier(player, Attributes.ATTACK_DAMAGE, CLAWS_ID, clawed ? HollowPlayerLogic.clawBonus(data) : 0.0,
                 AttributeModifier.Operation.ADD_VALUE);
-        setModifier(player, Attributes.ATTACK_SPEED, CLAW_SPEED_ID, bare ? HollowPlayerLogic.clawSpeedModifier() : 0.0,
+        setModifier(player, Attributes.ATTACK_SPEED, CLAW_SPEED_ID, clawed ? HollowPlayerLogic.clawSpeedModifier() : 0.0,
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         setModifier(player, Attributes.ARMOR, HIDE_ID, HollowPlayerLogic.hideArmour(data),
                 AttributeModifier.Operation.ADD_VALUE);
@@ -304,7 +320,9 @@ public final class HollowBody {
                 || !HollowPlayerLogic.starves(player.level().getDifficulty(), player.getHealth())) {
             return false;
         }
-        return player.hurt(soulHunger(player.level()), (float) BleachConfig.get(BleachConfig.STARVING_DAMAGE));
+        float amount = HollowPlayerLogic.starvingHurt(player.level().getDifficulty(), player.getHealth(),
+                (float) BleachConfig.get(BleachConfig.STARVING_DAMAGE));
+        return player.hurt(soulHunger(player.level()), amount);
     }
 
     /**

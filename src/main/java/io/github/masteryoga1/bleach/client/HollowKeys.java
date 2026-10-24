@@ -120,7 +120,7 @@ public final class HollowKeys {
         }
         int hold;
         if (confirmed) {
-            hold = (look & HollowPlayerLogic.LOOK_DEVOURING_QUICK) != 0
+            hold = (look & HollowPlayerLogic.LOOK_DEVOURING_PLUS) != 0
                     ? BleachConfig.get(BleachConfig.DEVOUR_PLUS_HOLD_TICKS)
                     : BleachConfig.get(BleachConfig.DEVOUR_HOLD_TICKS);
         } else {

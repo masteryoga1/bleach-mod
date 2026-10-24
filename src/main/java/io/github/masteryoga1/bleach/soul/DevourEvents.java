@@ -144,7 +144,7 @@ public final class DevourEvents {
         }
         data.devourTargetId = prey.getId();
         data.devourHeldTicks = 0;
-        data.devourQuick = DevourLogic.holdTicks(prey) < BleachConfig.get(BleachConfig.DEVOUR_HOLD_TICKS);
+        data.devourPlus = prey instanceof PlusSpirit;
         AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null) {
             speed.addOrUpdateTransientModifier(new AttributeModifier(DevourLogic.DEVOURING_ID,
@@ -178,7 +178,7 @@ public final class DevourEvents {
         }
         data.devourTargetId = -1;
         data.devourHeldTicks = 0;
-        data.devourQuick = false;
+        data.devourPlus = false;
         data.devourReadyAt = now + BleachConfig.get(BleachConfig.DEVOUR_COOLDOWN_TICKS);
         if (messageKey != null && player instanceof ServerPlayer server) {
             server.displayClientMessage(Component.translatable(messageKey).withStyle(ChatFormatting.GRAY), true);
@@ -281,7 +281,6 @@ public final class DevourEvents {
         DevourLogic.Gnaw gnaw = DevourLogic.gnawRefusal(player, data);
         if (gnaw == DevourLogic.Gnaw.GNAWING && !DevourLogic.gnawing(data)) {
             data.gnawStartedAt = now;
-            data.gnawTicks = 0;
             if (player instanceof ServerPlayer server) {
                 server.displayClientMessage(Component.translatable("message.bleach.gnaw.start")
                         .withStyle(ChatFormatting.DARK_RED), true);
@@ -293,7 +292,6 @@ public final class DevourEvents {
     /** The Plus stops gnawing: the chain wears away at its usual pace again. */
     public static void stopGnaw(SoulData data) {
         data.gnawStartedAt = NEVER;
-        data.gnawTicks = 0;
     }
 
     // ---- Events ----
