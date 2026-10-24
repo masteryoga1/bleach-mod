@@ -334,7 +334,9 @@ public final class RansotengaiTests {
         helper.assertTrue(slowed != null && slowed.getAmplifier() == 3 && weakened != null && weakened.getAmplifier() == 1,
                 "after milk the trial's binding is " + slowed + " and " + weakened);
 
-        long trial = (long) BleachConfig.get(BleachConfig.RANSOTENGAI_TRIAL_SECONDS) * TICKS_PER_SECOND;
+        long trial = QuincyRansotengai.trialTicks();
+        long hold = (long) BleachConfig.get(BleachConfig.RANSOTENGAI_TRIAL_HOLD_SECONDS) * TICKS_PER_SECOND;
+        helper.assertTrue(trial >= hold + 5L * TICKS_PER_SECOND, "a trial of " + trial + " ticks leaves no time to hold for " + hold);
         QuincyRansotengai.tick(mock, data, NOW + trial);
         helper.assertFalse(QuincyRansotengai.trialOpen(data, NOW + trial), "the trial is still open after it ran out");
         helper.assertFalse(mock.hasEffect(MobEffects.MOVEMENT_SLOWDOWN) || mock.hasEffect(MobEffects.WEAKNESS),

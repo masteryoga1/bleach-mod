@@ -67,6 +67,8 @@ public final class QuincyRansotengai {
      * as long as the trial is open and the threads are not woven; never past the trial's end.
      */
     public static final int BIND_TICKS = 40;
+    /** The trial stays open at least this much longer than the threads must hold in it: 5 seconds. */
+    private static final long TRIAL_SPARE_TICKS = 100L;
     /** The collapse after the threads let go: Slowness II and Weakness II. */
     private static final int COLLAPSE_SLOWNESS = 1, COLLAPSE_WEAKNESS = 1;
     /** How far from the soul passing the trial an Elder still notices it, and cuts his visit short. */
@@ -240,8 +242,13 @@ public final class QuincyRansotengai {
         return Math.max(0, (int) (BleachConfig.get(BleachConfig.RANSOTENGAI_COLLAPSE_SECONDS) * TICKS_PER_SECOND));
     }
 
-    private static int trialTicks() {
-        return Math.max(1, (int) (BleachConfig.get(BleachConfig.RANSOTENGAI_TRIAL_SECONDS) * TICKS_PER_SECOND));
+    /**
+     * How long the Elder's trial stays open: as set, but always somewhat longer than the threads must
+     * hold, so that a soul who weaves them at once can pass it, whatever the settings.
+     */
+    public static int trialTicks() {
+        long set = Math.max(1L, (long) BleachConfig.get(BleachConfig.RANSOTENGAI_TRIAL_SECONDS) * TICKS_PER_SECOND);
+        return (int) Math.max(set, trialHoldTicks() + TRIAL_SPARE_TICKS);
     }
 
     private static long trialHoldTicks() {

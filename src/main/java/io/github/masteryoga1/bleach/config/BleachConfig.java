@@ -1309,7 +1309,7 @@ public final class BleachConfig {
                 .comment("Seconds of Slowness and Weakness after the threads let go, as the body gives out.")
                 .defineInRange("collapse_seconds", 10, 0, 600);
         RANSOTENGAI_TRIAL_SECONDS = builder
-                .comment("Seconds the Elder's Ransōtengai trial stays open.")
+                .comment("Seconds the Elder's Ransōtengai trial stays open, and always at least 5 more than trial_hold_seconds.")
                 .defineInRange("trial_seconds", 30, 5, 600);
         RANSOTENGAI_TRIAL_HOLD_SECONDS = builder
                 .comment("Seconds the threads must hold unbroken in the trial for the art to be learned.")
