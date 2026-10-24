@@ -15,9 +15,6 @@ import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Equipable;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.CakeBlock;
-import net.minecraft.world.level.block.CandleCakeBlock;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
@@ -45,7 +42,6 @@ public final class HollowPlayerEvents {
         bus.addListener(HollowPlayerEvents::onDamageTaken);
         bus.addListener(HollowPlayerEvents::onUseItemStart);
         bus.addListener(HollowPlayerEvents::onRightClickItem);
-        bus.addListener(HollowPlayerEvents::onRightClickBlock);
         bus.addListener(HollowPlayerEvents::onEntityInteract);
         bus.addListener(HollowPlayerEvents::onAttackEntity);
         // Low, after the soul's own death handlers have had their say, and never for a death that was cancelled.
@@ -90,18 +86,16 @@ public final class HollowPlayerEvents {
         }
     }
 
-    /** A cake is food as well, eaten straight from the block. */
-    private static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        Player player = event.getEntity();
+    /**
+     * Whether a bite of cake, straight from the block, is refused, as food is to a Hollow under survival's
+     * rules, telling it so. Asked by CakeBlockMixin on both sides, only when the click would really bite.
+     */
+    public static boolean refusesCake(Player player) {
         if (!HollowPlayerLogic.survivalRules(player) || !HollowPlayerLogic.isHollowPlayer(player)) {
-            return;
+            return false;
         }
-        Block block = event.getLevel().getBlockState(event.getPos()).getBlock();
-        if (block instanceof CakeBlock || block instanceof CandleCakeBlock) {
-            event.setCanceled(true);
-            event.setCancellationResult(InteractionResult.FAIL);
-            refuseFood(player);
-        }
+        refuseFood(player);
+        return true;
     }
 
     /**

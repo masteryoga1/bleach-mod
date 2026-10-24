@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
@@ -65,6 +67,9 @@ import net.minecraft.world.food.FoodData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CakeBlock;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -747,6 +752,22 @@ public final class HollowPlayerTests {
         // Empty in the mod's own data: a pack fills it.
         helper.assertTrue(BuiltInRegistries.ITEM.getTag(BleachTags.HOLLOW_EDIBLE).map(set -> set.size() == 0).orElse(true),
                 "#bleach:hollow_edible is not empty");
+
+        // A cake straight from the block: a hungry Hollow takes no bite, where a hungry Human does.
+        BlockPos cake = helper.absolutePos(new BlockPos(8, 2, 8));
+        helper.getLevel().setBlockAndUpdate(cake, Blocks.CAKE.defaultBlockState());
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(cake), Direction.UP, cake, false);
+        player.getFoodData().setFoodLevel(6);
+        helper.getLevel().getBlockState(cake).useWithoutItem(helper.getLevel(), player, hit);
+        helper.assertTrue(helper.getLevel().getBlockState(cake).getValue(CakeBlock.BITES) == 0, "a Hollow bit the cake");
+        helper.assertTrue(player.getFoodData().getFoodLevel() == 6,
+                "a Hollow's food rose to " + player.getFoodData().getFoodLevel());
+        Player human = soulPlayer(helper, GameType.SURVIVAL, SoulState.HUMAN, 90.0F, DEVOURER_SPOT);
+        human.getFoodData().setFoodLevel(6);
+        helper.getLevel().getBlockState(cake).useWithoutItem(helper.getLevel(), human, hit);
+        helper.assertTrue(helper.getLevel().getBlockState(cake).getValue(CakeBlock.BITES) == 1,
+                "a hungry Human did not bite the cake");
+        helper.getLevel().setBlockAndUpdate(cake, Blocks.AIR.defaultBlockState());
         helper.succeed();
     }
 
