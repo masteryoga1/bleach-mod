@@ -29,13 +29,15 @@ public final class HollowPlayerLogic {
         STARVING
     }
 
-    // The SoulAppearance.hollowLook bits. 8 and up are kept for the Menos tiers and Cero.
+    // The SoulAppearance.hollowLook bits. 8 to 64 are kept for the Menos tiers and Cero.
     /** The jaw of the mask hangs open: the Hollow is devouring. */
     public static final int LOOK_DEVOURING = 1;
     /** The mask is cracked from a blow. */
     public static final int LOOK_MASK_CRACKED = 2;
     /** The eyes burn red: the Hollow is ravenous or starving. */
     public static final int LOOK_RAVENOUS = 4;
+    /** With {@link #LOOK_DEVOURING}: the prey is a Plus, so the hold is the quicker one (its owner's devour bar reads it). */
+    public static final int LOOK_DEVOURING_QUICK = 128;
     /** How many mask shapes there are: 0 skull, 1 fanged, 2 horned, 3 beaked. */
     public static final int MASK_VARIANTS = 4;
     /** The food level a starving Hollow is held at: exactly the client's own limit for sprinting. */
@@ -211,13 +213,14 @@ public final class HollowPlayerLogic {
     }
 
     /**
-     * Every look bit, with those only the server knows: the jaw open while devouring and the mask
-     * cracked after a blow. On a client's copy those are at their defaults and add nothing.
+     * Every look bit, with those only the server knows: the jaw open while devouring (and whether the
+     * hold is a Plus's quick one) and the mask cracked after a blow. On a client's copy those are at
+     * their defaults and add nothing.
      */
     public static int hollowLook(SoulData data, long now) {
         int look = hollowLook(data);
         if (data.devourTargetId >= 0) {
-            look |= LOOK_DEVOURING;
+            look |= data.devourQuick ? LOOK_DEVOURING | LOOK_DEVOURING_QUICK : LOOK_DEVOURING;
         }
         if (now < data.hollowCrackedUntil) {
             look |= LOOK_MASK_CRACKED;

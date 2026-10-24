@@ -144,6 +144,7 @@ public final class DevourEvents {
         }
         data.devourTargetId = prey.getId();
         data.devourHeldTicks = 0;
+        data.devourQuick = DevourLogic.holdTicks(prey) < BleachConfig.get(BleachConfig.DEVOUR_HOLD_TICKS);
         AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null) {
             speed.addOrUpdateTransientModifier(new AttributeModifier(DevourLogic.DEVOURING_ID,
@@ -177,6 +178,7 @@ public final class DevourEvents {
         }
         data.devourTargetId = -1;
         data.devourHeldTicks = 0;
+        data.devourQuick = false;
         data.devourReadyAt = now + BleachConfig.get(BleachConfig.DEVOUR_COOLDOWN_TICKS);
         if (messageKey != null && player instanceof ServerPlayer server) {
             server.displayClientMessage(Component.translatable(messageKey).withStyle(ChatFormatting.GRAY), true);

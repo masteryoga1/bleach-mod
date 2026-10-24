@@ -24,6 +24,7 @@ import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.BaitLogic;
 import io.github.masteryoga1.bleach.soul.BaitSite;
 import io.github.masteryoga1.bleach.soul.BaitSites;
+import io.github.masteryoga1.bleach.soul.DevourEvents;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HollowBody;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
@@ -900,6 +901,9 @@ public final class BleachCommand {
             ShikaiEvents.forceSeal(player, SoulLogic.get(player), null);
             QuincyArtsEvents.endAll(player, SoulLogic.get(player));
             QuincyRansotengai.closeTrial(player, SoulLogic.get(player));
+            DevourEvents.stopDevour(player, SoulLogic.get(player), null, player.level().getGameTime());
+            DevourEvents.stopGnaw(SoulLogic.get(player));
+            HollowBody.leaveBodyIfWorn(player, SoulLogic.get(player));
             SoulData fresh = new SoulData();
             QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);
             player.setData(SoulAttachments.SOUL, fresh);

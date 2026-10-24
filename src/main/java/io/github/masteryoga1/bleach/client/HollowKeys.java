@@ -78,8 +78,9 @@ public final class HollowKeys {
             if (player.isShiftKeyDown() && data.state() == SoulState.HOLLOW) {
                 BleachNetwork.requestHollowKey(HollowKey.SIGHT, -1);
             } else {
+                // Only a living creature can be prey: anything else is no aim, and the server looks nearby.
                 Entity target = minecraft.crosshairPickEntity;
-                int targetId = target != null ? target.getId() : -1;
+                int targetId = target instanceof LivingEntity ? target.getId() : -1;
                 BleachNetwork.requestHollowKey(HollowKey.PRESS, targetId);
                 holding = true;
                 holdStartedAt = ticks;
@@ -93,8 +94,9 @@ public final class HollowKeys {
      * been held over the hold the prey takes (a Plus is quicker); 0 when there is nothing to show. Only
      * while a Hollow holds the key, the creature it aimed at is still alive, and, once the server has had
      * time to answer, its jaw hangs open (the server's word that the hold is on). A guide only: the server
-     * times the real hold. Without an aimed-at creature the server picks the prey, and the bar assumes the
-     * longer hold.
+     * times the real hold. Once the jaw is open the server's look also says which hold it is, which
+     * matters when nothing was aimed at and the server picked the prey itself; before that the bar
+     * guesses from the creature aimed at, or assumes the longer hold.
      */
     public static float holdProgress(float partialTick) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -111,11 +113,20 @@ public final class HollowKeys {
             prey = living;
         }
         int held = ticks - holdStartedAt;
-        if (held > CONFIRM_TICKS
-                && (ClientSouls.appearance(player).hollowLook() & HollowPlayerLogic.LOOK_DEVOURING) == 0) {
+        int look = ClientSouls.appearance(player).hollowLook();
+        boolean confirmed = (look & HollowPlayerLogic.LOOK_DEVOURING) != 0;
+        if (held > CONFIRM_TICKS && !confirmed) {
             return 0.0F;
         }
-        int hold = Math.max(1, prey != null ? DevourLogic.holdTicks(prey) : BleachConfig.get(BleachConfig.DEVOUR_HOLD_TICKS));
+        int hold;
+        if (confirmed) {
+            hold = (look & HollowPlayerLogic.LOOK_DEVOURING_QUICK) != 0
+                    ? BleachConfig.get(BleachConfig.DEVOUR_PLUS_HOLD_TICKS)
+                    : BleachConfig.get(BleachConfig.DEVOUR_HOLD_TICKS);
+        } else {
+            hold = prey != null ? DevourLogic.holdTicks(prey) : BleachConfig.get(BleachConfig.DEVOUR_HOLD_TICKS);
+        }
+        hold = Math.max(1, hold);
         return Math.min(1.0F, (held + partialTick) / hold);
     }
 

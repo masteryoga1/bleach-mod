@@ -160,9 +160,7 @@ public final class HollowBody {
      */
     public static void tickBody(Player player, SoulData data, long now) {
         if (!HollowPlayerLogic.isHollow(data)) {
-            if (data.hollowBodyApplied || data.hollow().hungerStarted()) {
-                leaveBody(player, data);
-            }
+            leaveBodyIfWorn(player, data);
             return;
         }
         ensureHunger(data);
@@ -241,6 +239,17 @@ public final class HollowBody {
                 AttributeModifier.Operation.ADD_VALUE);
         sight(player, data);
         data.hollowBodyApplied = true;
+    }
+
+    /**
+     * Gives a soul that has stopped being a Hollow its body back, if it ever wore the Hollow's. A soul
+     * about to be replaced outright (a reset) needs this first: its replacement never wore the body, so
+     * it would have nothing to take off and the food would stay pinned.
+     */
+    public static void leaveBodyIfWorn(Player player, SoulData data) {
+        if (data.hollowBodyApplied || data.hollow().hungerStarted()) {
+            leaveBody(player, data);
+        }
     }
 
     /**

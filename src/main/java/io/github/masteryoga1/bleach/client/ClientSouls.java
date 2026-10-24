@@ -17,7 +17,8 @@ public final class ClientSouls {
 
     /**
      * How an entity's soul looks: the local player's from its own data, others' from what the server sent.
-     * The local player's Hollow jaw and cracked mask come from the server too, which alone knows them.
+     * The local player's Hollow jaw (and how long its hold is) and cracked mask come from the server too,
+     * which alone knows them.
      */
     public static SoulAppearance appearance(Entity entity) {
         LocalPlayer self = Minecraft.getInstance().player;
@@ -25,8 +26,8 @@ public final class ClientSouls {
             SoulAppearance own = SoulAppearance.of(self, self.getData(SoulAttachments.SOUL));
             // The devouring and cracked bits live only on the server, which sends them to the owner too.
             int sent = self.hasData(SoulAttachments.APPEARANCE)
-                    ? self.getData(SoulAttachments.APPEARANCE).hollowLook()
-                            & (HollowPlayerLogic.LOOK_DEVOURING | HollowPlayerLogic.LOOK_MASK_CRACKED)
+                    ? self.getData(SoulAttachments.APPEARANCE).hollowLook() & (HollowPlayerLogic.LOOK_DEVOURING
+                            | HollowPlayerLogic.LOOK_DEVOURING_QUICK | HollowPlayerLogic.LOOK_MASK_CRACKED)
                     : 0;
             return sent == 0 ? own : own.withHollowLook(own.hollowLook() | sent);
         }

@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
@@ -599,6 +600,50 @@ public final class HollowPlayerTests {
     }
 
     @GameTest(template = "field")
+    public static void maskStrikesOnlyFromInFront(GameTestHelper helper) {
+        // The body is never put on, so no hide stands between the blows and the ratio is the multiplier.
+        Player victim = hollow(helper, 90.0F);
+        victim.setYHeadRot(0.0F);
+        SoulData data = SoulLogic.get(victim);
+        Vec3 at = victim.position();
+        Vec3 mask = HollowMask.playerMaskBox(victim).getCenter();
+        // Two Shinigami, who see the Hollow, of the same reiryoku: one behind it, one in front aiming at the mask.
+        Player behind = soulPlayer(helper, GameType.SURVIVAL, SoulState.SHINIGAMI, 90.0F, DEVOURER_SPOT);
+        behind.moveTo(at.add(0.0, 0.0, -2.0));
+        behind.lookAt(EntityAnchorArgument.Anchor.EYES, victim.getEyePosition());
+        Player front = soulPlayer(helper, GameType.SURVIVAL, SoulState.SHINIGAMI, 90.0F, DEVOURER_SPOT);
+        front.moveTo(at.add(0.0, 0.0, 2.0));
+        front.lookAt(EntityAnchorArgument.Anchor.EYES, mask);
+        DamageSource fromBehind = helper.getLevel().damageSources().playerAttack(behind);
+        DamageSource fromFront = helper.getLevel().damageSources().playerAttack(front);
+        helper.assertFalse(HollowMask.struckPlayer(victim, fromBehind), "a blow from behind struck the mask");
+        helper.assertTrue(HollowMask.struckPlayer(victim, fromFront), "a blow from in front missed the mask");
+        // Only a player's own blow is traced along their aim: the same aim under another damage type misses.
+        helper.assertFalse(HollowMask.struckPlayer(victim, helper.getLevel().damageSources().mobAttack(front)),
+                "a mob's blow struck the mask");
+
+        float full = victim.getHealth();
+        victim.hurt(fromBehind, 4.0F);
+        float bodyDrop = full - victim.getHealth();
+        long now = now(helper);
+        helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_MASK_CRACKED) == 0,
+                "a blow from behind cracked the mask");
+        victim.invulnerableTime = 0;
+        float beforeMask = victim.getHealth();
+        victim.hurt(fromFront, 4.0F);
+        float maskDrop = beforeMask - victim.getHealth();
+
+        helper.assertTrue(bodyDrop > 0.0F, "the blow from behind did no harm");
+        double multiplier = BleachConfig.get(BleachConfig.HOLLOW_PLAYER_MASK_DAMAGE_MULTIPLIER);
+        double ratio = maskDrop / bodyDrop;
+        helper.assertTrue(Math.abs(ratio - multiplier) < 0.05,
+                "a blow to the mask did " + maskDrop + " against " + bodyDrop + " from behind, " + ratio + " times as much");
+        helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_MASK_CRACKED) != 0,
+                "a blow to the mask did not crack it");
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
     public static void starvingHurtsAsSoulHunger(GameTestHelper helper) {
         Player player = hollow(helper, 90.0F);
         SoulData data = SoulLogic.get(player);
@@ -791,6 +836,8 @@ public final class HollowPlayerTests {
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, "the devourer's slowness");
         helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_DEVOURING) != 0,
                 "the jaw does not hang open during the hold");
+        helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_DEVOURING_QUICK) != 0,
+                "the hold on a Plus does not say it is the quick one");
         start = DevourEvents.startDevour(player, data, plus, now);
         helper.assertTrue(start == null, "a second press on the held Plus was refused as " + start);
         helper.assertTrue(plus.isSeized()
@@ -802,7 +849,8 @@ public final class HollowPlayerTests {
         DevourEvents.stopDevour(player, data, null, now);
         helper.assertTrue(modifier(player, Attributes.MOVEMENT_SPEED, DevourLogic.DEVOURING_ID) == null,
                 "the devourer stayed slow after letting go");
-        helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_DEVOURING) == 0,
+        helper.assertTrue((HollowPlayerLogic.hollowLook(data, now)
+                        & (HollowPlayerLogic.LOOK_DEVOURING | HollowPlayerLogic.LOOK_DEVOURING_QUICK)) == 0,
                 "the jaw still hangs open after letting go");
         helper.assertFalse(plus.isSeized(), "the Plus stayed seized after letting go");
         start = DevourEvents.startDevour(player, data, plus, now + 5);

@@ -71,7 +71,8 @@ public final class HollowEvents {
                 strikeMask(event, hollow);
             }
         } else if (victim instanceof Player player && HollowPlayerLogic.isHollowPlayer(player)
-                && HollowMask.struckPlayer(player, source)) {
+                && !player.isDamageSourceBlocked(source) && HollowMask.struckPlayer(player, source)) {
+            // A blow the Hollow's raised shield takes never reaches the mask behind it.
             strikePlayerMask(event, player);
         }
     }
