@@ -27,6 +27,13 @@ public final class SoulLogic {
     /** Creature types that are spirits, hidden from the spiritually unaware: Shinigami NPCs, Hollows, Pluses and the Garganta. */
     public static final TagKey<EntityType<?>> SPIRITS = TagKey.create(Registries.ENTITY_TYPE, BleachMod.id("spirits"));
 
+    /**
+     * Creature types that are no spirits but can see them, and whose bodies and arrows meet theirs:
+     * the living Quincy NPCs. Everyone sees them, and they see and fight Hollows.
+     */
+    public static final TagKey<EntityType<?>> SPIRIT_SIGHTED = TagKey.create(Registries.ENTITY_TYPE,
+            BleachMod.id("spirit_sighted"));
+
     /** Share of maximum reiryoku needed to start releasing reiatsu. */
     public static final float RELEASE_MIN_FRACTION = 0.1F;
 

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:elder_met",
+  "display": {
+    "icon": {
+      "id": "minecraft:string"
+    },
+    "title": {
+      "translate": "advancements.bleach.ransotengai.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.ransotengai.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "ransotengai": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "ransotengai"
+      }
+    }
+  }
+}

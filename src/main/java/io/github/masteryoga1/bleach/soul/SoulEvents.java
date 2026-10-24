@@ -69,6 +69,8 @@ public final class SoulEvents {
         ShikaiEvents.register(bus);
         QuincyEvents.register(bus);
         QuincyArtsEvents.register(bus);
+        QuincyNpcEvents.register(bus);
+        BaitEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -137,14 +139,15 @@ public final class SoulEvents {
 
     /**
      * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
-     * the release ends and the reiatsu settles; standing on reishi footing paid in reiryoku, or holding
-     * a Shikai that can seal, spends it as it comes. A Quincy's footing is paid in reishi instead.
+     * the release ends and the reiatsu settles; standing on reishi footing paid in reiryoku, holding a
+     * Shikai that can seal, or weaving Ransōtengai's threads spends it as it comes. A Quincy's footing
+     * is paid in reishi instead.
      */
     public static boolean mayRegenerate(Player player, SoulData data) {
         boolean footingOnReiryoku = ReishiFooting.isActive(player)
                 && !QuincyLogic.footingOnReishi(data, player.level().getGameTime());
         return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !footingOnReiryoku
-                && !data.isShikaiActive();
+                && !data.isShikaiActive() && !QuincyRansotengai.isWoven(data);
     }
 
     /** Zanjutsu and Hakuda make melee hits stronger. Training happens once a hit lands, in {@link #onDamageTaken}. */

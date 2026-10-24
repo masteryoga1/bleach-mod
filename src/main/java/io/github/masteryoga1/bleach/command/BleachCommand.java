@@ -9,6 +9,8 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.entity.QuincyNpc;
+import io.github.masteryoga1.bleach.item.HollowBaitItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
@@ -16,7 +18,12 @@ import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.quincy.QuincyStage;
 import io.github.masteryoga1.bleach.registry.ModComponents;
+import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.BaitEvents;
+import io.github.masteryoga1.bleach.soul.BaitLogic;
+import io.github.masteryoga1.bleach.soul.BaitSite;
+import io.github.masteryoga1.bleach.soul.BaitSites;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
@@ -27,7 +34,11 @@ import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
 import io.github.masteryoga1.bleach.soul.QuincyForms;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.QuincyNpcEvents;
+import io.github.masteryoga1.bleach.soul.QuincyNpcLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
+import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
+import io.github.masteryoga1.bleach.soul.QuincyTeaching;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
@@ -47,6 +58,8 @@ import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -67,11 +80,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -91,6 +106,9 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
  * /bleach garganta &lt;players&gt; [spider|hexapodus|hound|serpent|fishbone_d]   (a tear now; not on Peaceful)
  * /bleach firsthollow &lt;players&gt; &lt;reset|skip|start&gt;   (the Fishbone D encounter)
+ * /bleach bait &lt;players&gt; &lt;start|stop|wave|finale|status&gt;   (start skips every refusal but the world and Peaceful, and counts as a crush)
+ * /bleach bait list
+ * /bleach npc &lt;players&gt; &lt;elder|hunter&gt;   (a visit now, with no gates, chance or cooldown)
  * /bleach zanpakuto &lt;players&gt; bond &lt;0..1000&gt;   (the Asauchi bond, with no gates or multiplier)
  * /bleach zanpakuto &lt;players&gt; affinity &lt;power|kido|constant_release&gt; &lt;0..10000&gt;   (the hidden leaning)
  * /bleach zanpakuto &lt;players&gt; spirit &lt;id&gt;
@@ -106,6 +124,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach quincy &lt;players&gt; letzt &lt;start|seal|ready|restore|reset&gt;   (ready skips the sealed wait, restore every condition)
  * /bleach quincy &lt;players&gt; vollstandig &lt;on|off&gt;   (on skips the unlock, cost and cooldown; restored power only)
  * /bleach quincy &lt;players&gt; ginto &lt;gritz|wolke|heizen|sprenger&gt;   (the spell Gintō cast, known or not)
+ * /bleach quincy &lt;players&gt; ransotengai &lt;learn|forget|start|stop&gt;   (start skips whether it is known and the wait after a collapse)
+ * /bleach quincy &lt;players&gt; lessons reset   (the Elder's lessons and visits start over; Ransōtengai stays known)
  * /bleach quincy &lt;players&gt; reset   (no Quincy power, and the bloodline is asked again)
  * </pre>
  */
@@ -123,6 +143,8 @@ public final class BleachCommand {
     private static final SuggestionProvider<CommandSourceStack> LETZT_ACTIONS = suggest(LetztAction.values());
     private static final SuggestionProvider<CommandSourceStack> TOGGLES = suggest(Toggle.values());
     private static final SuggestionProvider<CommandSourceStack> GINTO_SPELLS = suggest(GintoSpell.values());
+    private static final SuggestionProvider<CommandSourceStack> BAIT_ACTIONS = suggest(BaitAction.values());
+    private static final SuggestionProvider<CommandSourceStack> RANSOTENGAI_ACTIONS = suggest(RansotengaiAction.values());
     /** The spirits the world loaded, read from the server's registry. */
     private static final SuggestionProvider<CommandSourceStack> SPIRITS = (context, builder) ->
             SharedSuggestionProvider.suggestResource(ZanpakutoSpirits.registry(context.getSource().getLevel())
@@ -194,6 +216,20 @@ public final class BleachCommand {
                                                 hunt -> hunt.withFirstHollowDone(true))))
                                 .then(Commands.literal("start")
                                         .executes(BleachCommand::startFirstHollow))))
+                .then(Commands.literal("bait")
+                        .then(Commands.literal("list")
+                                .executes(context -> baitList(context.getSource())))
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.argument("action", StringArgumentType.word())
+                                        .suggests(BAIT_ACTIONS)
+                                        .executes(context -> bait(context,
+                                                StringArgumentType.getString(context, "action"))))))
+                .then(Commands.literal("npc")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.literal("elder")
+                                        .executes(context -> spawnNpc(context, true)))
+                                .then(Commands.literal("hunter")
+                                        .executes(context -> spawnNpc(context, false)))))
                 .then(Commands.literal("zanpakuto")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .then(Commands.literal("bond")
@@ -252,6 +288,14 @@ public final class BleachCommand {
                                         .then(Commands.argument("spell", StringArgumentType.word())
                                                 .suggests(GINTO_SPELLS)
                                                 .executes(BleachCommand::setGinto)))
+                                .then(Commands.literal("ransotengai")
+                                        .then(Commands.argument("action", StringArgumentType.word())
+                                                .suggests(RANSOTENGAI_ACTIONS)
+                                                .executes(context -> ransotengai(context,
+                                                        StringArgumentType.getString(context, "action")))))
+                                .then(Commands.literal("lessons")
+                                        .then(Commands.literal("reset")
+                                                .executes(BleachCommand::resetLessons)))
                                 .then(Commands.literal("reset")
                                         .executes(BleachCommand::resetQuincy)))));
     }
@@ -463,6 +507,178 @@ public final class BleachCommand {
         return true;
     }
 
+    // ---- /bleach bait ----
+
+    /**
+     * A Hollow Bait action for each player's site. {@code start} opens one where they stand, as if
+     * they had crushed a bait: only another world or Peaceful refuses it, a site they already own is
+     * stopped first, and it counts as a crush. {@code stop} ends their site; {@code wave} sends a wave
+     * now, still within the cap on Hollows, at them if they are hunted there; {@code finale} cracks
+     * the sky over their bait now; {@code status} says how it stands.
+     */
+    private static int bait(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException {
+        BaitAction action = byName(BaitAction.values(), name);
+        CommandSourceStack source = context.getSource();
+        if (action == null) {
+            source.sendFailure(Component.translatable("argument.enum.invalid", name));
+            return 0;
+        }
+        // A wave's Hollows, like the ones a bait draws, would vanish at once.
+        if ((action == BaitAction.START || action == BaitAction.WAVE) && peaceful(source)) {
+            return 0;
+        }
+        ServerLevel overworld = source.getServer().overworld();
+        BaitSites sites = BaitSites.get(source.getServer());
+        int done = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            if (baitFor(source, overworld, sites, player, action)) {
+                done++;
+            }
+        }
+        String key = switch (action) {
+            case START -> "commands.bleach.bait.started";
+            case STOP -> "commands.bleach.bait.stopped";
+            case WAVE -> "commands.bleach.bait.wave";
+            case FINALE -> "commands.bleach.bait.finale";
+            case STATUS -> null;
+        };
+        int count = done;
+        if (count > 0 && key != null) {
+            source.sendSuccess(() -> Component.translatable(key, count), true);
+        }
+        return count;
+    }
+
+    /** Does one bait action for one player, or says why it cannot. Sites live in the Overworld. */
+    private static boolean baitFor(CommandSourceStack source, ServerLevel overworld, BaitSites sites,
+                                   ServerPlayer player, BaitAction action) {
+        long now = overworld.getGameTime();
+        if (action == BaitAction.START) {
+            SoulData data = SoulLogic.get(player);
+            if (BaitEvents.crushRefusal(player, data, player.blockPosition(), true) != null
+                    || BaitEvents.start(player, player.blockPosition(), false, null, now) == null) {
+                source.sendFailure(Component.translatable("commands.bleach.bait.failed", player.getDisplayName()));
+                return false;
+            }
+            HollowBaitItem.countCrush(player, data);
+            BleachNetwork.syncSoul(player, data);
+            return true;
+        }
+        BaitSite site = sites.ownedBy(player.getUUID());
+        // A contest is a site too, but has no sky to crack.
+        if (site == null || (action == BaitAction.FINALE && site.contest())) {
+            source.sendFailure(Component.translatable("commands.bleach.bait.none", player.getDisplayName()));
+            return false;
+        }
+        switch (action) {
+            case STOP -> BaitEvents.end(overworld, sites, site, BaitLogic.End.STOPPED);
+            case WAVE -> {
+                if (BaitEvents.wave(overworld, sites, site, now, waveSouls(overworld, site, player)) == 0) {
+                    source.sendFailure(Component.translatable("commands.bleach.garganta.failed", player.getDisplayName()));
+                    return false;
+                }
+            }
+            case FINALE -> {
+                if (!BaitEvents.startFinale(overworld, sites, site, now)) {
+                    source.sendFailure(Component.translatable("commands.bleach.garganta.failed", player.getDisplayName()));
+                    return false;
+                }
+            }
+            case STATUS -> source.sendSuccess(() -> baitStatus(player, site), false);
+            case START -> {
+                // Handled above.
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The souls a commanded wave counts as hunted: the site's own, all of them the player when the
+     * player is among them, so the wave comes for them. The list keeps its length, so the cap on the
+     * site's Hollows is the one those souls give.
+     */
+    private static List<? extends Player> waveSouls(ServerLevel level, BaitSite site, ServerPlayer player) {
+        List<Player> hunted = BaitEvents.hunted(level, site);
+        boolean huntedHere = hunted.stream().anyMatch(soul -> soul.getUUID().equals(player.getUUID()));
+        return huntedHere ? Collections.nCopies(hunted.size(), player) : hunted;
+    }
+
+    private static Component baitStatus(ServerPlayer player, BaitSite site) {
+        return Component.translatable("commands.bleach.bait.status", player.getDisplayName(), site.arrived(),
+                site.waves(), site.ownerKills(), site.rivalKills(), baitTimeLeft(site),
+                site.frozenTicks() > 0 ? Component.translatable("commands.bleach.bait.frozen") : Component.empty());
+    }
+
+    /** Lists every open site: whose it is, where, what kind, how many Hollows have come and how long it has left. */
+    private static int baitList(CommandSourceStack source) {
+        MinecraftServer server = source.getServer();
+        List<BaitSite> all = List.copyOf(BaitSites.get(server).all());
+        source.sendSuccess(() -> Component.translatable("commands.bleach.bait.list", all.size()), false);
+        for (BaitSite site : all) {
+            ServerPlayer owner = server.getPlayerList().getPlayer(site.owner());
+            Component who = owner != null ? owner.getDisplayName() : Component.literal(site.owner().toString());
+            BlockPos centre = site.centre();
+            String kind = site.contest() ? "contest" : site.inFinale() ? "finale" : "bait";
+            Component entry = Component.translatable("commands.bleach.bait.list_entry", who,
+                    Component.translatable("chat.coordinates", centre.getX(), centre.getY(), centre.getZ()), kind,
+                    site.arrived(), baitTimeLeft(site));
+            source.sendSuccess(() -> entry, false);
+        }
+        return all.size();
+    }
+
+    private static String baitTimeLeft(BaitSite site) {
+        return QuincyArtsLogic.formatTicks(site.durationTicks() - site.activeTicks());
+    }
+
+    // ---- /bleach npc ----
+
+    /**
+     * Sends a visiting Quincy to each player now, with none of a visit's gates, chance or cooldown:
+     * the Elder, for whatever reason he would come (with none he still comes, with nothing to give),
+     * or the Hunter, near them but not for a contest. Either way the visit counts as a natural one:
+     * the player is told, and the wait before the next one starts. Each needs open ground near the
+     * player.
+     */
+    private static int spawnNpc(CommandContext<CommandSourceStack> context, boolean elder) throws CommandSyntaxException {
+        int sent = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            ServerLevel level = player.serverLevel();
+            long now = level.getGameTime();
+            QuincyNpc npc;
+            if (elder) {
+                QuincyNpcLogic.Visit reason = QuincyNpcLogic.visitReason(data, now,
+                        QuincyArtsLogic.gloveDay(now, level.getDayTime()));
+                npc = QuincyNpcEvents.spawnElder(player, data, reason, now);
+            } else {
+                npc = QuincyNpcEvents.spawnHunter(level, player, player, now);
+            }
+            if (npc == null) {
+                context.getSource().sendFailure(Component.translatable("commands.bleach.npc.failed",
+                        player.getDisplayName()));
+                continue;
+            }
+            if (!elder) {
+                // Met as when he follows a Garganta: noted, and told. The Elder's visit does both itself.
+                HuntRecord hunt = data.hunt();
+                data.setHunt(hunt.withBait(hunt.bait().withHunterMet(true).withLastHunterAt(now)));
+                player.sendSystemMessage(Component.translatable("message.bleach.hunter.arrives")
+                        .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+            }
+            BleachNetwork.syncSoul(player, data);
+            sent++;
+        }
+        if (sent == 0) {
+            return 0;
+        }
+        int count = sent;
+        Component kind = elder ? ModEntities.QUINCY_ELDER.get().getDescription()
+                : ModEntities.QUINCY_HUNTER.get().getDescription();
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.npc.spawned", kind, count), true);
+        return count;
+    }
+
     private static int setState(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "state");
         SoulState state = byName(SoulState.values(), name);
@@ -585,6 +801,7 @@ public final class BleachCommand {
             // What the old soul had released goes with it, so nothing it held lingers on the body.
             ShikaiEvents.forceSeal(player, SoulLogic.get(player), null);
             QuincyArtsEvents.endAll(player, SoulLogic.get(player));
+            QuincyRansotengai.closeTrial(player, SoulLogic.get(player));
             SoulData fresh = new SoulData();
             QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);
             player.setData(SoulAttachments.SOUL, fresh);
@@ -1071,6 +1288,80 @@ public final class BleachCommand {
         return players.size();
     }
 
+    /**
+     * Ransōtengai by command: {@code learn} or {@code forget} the art (forgetting also closes an open
+     * trial and lets a weave go); {@code start} weaves it, known or not, skipping the wait after a
+     * collapse but no other refusal, which the player is told; {@code stop} lets it go. A weave let go
+     * by command never collapses the body or starts the wait.
+     */
+    private static int ransotengai(CommandContext<CommandSourceStack> context, String name)
+            throws CommandSyntaxException {
+        RansotengaiAction action = byName(RansotengaiAction.values(), name);
+        if (action == null) {
+            context.getSource().sendFailure(Component.translatable("argument.enum.invalid", name));
+            return 0;
+        }
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            long now = player.level().getGameTime();
+            switch (action) {
+                case LEARN -> {
+                    // Learned outright: an open trial has nothing left to teach, so it closes and lets go.
+                    QuincyRansotengai.closeTrial(player, data);
+                    data.setQuincy(data.quincy().withTeaching(data.quincy().teaching().withRansotengaiKnown(true)));
+                    Milestones.check(player, data);
+                }
+                case FORGET -> {
+                    if (QuincyRansotengai.isWoven(data)) {
+                        QuincyRansotengai.end(player, data, now, QuincyRansotengai.End.COMMAND);
+                    }
+                    QuincyRansotengai.closeTrial(player, data);
+                    // Read again: letting the weave go and closing the trial changed the record.
+                    data.setQuincy(data.quincy().withTeaching(data.quincy().teaching().withRansotengaiKnown(false)));
+                }
+                case START -> {
+                    if (!QuincyRansotengai.start(player, data, now, true)) {
+                        context.getSource().sendFailure(Component.translatable("commands.bleach.ransotengai.failed",
+                                player.getDisplayName()));
+                        continue;
+                    }
+                }
+                case STOP -> {
+                    if (QuincyRansotengai.isWoven(data)) {
+                        QuincyRansotengai.end(player, data, now, QuincyRansotengai.End.COMMAND);
+                    }
+                }
+            }
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable(
+                    "commands.bleach.ransotengai." + action.getSerializedName(), count), true);
+        }
+        return count;
+    }
+
+    /**
+     * Starts the Elder's teaching over: no lessons given and none today, never visited and never met,
+     * so his next visit can come as soon as the gates allow. Ransōtengai stays known.
+     */
+    private static int resetLessons(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        for (ServerPlayer player : players) {
+            SoulData data = SoulLogic.get(player);
+            QuincyTeaching teaching = data.quincy().teaching();
+            data.setQuincy(data.quincy().withTeaching(teaching.withLessons(0).withLessonDay(-1L)
+                    .withLastVisitAt(QuincyTeaching.NEVER).withElderMet(false)));
+            BleachNetwork.syncSoul(player, data);
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.lessons.reset",
+                players.size()), true);
+        return players.size();
+    }
+
     /** Says a Quincy arts command was refused for this player, and why. */
     private static void refuseArts(CommandSourceStack source, ServerPlayer player, Component reason) {
         source.sendFailure(Component.translatable("commands.bleach.quincy.arts_refused", player.getDisplayName(), reason));
@@ -1129,6 +1420,26 @@ public final class BleachCommand {
     /** On or off, for {@code /bleach quincy <players> vollstandig}. */
     private enum Toggle implements StringRepresentable {
         ON, OFF;
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** What {@code /bleach bait <players>} does to each player's site. */
+    private enum BaitAction implements StringRepresentable {
+        START, STOP, WAVE, FINALE, STATUS;
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** What {@code /bleach quincy <players> ransotengai} does. */
+    private enum RansotengaiAction implements StringRepresentable {
+        LEARN, FORGET, START, STOP;
 
         @Override
         public String getSerializedName() {

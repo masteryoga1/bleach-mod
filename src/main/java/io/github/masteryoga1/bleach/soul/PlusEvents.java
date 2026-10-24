@@ -176,6 +176,7 @@ public final class PlusEvents {
 
     private static void devoured(ServerLevel level, Hollow hollow, LivingEntity victim) {
         hollow.devour(victim);
+        BaitEvents.onDevoured(hollow);
         for (ServerPlayer witness : SpiritSenses.awareNear(level, victim.position(), HollowLogic.AWARE_NEAR_RANGE)) {
             if (witness != victim) {
                 witness.sendSystemMessage(Component.translatable("message.bleach.plus_devoured")

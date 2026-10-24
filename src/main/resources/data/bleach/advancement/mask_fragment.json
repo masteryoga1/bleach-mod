@@ -1,0 +1,27 @@
+{
+  "parent": "bleach:mask_strike",
+  "display": {
+    "icon": {
+      "id": "bleach:mask_fragment"
+    },
+    "title": {
+      "translate": "advancements.bleach.mask_fragment.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.mask_fragment.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "mask_fragment": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "bleach:mask_fragment"
+          }
+        ]
+      }
+    }
+  }
+}

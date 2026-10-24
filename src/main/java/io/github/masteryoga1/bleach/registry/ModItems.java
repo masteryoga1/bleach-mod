@@ -4,18 +4,24 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.EmptyGintoItem;
 import io.github.masteryoga1.bleach.item.GintoItem;
+import io.github.masteryoga1.bleach.item.HollowBaitItem;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.SanreiGloveItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
+import java.util.List;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tiers;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.Unbreakable;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -66,6 +72,20 @@ public final class ModItems {
             () -> new QuincyGarbItem(ArmorItem.Type.BOOTS));
 
     /**
+     * The Wandenreich uniform, white with black bands: cap, coat, trousers and boots. The coat,
+     * trousers and boots count as Quincy garb, mixed with the white garb or not; the cap is only for
+     * the look. See {@link QuincyGarbItem}.
+     */
+    public static final DeferredItem<QuincyGarbItem> WANDENREICH_CAP = ITEMS.register("wandenreich_cap",
+            () -> new QuincyGarbItem(ModArmorMaterials.WANDENREICH, ArmorItem.Type.HELMET));
+    public static final DeferredItem<QuincyGarbItem> WANDENREICH_COAT = ITEMS.register("wandenreich_coat",
+            () -> new QuincyGarbItem(ModArmorMaterials.WANDENREICH, ArmorItem.Type.CHESTPLATE));
+    public static final DeferredItem<QuincyGarbItem> WANDENREICH_TROUSERS = ITEMS.register("wandenreich_trousers",
+            () -> new QuincyGarbItem(ModArmorMaterials.WANDENREICH, ArmorItem.Type.LEGGINGS));
+    public static final DeferredItem<QuincyGarbItem> WANDENREICH_BOOTS = ITEMS.register("wandenreich_boots",
+            () -> new QuincyGarbItem(ModArmorMaterials.WANDENREICH, ArmorItem.Type.BOOTS));
+
+    /**
      * The Sanrei Glove, handed down to a Quincy of the third tier: worn, it fights every draw until a
      * week of training masters it, and torn off it burns the power out in Letzt Stil. Wearing it puts
      * it on the soul, not in a slot. See {@link SanreiGloveItem}.
@@ -88,12 +108,36 @@ public final class ModItems {
     public static final DeferredItem<GintoItem> GINTO = ITEMS.register("ginto",
             () -> new GintoItem(new Item.Properties().stacksTo(16)));
 
+    /**
+     * A shard of a Hollow's mask, knocked loose by a player's fresh crack (see
+     * {@link io.github.masteryoga1.bleach.soul.MaskFragments}). Its only use is Hollow Bait, so it
+     * needs no class of its own, only a line of tooltip.
+     */
+    public static final DeferredItem<Item> MASK_FRAGMENT = ITEMS.register("mask_fragment",
+            () -> new Item(new Item.Properties().stacksTo(64)) {
+                @Override
+                public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip,
+                                            TooltipFlag flag) {
+                    tooltip.add(Component.translatable("tooltip.bleach.mask_fragment").withStyle(ChatFormatting.GRAY));
+                }
+            });
+
+    /** A mask fragment, a filled Gintō and bone meal: crushed, it draws Hollows. See {@link HollowBaitItem}. */
+    public static final DeferredItem<HollowBaitItem> HOLLOW_BAIT = ITEMS.register("hollow_bait",
+            () -> new HollowBaitItem(new Item.Properties().stacksTo(16)));
+
     public static final DeferredItem<DeferredSpawnEggItem> ACADEMY_INSTRUCTOR_SPAWN_EGG = ITEMS.register(
             "academy_instructor_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.ACADEMY_INSTRUCTOR, 0x1A1A1A, 0xF2F2F2, new Item.Properties()));
     public static final DeferredItem<DeferredSpawnEggItem> WOUNDED_SHINIGAMI_SPAWN_EGG = ITEMS.register(
             "wounded_shinigami_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.WOUNDED_SHINIGAMI, 0x1A1A1A, 0x8B1A1A, new Item.Properties()));
+    public static final DeferredItem<DeferredSpawnEggItem> QUINCY_ELDER_SPAWN_EGG = ITEMS.register(
+            "quincy_elder_spawn_egg",
+            () -> new DeferredSpawnEggItem(ModEntities.QUINCY_ELDER, 0xF2F2F2, 0x2E4A8A, new Item.Properties()));
+    public static final DeferredItem<DeferredSpawnEggItem> QUINCY_HUNTER_SPAWN_EGG = ITEMS.register(
+            "quincy_hunter_spawn_egg",
+            () -> new DeferredSpawnEggItem(ModEntities.QUINCY_HUNTER, 0xF2F2F2, 0x3A6FD8, new Item.Properties()));
     public static final DeferredItem<DeferredSpawnEggItem> SPIDER_HOLLOW_SPAWN_EGG = ITEMS.register(
             "spider_hollow_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.SPIDER_HOLLOW, 0x1E1C22, 0xEAE6DA, new Item.Properties()));

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:mask_fragment",
+  "display": {
+    "icon": {
+      "id": "bleach:hollow_bait"
+    },
+    "title": {
+      "translate": "advancements.bleach.hollow_bait.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.hollow_bait.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "hollow_bait": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "hollow_bait"
+      }
+    }
+  }
+}

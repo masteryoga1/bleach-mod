@@ -9,7 +9,10 @@ import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.entity.QuincyElder;
+import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
@@ -20,12 +23,14 @@ import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.quincy.QuincyKey;
+import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -53,6 +58,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -89,12 +95,21 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * arrows while drawn, then calls down Licht Regen. A Seele Schneider forms in the main hand and is
  * fired from the offhand; Gintō cast Wolke underfoot and Heizen on a Hollow. Last, Vollständig gives
  * flight, Sklaverei is switched on and off, and Vollständig is let go in the air, so the landing must
- * not hurt. The soul screen is opened a last time, and the run quits.
+ * not hurt. The soul screen is opened again.
+ *
+ * <p>Last comes the Quincy in the world. A Quincy Elder and a Quincy Hunter are summoned and must be
+ * seen; talking to the Elder opens his dialogue, and taking his trial binds the player, who weaves
+ * Ransōtengai with the Quincy Form key's sneak press to break free and so learns it. The Hunter's
+ * dialogue opens too. In the Wandenreich uniform the player opens the Tailoring Table on its
+ * second page. A Hollow Bait site is opened by command, its wave comes through a Garganta, and its
+ * finale cracks the sky, which closes again when the site is stopped. Ransōtengai is woven once more
+ * and let go with the key, so the collapse follows. The soul screen is opened a last time, and the
+ * run quits.
  *
  * <p>All of it is seen with the camera behind the player, so the chain, mask, garb, saya, NPCs,
- * Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts and HUD are drawn, and
- * screenshots of the main moments are saved for review. Any crash in the mod's client code fails the
- * run, and so does anything that did not reach the client as expected.
+ * Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts and
+ * HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's
+ * client code fails the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -129,7 +144,7 @@ public final class ClientSmokeTest {
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** Where the player stood before the flash step. */
     private static Vec3 dashFrom;
-    /** What the current step acts on: the Hollow to strike, or the Plus to send on. */
+    /** What the current step acts on: the Hollow to strike, the Plus to send on, or the Quincy to talk to. */
     @Nullable
     private static Entity subject;
     /** How high the player stood when Vollständig's flight began. */
@@ -270,6 +285,7 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, 1686, 1720, () -> soul.quincy().blut() == BlutMode.OFF, "Blut never ended");
         checkArts(minecraft, player, soul);
+        checkQuincyWorld(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -345,7 +361,7 @@ public final class ClientSmokeTest {
                 }
             }
             case 340 -> {
-                expect(minecraft, minecraft.screen instanceof ShinigamiDialogueScreen,
+                expect(minecraft, minecraft.screen instanceof NpcDialogueScreen,
                         "talking to the instructor did not open the dialogue");
                 minecraft.setScreen(null);
                 dashFrom = player.position();
@@ -609,7 +625,81 @@ public final class ClientSmokeTest {
             case 2490 -> minecraft.setScreen(new SoulStatsScreen());
             case 2495 -> shot(minecraft, "stats_quincy_arts");
             case 2510 -> minecraft.setScreen(null);
+            // The Quincy in the world: the Elder and the Hunter, summoned to stand still to the north.
             case 2530 -> {
+                command(minecraft, "kill @e[type=#bleach:hollows]");
+                command(minecraft, "effect clear @s");
+                command(minecraft, "bleach reiryoku @s 200 200");
+                command(minecraft, "bleach quincy @s reishi 200");
+                command(minecraft, "tp @s ~ ~ ~ 180 0");
+                command(minecraft, "summon bleach:quincy_elder ~ ~ ~-3 " + STILL);
+            }
+            case 2531 -> command(minecraft, "summon bleach:quincy_hunter ~3 ~ ~-3 " + STILL);
+            case 2562 -> {
+                shot(minecraft, "quincy_npcs");
+                subject = nearest(minecraft, QuincyElder.class, 8.0, LivingEntity::isAlive);
+                expect(minecraft, subject != null, "the summoned Quincy Elder never reached the client");
+                if (subject != null) {
+                    minecraft.gameMode.interact(player, subject, InteractionHand.MAIN_HAND);
+                }
+            }
+            case 2586 -> {
+                shot(minecraft, "elder_dialogue");
+                if (subject != null) {
+                    BleachNetwork.requestNpcAction(subject.getId(), NpcAction.RANSOTENGAI);
+                }
+                minecraft.setScreen(null);
+            }
+            // The real key: in the trial, the threads are woven with no wait.
+            case 2612 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM_SNEAK);
+            case 2780 -> {
+                subject = nearest(minecraft, QuincyHunter.class, 8.0, LivingEntity::isAlive);
+                expect(minecraft, subject != null, "the summoned Quincy Hunter never reached the client");
+                if (subject != null) {
+                    minecraft.gameMode.interact(player, subject, InteractionHand.MAIN_HAND);
+                }
+            }
+            case 2805 -> {
+                command(minecraft, "item replace entity @s armor.head with bleach:wandenreich_cap");
+                command(minecraft, "item replace entity @s armor.chest with bleach:wandenreich_coat");
+                command(minecraft, "item replace entity @s armor.legs with bleach:wandenreich_trousers");
+                command(minecraft, "item replace entity @s armor.feet with bleach:wandenreich_boots");
+            }
+            case 2822 -> command(minecraft, "setblock ~2 ~ ~ bleach:tailoring_table");
+            case 2826 -> {
+                BlockPos table = BlockPos.containing(player.getX() + 2.0, player.getY(), player.getZ());
+                minecraft.gameMode.useItemOn(player, InteractionHand.MAIN_HAND,
+                        new BlockHitResult(Vec3.atCenterOf(table), Direction.UP, table, false));
+            }
+            case 2852 -> {
+                expect(minecraft, minecraft.screen instanceof TailoringScreen tailoring && tailoring.page() == 1,
+                        "the Tailoring Table has no second page");
+                shot(minecraft, "tailoring_page_2");
+            }
+            case 2856 -> player.closeContainer();
+            // Hollow Bait, by command: the Academy close by and the quiet game rule are passed over.
+            case 2860 -> {
+                command(minecraft, "kill @e[type=bleach:quincy_hunter]");
+                command(minecraft, "kill @e[type=bleach:quincy_elder]");
+                command(minecraft, "effect give @s minecraft:resistance 60 4 true");
+                command(minecraft, "bleach bait @s start");
+            }
+            case 2892 -> command(minecraft, "bleach bait @s wave");
+            case 3025 -> command(minecraft, "bleach bait @s finale");
+            case 3085 -> {
+                command(minecraft, "bleach bait @s stop");
+                command(minecraft, "kill @e[type=#bleach:hollows]");
+            }
+            case 3145 -> {
+                command(minecraft, "effect clear @s");
+                command(minecraft, "bleach quincy @s ransotengai start");
+            }
+            // The real key again: a woven soul's press lets the threads go, with the collapse.
+            case 3175 -> BleachNetwork.requestQuincyKey(QuincyKey.FORM_SNEAK);
+            case 3205 -> minecraft.setScreen(new SoulStatsScreen());
+            case 3210 -> shot(minecraft, "stats_quincy_world");
+            case 3225 -> minecraft.setScreen(null);
+            case 3245 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -617,6 +707,75 @@ public final class ClientSmokeTest {
             default -> {
             }
         }
+    }
+
+    /** The checks of the Quincy in the world, each window from the step it follows. */
+    private static void checkQuincyWorld(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        expectWithin(minecraft, 2535, 2560,
+                () -> nearest(minecraft, QuincyElder.class, 8.0,
+                        elder -> elder.isAlive() && !ClientSouls.isHiddenFromViewer(elder)) != null
+                        && nearest(minecraft, QuincyHunter.class, 8.0,
+                        hunter -> hunter.isAlive() && !ClientSouls.isHiddenFromViewer(hunter)) != null,
+                "the Quincy NPCs never reached the client");
+        expectWithin(minecraft, 2563, 2585, () -> minecraft.screen instanceof NpcDialogueScreen,
+                "talking to the Elder did not open the dialogue");
+        expectWithin(minecraft, 2587, 2610,
+                () -> player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)
+                        && QuincyRansotengai.trialOpen(soul, minecraft.level.getGameTime()),
+                "the Elder's trial did not begin");
+        if (expectWithin(minecraft, 2613, 2635,
+                () -> QuincyRansotengai.isWoven(soul) && !player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN),
+                "Ransōtengai never wove")) {
+            shot(minecraft, "ransotengai");
+        }
+        expectWithin(minecraft, 2712, 2770,
+                () -> soul.quincy().teaching().ransotengaiKnown() && !QuincyRansotengai.isWoven(soul),
+                "the trial never taught Ransōtengai");
+        if (expectWithin(minecraft, 2781, 2800, () -> minecraft.screen instanceof NpcDialogueScreen,
+                "talking to the Hunter did not open the dialogue")) {
+            shot(minecraft, "hunter_dialogue");
+            minecraft.setScreen(null);
+        }
+        if (expectWithin(minecraft, 2806, 2820,
+                () -> player.getItemBySlot(EquipmentSlot.CHEST).is(BleachTags.QUINCY_GARB)
+                        && player.getItemBySlot(EquipmentSlot.HEAD).is(ModItems.WANDENREICH_CAP.get()),
+                "the player is not wearing the Wandenreich uniform")) {
+            shot(minecraft, "wandenreich");
+        }
+        if (expectWithin(minecraft, 2827, 2850, () -> minecraft.screen instanceof TailoringScreen,
+                "the Tailoring Table did not open again")
+                && minecraft.screen instanceof TailoringScreen tailoring) {
+            tailoring.nextPage();
+        }
+        expectWithin(minecraft, 2861, 2890, () -> soul.hunt().bait().crushed() >= 1, "the bait site never opened");
+        expectWithin(minecraft, 2893, 2960, () -> openRift(minecraft) != null, "the bait's Garganta never opened");
+        // The boss bar of the site shows in this one.
+        if (expectWithin(minecraft, 2961, 3020, () -> count(minecraft, Hollow.class, 48.0) >= 1,
+                "the bait's wave brought no Hollow")) {
+            shot(minecraft, "bait_wave");
+        }
+        if (expectWithin(minecraft, 3026, 3080, () -> crackedSky(minecraft) != null, "the finale never cracked the sky")) {
+            GargantaRift sky = crackedSky(minecraft);
+            if (sky != null) {
+                look(minecraft, sky.getBoundingBoxForCulling().getCenter());
+            }
+            shot(minecraft, "sky_cracked");
+        }
+        expectWithin(minecraft, 3086, 3140,
+                () -> nearest(minecraft, GargantaRift.class, 64.0, rift -> rift.size() >= 3.0F) == null,
+                "the sky crack never closed");
+        expectWithin(minecraft, 3146, 3170, () -> QuincyRansotengai.isWoven(soul), "the command did not weave Ransōtengai");
+        if (expectWithin(minecraft, 3176, 3200,
+                () -> !QuincyRansotengai.isWoven(soul) && player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN),
+                "letting Ransōtengai go did not bring the collapse")) {
+            shot(minecraft, "ransotengai_collapse");
+        }
+    }
+
+    /** The bait finale's cracked sky on the client, once it is at least mostly open, or null. */
+    @Nullable
+    private static GargantaRift crackedSky(Minecraft minecraft) {
+        return nearest(minecraft, GargantaRift.class, 64.0, rift -> rift.size() >= 3.0F && rift.openness(0.0F) >= 0.8F);
     }
 
     /** The checks of the arts past the third tier, each window from the step it follows. */

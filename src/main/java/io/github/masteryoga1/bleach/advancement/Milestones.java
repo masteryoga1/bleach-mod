@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.quincy.QuincyStage;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.QuincyTeaching;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -96,6 +97,20 @@ public final class Milestones {
     public static final String VOLLSTANDIG = "vollstandig";
     /** Bent the reishi around them to their will with Sklaverei. */
     public static final String SKLAVEREI = "sklaverei";
+    /** Crushed a Hollow Bait, or had a site opened by command. Granted when it happens, as are the three below. */
+    public static final String HOLLOW_BAIT = "hollow_bait";
+    /** Was hunted at a bait when the sky above it cracked, and saw it through. */
+    public static final String SKY_CRACKED = "sky_cracked";
+    /** Saw a bait through to the cracked sky, with ten Hollows come and no Plus devoured. */
+    public static final String BAIT_NO_LOSS = "bait_no_loss";
+    /** Beat the young Quincy Hunter at his contest. */
+    public static final String RIVAL_BESTED = "rival_bested";
+    /** Talked with the Quincy Elder. Granted when it happens and by {@link #check}, as is the one below. */
+    public static final String ELDER_MET = "elder_met";
+    /** Learned Ransōtengai in the Elder's trial. */
+    public static final String RANSOTENGAI = "ransotengai";
+    /** Wearing the Wandenreich coat, trousers and boots. */
+    public static final String WANDENREICH = "wandenreich";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -162,6 +177,17 @@ public final class Milestones {
         }
         if (QuincyGarbItem.isFullSet(player)) {
             trigger.trigger(player, QUINCY_GARB);
+        }
+        if (QuincyGarbItem.isWandenreichSet(player)) {
+            trigger.trigger(player, WANDENREICH);
+        }
+        // Read from the record, so a soul taught or met by command counts too.
+        QuincyTeaching teaching = data.quincy().teaching();
+        if (teaching.elderMet()) {
+            trigger.trigger(player, ELDER_MET);
+        }
+        if (teaching.ransotengaiKnown()) {
+            trigger.trigger(player, RANSOTENGAI);
         }
         QuincyArts arts = data.quincy().arts();
         SanreiProgress glove = arts.glove();

@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.PlusEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
@@ -68,6 +69,10 @@ import net.minecraft.world.phys.Vec3;
  * <p>The mask is its weak point (see {@link HollowMask}). A zanpakutō's killing blow purifies it instead
  * of destroying it: it turns white and dissolves into light, and the soul it once was rises and passes on.
  *
+ * <p>One drawn by a Hollow Bait belongs to its site ({@link #baitSite()}). While the site keeps it
+ * ({@link #isBaitHeld()}) it never leaves, despawns or flees, and wanders back towards the bait; while
+ * the sky cracks it stops fighting and gathers below the tear.
+ *
  * <p>Each kind ({@link HollowKind}) is its own subclass, because goals and navigation are made inside
  * the constructor of {@code Mob}, before any field here is set: {@link #kind()}, {@link #leaps()} and
  * {@link #hurtByTargetGoal()} may only return constants.
@@ -126,6 +131,16 @@ public abstract class Hollow extends Monster {
     /** The soul whose reiatsu drew this Hollow through a Garganta, if any. */
     @Nullable
     private UUID drawer;
+    /** The Hollow Bait site whose pull brought this Hollow through, if any. Saved. */
+    @Nullable
+    private UUID baitSite;
+    // Set each second by the site while it runs (see holdForBait); not saved, so a reload lets go.
+    private long baitHeldUntil = NEVER;
+    @Nullable
+    private Vec3 baitCentre;
+    private boolean baitFinale;
+    /** Whether a blow to the mask has already had its one chance at a fragment. Saved, so a reload cannot re-roll it. */
+    private boolean fragmentRolled;
     /** What the villager this Hollow once was looked like, for the soul that rises when it is purified. */
     @Nullable
     private VillagerData formerVillager;
@@ -161,6 +176,7 @@ public abstract class Hollow extends Monster {
             goalSelector.addGoal(1, new LeapAtTargetGoal(this, 0.4F));
         }
         goalSelector.addGoal(2, new HollowMeleeGoal(this));
+        goalSelector.addGoal(4, new HollowGatherGoal(this));
         goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 0.8));
         goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 12.0F));
         goalSelector.addGoal(7, new RandomLookAroundGoal(this));
@@ -276,10 +292,18 @@ public abstract class Hollow extends Monster {
         }
     }
 
-    /** Counts the time without prey, and leaves through a tear of its own when there has been too much. */
+    /**
+     * Gives up its prey while a bait's finale draws it under the tear: one set straight on it (by the
+     * rift it came through, or a pack's call) is not let go by the target goals, which no longer run.
+     * Otherwise counts the time without prey, and leaves through a tear of its own when there has
+     * been too much.
+     */
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
+        if (isBaitFinale() && getTarget() != null) {
+            setTarget(null);
+        }
         if (getTarget() != null) {
             idleTicks = 0;
             return;
@@ -293,9 +317,13 @@ public abstract class Hollow extends Monster {
         }
     }
 
-    /** Hollows someone wants kept stay: named ones, persistent ones, and ones without AI. */
+    /**
+     * Hollows someone wants kept stay: named ones, persistent ones, ones without AI, and ones a Hollow
+     * Bait still holds.
+     */
     private boolean mayLeave() {
-        return !departing && !isPurifying() && !isPersistenceRequired() && !hasCustomName() && !isNoAi();
+        return !departing && !isPurifying() && !isPersistenceRequired() && !hasCustomName() && !isNoAi()
+                && !isBaitHeld();
     }
 
     /** Leaves for lack of prey. */
@@ -350,8 +378,11 @@ public abstract class Hollow extends Monster {
      * A blow landed on the mask: it cracks and stops the Hollow healing for a while, and the Hollow
      * reels (no more than once every two seconds). Bone chips fly and the mask cracks audibly, for the
      * aware.
+     *
+     * @return whether the blow was fresh: the mask was whole until now, not still cracked from before
      */
-    public void onMaskStruck(long now) {
+    public boolean onMaskStruck(long now) {
+        boolean fresh = now >= crackedUntil;
         crackedUntil = now + CRACK_TICKS;
         setFlag(FLAG_CRACKED, true);
         regenPausedUntil = Math.max(regenPausedUntil,
@@ -367,6 +398,18 @@ public abstract class Hollow extends Monster {
                     mask.x, mask.y, mask.z, 8, 0.15, 0.15, 0.15, 0.08);
         }
         playSound(ModSounds.MASK_CRACK.get(), 1.0F, 0.9F + random.nextFloat() * 0.2F);
+        return fresh;
+    }
+
+    /**
+     * Marks that this Hollow's mask has had its one chance at a fragment.
+     *
+     * @return whether it had had it before
+     */
+    public boolean markFragmentRolled() {
+        boolean before = fragmentRolled;
+        fragmentRolled = true;
+        return before;
     }
 
     /** Whether the mask was struck on this very tick, so the blow that did it can count for more. */
@@ -452,6 +495,43 @@ public abstract class Hollow extends Monster {
         drawer = uuid;
     }
 
+    /** The Hollow Bait site that drew this Hollow, if any. */
+    @Nullable
+    public UUID baitSite() {
+        return baitSite;
+    }
+
+    public void setBaitSite(@Nullable UUID site) {
+        baitSite = site;
+    }
+
+    /**
+     * The site still pulls: for the next {@link BaitEvents#HOLD_TICKS} ticks this Hollow stays near
+     * {@code centre}, and in the finale it gathers below the tear and fights no one. The site renews
+     * it every second while it runs, so it lapses soon after the site ends.
+     */
+    public void holdForBait(Vec3 centre, long now, boolean finale) {
+        baitHeldUntil = now + BaitEvents.HOLD_TICKS;
+        baitCentre = centre;
+        baitFinale = finale;
+    }
+
+    /** Whether a Hollow Bait site holds this Hollow now. Known on the server only. */
+    public boolean isBaitHeld() {
+        return baitSite != null && level().getGameTime() < baitHeldUntil;
+    }
+
+    /** Whether this Hollow is held for a finale, the sky cracked above the bait. */
+    public boolean isBaitFinale() {
+        return isBaitHeld() && baitFinale;
+    }
+
+    /** Where the bait that holds this Hollow lies, once a site has held it. */
+    @Nullable
+    public Vec3 baitCentre() {
+        return baitCentre;
+    }
+
     @Nullable
     public VillagerData formerVillager() {
         return formerVillager;
@@ -531,10 +611,13 @@ public abstract class Hollow extends Monster {
         return SoulLogic.seesSpirits(player);
     }
 
-    /** As for any monster, except one fighting (hurt by a creature in the last 100 seconds) stays. */
+    /**
+     * As for any monster, except one fighting (hurt by a creature in the last 100 seconds) stays, and
+     * so does one a Hollow Bait holds.
+     */
     @Override
     public boolean removeWhenFarAway(double distanceToClosestPlayer) {
-        return level().getGameTime() - lastHurtByMobAt > MOB_HURT_PROTECTION_TICKS
+        return !isBaitHeld() && level().getGameTime() - lastHurtByMobAt > MOB_HURT_PROTECTION_TICKS
                 && super.removeWhenFarAway(distanceToClosestPlayer);
     }
 
@@ -582,10 +665,14 @@ public abstract class Hollow extends Monster {
     /**
      * Hollows go only after their prey ({@link HollowLogic#isPrey}), and strike back at whoever just hurt
      * them, unless that is a player in creative or spectator mode. Every goal asks this, so prey that
-     * stops being prey is dropped.
+     * stops being prey is dropped. While the sky cracks above a bait, a Hollow it holds goes after no
+     * one.
      */
     @Override
     public boolean canAttack(LivingEntity target) {
+        if (isBaitFinale()) {
+            return false;
+        }
         if (!super.canAttack(target)) {
             return false;
         }
@@ -671,18 +758,25 @@ public abstract class Hollow extends Monster {
         if (drawer != null) {
             tag.putUUID("Drawer", drawer);
         }
+        if (baitSite != null) {
+            tag.putUUID("BaitSite", baitSite);
+        }
         if (formerVillager != null) {
             VillagerData.CODEC.encodeStart(NbtOps.INSTANCE, formerVillager)
                     .resultOrPartial(BleachMod.LOGGER::error)
                     .ifPresent(saved -> tag.put("FormerVillager", saved));
         }
         tag.putBoolean("FromPlus", fromPlus);
+        if (fragmentRolled) {
+            tag.putBoolean("FragmentRolled", true);
+        }
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         drawer = tag.hasUUID("Drawer") ? tag.getUUID("Drawer") : null;
+        baitSite = tag.hasUUID("BaitSite") ? tag.getUUID("BaitSite") : null;
         formerVillager = null;
         if (tag.contains("FormerVillager", Tag.TAG_COMPOUND)) {
             VillagerData.CODEC.parse(NbtOps.INSTANCE, tag.get("FormerVillager"))
@@ -690,5 +784,6 @@ public abstract class Hollow extends Monster {
                     .ifPresent(data -> formerVillager = data);
         }
         fromPlus = tag.getBoolean("FromPlus");
+        fragmentRolled = tag.getBoolean("FragmentRolled");
     }
 }

@@ -8,7 +8,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ByIdMap;
 
 /**
- * What a Shinigami NPC says to a visitor, chosen from the visitor's soul. Each view has its own text,
+ * What an NPC says to a visitor, chosen from the visitor's soul. Each view has its own text,
  * {@code screen.bleach.dialogue.<npc>.<view>}, and the actions in {@link NpcAction} it allows.
  * Sent by ordinal, so new views go last.
  */
@@ -28,7 +28,35 @@ public enum DialogueView {
     /** The wounded Shinigami has nothing to ask of this visitor. */
     RESTING,
     /** A Quincy, whose kind the Shinigami distrust. */
-    QUINCY;
+    QUINCY,
+    /** The Quincy Elder meets one of his blood for the first time, and offers a first lesson. */
+    ELDER_GREETING,
+    /** The Elder has a lesson to give today. */
+    ELDER_LESSON,
+    /** The Elder offers a Quincy of the third tier the Ransōtengai trial. */
+    ELDER_TEACH,
+    /** The trial is open: the visitor must weave the threads. */
+    ELDER_TRIAL,
+    /** The visitor's power is sealed, and the Elder can bring it back with an arrow. */
+    ELDER_RESTORE,
+    /** The Elder has nothing more to give this visitor today. */
+    ELDER_IDLE,
+    /** The visitor has no Quincy blood. */
+    ELDER_STRANGER,
+    /** A Hollow or an Arrancar, whom the Elder will not speak with. */
+    ELDER_HOLLOW,
+    /** The young Quincy Hunter challenges a Shinigami to a contest. */
+    HUNTER_CHALLENGE,
+    /** The Hunter challenges another Quincy to a contest. */
+    HUNTER_RIVALRY,
+    /** The Hunter's contest with this visitor is running. */
+    HUNTER_CONTEST,
+    /** The Hunter has had his contest for this visit. */
+    HUNTER_RESTING,
+    /** Anyone else, the unaware included, whom the Hunter sends home. */
+    HUNTER_PLAIN,
+    /** A Hollow or an Arrancar, whom the Hunter warns off. */
+    HUNTER_HOLLOW;
 
     private static final IntFunction<DialogueView> BY_ID =
             ByIdMap.continuous(DialogueView::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

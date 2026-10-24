@@ -5,12 +5,16 @@ import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.BaitRecord;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
+import io.github.masteryoga1.bleach.soul.QuincyForms;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
+import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
+import io.github.masteryoga1.bleach.soul.QuincyTeaching;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -37,15 +41,20 @@ import net.minecraft.world.level.Level;
 
 /**
  * The soul screen: state, reiryoku, the zanpakutō (or until it has a name, the Asauchi bond), Hollows
- * purified and slain and Pluses sent on, Quincy blood (its reishi and Blut, the Hollow poison in it,
- * souls destroyed and how rich the reishi is here, and how far its arts have come), stats with
- * training progress, awakened powers and what comes next.
+ * purified and slain and Pluses sent on, Hollow Bait crushed and contests with the Quincy Hunter,
+ * Quincy blood (its reishi and Blut, the Hollow poison in it, souls destroyed and how rich the reishi
+ * is here, how far its arts have come, and the Quincy Elder's lessons), stats with training progress,
+ * awakened powers and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
+    /** Where the title sits in the full and compact layouts, and in the tight one. */
+    private static final int TOP = 16, TIGHT_TOP = 6;
     private static final int LINE = 12;
     /** The rows' spacing on a screen too short for the full layout, which also drops the gaps between sections. */
     private static final int COMPACT_LINE = 10;
+    /** The rows' spacing, a line of text each, when even the compact rows would reach the Done button. */
+    private static final int TIGHT_LINE = 9;
     /** The space between sections in the full layout. */
     private static final int GAP = 6;
     /** How far above the bottom the Done button's top edge is. */
@@ -83,11 +92,18 @@ public final class SoulStatsScreen extends Screen {
         }
         SoulData data = player.getData(SoulAttachments.SOUL);
         List<FormattedCharSequence> next = font.split(nextStep(player, data), PANEL_WIDTH);
-        // Everything stays above the Done button: when the next step would reach it, the rows close up,
-        // and on a screen too short even then, what still does not fit of the next step is left out.
+        // Everything stays above the Done button: when the next step would reach it, the rows close up;
+        // when even the closed-up rows would, they close up to a line of text each and start higher;
+        // and what still does not fit of the next step is left out.
         int bottom = height - DONE_TOP - 4;
-        boolean compact = drawRows(null, player, data, LINE, GAP) + next.size() * font.lineHeight > bottom;
-        int y = compact ? drawRows(graphics, player, data, COMPACT_LINE, 0) : drawRows(graphics, player, data, LINE, GAP);
+        int y;
+        if (drawRows(null, player, data, TOP, LINE, GAP) + next.size() * font.lineHeight <= bottom) {
+            y = drawRows(graphics, player, data, TOP, LINE, GAP);
+        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0) <= bottom) {
+            y = drawRows(graphics, player, data, TOP, COMPACT_LINE, 0);
+        } else {
+            y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0);
+        }
         int left = width / 2 - PANEL_WIDTH / 2;
         for (FormattedCharSequence text : next) {
             if (y + font.lineHeight > bottom) {
@@ -99,14 +115,14 @@ public final class SoulStatsScreen extends Screen {
     }
 
     /**
-     * Every row above the next step, {@code line} apart with {@code gap} more between sections; with no
-     * {@code graphics}, only measures them.
+     * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
+     * more between sections; with no {@code graphics}, only measures them.
      *
      * @return where the next step starts
      */
-    private int drawRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int line, int gap) {
+    private int drawRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int top, int line, int gap) {
         int left = width / 2 - PANEL_WIDTH / 2;
-        int y = 16;
+        int y = top;
 
         if (graphics != null) {
             graphics.drawCenteredString(font, title, width / 2, y, WHITE);
@@ -146,6 +162,12 @@ public final class SoulStatsScreen extends Screen {
         if (hunt.purified() + hunt.slain() + hunt.sentOn() > 0) {
             text(graphics, Component.translatable("screen.bleach.soul.hunt",
                     hunt.purified(), hunt.slain(), hunt.sentOn()), left, y, GREY);
+            y += line;
+        }
+        BaitRecord bait = hunt.bait();
+        if (bait.crushed() + bait.won() + bait.lost() > 0) {
+            text(graphics, Component.translatable("screen.bleach.soul.bait",
+                    bait.crushed(), bait.finales(), bait.won(), bait.lost()), left, y, GREY);
             y += line;
         }
         y = renderQuincy(graphics, player, data, left, y, line);
@@ -196,12 +218,12 @@ public final class SoulStatsScreen extends Screen {
     }
 
     /**
-     * Up to four lines on Quincy blood, when the soul has it. Awakened: the blood, reishi held and the
+     * Up to six lines on Quincy blood, when the soul has it. Awakened: the blood, reishi held and the
      * most it can hold, and the Blut it is calling on; then the Hollow poison in it, souls its arrows
      * have destroyed, and how rich the reishi is where it stands (leaving out what other souls'
-     * reiatsu adds, which only the server weighs); then up to two on its arts (see
-     * {@link #artsLines}). Not yet awakened: just the blood. With no {@code graphics}, only counts
-     * them.
+     * reiatsu adds, which only the server weighs); then up to three on its arts (see
+     * {@link #artsLines}). Not yet awakened: just the blood. Either way, once a Quincy Elder has been
+     * met, the lessons he has given last. With no {@code graphics}, only counts them.
      *
      * @return the line below the last one drawn
      */
@@ -213,11 +235,11 @@ public final class SoulStatsScreen extends Screen {
         if (!QuincyLogic.isAwakened(data)) {
             text(graphics, Component.translatable("screen.bleach.soul.quincy.latent", bloodline.displayName()),
                     left, y, GREY);
-            return y + line;
+            return lessonsLine(graphics, data, left, y + line, line);
         }
         List<Component> arts = artsLines(data, player, player.level().getGameTime());
         if (graphics == null) {
-            return y + (2 + arts.size()) * line;
+            return lessonsLine(null, data, left, y + (2 + arts.size()) * line, line);
         }
         QuincyProgress quincy = data.quincy();
         graphics.drawString(font, Component.translatable("screen.bleach.soul.quincy", bloodline.displayName(),
@@ -234,17 +256,35 @@ public final class SoulStatsScreen extends Screen {
             graphics.drawString(font, art, left, y, GREY);
             y += line;
         }
-        return y;
+        return lessonsLine(graphics, data, left, y, line);
     }
 
     /**
-     * How far an awakened Quincy's arts have come, in up to two lines. First where the power stands:
+     * The Quincy Elder's lessons, given out of the most he gives, once the soul has met him. With no
+     * {@code graphics}, only counts the line.
+     *
+     * @return the line below it, or {@code y} when there is none
+     */
+    private int lessonsLine(@Nullable GuiGraphics graphics, SoulData data, int left, int y, int line) {
+        QuincyTeaching teaching = data.quincy().teaching();
+        if (!teaching.elderMet()) {
+            return y;
+        }
+        text(graphics, Component.translatable("screen.bleach.soul.quincy.lessons", teaching.lessons(),
+                BleachConfig.get(BleachConfig.ELDER_MAX_LESSONS)), left, y, GREY);
+        return y + line;
+    }
+
+    /**
+     * How far an awakened Quincy's arts have come, in up to three lines. First where the power stands:
      * the Sanrei Glove's training or its mastery, the time Letzt Stil has left, the wait while sealed,
      * or Ginrei Kojaku. Then, while a Gintō is in hand, the spell it casts; otherwise, once the power
-     * is restored, the way to Vollständig, or that it is ready (with its key) or taken.
+     * is restored, the way to Vollständig, or that it is ready (with its key) or taken. Last,
+     * Ransōtengai: woven now, or once learned, how long until the threads hold again after a
+     * collapse, or simply that it is known.
      */
     private static List<Component> artsLines(SoulData data, Player player, long now) {
-        List<Component> lines = new ArrayList<>(2);
+        List<Component> lines = new ArrayList<>(3);
         QuincyArts arts = QuincyArtsLogic.arts(data);
         SanreiProgress glove = arts.glove();
         switch (arts.stage()) {
@@ -279,6 +319,16 @@ public final class SoulStatsScreen extends Screen {
             int needed = Math.max(0, BleachConfig.get(BleachConfig.VOLL_TRAINING_AFTER_RESTORE));
             lines.add(Component.translatable("screen.bleach.soul.quincy.vollstandig_progress",
                     Math.max(0, needed - QuincyArtsLogic.vollTrainingLeft(data)), needed));
+        }
+
+        QuincyForms forms = arts.forms();
+        if (QuincyRansotengai.isWoven(data)) {
+            lines.add(Component.translatable("screen.bleach.soul.quincy.ransotengai_woven").withColor(REISHI));
+        } else if (QuincyRansotengai.isKnown(data) && now < forms.ransotengaiReadyAt()) {
+            lines.add(Component.translatable("screen.bleach.soul.quincy.ransotengai_cooldown",
+                    QuincyArtsLogic.formatTicks(forms.ransotengaiReadyAt() - now)));
+        } else if (QuincyRansotengai.isKnown(data)) {
+            lines.add(Component.translatable("screen.bleach.soul.quincy.ransotengai_known"));
         }
         return lines;
     }

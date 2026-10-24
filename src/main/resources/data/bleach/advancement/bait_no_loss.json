@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:sky_cracked",
+  "display": {
+    "icon": {
+      "id": "minecraft:totem_of_undying"
+    },
+    "title": {
+      "translate": "advancements.bleach.bait_no_loss.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.bait_no_loss.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "bait_no_loss": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "bait_no_loss"
+      }
+    }
+  }
+}

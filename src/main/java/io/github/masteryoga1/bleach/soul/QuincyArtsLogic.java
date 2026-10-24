@@ -66,6 +66,11 @@ public final class QuincyArtsLogic {
     public static final double HEART_HEIGHT_MIN = 0.55, HEART_HEIGHT_MAX = 0.85;
     /** The shot must come from in front: its heading against the body's facing at most this (within 60 degrees). */
     public static final double HEART_FRONT_DOT = -0.5;
+    /**
+     * Where a Quincy Elder aims his restoring shot: this far along the body's own left, and at this
+     * share of its height, well inside the place beside the heart that counts.
+     */
+    public static final double HEART_AIM_LATERAL = 0.05, HEART_AIM_HEIGHT = 0.70;
     /** How long the weakness after winning the power back lasts. */
     public static final int RESTORE_EFFECT_TICKS = 600;
     /**
@@ -466,6 +471,16 @@ public final class QuincyArtsLogic {
                 && elapsed(now, arts.stageSince()) >= sealedTicksNeeded(byArrow);
     }
 
+    /**
+     * How long until the seal has lasted {@link #sealedTicksNeeded}, from its own start, which a death
+     * in Letzt Stil puts when the Letzt Stil would have ended, so it can still lie ahead.
+     */
+    public static long sealedTicksLeft(SoulData data, long now, boolean byArrow) {
+        long since = arts(data).stageSince();
+        long wait = sealedTicksNeeded(byArrow);
+        return since >= now ? wait + (since - now) : Math.max(0L, wait - (now - since));
+    }
+
     /** Whether a sealed soul may hold the Cross for the solo rite now (the draw itself is allowed). */
     public static boolean riteOpen(SoulData data, long now) {
         return isSealed(data) && BleachConfig.get(BleachConfig.RESTORE_SOLO_RITE) && sealedLongEnough(data, now, false);
@@ -547,6 +562,17 @@ public final class QuincyArtsLogic {
         double up = (crossing.y - feet.y) / height;
         return lateral >= HEART_LATERAL_MIN && lateral <= HEART_LATERAL_MAX
                 && up >= HEART_HEIGHT_MIN && up <= HEART_HEIGHT_MAX;
+    }
+
+    /**
+     * The point a shot aims at to pass just beside the heart of a standing body of this height with
+     * its feet here, facing its body yaw: a little to its own left, at chest height, in the body's
+     * middle plane (see {@link #besideTheHeart}).
+     */
+    public static Vec3 heartPoint(Vec3 feet, float bodyYawDeg, float height) {
+        double yaw = Math.toRadians(bodyYawDeg);
+        Vec3 left = new Vec3(Math.cos(yaw), 0.0, Math.sin(yaw));
+        return feet.add(left.scale(HEART_AIM_LATERAL)).add(0.0, HEART_AIM_HEIGHT * height, 0.0);
     }
 
     // ---- Quincy: Vollständig and Sklaverei ----
@@ -763,14 +789,16 @@ public final class QuincyArtsLogic {
 
     /**
      * What the arts become when the body dies. A Letzt Stil burns out at once: the power is sealed
-     * from the moment it would have been. Every form ends (Vollständig, Sklaverei, the halo and the
-     * landing grace); the cooldowns, the glove and every other stage stay as they were.
+     * from the moment it would have been. Every form ends (Vollständig, Sklaverei, the halo, the
+     * landing grace and Ransōtengai's threads, which let go quietly); the cooldowns, the glove and
+     * every other stage stay as they were.
      */
     public static QuincyArts afterDeath(QuincyArts arts) {
         QuincyArts after = arts.stage() == QuincyStage.LETZT_STIL
                 ? arts.withStage(QuincyStage.SEALED, arts.letztEndsAt()) : arts;
         QuincyForms forms = after.forms();
-        QuincyForms ended = forms.withVollstandig(false).withSklaverei(false).withHaloBroken(false).withLandingGrace(false);
+        QuincyForms ended = forms.withVollstandig(false).withSklaverei(false).withHaloBroken(false).withLandingGrace(false)
+                .withRansotengaiSince(ShinigamiProgress.NEVER);
         return ended.equals(forms) ? after : after.withForms(ended);
     }
 
@@ -802,6 +830,10 @@ public final class QuincyArtsLogic {
         long lichtLatest = now + BleachConfig.get(BleachConfig.LICHT_REGEN_COOLDOWN_TICKS);
         if (forms.lichtRegenReadyAt() > lichtLatest) {
             forms = forms.withLichtRegenReadyAt(lichtLatest);
+        }
+        long threadsLatest = now + QuincyRansotengai.cooldownTicks();
+        if (forms.ransotengaiReadyAt() > threadsLatest) {
+            forms = forms.withRansotengaiReadyAt(threadsLatest);
         }
         return forms.equals(out.forms()) ? out : out.withForms(forms);
     }

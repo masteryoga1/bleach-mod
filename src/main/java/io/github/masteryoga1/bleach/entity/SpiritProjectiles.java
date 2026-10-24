@@ -18,8 +18,10 @@ public final class SpiritProjectiles {
     /**
      * Whether a projectile fired by {@code owner} may strike this creature: never its owner, anything
      * riding with them or their tamed animals, never a Plus or a Shinigami, nor a player in creative
-     * or spectator mode or one the owner may not harm (a teammate, with friendly fire off). A
-     * projectile whose owner is gone keeps only the rules that do not need one.
+     * or spectator mode or one the owner may not harm (a teammate, with friendly fire off). A living
+     * Quincy of the Human World is never struck, and their own arrows strike only the Hollows they
+     * hunt ({@link QuincyNpc#isQuarry}), so a miss passes through everyone else. A projectile whose
+     * owner is gone keeps only the rules that do not need one.
      */
     public static boolean mayStrike(@Nullable Entity owner, LivingEntity target) {
         if (!target.isAlive()) {
@@ -35,6 +37,12 @@ public final class SpiritProjectiles {
                     return false;
                 }
             }
+        }
+        if (target instanceof QuincyNpc) {
+            return false;
+        }
+        if (owner instanceof QuincyNpc) {
+            return QuincyNpc.isQuarry(target);
         }
         if (target instanceof PlusSpirit || target instanceof ShinigamiNpc) {
             return false;

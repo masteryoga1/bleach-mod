@@ -18,6 +18,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
@@ -48,9 +49,10 @@ public final class HollowEvents {
 
     /**
      * A blow or arrow that meets the mask before the body hits twice as hard. A fresh one also cracks
-     * the mask, stops the Hollow healing and makes it reel. The event fires before the invulnerability
-     * check, so a hit inside the invulnerability frames gets the damage but none of the rest. What does
-     * no harm, such as a snowball, does nothing to the mask.
+     * the mask, stops the Hollow healing and makes it reel, and if the mask was whole, a player's blow
+     * may knock a fragment off it (see {@link MaskFragments}). The event fires before the
+     * invulnerability check, so a hit inside the invulnerability frames gets the damage but none of
+     * the rest. What does no harm, such as a snowball, does nothing to the mask.
      */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
         if (!(event.getEntity() instanceof Hollow hollow) || hollow.level().isClientSide() || event.getAmount() <= 0.0F
@@ -59,10 +61,16 @@ public final class HollowEvents {
         }
         event.setAmount(event.getAmount() * (float) BleachConfig.get(BleachConfig.MASK_DAMAGE_MULTIPLIER));
         if (hollow.invulnerableTime <= FRESH_HIT_INVULNERABLE_TICKS) {
-            hollow.onMaskStruck(hollow.level().getGameTime());
-            if (event.getSource().getEntity() instanceof ServerPlayer player) {
+            long now = hollow.level().getGameTime();
+            boolean fresh = hollow.onMaskStruck(now);
+            Entity cause = event.getSource().getEntity();
+            if (cause instanceof ServerPlayer player) {
                 Milestones.grant(player, Milestones.MASK_STRIKE);
                 ZanpakutoEvents.onMaskStrike(player);
+            }
+            // Machines that swing for a player break no fragments off.
+            if (fresh && cause instanceof Player player && !(player instanceof FakePlayer)) {
+                MaskFragments.onFreshCrack(player, hollow, now);
             }
         }
     }
@@ -155,6 +163,7 @@ public final class HollowEvents {
         if (hollow instanceof FishboneD fishbone) {
             settleFirstHollow(fishbone);
         }
+        BaitEvents.onHollowDeath(hollow, source);
     }
 
     /**

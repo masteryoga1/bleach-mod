@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
@@ -68,7 +69,8 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 /**
  * Everything the Quincy arts do in the world: the Sanrei Glove's training and its tearing, Letzt
  * Stil and the seal that follows, the rite and the arrow that bring the power back, Ginrei Kojaku's
- * stream and Licht Regen, firing a Seele Schneider, and Vollständig with its halo and Sklaverei.
+ * stream and Licht Regen, firing a Seele Schneider, and Vollständig with its halo and Sklaverei;
+ * Ransōtengai, which shares the Quincy Form key and the tick, is {@link QuincyRansotengai}'s.
  * The rules are {@link QuincyArtsLogic}'s. Every method takes a {@link Player}, so game tests can
  * drive them with mock players; titles, syncing and milestones only reach real connections.
  */
@@ -120,17 +122,20 @@ public final class QuincyArtsEvents {
         bus.addListener(QuincyArtsEvents::onChangedDimension);
         bus.addListener(QuincyArtsEvents::onLoggedOut);
         bus.addListener(GritzEffect::onJump);
+        QuincyRansotengai.register(bus);
     }
 
     // ---- Every tick ----
 
     /**
-     * Runs every tick for every living player, from {@link QuincyEvents#tick}: keeps the attribute
-     * modifiers in step with the forms, burns a spent Letzt Stil out into the seal, pays for
-     * Vollständig or ends it, pulses Sklaverei, clears a landing grace no longer needed, and gathers
-     * and looses Licht Regen.
+     * Runs every tick for every living player, from {@link QuincyEvents#tick}: keeps Ransōtengai
+     * woven or ends it (and closes an Elder's trial run out), keeps the attribute modifiers in step
+     * with the forms, burns a spent Letzt Stil out into the seal, pays for Vollständig or ends it,
+     * pulses Sklaverei, clears a landing grace no longer needed, and gathers and looses Licht Regen.
      */
     public static void tick(Player p, SoulData d, long now) {
+        // First: the weave and the trial live outside the arts, and a soul with no arts can be in a trial.
+        QuincyRansotengai.tick(p, d, now);
         if (QuincyArtsLogic.arts(d).equals(QuincyArts.NONE) && d.lichtVolley == null && d.lichtGatherFrom == NEVER) {
             return;
         }
@@ -180,12 +185,15 @@ public final class QuincyArtsEvents {
             }
             return;
         }
-        if (now % 20L == 0L && !QuincyLogic.drainReishi(d, QuincyArtsLogic.vollUpkeepPerSecond(d, p.getAbilities().flying))) {
+        // On whole seconds of game time, which stands still under /tick freeze while players still tick.
+        boolean running = p.level().tickRateManager().runsNormally();
+        if (running && now % 20L == 0L
+                && !QuincyLogic.drainReishi(d, QuincyArtsLogic.vollUpkeepPerSecond(d, p.getAbilities().flying))) {
             endVollstandig(p, d, now, true);
             tell(p, Component.translatable("message.bleach.vollstandig.dry"));
             return;
         }
-        if (QuincyArtsLogic.sklavereiOn(d) && now % QuincyArtsLogic.SKLAVEREI_INTERVAL_TICKS == 0L) {
+        if (running && QuincyArtsLogic.sklavereiOn(d) && now % QuincyArtsLogic.SKLAVEREI_INTERVAL_TICKS == 0L) {
             sklavereiPulse(p, d);
         }
     }
@@ -219,9 +227,10 @@ public final class QuincyArtsEvents {
     // ---- Logging in and respawning ----
 
     /**
-     * Runs on every refresh, from {@link QuincyEvents#onRefresh}: puts the saved clocks back in reach
-     * of the game time, hands down a glove an old save is owed, ends a saved Vollständig whose flight
-     * did not survive the relog, and burns out a Letzt Stil whose time ran out meanwhile.
+     * Runs on every refresh, from {@link QuincyEvents#onRefresh}: puts the saved clocks (the Elder's
+     * trial's among them) back in reach of the game time, hands down a glove an old save is owed,
+     * ends a saved Vollständig whose flight did not survive the relog, and burns out a Letzt Stil
+     * whose time ran out meanwhile.
      */
     public static void onRefresh(Player p, SoulData d, long now) {
         QuincyArts arts = QuincyArtsLogic.arts(d);
@@ -229,6 +238,7 @@ public final class QuincyArtsEvents {
         if (!normal.equals(arts)) {
             QuincyArtsLogic.setArts(d, normal);
         }
+        QuincyRansotengai.normaliseTrial(d, now);
         if (p.isAlive() && owedGlove(d)) {
             giveGlove(p, d);
         }
@@ -539,9 +549,10 @@ public final class QuincyArtsEvents {
 
     /**
      * The Quincy Form key (H), sneaking or not. Presses too close together are ignored; otherwise the
-     * first rule that fits decides: Sklaverei (sneaking, in Vollständig), Licht Regen (drawing a
-     * restored Cross), a word that Letzt Stil already burns, the unmastered glove off, the mastered
-     * glove armed and torn, Vollständig ended or started, or a word on what is still to come.
+     * first rule that fits decides: Sklaverei (sneaking, in Vollständig), Ransōtengai (sneaking, when
+     * it claims the key: woven, in the Elder's trial, or learned with the body failing), Licht Regen
+     * (drawing a restored Cross), a word that Letzt Stil already burns, the unmastered glove off, the
+     * mastered glove armed and torn, Vollständig ended or started, or a word on what is still to come.
      */
     public static void onFormKey(Player p, boolean sneak, long now) {
         if (!SoulLogic.hasSoul(p)) {
@@ -554,6 +565,14 @@ public final class QuincyArtsEvents {
         d.lastFormPressAt = now;
         if (sneak && QuincyArtsLogic.inVollstandig(d)) {
             setSklaverei(p, d, !QuincyArtsLogic.sklavereiOn(d));
+        } else if (sneak && QuincyRansotengai.claimsKey(p, d, now)) {
+            // Only claimed when the threads are woven, in the trial, or learned and the body failing,
+            // so every other sneak and press goes on to the older rules below.
+            if (QuincyRansotengai.isWoven(d)) {
+                QuincyRansotengai.end(p, d, now, QuincyRansotengai.End.PRESSED);
+            } else {
+                QuincyRansotengai.start(p, d, now, false);
+            }
         } else if (!sneak && drawingCross(p) && QuincyArtsLogic.isRestored(d) && QuincyLogic.canUsePowers(d)) {
             startLichtRegen(p, d, now);
         } else if (QuincyArtsLogic.inLetzt(d)) {
@@ -684,10 +703,7 @@ public final class QuincyArtsEvents {
 
     /** How long until a sealed power can return the way its wait counts towards (see {@link QuincyArtsLogic#waitsForArrow}). */
     private static long sealedTicksLeft(SoulData d, long now) {
-        // From the seal's own start, which a death in Letzt Stil puts when the Letzt Stil would have ended.
-        long since = QuincyArtsLogic.arts(d).stageSince();
-        long wait = QuincyArtsLogic.sealedWaitTicks();
-        return since >= now ? wait + (since - now) : Math.max(0L, wait - (now - since));
+        return QuincyArtsLogic.sealedTicksLeft(d, now, QuincyArtsLogic.waitsForArrow());
     }
 
     // ---- Restoration ----
@@ -734,6 +750,26 @@ public final class QuincyArtsEvents {
             return false;
         }
         restore(target, d, now, owner);
+        return true;
+    }
+
+    /**
+     * A Quincy Elder's heart shot found the place beside the heart of the soul he is restoring (see
+     * {@link HeiligPfeil#heartTarget}): brings the power back if everything still holds, as another
+     * Quincy's arrow would, and his visit draws to a close.
+     *
+     * @return whether the power came back, in which case the arrow is spent on it
+     */
+    public static boolean tryRestoreByElder(QuincyElder elder, Player target, long now) {
+        if (target != elder.restoreTarget() || !SoulLogic.hasSoul(target)) {
+            return false;
+        }
+        SoulData d = SoulLogic.get(target);
+        if (!QuincyArtsLogic.restorable(target, d, now, true)) {
+            return false;
+        }
+        restore(target, d, now, null);
+        elder.onRestored(target);
         return true;
     }
 
@@ -840,7 +876,7 @@ public final class QuincyArtsEvents {
     /**
      * Takes the full form: wings, a halo and flight as in creative, for a reishi upkeep every second.
      * Refused (with the reason on the action bar) unless forced, as the command does, which also
-     * skips the cost.
+     * skips the cost. Ransōtengai's threads let go first, and the body pays for it.
      *
      * @return whether Vollständig started
      */
@@ -859,6 +895,9 @@ public final class QuincyArtsEvents {
                 tell(p, vollMessage("message.bleach.vollstandig.reishi", d, now));
                 return false;
             }
+        }
+        if (QuincyRansotengai.isWoven(d)) {
+            QuincyRansotengai.end(p, d, now, QuincyRansotengai.End.VOLLSTANDIG);
         }
         setForms(d, QuincyArtsLogic.arts(d).forms().withVollstandig(true).withSklaverei(false).withHaloBroken(false));
         if (!flight.hasModifier(VOLL_FLIGHT_ID)) {
@@ -1057,11 +1096,14 @@ public final class QuincyArtsEvents {
     // ---- Ending everything ----
 
     /**
-     * Ends every running art at once, for a reset: the modifiers come off, Vollständig ends (with a
-     * landing grace in the air), Sklaverei stops, and Licht Regen and the tear's first tap are
-     * forgotten. The stage itself is left as it is.
+     * Ends every running art at once, for a reset: the modifiers come off, Ransōtengai lets go
+     * quietly (no collapse, no wait), Vollständig ends (with a landing grace in the air), Sklaverei
+     * stops, and Licht Regen and the tear's first tap are forgotten. The stage itself is left as it is.
      */
     public static void endAll(Player p, SoulData d) {
+        if (QuincyRansotengai.isWoven(d)) {
+            QuincyRansotengai.end(p, d, p.level().getGameTime(), QuincyRansotengai.End.DEATH);
+        }
         if (QuincyArtsLogic.inVollstandig(d)) {
             endVollstandig(p, d, p.level().getGameTime(), true);
         } else {
@@ -1173,8 +1215,8 @@ public final class QuincyArtsEvents {
     }
 
     /**
-     * Sklaverei and Licht Regen end with the session. Vollständig is saved, and ends quietly at the
-     * next login, when its flight is found missing.
+     * Sklaverei, Licht Regen and Ransōtengai's threads (quietly) end with the session. Vollständig is
+     * saved, and ends quietly at the next login, when its flight is found missing.
      */
     private static void onLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         Player player = event.getEntity();
@@ -1182,6 +1224,9 @@ public final class QuincyArtsEvents {
             return;
         }
         SoulData d = SoulLogic.get(player);
+        if (QuincyRansotengai.isWoven(d)) {
+            QuincyRansotengai.end(player, d, player.level().getGameTime(), QuincyRansotengai.End.LOGOUT);
+        }
         QuincyForms forms = QuincyArtsLogic.arts(d).forms();
         if (forms.sklaverei()) {
             setForms(d, forms.withSklaverei(false));

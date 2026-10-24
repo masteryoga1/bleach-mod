@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:quincy_garb",
+  "display": {
+    "icon": {
+      "id": "bleach:wandenreich_coat"
+    },
+    "title": {
+      "translate": "advancements.bleach.wandenreich.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.wandenreich.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "wandenreich": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "wandenreich"
+      }
+    }
+  }
+}

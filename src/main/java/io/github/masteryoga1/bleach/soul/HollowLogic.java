@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.util.ArrayList;
@@ -59,8 +60,9 @@ public final class HollowLogic {
 
     /**
      * Whether Hollows hunt this creature: a player who can see them (not in creative or spectator
-     * mode, and not a Hollow or Arrancar unless the server says so), or a Plus spirit that is not
-     * passing on. The unaware are hunted only if the server says so; nothing else is ever prey.
+     * mode, and not a Hollow or Arrancar unless the server says so), a Plus spirit that is not
+     * passing on, or the Quincy Hunter, who hunts them in turn, unless the server says not. The
+     * unaware are hunted only if the server says so; nothing else is ever prey.
      */
     public static boolean isPrey(LivingEntity target) {
         if (target instanceof Player player) {
@@ -75,6 +77,9 @@ public final class HollowLogic {
         }
         if (target instanceof PlusSpirit plus) {
             return plus.isAlive() && !plus.isDeparting();
+        }
+        if (target instanceof QuincyHunter hunter) {
+            return hunter.isAlive() && BleachConfig.get(BleachConfig.HOLLOWS_HUNT_HUNTER);
         }
         return false;
     }

@@ -35,15 +35,15 @@ public final class SpiritSenses {
     }
 
     /**
-     * Whether a spirit's body meets another's, to push or be pushed: only another spirit, or a player
-     * who can see spirits. Everything else, unaware players and mundane creatures alike, passes
-     * through.
+     * Whether a spirit's body meets another's, to push or be pushed: only another spirit, a creature
+     * that sees spirits (see {@link SoulLogic#SPIRIT_SIGHTED}), or a player who can see them.
+     * Everything else, unaware players and mundane creatures alike, passes through.
      */
     public static boolean bodiesTouch(Entity spirit, Entity other) {
         if (other instanceof Player player) {
             return SoulLogic.seesSpirits(player);
         }
-        return other.getType().is(SoulLogic.SPIRITS);
+        return other.getType().is(SoulLogic.SPIRITS) || other.getType().is(SoulLogic.SPIRIT_SIGHTED);
     }
 
     /** Plays a spirit's sound at its position. Does nothing on the client. */

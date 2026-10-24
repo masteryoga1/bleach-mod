@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.menu.TailoringMenu;
+import io.github.masteryoga1.bleach.menu.TailoringPages;
 import io.github.masteryoga1.bleach.recipe.TailoringInput;
 import io.github.masteryoga1.bleach.recipe.TailoringRecipe;
 import io.github.masteryoga1.bleach.registry.BleachTags;
@@ -16,6 +17,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,7 +35,10 @@ import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** Tests for the Shihakushō and the Quincy garb, the Tailoring Table and the sheathed blade. */
+/**
+ * Tests for the Shihakushō, the Quincy garb and the Wandenreich uniform, the Tailoring Table and its
+ * pages, and the sheathed blade.
+ */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class GarbTests {
@@ -71,7 +76,9 @@ public final class GarbTests {
                 .collect(Collectors.toSet());
         helper.assertTrue(results.equals(Set.of(ModItems.SHIHAKUSHO_KOSODE.get(), ModItems.SHIHAKUSHO_HAKAMA.get(),
                 ModItems.WARAJI.get(), ModItems.QUINCY_TUNIC.get(), ModItems.QUINCY_TROUSERS.get(),
-                ModItems.QUINCY_SHOES.get(), ModItems.SANREI_GLOVE.get())), "tailoring makes " + results);
+                ModItems.QUINCY_SHOES.get(), ModItems.SANREI_GLOVE.get(), ModItems.WANDENREICH_CAP.get(),
+                ModItems.WANDENREICH_COAT.get(), ModItems.WANDENREICH_TROUSERS.get(), ModItems.WANDENREICH_BOOTS.get())),
+                "tailoring makes " + results);
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("tailoring_table")).isPresent(),
                 "the Tailoring Table cannot be crafted");
         helper.succeed();
@@ -166,6 +173,66 @@ public final class GarbTests {
         helper.assertFalse(tunic.is(BleachTags.SHINIGAMI_GARB), "the Quincy tunic counts as the Shihakushō");
         helper.assertFalse(new ItemStack(ModItems.SHIHAKUSHO_KOSODE.get()).is(BleachTags.QUINCY_GARB),
                 "the kosode counts as the Quincy garb");
+        helper.succeed();
+    }
+
+    /** The Wandenreich uniform is a Quincy garb too, but for its cap, which is worn on the head. */
+    @GameTest(template = "empty")
+    public static void wandenreichUniformCountsAsGarb(GameTestHelper helper) {
+        List<Item> worn = List.of(ModItems.WANDENREICH_COAT.get(), ModItems.WANDENREICH_TROUSERS.get(),
+                ModItems.WANDENREICH_BOOTS.get());
+        for (Item piece : worn) {
+            helper.assertTrue(new ItemStack(piece).is(BleachTags.QUINCY_GARB), piece + " is not in #bleach:quincy_garb");
+        }
+        helper.assertFalse(new ItemStack(ModItems.WANDENREICH_CAP.get()).is(BleachTags.QUINCY_GARB),
+                "the Wandenreich cap is in #bleach:quincy_garb");
+        for (Item piece : List.of(ModItems.WANDENREICH_CAP.get(), ModItems.WANDENREICH_COAT.get(),
+                ModItems.WANDENREICH_TROUSERS.get(), ModItems.WANDENREICH_BOOTS.get())) {
+            helper.assertTrue(new ItemStack(piece).is(BleachTags.WANDENREICH_UNIFORM), piece + " is not in #bleach:wandenreich_uniform");
+        }
+
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setItemSlot(EquipmentSlot.CHEST, new ItemStack(ModItems.WANDENREICH_COAT.get()));
+        player.setItemSlot(EquipmentSlot.LEGS, new ItemStack(ModItems.QUINCY_TROUSERS.get()));
+        player.setItemSlot(EquipmentSlot.FEET, new ItemStack(ModItems.WANDENREICH_BOOTS.get()));
+        helper.assertTrue(QuincyGarbItem.isFullSet(player), "the Wandenreich coat and boots with the white trousers are not a full garb");
+        helper.assertFalse(QuincyGarbItem.isWandenreichSet(player), "the white trousers passed for the Wandenreich's");
+        player.setItemSlot(EquipmentSlot.LEGS, new ItemStack(ModItems.WANDENREICH_TROUSERS.get()));
+        helper.assertTrue(QuincyGarbItem.isWandenreichSet(player), "the whole Wandenreich uniform is not a set");
+
+        for (String name : List.of("wandenreich_cap", "wandenreich_coat", "wandenreich_trousers", "wandenreich_boots")) {
+            ItemStack made = recipe(helper, name).getResultItem(helper.getLevel().registryAccess());
+            helper.assertTrue(BuiltInRegistries.ITEM.getKey(made.getItem()).equals(BleachMod.id(name)),
+                    "bleach:tailoring/" + name + " makes " + made);
+        }
+        helper.succeed();
+    }
+
+    /** Eight buttons a page: every recipe on the table is on one page, in one place. */
+    @GameTest(template = "empty")
+    public static void tailoringPagesReachEveryRecipe(GameTestHelper helper) {
+        helper.assertTrue(TailoringPages.pageCount(11) == 2, "11 recipes fill " + TailoringPages.pageCount(11) + " pages");
+        helper.assertTrue(TailoringPages.pageCount(0) == 1, "an empty table has " + TailoringPages.pageCount(0) + " pages");
+        helper.assertTrue(TailoringPages.indexAt(1, 0, 11) == 8, "the second page starts at " + TailoringPages.indexAt(1, 0, 11));
+        helper.assertTrue(TailoringPages.indexAt(1, 3, 11) == -1,
+                "the fourth button of the second page of 11 is " + TailoringPages.indexAt(1, 3, 11));
+        helper.assertTrue(TailoringPages.pageOf(10) == 1, "the eleventh recipe is on page " + TailoringPages.pageOf(10));
+
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        int recipes = new TailoringMenu(1, player.getInventory(), ContainerLevelAccess.NULL).recipes().size();
+        helper.assertTrue(recipes >= 11, "the Tailoring Table has only " + recipes + " recipes");
+        int[] shown = new int[recipes];
+        for (int page = 0; page < TailoringPages.pageCount(recipes); page++) {
+            for (int slot = 0; slot < TailoringPages.PER_PAGE; slot++) {
+                int index = TailoringPages.indexAt(page, slot, recipes);
+                if (index >= 0) {
+                    shown[index]++;
+                }
+            }
+        }
+        for (int index = 0; index < recipes; index++) {
+            helper.assertTrue(shown[index] == 1, "recipe " + index + " is shown " + shown[index] + " times");
+        }
         helper.succeed();
     }
 

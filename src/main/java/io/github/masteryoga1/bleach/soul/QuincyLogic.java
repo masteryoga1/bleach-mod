@@ -266,6 +266,19 @@ public final class QuincyLogic {
 
     // ---- Training ----
 
+    /**
+     * The training a tier takes, the inverse of {@link #tierForTraining}: none for tier 0, then the
+     * configured thresholds. A tier past {@link #MAX_TIER} counts as the highest.
+     */
+    public static int trainingForTier(int tier) {
+        return switch (Mth.clamp(tier, 0, MAX_TIER)) {
+            case 1 -> BleachConfig.get(BleachConfig.QUINCY_TIER_1_TRAINING);
+            case 2 -> BleachConfig.get(BleachConfig.QUINCY_TIER_2_TRAINING);
+            case 3 -> BleachConfig.get(BleachConfig.QUINCY_TIER_3_TRAINING);
+            default -> 0;
+        };
+    }
+
     /** The tier this much training earns. */
     public static int tierForTraining(int training) {
         if (training >= BleachConfig.get(BleachConfig.QUINCY_TIER_3_TRAINING)) {

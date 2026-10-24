@@ -1,0 +1,13 @@
+{
+  "type": "bleach:tailoring",
+  "cloth": {
+    "item": "minecraft:white_wool"
+  },
+  "cloth_count": 6,
+  "trim": {
+    "item": "minecraft:black_dye"
+  },
+  "result": {
+    "id": "bleach:wandenreich_coat"
+  }
+}

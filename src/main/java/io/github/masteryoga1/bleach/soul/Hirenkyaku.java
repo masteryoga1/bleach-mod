@@ -97,8 +97,11 @@ public final class Hirenkyaku {
         FlashStep.land(player, data, path, onFooting, grounded);
     }
 
-    /** A ring of light bursting out where the step began, and a trail of reishi all the way to its end. */
-    private static void effects(ServerLevel level, Vec3 start, Vec3 end) {
+    /**
+     * A ring of light bursting out where the step began, and a trail of reishi all the way to its end.
+     * Public for the Quincy NPCs, who step in and out of a scene the same way.
+     */
+    public static void effects(ServerLevel level, Vec3 start, Vec3 end) {
         for (int i = 0; i < RING_POINTS; i++) {
             double angle = 2.0 * Math.PI * i / RING_POINTS;
             double dx = Math.cos(angle);
