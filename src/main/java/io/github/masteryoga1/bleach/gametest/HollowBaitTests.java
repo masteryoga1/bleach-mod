@@ -20,6 +20,7 @@ import io.github.masteryoga1.bleach.soul.BaitSites;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.MaskFragments;
 import io.github.masteryoga1.bleach.soul.QuincyForms;
+import io.github.masteryoga1.bleach.soul.QuincyNpcLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
 import io.github.masteryoga1.bleach.soul.QuincyTeaching;
 import io.github.masteryoga1.bleach.soul.ReiatsuEvents;
@@ -517,6 +518,46 @@ public final class HollowBaitTests {
         expected.put("behind when the Hunter left", BaitLogic.Outcome.LOSS);
         outcomes.forEach((what, outcome) -> helper.assertTrue(outcome == expected.get(what),
                 "a contest with " + what + " ended in a " + outcome + ", not a " + expected.get(what)));
+        helper.succeed();
+    }
+
+    /**
+     * A site frozen too long is given up, a contest called off and its Hunter let go. Game tests
+     * have no mob spawning, so every step of a site here is a frozen one.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void frozenSitesAreGivenUp(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        QuincyHunter hunter = QuincyTests.still(helper.spawn(ModEntities.QUINCY_HUNTER.get(), 12, 2, 12));
+        hunter.setLifetime(QuincyNpcLogic.VISIT_LIFETIME);
+        BaitSites sites = BaitSites.get(level.getServer());
+        BaitSite bait = BaitSite.create(UUID.randomUUID(), helper.absolutePos(new BlockPos(4, 2, 4)), false, null, 0);
+        BaitSite contest = BaitSite.create(UUID.randomUUID(), helper.absolutePos(new BlockPos(12, 2, 12)), true,
+                hunter.getUUID(), 0);
+        int limit = BleachConfig.get(BleachConfig.BAIT_ABANDON_MINUTES) * 1200;
+        try {
+            for (BaitSite site : List.of(bait, contest)) {
+                sites.add(site);
+                site.setFrozenTicks(limit - 2 * BaitEvents.STEP_TICKS);
+            }
+            hunter.setContestSite(contest.id());
+            long now = level.getGameTime();
+            for (BaitSite site : List.of(bait, contest)) {
+                BaitEvents.step(level, sites, site, now);
+                helper.assertTrue(sites.find(site.id()) == site, "a site frozen short of the limit was given up");
+                BaitEvents.step(level, sites, site, now + BaitEvents.STEP_TICKS);
+                helper.assertTrue(sites.find(site.id()) == null, "a site frozen past the limit went on");
+            }
+            helper.assertTrue(hunter.contestSite() == null, "the Hunter still runs the contest called off");
+            helper.assertTrue(hunter.lifetime() < QuincyNpcLogic.VISIT_LIFETIME, "the Hunter was not let go");
+        } finally {
+            hunter.discard();
+            for (BaitSite site : List.of(bait, contest)) {
+                if (sites.find(site.id()) != null) {
+                    sites.remove(site.id());
+                }
+            }
+        }
         helper.succeed();
     }
 

@@ -1370,7 +1370,7 @@ public final class BleachConfig {
                 .comment("Most seconds the cracked sky holds open.")
                 .defineInRange("finale_seconds_max", 20, 1, 120);
         BAIT_ABANDON_MINUTES = builder
-                .comment("Minutes a site can stay frozen, with its ground unloaded or no Hollows able to come, before it is given up.")
+                .comment("Minutes a site can stay frozen, with its ground unloaded or no Hollows able to come, before it is given up (a contest is called off).")
                 .defineInRange("abandon_minutes", 20, 1, 1_440);
         CONTEST_MINUTES = builder
                 .comment("Minutes the Quincy Hunter's contest lasts: whoever destroys more Hollows in that time wins.")

@@ -569,7 +569,7 @@
   "message.bleach.bait.finale": "The sky above the bait cracks open.",
   "message.bleach.bait.ended.expired": "The bait's scent fades. No more Hollows come.",
   "message.bleach.bait.ended.finale": "The great tear closes, and the Hollows are drawn up into it.",
-  "message.bleach.bait.ended.abandoned": "The bait you crushed has gone cold.",
+  "message.bleach.bait.ended.abandoned": "The bait has gone cold.",
   "message.bleach.bait.ended.stopped": "The bait's pull is gone.",
   "message.bleach.bait.ended.contest": "The contest is over.",
   "message.bleach.elder.arrives": "An old Quincy in white is watching you.",
@@ -614,7 +614,7 @@
   "title.bleach.vollstandig": "Quincy: Vollständig",
   "title.bleach.vollstandig.subtitle": "Your full form",
   "bossbar.bleach.bait": "Hollow Bait",
-  "bossbar.bleach.contest": "Contest: you %s, rival %s",
+  "bossbar.bleach.contest": "Contest: challenger %s, Hunter %s",
   "bossbar.bleach.finale": "The sky cracks",
 
   "death.attack.bleach.encroachment": "%1$s was consumed by Encroachment",

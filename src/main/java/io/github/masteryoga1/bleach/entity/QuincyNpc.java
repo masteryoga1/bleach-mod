@@ -323,7 +323,8 @@ public abstract class QuincyNpc extends PathfinderMob implements RangedAttackMob
     /**
      * A Hirenkyaku step of up to {@code distance} blocks along the ground in this direction, as far as
      * the body fits safely, leaving a trail of reishi. Not taken without AI, while Gritz holds the
-     * body, or when it would go less than {@code minDistance}. Server side.
+     * body, when it would go less than {@code minDistance}, or when it would end over a drop: unlike
+     * a player, an NPC has no footing to stand on in the air. Server side.
      *
      * @return whether it stepped
      */
@@ -336,8 +337,9 @@ public abstract class QuincyNpc extends PathfinderMob implements RangedAttackMob
             return false;
         }
         Vec3 start = position();
-        Vec3 end = FlashStep.sweep(server, this, getBoundingBox(), flat.normalize(), distance, true).end();
-        if (!Double.isFinite(end.x) || !Double.isFinite(end.y) || !Double.isFinite(end.z)
+        FlashStep.DashPath path = FlashStep.sweep(server, this, getBoundingBox(), flat.normalize(), distance, true);
+        Vec3 end = path.end();
+        if (!path.supported() || !Double.isFinite(end.x) || !Double.isFinite(end.y) || !Double.isFinite(end.z)
                 || end.distanceTo(start) < minDistance) {
             return false;
         }

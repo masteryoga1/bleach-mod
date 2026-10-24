@@ -28,7 +28,7 @@ public final class BaitLogic {
         EXPIRED,
         /** The sky cracked and the Hollows were drawn up. */
         FINALE,
-        /** Frozen too long, unloaded or in a world where no Hollows come. */
+        /** Frozen too long, unloaded or in a world where no Hollows come (a contest is called off instead). */
         ABANDONED,
         /** Stopped by command. */
         STOPPED,

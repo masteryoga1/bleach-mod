@@ -93,10 +93,13 @@ public final class BaitEvents {
         bus.addListener(BaitEvents::onLoggedOut);
     }
 
-    /** Steps every site once a second, in the Overworld. Game tests step them themselves. */
+    /**
+     * Steps every site once a second, in the Overworld, while the game runs: under /tick freeze the
+     * time stands still but the level still ticks. Game tests step them themselves.
+     */
     private static void onLevelTick(LevelTickEvent.Post event) {
         if (!(event.getLevel() instanceof ServerLevel level) || level.dimension() != Level.OVERWORLD
-                || level.getServer() instanceof GameTestServer) {
+                || level.getServer() instanceof GameTestServer || !level.tickRateManager().runsNormally()) {
             return;
         }
         long now = level.getGameTime();
@@ -229,7 +232,7 @@ public final class BaitEvents {
 
     /**
      * One second of a site. Frozen, it only counts the time it has been frozen, and is given up once
-     * that is long enough. Otherwise, in order: a contest whose Hunter is gone ends on the tally; the
+     * that is long enough (a contest is called off). Otherwise, in order: a contest whose Hunter is gone ends on the tally; the
      * site's Hollows are held; the hunted souls are found; the bar is brought up to date; the cracked
      * sky runs on, or cracks; the time runs out; and the next wave comes nearer, or comes.
      */
@@ -240,7 +243,11 @@ public final class BaitEvents {
             site.setFrozenTicks(site.frozenTicks() + STEP_TICKS);
             sites.setDirty();
             if (site.frozenTicks() >= BleachConfig.get(BleachConfig.BAIT_ABANDON_MINUTES) * TICKS_PER_MINUTE) {
-                end(level, sites, site, BaitLogic.End.ABANDONED);
+                if (site.contest()) {
+                    callOff(level, sites, site);
+                } else {
+                    end(level, sites, site, BaitLogic.End.ABANDONED);
+                }
                 return;
             }
             showBar(level, sites, site);
@@ -535,6 +542,15 @@ public final class BaitEvents {
             }
         }
         sites.remove(site.id());
+    }
+
+    /** Ends a contest that was frozen too long: it is off, whoever was ahead. */
+    private static void callOff(ServerLevel level, BaitSites sites, BaitSite site) {
+        ServerPlayer owner = level.getServer().getPlayerList().getPlayer(site.owner());
+        if (owner != null) {
+            owner.sendSystemMessage(Component.translatable("message.bleach.contest.void").withStyle(ChatFormatting.GRAY));
+        }
+        end(level, sites, site, BaitLogic.End.CONTEST);
     }
 
     /**

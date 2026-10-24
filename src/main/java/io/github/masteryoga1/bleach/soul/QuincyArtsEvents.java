@@ -185,12 +185,15 @@ public final class QuincyArtsEvents {
             }
             return;
         }
-        if (now % 20L == 0L && !QuincyLogic.drainReishi(d, QuincyArtsLogic.vollUpkeepPerSecond(d, p.getAbilities().flying))) {
+        // On whole seconds of game time, which stands still under /tick freeze while players still tick.
+        boolean running = p.level().tickRateManager().runsNormally();
+        if (running && now % 20L == 0L
+                && !QuincyLogic.drainReishi(d, QuincyArtsLogic.vollUpkeepPerSecond(d, p.getAbilities().flying))) {
             endVollstandig(p, d, now, true);
             tell(p, Component.translatable("message.bleach.vollstandig.dry"));
             return;
         }
-        if (QuincyArtsLogic.sklavereiOn(d) && now % QuincyArtsLogic.SKLAVEREI_INTERVAL_TICKS == 0L) {
+        if (running && QuincyArtsLogic.sklavereiOn(d) && now % QuincyArtsLogic.SKLAVEREI_INTERVAL_TICKS == 0L) {
             sklavereiPulse(p, d);
         }
     }

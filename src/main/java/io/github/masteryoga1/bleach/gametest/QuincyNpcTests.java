@@ -54,6 +54,7 @@ import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -450,6 +451,38 @@ public final class QuincyNpcTests {
             helper.assertTrue(hunter.contestSite() == null, "the Hunter still runs a contest that has ended");
             helper.assertTrue(hunter.contestOffered(), "letting an ended contest go let him offer another");
             hunter.discard();
+        });
+    }
+
+    /**
+     * The Hunter's dodge keeps to the ground: on a ledge four blocks high, with the threat on the
+     * landward side, he does not step off it; on open ground he steps away. Both have their AI, as a
+     * body without it never steps.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void hunterDodgesOnlyOntoGround(GameTestHelper helper) {
+        for (int x = 0; x <= 5; x++) {
+            for (int y = 2; y <= 5; y++) {
+                for (int z = 0; z < 16; z++) {
+                    helper.setBlock(x, y, z, Blocks.STONE);
+                }
+            }
+        }
+        QuincyHunter onLedge = helper.spawn(ModEntities.QUINCY_HUNTER.get(), 3, 6, 8);
+        Husk landward = QuincyTests.still(helper.spawn(EntityType.HUSK, 1, 6, 8));
+        QuincyHunter inOpen = helper.spawn(ModEntities.QUINCY_HUNTER.get(), 10, 2, 4);
+        Husk behind = QuincyTests.still(helper.spawn(EntityType.HUSK, 10, 2, 1));
+        helper.runAfterDelay(5, () -> {
+            long now = helper.getLevel().getGameTime();
+            helper.assertTrue(onLedge.onGround() && inOpen.onGround(), "the Hunters were not standing yet");
+            helper.assertFalse(onLedge.tryDodge(landward, now), "the Hunter dodged off the ledge");
+            Vec3 from = inOpen.position();
+            helper.assertTrue(inOpen.tryDodge(behind, now), "the Hunter did not dodge on open ground");
+            double went = inOpen.position().distanceTo(from);
+            helper.assertTrue(went >= QuincyHunter.DODGE_MIN && Math.abs(inOpen.getY() - from.y) < 1.0E-6,
+                    "the Hunter's dodge on open ground went " + went + " blocks, to y " + inOpen.getY());
+            QuincyArtsTests.discardAll(List.of(onLedge, landward, inOpen, behind));
+            helper.succeed();
         });
     }
 
