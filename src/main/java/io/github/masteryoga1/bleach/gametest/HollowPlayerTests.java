@@ -405,7 +405,7 @@ public final class HollowPlayerTests {
 
         // A blow struck in the same tick as the swap to a sword already has no claws.
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_SWORD));
-        HollowBody.reconcileBeforeBlow(player, data);
+        HollowBody.reconcile(player, data);
         helper.assertTrue(modifier(player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID) == null,
                 "the claws stayed on a sword");
         helper.assertTrue(modifier(player, Attributes.ATTACK_SPEED, HollowBody.CLAW_SPEED_ID) == null,
@@ -413,16 +413,19 @@ public final class HollowPlayerTests {
         helper.assertTrue(modifier(player, Attributes.ARMOR, HollowBody.HIDE_ID) != null,
                 "the hide came off with a sword in hand");
 
-        // One struck in the same tick as the hand empties waits for the claws, as the sword still lends its damage.
+        // A hand emptied between ticks waits for the player's tick to grow the claws, as the sword it held
+        // still lends its damage until then: a blow or a stat change in between leaves them off.
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-        HollowBody.reconcileBeforeBlow(player, data);
-        helper.assertTrue(modifier(player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID) == null,
-                "the claws grew on a hand emptied in the tick of the blow");
-        HollowBody.setSatiety(data, 20.0F);
         HollowBody.reconcile(player, data);
+        SoulLogic.applyStatModifiers(player, data);
+        helper.assertTrue(modifier(player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID) == null,
+                "the claws grew on a hand emptied between ticks");
+        HollowBody.setSatiety(data, 20.0F);
+        HollowBody.tickBody(player, data, now(helper));
         assertModifier(helper, player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID, 6.446,
                 AttributeModifier.Operation.ADD_VALUE, "the ravenous claws");
-        HollowBody.reconcileBeforeBlow(player, data);
+        // Claws already on a bare hand stay on between ticks.
+        HollowBody.reconcile(player, data);
         assertModifier(helper, player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID, 6.446,
                 AttributeModifier.Operation.ADD_VALUE, "the claws before a bare-handed blow");
 

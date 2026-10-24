@@ -289,7 +289,11 @@ public final class SoulEvents {
 
     private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            BleachNetwork.syncSoul(player, SoulLogic.get(player));
+            SoulData data = SoulLogic.get(player);
+            BleachNetwork.syncSoul(player, data);
+            // The client has a new player for the new dimension, which knows nothing of its own looks
+            // (a Hollow's cracked mask, say): the next tick sends them again.
+            data.lastSentAppearance = null;
         }
     }
 

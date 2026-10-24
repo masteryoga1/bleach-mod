@@ -164,7 +164,8 @@ public final class HollowBody {
             return;
         }
         ensureHunger(data);
-        reconcile(player, data);
+        // The one place claws grow: vanilla has just taken off the modifiers of whatever left the hand.
+        reconcile(player, data, true);
         boolean alive = player.isAlive();
         if (alive && data.hollow().purifiedOnDeath()) {
             // Marked by a purifying blow whose death did not happen after all.
@@ -218,18 +219,12 @@ public final class HollowBody {
      * modifiers are transient, so this runs again on logging in and respawning (see
      * {@link SoulLogic#applyStatModifiers}), and each is written only when its amount changes, so the
      * attributes are not re-sent every tick. Server side.
+     * <p>
+     * The claws come off a hand that holds something at once, but grow only on the player's tick (see
+     * {@link #tickBody}), after vanilla's equipment check. Between ticks, a hand just emptied by a hotbar
+     * swap still lends the weapon it held its own damage, and the claws would stack on it.
      */
     public static void reconcile(Player player, SoulData data) {
-        reconcile(player, data, true);
-    }
-
-    /**
-     * Puts the body right as a blow is struck, for a hand changed since the last tick: the claws come off
-     * a hand that now holds something, but a hand only just emptied grows them on the next tick. Until
-     * vanilla's equipment check that tick, the weapon it held still lends its own damage, and the claws
-     * would stack on it.
-     */
-    public static void reconcileBeforeBlow(Player player, SoulData data) {
         reconcile(player, data, false);
     }
 
