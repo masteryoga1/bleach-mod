@@ -232,9 +232,10 @@ public final class BaitEvents {
 
     /**
      * One second of a site. Frozen, it only counts the time it has been frozen, and is given up once
-     * that is long enough (a contest is called off). Otherwise, in order: a contest whose Hunter is gone ends on the tally; the
-     * site's Hollows are held; the hunted souls are found; the bar is brought up to date; the cracked
-     * sky runs on, or cracks; the time runs out; and the next wave comes nearer, or comes.
+     * that is long enough (a contest is called off). Otherwise, in order: a contest whose Hunter is
+     * gone ends on the tally; the site's Hollows are held; the hunted souls are found; the bar is
+     * brought up to date; the cracked sky runs on, or cracks; the time runs out; and the next wave
+     * comes nearer, or comes.
      */
     public static void step(ServerLevel level, BaitSites sites, BaitSite site, long now) {
         // A chunk can tick before the creatures saved in it are back: the site waits for them too.
