@@ -118,7 +118,11 @@ public final class HollowBaitTests {
         return null;
     }
 
-    /** Forces every chunk within this reach of the point that is not forced already, and returns those it forced. */
+    /**
+     * Forces every chunk within this reach of the point that is not forced already, and returns those it forced.
+     * Each is loaded here and now: the test server runs ticks as fast as it can, so ground still being
+     * generated off the thread could outlast the test.
+     */
     private static List<ChunkPos> forceAround(ServerLevel level, Vec3 centre, double reach) {
         List<ChunkPos> forced = new ArrayList<>();
         for (ChunkPos chunk : chunksAround(centre, reach)) {
@@ -126,6 +130,7 @@ public final class HollowBaitTests {
                 level.setChunkForced(chunk.x, chunk.z, true);
                 forced.add(chunk);
             }
+            level.getChunk(chunk.x, chunk.z);
         }
         return forced;
     }
