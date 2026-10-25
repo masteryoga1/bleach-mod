@@ -57,6 +57,8 @@ public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClie
      * stands 1 block up, so at 1.62 it does too.
      */
     public static final float GILLIAN_FIT = 0.72F, ADJUCHAS_FIT = 1.62F, ADJUCHAS_BACK_SHIFT = 0.67F;
+    /** How far the player renderer lowers a crouching player, in the player's own units. */
+    private static final float CROUCH_DROP = 2.0F / 16.0F;
 
     @Nullable
     private static MenosPlayerRenderer gillian;
@@ -163,10 +165,14 @@ public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClie
     protected void setupRotations(AbstractClientPlayer player, PoseStack poseStack, float bob, float yBodyRot,
                                   float partialTick, float scale) {
         super.setupRotations(player, poseStack, bob, yBodyRot, partialTick, scale);
-        if (upright) {
+        if (player.isCrouching()) {
+            // The player renderer still lowers a crouching player before this draws (its render offset), for
+            // the bent player model; these bodies crouch by drawing smaller instead (see scale).
+            poseStack.translate(0.0F, CROUCH_DROP, 0.0F);
+        } else if (upright) {
             lieDown(player, poseStack, partialTick);
-        } else if (!player.isCrouching()) {
-            // The dying pose keeps the standing eyes, so a falling beast does not sink.
+        } else if (!player.hasPose(Pose.SLEEPING)) {
+            // A bed already lays the body out, and the dying pose keeps the standing eyes, so neither sinks.
             float sunk = player.getEyeHeight(Pose.STANDING) - player.getEyeHeight();
             if (sunk > 0.0F) {
                 poseStack.translate(0.0F, -sunk / scale, 0.0F);
