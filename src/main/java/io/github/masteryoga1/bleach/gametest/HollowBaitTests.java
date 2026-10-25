@@ -455,8 +455,12 @@ public final class HollowBaitTests {
             forced.clear();
         };
         helper.runAtTickTime(GIVE_UP_TICK, () -> {
+            // Says how far it got, as the stages wait on ground and landings picked at random.
+            String stage = "ticking " + allTicking(level, mock.position(), LANDING_REACH)
+                    + ", waves " + site.waves() + ", arrived " + site.arrived()
+                    + ", Hollows about " + siteHollows(level, site).size();
             clear.run();
-            helper.fail("the bait site never got through its wave and finale");
+            helper.fail("the bait site never got through its wave and finale (" + stage + ")");
         });
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(allTicking(level, mock.position(), LANDING_REACH),
