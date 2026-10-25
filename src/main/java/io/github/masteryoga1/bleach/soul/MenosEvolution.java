@@ -119,12 +119,18 @@ public final class MenosEvolution {
     }
 
     /**
-     * Whether the soul with this id is destined to become a Vasto Lorde in the world with this seed: a
-     * share of souls, fixed for each player in each world, so devouring more never changes it.
+     * Whether the soul with this id is destined to become a Vasto Lorde in the world with this seed, when
+     * this share of souls is: fixed for each player in each world, so devouring more never changes it, and
+     * a soul destined at one share is destined at every greater one.
      */
-    public static boolean destined(UUID id, long seed) {
+    public static boolean destined(UUID id, long seed, double share) {
         long mixed = seed ^ id.getMostSignificantBits() ^ Long.rotateLeft(id.getLeastSignificantBits(), 32);
-        return RandomSource.create(mixed).nextDouble() < BleachConfig.get(BleachConfig.VASTO_DESTINED_SHARE);
+        return RandomSource.create(mixed).nextDouble() < share;
+    }
+
+    /** Whether this soul is destined in the world with this seed at the server's share: by default, every soul. */
+    public static boolean destined(UUID id, long seed) {
+        return destined(id, seed, BleachConfig.get(BleachConfig.VASTO_DESTINED_SHARE));
     }
 
     /** Whether this player is destined to become a Vasto Lorde in its world; false off the server. */

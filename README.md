@@ -26,7 +26,7 @@ Step 2 is done, step 3, the Shinigami path, is playable from the Academy to Shik
 - Your first Hollow is Fishbone D, and a wounded Shinigami may arrive just ahead of it, offering her power.
 - Pluses wander the world with their chains, and villagers who die leave one behind. Leave a Plus alone too long and it becomes a Hollow.
 - As a Hollow, soul hunger replaces food: hold **J** (Devour) on a weakened soul to seize and devour it, for hunger, reiryoku, health and souls. Your claws and hide grow with your reiryoku, you heal fast while fed, see in the dark (Sneak and **J** turns it off) and cannot wear armour. Hollows come for you through Garganta. A Shinigami's zanpakutō, or kneeling before the Academy's instructor, cleanses you back into a soul.
-- Devour enough as a Hollow and you rise through the Menos Grande: a towering, mindless **Gillian**, then an **Adjuchas** with its will back that must keep eating Hollows or sink back, and, for a destined few, a human-sized **Vasto Lorde**. From Gillian up, hold **Y** (Cero) to gather a Cero at your mouth and let go to fire it.
+- Devour enough as a Hollow and you rise through the Menos Grande: a towering, mindless **Gillian**, then an **Adjuchas** with its will back that must keep eating Hollows or sink back, and at last a human-sized **Vasto Lorde**, of which a server holds only a handful. From Gillian up, hold **Y** (Cero) to gather a Cero at your mouth and let go to fire it.
 - A Plus can gnaw its own Chain of Fate by holding **J**: a quick way to become a Hollow.
 - Shinigami carry a Denreishinki, the soul pager, which beeps when Hollows arrive nearby.
 - Press **V** to flash step (Shunpo) from Hohō 5: a few blocks in an instant, further, cheaper and more often as Hohō grows.

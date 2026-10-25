@@ -1804,8 +1804,8 @@ public final class BleachConfig {
                 .defineInRange("vasto_adjuchas", 3, 0, 100);
         VASTO_DESTINED_SHARE = builder
                 .comment("Share of souls destined to become a Vasto Lorde, fixed for each player in each world. 1 makes every"
-                        + " Adjuchas destined.")
-                .defineInRange("vasto_destined_share", 0.25, 0.0, 1.0);
+                        + " Adjuchas destined; about 0.25 keeps them as rare as in canon.")
+                .defineInRange("vasto_destined_share", 1.0, 0.0, 1.0);
         VASTO_MAX = builder
                 .comment("Most Vasto Lorde the server holds by devouring, counting those offline. 0 allows none. Commands"
                         + " ignore it.")
