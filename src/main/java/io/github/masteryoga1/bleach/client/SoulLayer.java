@@ -2,37 +2,41 @@ package io.github.masteryoga1.bleach.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import net.minecraft.client.model.PlayerModel;
-import net.minecraft.client.model.SkullModel;
-import net.minecraft.client.model.SkullModelBase;
 import net.minecraft.client.model.geom.EntityModelSet;
-import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.blockentity.SkullBlockRenderer;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.level.block.AbstractSkullBlock;
-import net.minecraft.world.level.block.SkullBlock;
 
 /**
  * Draws what a player's soul shows on the outside: a Plus's Chain of Fate hanging from the chest,
- * shorter as it wears away, and a Hollow's mask. Placeholder looks built from vanilla models until
- * the mod has its own art.
+ * shorter as it wears away, and a Hollow's bone mask in one of four shapes, its jaw hanging open while
+ * it devours, cracked after a blow, and with red eyes while it is ravenous. The chain is built from
+ * vanilla models; the mask is placeholder art drawn by the art script.
  */
 public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
-    private final SkullModelBase mask;
-    private final RenderType maskType = SkullBlockRenderer.getRenderType(SkullBlock.Types.SKELETON, null);
+    public static final ResourceLocation MASK = BleachMod.id("textures/entity/hollow_player_mask.png");
+    public static final ResourceLocation MASK_CRACKED = BleachMod.id("textures/entity/hollow_player_mask_cracked.png");
+    public static final ResourceLocation MASK_EYES = BleachMod.id("textures/entity/hollow_player_mask_eyes.png");
+    /** Full brightness for the glowing eyes, as vanilla's EyesLayer passes it. */
+    private static final int EYES_LIGHT = 15728640;
+
+    private final HollowMaskModel mask;
 
     public SoulLayer(RenderLayerParent<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> parent,
                      EntityModelSet models) {
         super(parent);
-        this.mask = new SkullModel(models.bakeLayer(ModelLayers.SKELETON_SKULL));
+        this.mask = new HollowMaskModel(models.bakeLayer(BleachModelLayers.HOLLOW_PLAYER_MASK));
     }
 
     @Override
@@ -45,8 +49,9 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
         SoulAppearance look = ClientSouls.appearance(player);
         if (look.state() == SoulState.PLUS && look.chainFraction() > 0.0F) {
             renderChain(poseStack, buffer, packedLight, player, look.chainFraction());
-        } else if (look.state() == SoulState.HOLLOW && !wearsSkull(player)) {
-            renderMask(poseStack, buffer, packedLight);
+        } else if (look.state() == SoulState.HOLLOW && player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
+            // Anything worn on the head (a helmet in creative, a skull, a carved pumpkin) sits where the mask is.
+            renderMask(poseStack, buffer, packedLight, player, look);
         }
     }
 
@@ -64,19 +69,24 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
         poseStack.popPose();
     }
 
-    /** A worn mob or player head would sit exactly where the mask goes. */
-    private static boolean wearsSkull(AbstractClientPlayer player) {
-        return player.getItemBySlot(EquipmentSlot.HEAD).getItem() instanceof BlockItem item
-                && item.getBlock() instanceof AbstractSkullBlock;
-    }
-
-    /** A skull over the face, placed the way vanilla places a worn skull. */
-    private void renderMask(PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
+    /**
+     * The mask on the posed head, in the shape the player's id gives, and the eyes over it, glowing at
+     * full brightness, while the Hollow is ravenous. The mask is built in head space, so the head's own
+     * pose is all it needs.
+     */
+    private void renderMask(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
+                            AbstractClientPlayer player, SoulAppearance look) {
         poseStack.pushPose();
         getParentModel().getHead().translateAndRotate(poseStack);
-        poseStack.scale(1.1875F, -1.1875F, -1.1875F);
-        poseStack.translate(-0.5F, 0.0F, -0.5F);
-        SkullBlockRenderer.renderSkull(null, 180.0F, 0.0F, poseStack, buffer, packedLight, mask, maskType);
+        int bits = look.hollowLook();
+        mask.setup(HollowPlayerLogic.maskVariant(player.getUUID()), (bits & HollowPlayerLogic.LOOK_DEVOURING) != 0);
+        ResourceLocation texture = (bits & HollowPlayerLogic.LOOK_MASK_CRACKED) != 0 ? MASK_CRACKED : MASK;
+        mask.renderToBuffer(poseStack, buffer.getBuffer(RenderType.entityCutoutNoCull(texture)), packedLight,
+                LivingEntityRenderer.getOverlayCoords(player, 0.0F), -1);
+        if ((bits & HollowPlayerLogic.LOOK_RAVENOUS) != 0) {
+            mask.renderToBuffer(poseStack, buffer.getBuffer(RenderType.eyes(MASK_EYES)), EYES_LIGHT,
+                    OverlayTexture.NO_OVERLAY, -1);
+        }
         poseStack.popPose();
     }
 }

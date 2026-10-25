@@ -839,14 +839,17 @@ public final class QuincyEvents {
         event.setNewDamage(Math.max(0.0F, damage - prevented));
     }
 
-    /** Fires only for hits that got past shields and invulnerability frames: a Hollow's blow poisons a Quincy. */
+    /**
+     * Fires only for hits that got past shields and invulnerability frames: a Hollow's blow poisons a
+     * Quincy. Being devoured does not: the blow that swallows a soul would only pour poison into the dying.
+     */
     private static void onDamageTaken(LivingDamageEvent.Post event) {
         if (event.getNewDamage() <= 0.0F || !(event.getEntity() instanceof Player player) || player.level().isClientSide()
                 || !SoulLogic.hasSoul(player)) {
             return;
         }
         Entity cause = event.getSource().getEntity();
-        if (cause == player || !QuincyLogic.isHollowSource(cause)) {
+        if (cause == player || !QuincyLogic.isHollowSource(cause) || DevourLogic.isDevoured(event.getSource())) {
             return;
         }
         SoulData data = SoulLogic.get(player);

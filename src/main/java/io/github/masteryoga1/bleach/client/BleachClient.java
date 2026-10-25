@@ -43,8 +43,8 @@ import net.neoforged.neoforge.common.NeoForge;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Client-only entry point: HUD, screens, key bindings, and how souls, zanpakutō techniques and the
- * Quincy's reishi are drawn.
+ * Client-only entry point: HUD, screens, key bindings, and how souls, zanpakutō techniques, the
+ * Quincy's reishi and a Hollow's body are drawn.
  */
 @Mod(value = BleachMod.MODID, dist = Dist.CLIENT)
 public final class BleachClient {
@@ -70,6 +70,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachClient::registerRenderers);
         modEventBus.addListener(BleachModelLayers::register);
         QuincyClient.register(modEventBus);
+        HollowPlayerClient.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onClientTickPre);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onPlayerTickPre);
@@ -83,6 +84,9 @@ public final class BleachClient {
         event.registerAbove(VanillaGuiLayers.HOTBAR, ReiryokuHud.ID, ReiryokuHud::render);
         event.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, JinzenOverlay.ID, JinzenOverlay::render);
         event.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, QuincyClient.POISON_LAYER_ID, QuincyClient::renderPoison);
+        // Registered last, so it goes straight above vanilla's camera overlays, beneath Jinzen and the poison.
+        event.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, HollowPlayerClient.MASK_EDGE_LAYER_ID,
+                HollowPlayerClient::renderMaskEdge);
     }
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
@@ -95,6 +99,7 @@ public final class BleachClient {
         event.register(ZanpakutoKeys.TECHNIQUE);
         event.register(QuincyClient.BLUT_KEY);
         event.register(QuincyClient.FORM_KEY);
+        event.register(HollowKeys.DEVOUR);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
@@ -160,15 +165,17 @@ public final class BleachClient {
     }
 
     /**
-     * Adds the chain and mask layer, the sheathed blade, Blut Vene's veins and the Quincy arts (the
-     * Sanrei Glove, Letzt Stil's burning lines, and Vollständig's wings and halo) to both player
-     * models (wide and slim arms). The sheath takes the look of the blade the player carries, and the
-     * arts the look of the Quincy, as their appearance tells.
+     * Adds a Hollow's body (the hole, dark forearms and claws), the chain and mask layer, the sheathed
+     * blade, Blut Vene's veins and the Quincy arts (the Sanrei Glove, Letzt Stil's burning lines, and
+     * Vollständig's wings and halo) to both player models (wide and slim arms). The body goes under the
+     * mask. The sheath takes the look of the blade the player carries, and the arts the look of the
+     * Quincy, as their appearance tells.
      */
     private static void addLayers(EntityRenderersEvent.AddLayers event) {
         for (PlayerSkin.Model skin : event.getSkins()) {
             EntityRenderer<? extends Player> renderer = event.getSkin(skin);
             if (renderer instanceof PlayerRenderer playerRenderer) {
+                playerRenderer.addLayer(new HollowBodyLayer(playerRenderer));
                 playerRenderer.addLayer(new SoulLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new SayaLayer<>(playerRenderer,
                         player -> SheathLook.forModel(ClientSouls.appearance(player).sheathModel())));
@@ -207,6 +214,7 @@ public final class BleachClient {
 
         ZanpakutoKeys.tick(minecraft);
         QuincyClient.tick(minecraft);
+        HollowKeys.tick(minecraft);
 
         if (minecraft.level != null) {
             SpiritShimmer.tick(minecraft);

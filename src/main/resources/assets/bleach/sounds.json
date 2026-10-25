@@ -386,6 +386,65 @@
       }
     ]
   },
+  "player.hollow.devour": {
+    "subtitle": "subtitles.bleach.player.hollow.devour",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ravager/bite1",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/ravager/bite2",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/ravager/bite3",
+        "pitch": 0.8
+      }
+    ]
+  },
+  "player.hollow.pang": {
+    "subtitle": "subtitles.bleach.player.hollow.pang",
+    "sounds": [
+      {
+        "name": "minecraft:mob/warden/heartbeat_1",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/warden/heartbeat_2",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/warden/heartbeat_3",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/warden/heartbeat_4",
+        "pitch": 0.6
+      }
+    ]
+  },
+  "player.hollow.scent": {
+    "subtitle": "subtitles.bleach.player.hollow.scent",
+    "sounds": [
+      {
+        "name": "minecraft:mob/fox/sniff1",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/fox/sniff2",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/fox/sniff3",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/fox/sniff4",
+        "pitch": 0.6
+      }
+    ]
+  },
   "item.quincy_cross.charged": {
     "subtitle": "subtitles.bleach.item.quincy_cross.charged",
     "sounds": [

@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -20,7 +21,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The instructor at the Academy: performs Konsō for a Plus, enrolls souls that have passed on, sits
- * students' exams, and hands out Asauchi. He cannot be hurt or moved, so the Academy always works:
+ * students' exams, hands out Asauchi, and cleanses a Hollow who comes to him instead of to its prey,
+ * breaking its mask with his blade. He cannot be hurt or moved, so the Academy always works:
  * whatever pulls, carries or pushes him away from where he first stood, he is back there the next
  * tick. Only a teleport by command moves him for good.
  */
@@ -42,12 +44,16 @@ public final class AcademyInstructor extends ShinigamiNpc {
     }
 
     /**
-     * An awakened Quincy the Academy may not take in (a living Human who is no Substitute, or a
-     * Rukongai soul not yet enrolled) is turned away. Everyone else is seen for what they are: a
-     * Substitute or a living Human, a student or a Rukongai soul, or a Shinigami.
+     * A Hollow is offered his blade, unless the server says not (an Arrancar never is). An awakened
+     * Quincy the Academy may not take in (a living Human who is no Substitute, or a Rukongai soul not
+     * yet enrolled) is turned away. Everyone else is seen for what they are: a Substitute or a living
+     * Human, a student or a Rukongai soul, or a Shinigami.
      */
     @Override
     public DialogueView viewFor(SoulData visitor, long now) {
+        if (visitor.state() == SoulState.HOLLOW && BleachConfig.get(BleachConfig.INSTRUCTOR_PURIFIES)) {
+            return DialogueView.HOLLOW_PURIFY;
+        }
         DialogueView common = commonView(visitor);
         if (common != null) {
             return common;

@@ -62,7 +62,8 @@ public final class HollowLogic {
      * Whether Hollows hunt this creature: a player who can see them (not in creative or spectator
      * mode, and not a Hollow or Arrancar unless the server says so), a Plus spirit that is not
      * passing on, or the Quincy Hunter, who hunts them in turn, unless the server says not. The
-     * unaware are hunted only if the server says so; nothing else is ever prey.
+     * unaware are hunted only if the server says so; nothing else is ever prey. A Hollow also hunts
+     * its rival, the Hollow player that drew it (see {@link #isPreyFor}).
      */
     public static boolean isPrey(LivingEntity target) {
         if (target instanceof Player player) {
@@ -82,6 +83,23 @@ public final class HollowLogic {
             return hunter.isAlive() && BleachConfig.get(BleachConfig.HOLLOWS_HUNT_HUNTER);
         }
         return false;
+    }
+
+    /** Whether this Hollow hunts this creature: anything Hollows hunt ({@link #isPrey}), or its rival ({@link #isRival}). */
+    public static boolean isPreyFor(Hollow hunter, LivingEntity target) {
+        return isPrey(target) || isRival(hunter, target);
+    }
+
+    /**
+     * Whether this creature is the Hollow's rival: the Hollow player whose reiatsu drew it through a
+     * Garganta, alive and in survival or adventure mode, unless the server says rivals keep to
+     * themselves. Hollows tear at one another when they meet, and one that came for another Hollow
+     * came to feed.
+     */
+    public static boolean isRival(Hollow hunter, LivingEntity target) {
+        return BleachConfig.get(BleachConfig.RIVALS_HUNT_DRAWER) && target instanceof Player player && player.isAlive()
+                && HollowPlayerLogic.survivalRules(player) && player.getUUID().equals(hunter.drawer())
+                && HollowPlayerLogic.isHollowPlayer(player);
     }
 
     /**
@@ -114,12 +132,12 @@ public final class HollowLogic {
     /**
      * The chance a minute that a Garganta opens near this soul. It grows with the square root of
      * reiatsu up to a cap, then is likelier at night, for a Plus, while reiatsu is released, and for
-     * a soul whose constant-release zanpakutō is out for good. None for the unaware, for Hollows and
-     * Arrancar, or before the first Hollow.
+     * a soul whose constant-release zanpakutō is out for good. A Hollow draws them as a Human would,
+     * times the server's multiplier for Hollow players. None for the unaware, for Arrancar, or before
+     * the first Hollow.
      */
     public static double arrivalChancePerMinute(SoulData data, boolean night) {
-        if (!SoulLogic.isAware(data) || data.state() == SoulState.HOLLOW || data.state() == SoulState.ARRANCAR
-                || awaitsFirstHollow(data)) {
+        if (!SoulLogic.isAware(data) || data.state() == SoulState.ARRANCAR || awaitsFirstHollow(data)) {
             return 0.0;
         }
         double reiatsu = Math.max(data.maxReiryoku(), 1.0F);
@@ -136,6 +154,9 @@ public final class HollowLogic {
         }
         if (data.state() == SoulState.PLUS) {
             chance *= BleachConfig.get(BleachConfig.ARRIVAL_PLUS_MULTIPLIER);
+        }
+        if (data.state() == SoulState.HOLLOW) {
+            chance *= BleachConfig.get(BleachConfig.HOLLOW_ARRIVAL_MULTIPLIER);
         }
         return Math.min(1.0, chance);
     }

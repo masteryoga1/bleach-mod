@@ -145,9 +145,13 @@ public final class QuincyNpcEvents {
     /**
      * A Garganta opened for this soul of its own accord (not by command, and not the first Hollow):
      * the Hunter may follow it, if he is about at all, not already near, and not here too recently
-     * (see {@link QuincyNpcLogic#hunterArrives}). The soul is told someone else is hunting here.
+     * (see {@link QuincyNpcLogic#hunterArrives}). The soul is told someone else is hunting here. He
+     * never comes for a Hollow or an Arrancar: the soul that drew them is his quarry's kind.
      */
     public static void onNaturalArrival(ServerPlayer drawer, SoulData d, HollowKind kind, long now) {
+        if (d.state() == SoulState.HOLLOW || d.state() == SoulState.ARRANCAR) {
+            return;
+        }
         ServerLevel level = drawer.serverLevel();
         if (!BleachConfig.get(BleachConfig.HUNTER_ENABLED) || !QuincyNpcLogic.hunterMayCome(kind, false)
                 || hunterNear(level, drawer.position(), QuincyNpcLogic.NPC_SPACING) != null

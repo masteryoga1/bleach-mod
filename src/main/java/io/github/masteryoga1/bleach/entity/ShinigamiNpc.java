@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.HollowPlayerEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -148,6 +149,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
                     ShinigamiEvents.acceptPowerFrom(wounded, visitor);
                 }
             }
+            case PURIFY -> HollowPlayerEvents.purifyByInstructor(this, visitor);
         }
     }
 

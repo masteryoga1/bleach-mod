@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
 import io.github.masteryoga1.bleach.quincy.QuincyKey;
+import io.github.masteryoga1.bleach.soul.HollowKey;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenPage;
@@ -16,8 +17,11 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class BleachNetwork {
-    /** Bump when a payload changes shape, so mismatched clients are refused instead of breaking. */
-    private static final String VERSION = "9";
+    /**
+     * Bump when a payload changes shape, so mismatched clients are refused instead of breaking.
+     * 10: the Devour key, and the Hollow look in SoulAppearance.
+     */
+    private static final String VERSION = "10";
 
     private BleachNetwork() {
     }
@@ -41,7 +45,8 @@ public final class BleachNetwork {
                 .playToClient(OpenBloodlinePayload.TYPE, OpenBloodlinePayload.STREAM_CODEC, OpenBloodlinePayload::handle)
                 .playToServer(BloodlineChoicePayload.TYPE, BloodlineChoicePayload.STREAM_CODEC,
                         BloodlineChoicePayload::handle)
-                .playToServer(QuincyKeyPayload.TYPE, QuincyKeyPayload.STREAM_CODEC, QuincyKeyPayload::handle);
+                .playToServer(QuincyKeyPayload.TYPE, QuincyKeyPayload.STREAM_CODEC, QuincyKeyPayload::handle)
+                .playToServer(HollowKeyPayload.TYPE, HollowKeyPayload.STREAM_CODEC, HollowKeyPayload::handle);
     }
 
     /** Sends a player their own soul data and marks it as up to date. */
@@ -50,9 +55,12 @@ public final class BleachNetwork {
         data.clearDirty();
     }
 
-    /** Tells everyone tracking this player how their soul looks now. */
+    /**
+     * Tells everyone tracking this player how their soul looks now, and the player too: some of a
+     * Hollow's look (the jaw open as it devours, the mask cracked) is known only to the server.
+     */
     public static void broadcastAppearance(ServerPlayer player, SoulAppearance appearance) {
-        PacketDistributor.sendToPlayersTrackingEntity(player, new SoulAppearancePayload(player.getId(), appearance));
+        PacketDistributor.sendToPlayersTrackingEntityAndSelf(player, new SoulAppearancePayload(player.getId(), appearance));
     }
 
     /** Tells one player how another player's soul looks, when they start seeing them. */
@@ -129,5 +137,10 @@ public final class BleachNetwork {
     /** Tells the server a Quincy key was pressed. */
     public static void requestQuincyKey(QuincyKey key) {
         PacketDistributor.sendToServer(new QuincyKeyPayload(key));
+    }
+
+    /** Tells the server the Devour key went down (with the creature under the crosshair, or -1) or came up. */
+    public static void requestHollowKey(HollowKey key, int target) {
+        PacketDistributor.sendToServer(new HollowKeyPayload(key, target));
     }
 }

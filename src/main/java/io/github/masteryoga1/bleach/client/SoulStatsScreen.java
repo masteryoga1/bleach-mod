@@ -6,6 +6,9 @@ import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.BaitRecord;
+import io.github.masteryoga1.bleach.soul.DevourLogic;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
@@ -40,11 +43,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * The soul screen: state, reiryoku, the zanpakutō (or until it has a name, the Asauchi bond), Hollows
- * purified and slain and Pluses sent on, Hollow Bait crushed and contests with the Quincy Hunter,
- * Quincy blood (its reishi and Blut, the Hollow poison in it, souls destroyed and how rich the reishi
- * is here, how far its arts have come, and the Quincy Elder's lessons), stats with training progress,
- * awakened powers and what comes next.
+ * The soul screen: state, reiryoku, a Plus's Chain of Fate or a Hollow's soul hunger, the zanpakutō
+ * (or until it has a name, the Asauchi bond), Hollows purified and slain and Pluses sent on, Hollow
+ * Bait crushed and contests with the Quincy Hunter, the souls a Hollow has devoured and what they
+ * were, Quincy blood (its reishi and Blut, the Hollow poison in it, souls destroyed and how rich the
+ * reishi is here, how far its arts have come, and the Quincy Elder's lessons), stats with training
+ * progress, awakened powers and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -93,16 +97,19 @@ public final class SoulStatsScreen extends Screen {
         SoulData data = player.getData(SoulAttachments.SOUL);
         List<FormattedCharSequence> next = font.split(nextStep(player, data), PANEL_WIDTH);
         // Everything stays above the Done button: when the next step would reach it, the rows close up;
-        // when even the closed-up rows would, they close up to a line of text each and start higher;
-        // and what still does not fit of the next step is left out.
+        // when even the closed-up rows would, they close up to a line of text each and start higher; when
+        // those still would (the most a soul shows, such as a Hollow that was a Quincy), the two section
+        // headings go; and what still does not fit of the next step is left out.
         int bottom = height - DONE_TOP - 4;
         int y;
-        if (drawRows(null, player, data, TOP, LINE, GAP) + next.size() * font.lineHeight <= bottom) {
-            y = drawRows(graphics, player, data, TOP, LINE, GAP);
-        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0) <= bottom) {
-            y = drawRows(graphics, player, data, TOP, COMPACT_LINE, 0);
+        if (drawRows(null, player, data, TOP, LINE, GAP, true) + next.size() * font.lineHeight <= bottom) {
+            y = drawRows(graphics, player, data, TOP, LINE, GAP, true);
+        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0, true) <= bottom) {
+            y = drawRows(graphics, player, data, TOP, COMPACT_LINE, 0, true);
+        } else if (drawRows(null, player, data, TIGHT_TOP, TIGHT_LINE, 0, true) <= bottom) {
+            y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0, true);
         } else {
-            y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0);
+            y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0, false);
         }
         int left = width / 2 - PANEL_WIDTH / 2;
         for (FormattedCharSequence text : next) {
@@ -116,11 +123,13 @@ public final class SoulStatsScreen extends Screen {
 
     /**
      * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
-     * more between sections; with no {@code graphics}, only measures them.
+     * more between sections, and the stats and powers headings only with {@code headers}; with no
+     * {@code graphics}, only measures them.
      *
      * @return where the next step starts
      */
-    private int drawRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int top, int line, int gap) {
+    private int drawRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int top, int line, int gap,
+                         boolean headers) {
         int left = width / 2 - PANEL_WIDTH / 2;
         int y = top;
 
@@ -142,6 +151,13 @@ public final class SoulStatsScreen extends Screen {
                             ? "screen.bleach.soul.chain.encroaching" : "screen.bleach.soul.chain",
                     StringUtil.formatTickDuration(data.chainTicks(), TICKS_PER_SECOND)),
                     left, y, encroaching ? ENCROACHING : WHITE);
+            y += line;
+        } else if (data.state() == SoulState.HOLLOW && data.hollow().hungerStarted()) {
+            // In the chain's place, as a Hollow has no chain: red while the hunger is sharp.
+            float satiety = data.hollow().satiety();
+            boolean hungry = HollowPlayerLogic.band(satiety) != HollowPlayerLogic.Band.FED;
+            text(graphics, Component.translatable("screen.bleach.soul.hollow", (int) Math.floor(satiety)),
+                    left, y, hungry ? ENCROACHING : WHITE);
             y += line;
         }
         if (SoulLogic.isAware(data)) {
@@ -170,11 +186,19 @@ public final class SoulStatsScreen extends Screen {
                     bait.crushed(), bait.finales(), bait.won(), bait.lost()), left, y, GREY);
             y += line;
         }
+        HollowProgress hollow = data.hollow();
+        if (data.state() == SoulState.HOLLOW && hollow.meals() > 0) {
+            text(graphics, Component.translatable("screen.bleach.soul.hollow.souls",
+                    hollow.souls(), hollow.pluses(), hollow.totalHollows(), hollow.players()), left, y, GREY);
+            y += line;
+        }
         y = renderQuincy(graphics, player, data, left, y, line);
         y += gap;
 
-        text(graphics, Component.translatable("screen.bleach.soul.stats"), left, y, GOLD);
-        y += line;
+        if (headers) {
+            text(graphics, Component.translatable("screen.bleach.soul.stats"), left, y, GOLD);
+            y += line;
+        }
         int maxLevel = SoulLogic.maxStatLevel();
         for (Stat stat : Stat.values()) {
             if (graphics != null) {
@@ -191,8 +215,10 @@ public final class SoulStatsScreen extends Screen {
         }
         y += gap;
 
-        text(graphics, Component.translatable("screen.bleach.soul.powers"), left, y, GOLD);
-        y += line;
+        if (headers) {
+            text(graphics, Component.translatable("screen.bleach.soul.powers"), left, y, GOLD);
+            y += line;
+        }
         boolean anyPower = false;
         for (PowerPath path : PowerPath.values()) {
             int tier = data.tier(path);
@@ -370,20 +396,37 @@ public final class SoulStatsScreen extends Screen {
 
     /**
      * What this soul can do next. A Plus in the Overworld who was told where the Academy is gets its
-     * direction too.
+     * direction too, and a Plus who could gnaw its own chain is told it can, with the Devour key. A
+     * Hollow is told how to feed with that key and, once it has, how many souls are within it.
      */
     private static Component nextStep(Player player, SoulData data) {
         String key = ShinigamiLogic.nextStepKey(data, player.level().getGameTime());
-        if (key.equals("plus") && data.shinigami().academyPos().isPresent()
-                && player.level().dimension() == Level.OVERWORLD) {
+        Component devour = HollowKeys.DEVOUR.getTranslatedKeyMessage();
+        if (key.equals("hollow")) {
+            return Component.translatable("screen.bleach.soul.next.hollow", devour);
+        }
+        if (key.equals("hollow.fed")) {
+            return Component.translatable("screen.bleach.soul.next.hollow.fed", devour, data.hollow().souls());
+        }
+        if (!key.equals("plus")) {
+            return Component.translatable("screen.bleach.soul.next." + key);
+        }
+        Component plus;
+        if (data.shinigami().academyPos().isPresent() && player.level().dimension() == Level.OVERWORLD) {
             BlockPos academy = data.shinigami().academyPos().get();
             double dx = academy.getX() + 0.5 - player.getX();
             double dz = academy.getZ() + 0.5 - player.getZ();
-            return Component.translatable("screen.bleach.soul.next.plus.academy",
+            plus = Component.translatable("screen.bleach.soul.next.plus.academy",
                     Component.translatable(ShinigamiLogic.compassKey(dx, dz)),
                     ShinigamiLogic.roundedDistance(Math.sqrt(dx * dx + dz * dz)));
+        } else {
+            plus = Component.translatable("screen.bleach.soul.next.plus");
         }
-        return Component.translatable("screen.bleach.soul.next." + key);
+        // Only where the server would let it gnaw: not for a Quincy, nor with Hollowfication or gnawing off.
+        if (DevourLogic.gnawRefusal(player, data) == DevourLogic.Gnaw.GNAWING) {
+            return plus.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.plus.gnaw", devour));
+        }
+        return plus;
     }
 
     @Override

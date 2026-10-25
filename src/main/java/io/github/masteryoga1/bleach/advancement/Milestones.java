@@ -3,6 +3,8 @@ package io.github.masteryoga1.bleach.advancement;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.quincy.QuincyStage;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
@@ -111,6 +113,14 @@ public final class Milestones {
     public static final String RANSOTENGAI = "ransotengai";
     /** Wearing the Wandenreich coat, trousers and boots. */
     public static final String WANDENREICH = "wandenreich";
+    /** Devoured a soul as a Hollow. Granted when it happens and by {@link #check}, as is the one below. */
+    public static final String DEVOURED = "devoured";
+    /** Devoured a Hollow, mob or player. */
+    public static final String CANNIBAL = "cannibal";
+    /** Holds {@link HollowPlayerLogic#SOULS_WITHIN} devoured souls. */
+    public static final String SOULS_WITHIN = "souls_within";
+    /** A Hollow cleansed back into a soul, by the Academy's instructor or a Shinigami's blade. Granted when it happens. */
+    public static final String CLEANSED = "cleansed";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -203,6 +213,17 @@ public final class Milestones {
         }
         if (arts.stage() == QuincyStage.RESTORED) {
             trigger.trigger(player, RESTORED);
+        }
+        // Read from the record, so souls set by command count too.
+        HollowProgress hollow = data.hollow();
+        if (hollow.meals() > 0) {
+            trigger.trigger(player, DEVOURED);
+        }
+        if (hollow.totalHollows() > 0) {
+            trigger.trigger(player, CANNIBAL);
+        }
+        if (hollow.souls() >= HollowPlayerLogic.SOULS_WITHIN) {
+            trigger.trigger(player, SOULS_WITHIN);
         }
     }
 

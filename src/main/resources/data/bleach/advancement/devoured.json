@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:hollow",
+  "display": {
+    "icon": {
+      "id": "minecraft:bone"
+    },
+    "title": {
+      "translate": "advancements.bleach.devoured.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.devoured.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "devoured": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "devoured"
+      }
+    }
+  }
+}

@@ -1,6 +1,8 @@
 {
   "values": [
     "bleach:encroachment",
-    "bleach:soul_destruction"
+    "bleach:soul_destruction",
+    "bleach:devoured",
+    "bleach:soul_hunger"
   ]
 }

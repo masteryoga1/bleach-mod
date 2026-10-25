@@ -80,6 +80,12 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> PLAYER_VOLLSTANDIG = fixed("player.vollstandig", 32.0F);
     /** Sklaverei starting to draw in the reishi around its user. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SKLAVEREI = variable("player.sklaverei");
+    /** A Hollow player devouring a soul, and gnawing its own chain. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HOLLOW_DEVOUR = variable("player.hollow.devour");
+    /** The heartbeat of soul hunger, played to the hungry Hollow alone. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HOLLOW_PANG = variable("player.hollow.pang");
+    /** A hungry Hollow smelling a soul, played to it alone. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HOLLOW_SCENT = variable("player.hollow.scent");
 
     private ModSounds() {
     }

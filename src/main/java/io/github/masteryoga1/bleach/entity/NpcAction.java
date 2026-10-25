@@ -29,7 +29,9 @@ public enum NpcAction {
     /** The Elder's arrow beside the heart, which brings a sealed power back. */
     RESTORE(DialogueView.ELDER_RESTORE),
     /** The Quincy Hunter's contest: whoever destroys more Hollows. */
-    CONTEST(DialogueView.HUNTER_CHALLENGE, DialogueView.HUNTER_RIVALRY);
+    CONTEST(DialogueView.HUNTER_CHALLENGE, DialogueView.HUNTER_RIVALRY),
+    /** The instructor's blade through a Hollow player's mask. */
+    PURIFY(DialogueView.HOLLOW_PURIFY);
 
     private static final IntFunction<NpcAction> BY_ID =
             ByIdMap.continuous(NpcAction::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);
