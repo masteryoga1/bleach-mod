@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.Menos;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
@@ -19,6 +20,8 @@ import net.minecraft.network.chat.numbers.StyledFormat;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.DisplaySlot;
 import net.minecraft.world.scores.Objective;
 import net.minecraft.world.scores.ReadOnlyScoreInfo;
@@ -32,6 +35,9 @@ import net.neoforged.neoforge.client.event.RenderPlayerEvent;
  * scaled the model by the time {@link #scale} runs, so each form only fits its model to the player's box,
  * with the mask on the eyes: a Gillian's at nine tenths of its height, an Adjuchas's out in front of its
  * eyes, where blows to the mask are looked for, with the beast's hindquarters trailing behind the box.
+ * The mask stays on the eyes as the player's pose lowers them: a crouching body is drawn smaller, a
+ * swimming or gliding Gillian lies down as the player model does, and an Adjuchas, already on all fours,
+ * sinks instead.
  *
  * <p>Held items, armour (which Hollows cannot wear), the cape, the Hollow mask and every other layer of the
  * player model are not drawn on these bodies. A Vasto Lorde keeps the player model, with bone over it
@@ -60,13 +66,16 @@ public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClie
     private final ResourceLocation texture;
     private final float fit;
     private final float backShift;
+    /** Whether the form stands on two legs, as the player model does, and so lies down as it does. */
+    private final boolean upright;
 
     private MenosPlayerRenderer(EntityRendererProvider.Context context, EntityModel<AbstractClientPlayer> model,
-                                HollowKind kind, float fit, float backShift) {
+                                HollowKind kind, float fit, float backShift, boolean upright) {
         super(context, model, 0.5F);
         this.texture = kind.texture();
         this.fit = fit;
         this.backShift = backShift;
+        this.upright = upright;
         addLayer(new MaskLayer(this, kind));
     }
 
@@ -74,10 +83,10 @@ public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClie
     public static void build(EntityRendererProvider.Context context) {
         gillian = new MenosPlayerRenderer(context,
                 new GillianModel<AbstractClientPlayer>(context.bakeLayer(BleachModelLayers.GILLIAN)),
-                HollowKind.GILLIAN, GILLIAN_FIT, 0.0F);
+                HollowKind.GILLIAN, GILLIAN_FIT, 0.0F, true);
         adjuchas = new MenosPlayerRenderer(context,
                 new AdjuchasModel<AbstractClientPlayer>(context.bakeLayer(BleachModelLayers.ADJUCHAS)),
-                HollowKind.ADJUCHAS, ADJUCHAS_FIT, ADJUCHAS_BACK_SHIFT);
+                HollowKind.ADJUCHAS, ADJUCHAS_FIT, ADJUCHAS_BACK_SHIFT, false);
     }
 
     /**
@@ -146,12 +155,61 @@ public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClie
     }
 
     /**
-     * The model fitted to the player's box, which the player's size has already scaled. Model space is
-     * upside down here, so +z is towards the back.
+     * A swimming or gliding Gillian lies down as the player model does ({@code PlayerRenderer}'s tilts); an
+     * Adjuchas sinks by as much as the pose lowers the eyes instead. Units here are the player's own, before
+     * its size.
+     */
+    @Override
+    protected void setupRotations(AbstractClientPlayer player, PoseStack poseStack, float bob, float yBodyRot,
+                                  float partialTick, float scale) {
+        super.setupRotations(player, poseStack, bob, yBodyRot, partialTick, scale);
+        if (upright) {
+            lieDown(player, poseStack, partialTick);
+        } else if (!player.isCrouching()) {
+            // The dying pose keeps the standing eyes, so a falling beast does not sink.
+            float sunk = player.getEyeHeight(Pose.STANDING) - player.getEyeHeight();
+            if (sunk > 0.0F) {
+                poseStack.translate(0.0F, -sunk / scale, 0.0F);
+            }
+        }
+    }
+
+    private static void lieDown(AbstractClientPlayer player, PoseStack poseStack, float partialTick) {
+        float swim = player.getSwimAmount(partialTick);
+        float pitch = player.getViewXRot(partialTick);
+        if (player.isFallFlying()) {
+            float flight = (float) player.getFallFlyingTicks() + partialTick;
+            if (!player.isAutoSpinAttack()) {
+                float tilt = Mth.clamp(flight * flight / 100.0F, 0.0F, 1.0F);
+                poseStack.mulPose(Axis.XP.rotationDegrees(tilt * (-90.0F - pitch)));
+            }
+            Vec3 view = player.getViewVector(partialTick);
+            Vec3 motion = player.getDeltaMovementLerped(partialTick);
+            double motionSqr = motion.horizontalDistanceSqr();
+            double viewSqr = view.horizontalDistanceSqr();
+            if (motionSqr > 0.0 && viewSqr > 0.0) {
+                double cos = (motion.x * view.x + motion.z * view.z) / Math.sqrt(motionSqr * viewSqr);
+                double side = motion.x * view.z - motion.z * view.x;
+                poseStack.mulPose(Axis.YP.rotation((float) (Math.signum(side) * Math.acos(cos))));
+            }
+        } else if (swim > 0.0F) {
+            poseStack.mulPose(Axis.XP.rotationDegrees(Mth.lerp(swim, 0.0F, player.isInWater() ? -90.0F - pitch : -90.0F)));
+            if (player.isVisuallySwimming()) {
+                poseStack.translate(0.0F, -1.0F, 0.3F);
+            }
+        }
+    }
+
+    /**
+     * The model fitted to the player's box, which the player's size has already scaled, and drawn smaller
+     * while crouching, by as much as that lowers the eyes. Model space is upside down here, so +z is
+     * towards the back.
      */
     @Override
     protected void scale(AbstractClientPlayer player, PoseStack poseStack, float partialTick) {
-        poseStack.scale(fit, fit, fit);
+        float size = player.isCrouching()
+                ? fit * player.getEyeHeight(Pose.CROUCHING) / player.getEyeHeight(Pose.STANDING) : fit;
+        poseStack.scale(size, size, size);
         poseStack.translate(0.0F, 0.0F, backShift / fit);
     }
 

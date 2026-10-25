@@ -996,6 +996,8 @@ public final class HollowPlayerTests {
         helper.assertTrue(data.maxReiryoku() > maxBefore, "the first player grew nothing");
         helper.assertTrue(data.hunt().lastPlayerKillGrowthAt() == now, "the growth was stamped at "
                 + data.hunt().lastPlayerKillGrowthAt());
+        helper.assertTrue(data.hollow().evolution().tierHollows() == 1,
+                "the first player counted " + data.hollow().evolution().tierHollows() + " Hollows for the form");
 
         // The same soul again, soon after: only the souls it would lose pass over, and nothing grows.
         float maxAfter = data.maxReiryoku();
@@ -1003,6 +1005,8 @@ public final class HollowPlayerTests {
         helper.assertTrue(data.hollow().souls() == 29, "the second player gave " + (data.hollow().souls() - 19) + " souls");
         helper.assertTrue(data.hollow().players() == 2, "the players devoured are " + data.hollow().players());
         helper.assertTrue(data.maxReiryoku() == maxAfter, "the second player grew the maximum to " + data.maxReiryoku());
+        helper.assertTrue(data.hollow().evolution().tierHollows() == 1,
+                "the second player counted for the form: " + data.hollow().evolution().tierHollows());
         helper.succeed();
     }
 

@@ -236,8 +236,8 @@ public final class DevourEvents {
     /**
      * What a meal gives its devourer: soul hunger, the count of what it has devoured, reiryoku, health,
      * growth and souls, a Hollow's experience, and its road as a Menos (see {@link MenosEvolution#afterMeal}).
-     * A player feeds growth and the base souls only once in a while, as a player kill does, but a Hollow
-     * player's lost souls always pass to its devourer.
+     * A player feeds growth, the base souls and the road as a Menos only once in a while, as a player kill
+     * does, but a Hollow player's lost souls always pass to its devourer.
      */
     public static void reward(Player devourer, SoulData data, DevourLogic.Meal meal, long now) {
         HollowBody.addSatiety(data, meal.satiety());
@@ -259,7 +259,9 @@ public final class DevourEvents {
         int gained = meal.stolenSouls();
         boolean playerPrey = meal.prey() == DevourLogic.Prey.PLAYER;
         HuntRecord hunt = data.hunt();
-        if (!playerPrey || HollowLogic.playerKillGrows(hunt, now)) {
+        // The same soul again, soon after, comes back as it was: it feeds nothing that grows.
+        boolean fresh = !playerPrey || HollowLogic.playerKillGrows(hunt, now);
+        if (fresh) {
             if (playerPrey) {
                 data.setHunt(hunt.withLastPlayerKillGrowthAt(now));
             }
@@ -273,8 +275,10 @@ public final class DevourEvents {
         if (meal.prey() == DevourLogic.Prey.HOLLOW && kind != null) {
             devourer.giveExperiencePoints(kind.xp);
         }
-        // Last, so a soul that rises is measured on everything this meal gave it.
-        MenosEvolution.afterMeal(devourer, data, meal, now);
+        // Last, so a soul that rises is measured on everything this meal gave it. A stale player meal counts
+        // for no form and holds off no regression, or two Hollows could raise each other by turns.
+        MenosEvolution.afterMeal(devourer, data, fresh ? meal : new DevourLogic.Meal(meal.prey(), null, meal.reiatsu(),
+                meal.satiety(), meal.souls(), meal.stolenSouls(), false), now);
 
         if (devourer instanceof ServerPlayer server) {
             int mark = HollowPlayerLogic.stirring(before, after);

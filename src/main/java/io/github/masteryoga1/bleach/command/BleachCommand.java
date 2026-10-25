@@ -27,6 +27,7 @@ import io.github.masteryoga1.bleach.soul.BaitSites;
 import io.github.masteryoga1.bleach.soul.DevourEvents;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HollowBody;
+import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
@@ -903,6 +904,7 @@ public final class BleachCommand {
             QuincyRansotengai.closeTrial(player, SoulLogic.get(player));
             DevourEvents.stopDevour(player, SoulLogic.get(player), null, player.level().getGameTime());
             DevourEvents.stopGnaw(SoulLogic.get(player));
+            HollowCero.cancel(player, SoulLogic.get(player));
             HollowBody.leaveBodyIfWorn(player, SoulLogic.get(player));
             SoulData fresh = new SoulData();
             QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);

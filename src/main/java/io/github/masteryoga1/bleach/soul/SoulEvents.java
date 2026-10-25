@@ -7,6 +7,9 @@ import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
@@ -43,6 +46,12 @@ public final class SoulEvents {
     /** A Plus who meditates this long is reminded which way the Academy lies, once per sitting. */
     private static final int ACADEMY_REMINDER_TICKS = 40;
     private static final float CLOSE_CALL_HEALTH_FRACTION = 0.3F;
+    /**
+     * The health of a player leaving the End by its exit portal, which builds the player anew with all it
+     * had (see {@link #onClone}) but before the stat modifiers are back on it, so a Menos would be cut down
+     * to 20. Held only until {@link #onRespawn}, in the same call, has put them back.
+     */
+    private static final Map<UUID, Float> HEALTH_KEPT = new HashMap<>();
 
     private SoulEvents() {
     }
@@ -284,6 +293,10 @@ public final class SoulEvents {
     private static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             refresh(player);
+            Float kept = HEALTH_KEPT.remove(player.getUUID());
+            if (kept != null) {
+                player.setHealth(Math.min(kept, player.getMaxHealth()));
+            }
         }
     }
 
@@ -311,7 +324,10 @@ public final class SoulEvents {
         BleachNetwork.syncSoul(player, data);
     }
 
-    /** The soul survives death, changed by it: see {@link SoulLogic#afterDeath}. */
+    /**
+     * The soul survives death, changed by it: see {@link SoulLogic#afterDeath}. A player leaving the End
+     * keeps its soul as it was, and its health too (see {@link #HEALTH_KEPT}).
+     */
     private static void onClone(PlayerEvent.Clone event) {
         if (event.isWasDeath()) {
             SoulData next = SoulLogic.afterDeath(SoulLogic.get(event.getOriginal()));
@@ -319,6 +335,8 @@ public final class SoulEvents {
                 next.diedAt = event.getOriginal().position();
             }
             event.getEntity().setData(SoulAttachments.SOUL, next);
+        } else {
+            HEALTH_KEPT.put(event.getEntity().getUUID(), event.getOriginal().getHealth());
         }
     }
 }
