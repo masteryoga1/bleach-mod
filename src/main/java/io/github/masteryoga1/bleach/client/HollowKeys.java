@@ -2,13 +2,17 @@ package io.github.masteryoga1.bleach.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.HollowKey;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.MenosBody;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import java.util.List;
+import javax.annotation.Nullable;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -19,16 +23,23 @@ import net.neoforged.neoforge.entity.PartEntity;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * The Devour key (J). A Hollow holds it on a weakened soul to seize and devour it, and a Plus holds it to
- * gnaw at its own Chain of Fate; pressed while sneaking, it turns a Hollow's sight on or off instead. The
- * press goes to the server with the creature under the crosshair, and letting go (or a screen opening,
- * or dying) goes after it, so a hold lasts as long as the key does. The server decides everything and
- * says why when it refuses; this only sends the presses, and keeps a guess at the hold for the HUD.
- * Nothing is sent for a soul that is neither a Hollow nor a Plus.
+ * The Hollow keys. Devour (J): a Hollow holds it on a weakened soul to seize and devour it, and a Plus
+ * holds it to gnaw at its own Chain of Fate; pressed while sneaking, it turns a Hollow's sight on or off
+ * instead. The press goes to the server with the creature under the crosshair, and letting go (or a
+ * screen opening, or dying) goes after it, so a hold lasts as long as the key does. Cero (Y): a Hollow
+ * holds it to gather a Cero at its mouth and lets go to fire it; a screen opening, dying or no longer
+ * being a Hollow while it is held lets the Cero fizzle instead. The server decides everything and says
+ * why when it refuses (a plain Hollow is told only a Menos can gather one); this only sends the presses,
+ * and keeps a guess at the hold and the gathering Cero for the HUD. Nothing is sent for a soul that is
+ * neither a Hollow nor a Plus, and nothing for the Cero key but a Hollow's.
+ *
+ * <p>It also tells {@link MenosBody} how tall the giants this client sees stand, every second.
  */
 public final class HollowKeys {
     public static final KeyMapping DEVOUR = new KeyMapping("key.bleach.devour", KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J, BleachClient.KEY_CATEGORY);
+    public static final KeyMapping CERO = new KeyMapping("key.bleach.cero", KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Y, BleachClient.KEY_CATEGORY);
 
     /**
      * How long the HUD trusts a hold the server has not yet shown it: past this, a hold whose jaw never
@@ -36,6 +47,8 @@ public final class HollowKeys {
      * the look to come back on a slow connection.
      */
     private static final int CONFIRM_TICKS = 10;
+    /** Every so many ticks this client tells {@link MenosBody} about the giants it sees, as the server does. */
+    private static final int GIANT_REFRESH_TICKS = 20;
 
     /** Client ticks counted here: the clock the devour bar runs on. */
     private static int ticks;
@@ -46,6 +59,13 @@ public final class HollowKeys {
     private static int holdStartedAt;
     /** The creature under the crosshair when the press was sent, or -1 for none (the server looks nearby). */
     private static int holdTargetId = -1;
+    /** Whether the Cero key was down last tick, so holding it (and key repeat) sends only once. */
+    private static boolean ceroWasDown;
+    /** Whether a Cero press was sent and neither its release nor a cancel yet. */
+    private static boolean ceroHolding;
+    /** This player's own gathering Cero, once the server's beam has come; looked for each tick until then. */
+    @Nullable
+    private static CeroBeam ownCero;
 
     private HollowKeys() {
     }
@@ -53,6 +73,10 @@ public final class HollowKeys {
     /** Called every client tick. */
     static void tick(Minecraft minecraft) {
         ticks++;
+        if (ticks % GIANT_REFRESH_TICKS == 0) {
+            // With no world, none: so a giant seen in a world left behind stops counting.
+            MenosBody.noteGiants(minecraft.level != null ? minecraft.level.players() : List.of(), true);
+        }
         // The hold goes by whether the key is down; a click only catches a tap too quick to see held.
         boolean clicked = false;
         while (DEVOUR.consumeClick()) {
@@ -61,10 +85,19 @@ public final class HollowKeys {
         boolean down = DEVOUR.isDown();
         boolean rising = (down || clicked) && !wasDown;
         wasDown = down;
+        boolean ceroClicked = false;
+        while (CERO.consumeClick()) {
+            ceroClicked = true;
+        }
+        boolean ceroDown = CERO.isDown();
+        boolean ceroRising = (ceroDown || ceroClicked) && !ceroWasDown;
+        ceroWasDown = ceroDown;
 
         LocalPlayer player = minecraft.player;
         if (player == null || minecraft.getConnection() == null) {
             holding = false;
+            ceroHolding = false;
+            ownCero = null;
             return;
         }
         SoulData data = player.getData(SoulAttachments.SOUL);
@@ -92,6 +125,62 @@ public final class HollowKeys {
                 holdTargetId = targetId;
             }
         }
+        tickCero(minecraft, player, data, ceroDown, ceroRising);
+    }
+
+    /**
+     * The Cero key: down sends the start, and up the release, which fires it; a screen opening, dying or no
+     * longer being a Hollow cancels it. A tap is let go before anything has gathered, so it fizzles. While the
+     * key is held, this looks for the player's own gathering Cero, so the HUD and the model can show it.
+     */
+    private static void tickCero(Minecraft minecraft, LocalPlayer player, SoulData data, boolean down, boolean rising) {
+        boolean hollow = data.isInitialized() && data.state() == SoulState.HOLLOW && !player.isSpectator();
+        // A screen opening releases every key, so check for one before taking the key's release as a shot.
+        if (ceroHolding && (minecraft.screen != null || !player.isAlive() || !hollow)) {
+            BleachNetwork.requestHollowKey(HollowKey.CERO_CANCEL, -1);
+            ceroHolding = false;
+        } else if (ceroHolding && !down) {
+            BleachNetwork.requestHollowKey(HollowKey.CERO_RELEASE, -1);
+            ceroHolding = false;
+        }
+        if (rising && minecraft.screen == null && hollow && player.isAlive()) {
+            BleachNetwork.requestHollowKey(HollowKey.CERO, -1);
+            ceroHolding = true;
+            ownCero = null;
+        }
+        if (!ceroHolding) {
+            ownCero = null;
+        } else if (!gathering(ownCero, player)) {
+            ownCero = findOwnCero(player);
+        }
+    }
+
+    /** The player's own Cero that is gathering about its mouth, if the server has sent one. */
+    @Nullable
+    private static CeroBeam findOwnCero(LocalPlayer player) {
+        // The orb sits ahead of the eyes by a share of the player's size, so a box that grows with it holds it.
+        double reach = CeroBeam.LOOK_MUZZLE_AHEAD * player.getScale() + 1.0;
+        List<CeroBeam> found = player.level().getEntitiesOfClass(CeroBeam.class, player.getBoundingBox().inflate(reach),
+                beam -> gathering(beam, player));
+        return found.isEmpty() ? null : found.get(0);
+    }
+
+    /** Whether this Cero is the player's own, in its world, and still gathering. */
+    private static boolean gathering(@Nullable CeroBeam beam, LocalPlayer player) {
+        return beam != null && beam.isCharging() && beam.level() == player.level() && beam.owner() == player;
+    }
+
+    /**
+     * How far this client's own Cero has gathered, from 0 to 1, while the Cero key is held: the charging
+     * beam's own progress, which the server set going. 0 while nothing is gathering, so a refused press,
+     * a Cero that has fired or one that fizzled shows nothing.
+     */
+    public static float ceroProgress(float partialTick) {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (!ceroHolding || player == null || !gathering(ownCero, player)) {
+            return 0.0F;
+        }
+        return ownCero.chargeProgress(partialTick);
     }
 
     /**

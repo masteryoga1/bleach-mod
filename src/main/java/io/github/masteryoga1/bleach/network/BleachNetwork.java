@@ -20,8 +20,9 @@ public final class BleachNetwork {
     /**
      * Bump when a payload changes shape, so mismatched clients are refused instead of breaking.
      * 10: the Devour key, and the Hollow look in SoulAppearance.
+     * 11: the Cero keys, and the Menos record in HollowProgress.
      */
-    private static final String VERSION = "10";
+    private static final String VERSION = "11";
 
     private BleachNetwork() {
     }
@@ -139,7 +140,10 @@ public final class BleachNetwork {
         PacketDistributor.sendToServer(new QuincyKeyPayload(key));
     }
 
-    /** Tells the server the Devour key went down (with the creature under the crosshair, or -1) or came up. */
+    /**
+     * Tells the server the Devour key went down (with the creature under the crosshair, or -1) or came up, or
+     * the Cero key went down or came up, or a gathering Cero should fizzle (the target is then -1).
+     */
     public static void requestHollowKey(HollowKey key, int target) {
         PacketDistributor.sendToServer(new HollowKeyPayload(key, target));
     }

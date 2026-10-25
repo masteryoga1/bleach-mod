@@ -1242,6 +1242,34 @@ def hollow_player():
     return c
 
 
+def bone_plate(c, x0, y0, x1, y1):
+    """A plate of bone over x0..x1-1, y0..y1-1, shaded along its bottom row."""
+    c.rect(x0, y0, x1, y1 - 1, BONE)
+    c.rect(x0, y1 - 1, x1, y1, BONE_SHADE)
+
+
+def hollow_vasto_lorde():
+    """A Vasto Lorde's bone, drawn over a Hollow player's body (hollow_player) in the player skin layout: three
+    ribs each side of the chest hole, curving in round it, caps on the tops of the shoulders and plates down the
+    fronts of the shins, on the skin and on the jacket, sleeve and trouser layers alike. The hole itself and
+    everything else stay clear, so the body and the skin show through."""
+    c = Canvas(64, 64)
+    for top in (20, 36):  # body front, jacket front
+        holed = Canvas(64, 64)
+        hole(holed, 22, top + 3)  # where hollow_player draws the hole, which the ribs leave clear
+        for y in (top + 2, top + 5, top + 8):
+            for x in (20, 21, 22, 25, 26, 27):
+                if holed.get(x, y) == CLEAR:
+                    c.put(x, y, BONE if x in (20, 27) else BONE_SHADE)
+    # Right arm, right sleeve, left arm, left sleeve: the top face of each.
+    for u, v in ((44, 16), (44, 32), (36, 48), (52, 48)):
+        bone_plate(c, u, v, u + 4, v + 4)
+    # Right leg, right trouser leg, left leg, left trouser leg: the lower half of each front.
+    for x, y in ((4, 26), (4, 42), (20, 58), (4, 58)):
+        bone_plate(c, x, y, x + 4, y + 6)
+    return c
+
+
 def hollow_player_mask():
     """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
     between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
@@ -1380,6 +1408,7 @@ TEXTURES = {
     "entity/vollstandig.png": vollstandig,
     "entity/ginto_cast.png": ginto_cast,
     "entity/hollow_player.png": hollow_player,
+    "entity/hollow_vasto_lorde.png": hollow_vasto_lorde,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,

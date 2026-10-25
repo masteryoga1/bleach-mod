@@ -9,7 +9,9 @@ import io.github.masteryoga1.bleach.soul.BaitRecord;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
+import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
+import io.github.masteryoga1.bleach.soul.MenosEvolution;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
@@ -224,8 +226,12 @@ public final class SoulStatsScreen extends Screen {
             int tier = data.tier(path);
             if (tier > 0) {
                 anyPower = true;
-                text(graphics, Component.translatable("screen.bleach.soul.tier", path.displayName(), tier),
-                        left + 6, y, WHITE);
+                // A Hollow's tier is its form: Hollow, Gillian, Adjuchas or Vasto Lorde.
+                Component row = path == PowerPath.HOLLOW && HollowPlayerLogic.isHollow(data)
+                        ? Component.translatable("screen.bleach.soul.tier.hollow", path.displayName(),
+                                HollowTier.of(data).displayName())
+                        : Component.translatable("screen.bleach.soul.tier", path.displayName(), tier);
+                text(graphics, row, left + 6, y, WHITE);
                 y += line;
             }
         }
@@ -397,7 +403,9 @@ public final class SoulStatsScreen extends Screen {
     /**
      * What this soul can do next. A Plus in the Overworld who was told where the Academy is gets its
      * direction too, and a Plus who could gnaw its own chain is told it can, with the Devour key. A
-     * Hollow is told how to feed with that key and, once it has, how many souls are within it.
+     * Hollow is told how to feed with that key and, once it has, how many souls are within it. A Menos
+     * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
+     * how long it may go without a Hollow before it sinks back, wherever the server lets it.
      */
     private static Component nextStep(Player player, SoulData data) {
         String key = ShinigamiLogic.nextStepKey(data, player.level().getGameTime());
@@ -407,6 +415,10 @@ public final class SoulStatsScreen extends Screen {
         }
         if (key.equals("hollow.fed")) {
             return Component.translatable("screen.bleach.soul.next.hollow.fed", devour, data.hollow().souls());
+        }
+        Component menos = menosStep(key, data, devour);
+        if (menos != null) {
+            return menos;
         }
         if (!key.equals("plus")) {
             return Component.translatable("screen.bleach.soul.next." + key);
@@ -427,6 +439,37 @@ public final class SoulStatsScreen extends Screen {
             return plus.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.plus.gnaw", devour));
         }
         return plus;
+    }
+
+    /**
+     * The next step of a Menos, by its step key, or null for any other key. The counts are those the server
+     * last sent, read against the server's own settings, as the HUD reads them. Each Adjuchas step ends with
+     * the minutes left before it sinks back, unless the server has regression off.
+     */
+    @Nullable
+    private static Component menosStep(String key, SoulData data, Component devour) {
+        Component cero = HollowKeys.CERO.getTranslatedKeyMessage();
+        HollowProgress.Evolution evolution = data.hollow().evolution();
+        HollowTier.Regression regression = BleachConfig.get(BleachConfig.ADJUCHAS_REGRESSION);
+        Component step = switch (key) {
+            // In soft mode each fall back into a Gillian asks for as many Hollows again.
+            case "hollow.gillian" -> Component.translatable("screen.bleach.soul.next.hollow.gillian", devour, cero,
+                    evolution.tierHollows(), BleachConfig.get(BleachConfig.ADJUCHAS_HOLLOWS)
+                            * (regression == HollowTier.Regression.SOFT ? 1L + evolution.regressions() : 1L),
+                    evolution.tierMenos(), BleachConfig.get(BleachConfig.ADJUCHAS_MENOS));
+            case "hollow.adjuchas" -> Component.translatable("screen.bleach.soul.next.hollow.adjuchas", devour, cero,
+                    evolution.tierHollows(), BleachConfig.get(BleachConfig.VASTO_HOLLOWS), evolution.tierMenos(),
+                    BleachConfig.get(BleachConfig.VASTO_ADJUCHAS));
+            case "hollow.gillian.lost", "hollow.adjuchas.stalled", "hollow.adjuchas.full" ->
+                    Component.translatable("screen.bleach.soul.next." + key, devour, cero);
+            case "hollow.vasto_lorde" -> Component.translatable("screen.bleach.soul.next.hollow.vasto_lorde", cero);
+            default -> null;
+        };
+        if (step == null || !key.startsWith("hollow.adjuchas") || regression == HollowTier.Regression.OFF) {
+            return step;
+        }
+        return step.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.hollow.adjuchas.clock",
+                MenosEvolution.minutesLeft(data)));
     }
 
     @Override

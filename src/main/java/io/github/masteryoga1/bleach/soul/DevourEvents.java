@@ -61,9 +61,10 @@ public final class DevourEvents {
     }
 
     /**
-     * The Devour key, from {@link io.github.masteryoga1.bleach.network.HollowKeyPayload} on the server
-     * thread. A press starts a hold (a Hollow) or the gnawing (a Plus); letting go ends either; sneaking
-     * with it turns the Hollow sight on or off. The target id is only the client's hint.
+     * The Devour and Cero keys, from {@link io.github.masteryoga1.bleach.network.HollowKeyPayload} on the
+     * server thread. A press of the Devour key starts a hold (a Hollow) or the gnawing (a Plus); letting go
+     * ends either; sneaking with it turns the Hollow sight on or off. The target id is only the client's
+     * hint. The Cero key starts, fires or lets fizzle a Menos's Cero ({@link HollowCero}).
      */
     public static void onKey(ServerPlayer player, HollowKey key, int targetId) {
         if (!SoulLogic.hasSoul(player)) {
@@ -103,6 +104,17 @@ public final class DevourEvents {
                     toggleSight(player, data);
                 }
             }
+            case CERO -> {
+                if (player.isAlive() && !player.isSpectator() && HollowPlayerLogic.isHollow(data)) {
+                    HollowCero.Refusal refusal = HollowCero.start(player, data, now);
+                    if (refusal != null) {
+                        player.displayClientMessage(Component.translatable(refusal.messageKey())
+                                .withStyle(ChatFormatting.GRAY), true);
+                    }
+                }
+            }
+            case CERO_RELEASE -> HollowCero.release(player, data, now);
+            case CERO_CANCEL -> HollowCero.cancel(player, data);
         }
     }
 
@@ -141,6 +153,10 @@ public final class DevourEvents {
         }
         if (data.devourTargetId >= 0) {
             stopDevour(player, data, null, now);
+        }
+        // Jaws full of prey cannot gather a Cero: it fizzles, at no cost.
+        if (HollowCero.charging(data)) {
+            HollowCero.cancel(player, data);
         }
         data.devourTargetId = prey.getId();
         data.devourHeldTicks = 0;
@@ -219,8 +235,9 @@ public final class DevourEvents {
 
     /**
      * What a meal gives its devourer: soul hunger, the count of what it has devoured, reiryoku, health,
-     * growth and souls, and a Hollow's experience. A player feeds growth and the base souls only once in
-     * a while, as a player kill does, but a Hollow player's lost souls always pass to its devourer.
+     * growth and souls, a Hollow's experience, and its road as a Menos (see {@link MenosEvolution#afterMeal}).
+     * A player feeds growth and the base souls only once in a while, as a player kill does, but a Hollow
+     * player's lost souls always pass to its devourer.
      */
     public static void reward(Player devourer, SoulData data, DevourLogic.Meal meal, long now) {
         HollowBody.addSatiety(data, meal.satiety());
@@ -256,6 +273,8 @@ public final class DevourEvents {
         if (meal.prey() == DevourLogic.Prey.HOLLOW && kind != null) {
             devourer.giveExperiencePoints(kind.xp);
         }
+        // Last, so a soul that rises is measured on everything this meal gave it.
+        MenosEvolution.afterMeal(devourer, data, meal, now);
 
         if (devourer instanceof ServerPlayer server) {
             int mark = HollowPlayerLogic.stirring(before, after);

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -26,7 +27,8 @@ import org.joml.Vector3f;
  * last ticks. It is the vanilla beacon beam tinted, glows as brightly in the dark as at noon, and is seen
  * from inside as well as out. The entity gives the box it is culled by, which holds the whole beam, or
  * the orb with its motes, and is drawn from up to 128 blocks away; the unaware never see it, as with
- * every spirit (see {@code mixin.client}).
+ * every spirit (see {@code mixin.client}). A caster looking out through its own eyes does not see its own
+ * orb, which would sit in the camera (a player's HUD shows the gathering instead), only the fired beam.
  */
 public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
     public static final ResourceLocation BEAM_TEXTURE =
@@ -84,10 +86,17 @@ public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
                        MultiBufferSource buffer, int packedLight) {
         if (beam.isFired()) {
             renderBeam(beam, partialTick, poseStack, buffer);
-        } else {
+        } else if (!seenFromItsMouth(beam)) {
             renderCharge(beam, partialTick, poseStack, buffer);
         }
         super.render(beam, entityYaw, partialTick, poseStack, buffer, packedLight);
+    }
+
+    /** Whether the camera looks out through the eyes of the one gathering this Cero, in first person. */
+    private static boolean seenFromItsMouth(CeroBeam beam) {
+        Minecraft minecraft = Minecraft.getInstance();
+        LivingEntity owner = beam.owner();
+        return owner != null && owner == minecraft.getCameraEntity() && minecraft.options.getCameraType().isFirstPerson();
     }
 
     /** The gathering orb and the motes coming in to it. */

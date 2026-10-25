@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:souls_within",
+  "display": {
+    "icon": {
+      "id": "minecraft:bone_block"
+    },
+    "title": {
+      "translate": "advancements.bleach.gillian.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.gillian.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "gillian": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "gillian"
+      }
+    }
+  }
+}

@@ -221,6 +221,19 @@ public final class SoulData {
      * never dodges the pains.
      */
     int gnawTicks;
+    /**
+     * Ticks this Adjuchas has gone without a Hollow since the last whole minute was counted into the saved
+     * record, so the soul is re-sent once a minute and not every tick (see {@link MenosEvolution}).
+     */
+    int menosHungerTicks;
+    /** The Cero this Menos is gathering, by entity id, or -1 (see {@link HollowCero}). */
+    int ceroBeamId = -1;
+    /** Game time the Cero being gathered started, or {@link #NEVER}. */
+    long ceroStartedAt = NEVER;
+    /** Game time this Menos last fired a Cero, for the cooldown. */
+    long lastCeroAt = NEVER;
+    /** Game time a blow last cracked this Hollow's whole mask, or {@link #NEVER}: a fresh crack breaks a Cero's gather. */
+    long hollowFreshCrackAt = NEVER;
 
     public SoulData() {
     }

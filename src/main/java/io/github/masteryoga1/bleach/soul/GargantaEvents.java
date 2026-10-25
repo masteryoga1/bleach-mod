@@ -107,9 +107,10 @@ public final class GargantaEvents {
             return;
         }
         if (player.getRandom().nextDouble() < HollowLogic.arrivalChancePerCheck(data, level.isNight())) {
-            // A strong soul now and then draws a Menos Grande instead, while the server has room for one here.
-            HollowKind menos = Menos.arrivalKind(data.maxReiryoku(), player.getRandom().nextDouble(),
-                    player.getRandom().nextDouble());
+            // A strong soul now and then draws a Menos Grande instead, while the server has room for one here,
+            // and a Menos Hollow player more often, so the Menos it must devour to rise do come.
+            HollowKind menos = Menos.arrivalKind(data.maxReiryoku(), HollowTier.of(data).isMenos(),
+                    player.getRandom().nextDouble(), player.getRandom().nextDouble());
             openArrival(player, data, menos != null && Menos.mayArrive(level, player.position()) ? menos : null, now, false);
         }
     }

@@ -27,11 +27,11 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * Playing as a Hollow, on the events: the body's tick, the pause in healing after a hurt, the food,
- * armour and villagers a Hollow is refused, the claws put right before a blow, a Hollow devoured by
- * the Hollow that killed it, and the way back to being a soul, by the Academy instructor's blade or a
- * purifying blow. The rules are in {@link HollowPlayerLogic} and what they do to the body in
- * {@link HollowBody}. The refusals run on both sides, so the client does not first show what the
- * server then undoes.
+ * armour and villagers a Hollow is refused, what a mindless Gillian cannot do, the claws put right
+ * before a blow, a Hollow devoured by the Hollow that killed it, and the way back to being a soul, by
+ * the Academy instructor's blade or a purifying blow. The rules are in {@link HollowPlayerLogic} and
+ * what they do to the body in {@link HollowBody} and {@link MenosBody}. The refusals run on both sides,
+ * so the client does not first show what the server then undoes.
  */
 public final class HollowPlayerEvents {
     private HollowPlayerEvents() {
@@ -42,11 +42,14 @@ public final class HollowPlayerEvents {
         bus.addListener(HollowPlayerEvents::onDamageTaken);
         bus.addListener(HollowPlayerEvents::onUseItemStart);
         bus.addListener(HollowPlayerEvents::onRightClickItem);
+        bus.addListener(HollowPlayerEvents::onRightClickBlock);
         bus.addListener(HollowPlayerEvents::onEntityInteract);
+        bus.addListener(HollowPlayerEvents::onEntityInteractSpecific);
         bus.addListener(HollowPlayerEvents::onAttackEntity);
         // Low, after the soul's own death handlers have had their say, and never for a death that was cancelled.
         bus.addListener(EventPriority.LOW, HollowPlayerEvents::onDeath);
         bus.addListener(HollowPlayerEvents::onRespawn);
+        MenosBody.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -63,8 +66,15 @@ public final class HollowPlayerEvents {
         }
     }
 
-    /** Food is ash to a Hollow: it cannot start to eat or drink it (see {@link HollowPlayerLogic#cannotConsume}). */
+    /**
+     * Food is ash to a Hollow: it cannot start to eat or drink it (see {@link HollowPlayerLogic#cannotConsume}).
+     * A mindless Gillian cannot start using anything.
+     */
     private static void onUseItemStart(LivingEntityUseItemEvent.Start event) {
+        if (event.getEntity() instanceof Player player && refusedMindless(player)) {
+            event.setCanceled(true);
+            return;
+        }
         if (event.getEntity() instanceof Player player && HollowPlayerLogic.isHollowPlayer(player)
                 && HollowPlayerLogic.cannotConsume(event.getItem(), player)) {
             event.setCanceled(true);
@@ -74,10 +84,16 @@ public final class HollowPlayerEvents {
 
     /**
      * Right-click wearing of armour a Hollow's hide refuses. The armour slots already refuse it (see
-     * LivingEntityMixin); in the off hand, this would otherwise swap the two hands.
+     * LivingEntityMixin); in the off hand, this would otherwise swap the two hands. A mindless Gillian
+     * cannot use any item.
      */
     private static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         Player player = event.getEntity();
+        if (refusedMindless(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+            return;
+        }
         ItemStack stack = event.getItemStack();
         Equipable equipable = Equipable.get(stack);
         if (equipable != null && HollowPlayerLogic.refusesArmour(player, stack, equipable.getEquipmentSlot())) {
@@ -103,11 +119,28 @@ public final class HollowPlayerEvents {
     }
 
     /**
+     * A mindless Gillian cannot place a block or use what it holds on one. A bare hand still opens doors,
+     * works levers and opens chests, as it can do nothing else anyway.
+     */
+    private static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!event.getItemStack().isEmpty() && refusedMindless(event.getEntity())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+        }
+    }
+
+    /**
      * Villagers and wandering traders shy away from a Hollow they cannot see (see
-     * {@link HollowPlayerLogic#shunnedByVillagers}).
+     * {@link HollowPlayerLogic#shunnedByVillagers}). A mindless Gillian deals with no creature but a
+     * Shinigami, so the Academy's instructor can still purify it.
      */
     private static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         Player player = event.getEntity();
+        if (!(event.getTarget() instanceof ShinigamiNpc) && refusedMindless(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+            return;
+        }
         if (event.getTarget() instanceof AbstractVillager && HollowPlayerLogic.shunnedByVillagers(player)) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
@@ -116,6 +149,14 @@ public final class HollowPlayerEvents {
                 HollowBody.actionBar(player, data, Component.translatable("message.bleach.hollow_player.villager")
                         .withStyle(ChatFormatting.GRAY), player.level().getGameTime());
             }
+        }
+    }
+
+    /** A click on a particular part of a creature (an armour stand's slots, for one): as {@link #onEntityInteract}. */
+    private static void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
+        if (!(event.getTarget() instanceof ShinigamiNpc) && refusedMindless(event.getEntity())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
         }
     }
 
@@ -191,6 +232,21 @@ public final class HollowPlayerEvents {
         if (visitor instanceof ServerPlayer player) {
             Milestones.grant(player, Milestones.CLEANSED);
             Milestones.check(player, data);
+        }
+        return true;
+    }
+
+    /**
+     * Whether this player is a mindless Gillian (see {@link MenosBody#mindless}), told so on the server and
+     * not too often. On both sides, so the client never shows what the server refuses.
+     */
+    private static boolean refusedMindless(Player player) {
+        if (!MenosBody.mindless(player)) {
+            return false;
+        }
+        if (!player.level().isClientSide()) {
+            HollowBody.actionBar(player, SoulLogic.get(player), Component.translatable("message.bleach.menos.mindless")
+                    .withStyle(ChatFormatting.GRAY), player.level().getGameTime());
         }
         return true;
     }

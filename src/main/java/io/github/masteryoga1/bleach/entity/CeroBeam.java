@@ -50,10 +50,12 @@ import org.joml.Vector3f;
 
 /**
  * A Cero, the "hollow flash": reiatsu a Menos gathers into a glowing orb at its mouth and looses all at
- * once as a beam (an Arrancar or a masked Visored will fire it too). This entity is both halves. While
- * it charges it sits at its caster's muzzle and grows; a caster that is seized, reeling, struck on its
- * mask or otherwise kept from it lets it fizzle ({@link #cancel}). A little before it fires the aim
- * stops following the prey ({@link Spec#aimLockTicks}), so a quick soul can step out of the line.
+ * once as a beam (a Hollow player from Gillian up does too, see
+ * {@link io.github.masteryoga1.bleach.soul.HollowCero}; an Arrancar or a masked Visored will later). This
+ * entity is both halves. While it charges it sits at its caster's muzzle and grows; a caster that is
+ * seized, reeling, struck on its mask or otherwise kept from it lets it fizzle ({@link #cancel}). A little
+ * before it fires the aim stops following the prey ({@link Spec#aimLockTicks}), so a quick soul can step
+ * out of the line.
  *
  * <p>Then {@link #fire} strikes the whole line at once: every creature on it the caster may strike
  * ({@link #mayStrike}), nearest first and each once, until a shield raised towards the mouth takes it
@@ -77,7 +79,10 @@ public class CeroBeam extends Entity {
     public static final int MAX_DISPLAY_LIFE = 200;
     /** Drawn out to this many blocks from the muzzle: eight chunks. */
     public static final double RENDER_DISTANCE = 128.0;
-    /** How far ahead of the eyes a caster without a mouth of its own (a player) gathers the Cero, in blocks. */
+    /**
+     * How far ahead of the eyes a caster without a mouth of its own (a player) gathers the Cero, in blocks
+     * at its size of 1: it grows with the caster ({@link #muzzleOf}).
+     */
     public static final double LOOK_MUZZLE_AHEAD = 0.6;
     /** How far back along the beam from where it bursts the blast looks for what it can reach, in blocks. */
     public static final double BLAST_CLEARANCE = 0.2;
@@ -134,7 +139,10 @@ public class CeroBeam extends Entity {
     /** {@link #tickCount} when it fired; on a client, when it learned that it had. */
     private int firedAt = -1;
 
-    /** Who charges a Cero and keeps it going: a Menos now; an Arrancar or a masked Visored later. */
+    /**
+     * Who charges a Cero and keeps it going: a Menos mob now; an Arrancar or a masked Visored later. A player
+     * is none: its Cero gathers ahead of its eyes and fires where it looks, and its own code keeps it.
+     */
     public interface Caster {
         /** Where the Cero gathers, between last tick ({@code 0}) and this one ({@code 1}). Both sides. */
         Vec3 ceroMuzzle(float partialTick);
@@ -175,6 +183,16 @@ public class CeroBeam extends Entity {
             chargeTicks = Mth.clamp(chargeTicks, 1, 1_200);
             aimLockTicks = Mth.clamp(aimLockTicks, 0, chargeTicks);
         }
+
+        /**
+         * This Cero gathered only so far, from 0 to 1: its damage, its blast's reach, the blocks it may break
+         * (rounded) and its knockback each scaled by that share. Its width, range and colour stay as they are.
+         */
+        public Spec weakened(float share) {
+            float kept = within(share, 0.0F, 1.0F);
+            return new Spec(damage * kept, range, radius, blastRadius * kept, blastShare, Math.round(maxBlocks * kept),
+                    knockback * kept, colour, chargeTicks, aimLockTicks, breaksBlocks);
+        }
     }
 
     /**
@@ -202,9 +220,9 @@ public class CeroBeam extends Entity {
     /**
      * Starts a Cero gathering at the shooter's muzzle ({@link #muzzleOf}) and adds it to the level, with
      * the charge's sound. It fires by itself once the spec's charge is gathered, the way the shooter aimed
-     * ({@link #aimOf}) when the aim locked; a caller may fire it sooner ({@link #fireNow}) or let it fizzle
-     * ({@link #cancel}). Returns null, adding nothing, when the shooter is dead or in another level, or the
-     * level refuses the Cero.
+     * ({@link #aimOf}) when the aim locked; a caller may fire it sooner, at full strength ({@link #fireNow()})
+     * or weaker ({@link #fireNow(float)}), or let it fizzle ({@link #cancel}). Returns null, adding nothing,
+     * when the shooter is dead or in another level, or the level refuses the Cero.
      */
     @Nullable
     public static CeroBeam charge(ServerLevel level, LivingEntity shooter, Spec spec) {
@@ -256,6 +274,18 @@ public class CeroBeam extends Entity {
         if (owner instanceof Caster caster) {
             caster.onCeroFired(shot);
         }
+    }
+
+    /**
+     * Fires now, as {@link #fireNow()} does, at this share of its full strength (see {@link Spec#weakened}):
+     * a Cero let go before it had fully gathered. Server only.
+     */
+    public void fireNow(float strength) {
+        if (isFired() || isRemoved() || spec == null) {
+            return;
+        }
+        spec = spec.weakened(strength);
+        fireNow();
     }
 
     /**
@@ -456,12 +486,16 @@ public class CeroBeam extends Entity {
         return target == hollow.getTarget() || target == hollow.getLastHurtByMob() || HollowLogic.isPreyFor(hollow, target);
     }
 
-    /** Where the shooter's Cero gathers: a {@link Caster}'s own muzzle, or a little ahead of the eyes. */
+    /**
+     * Where the shooter's Cero gathers: a {@link Caster}'s own muzzle, or a little ahead of the eyes, further
+     * the bigger the shooter is, so a towering Menos player gathers it clear of its own mask.
+     */
     public static Vec3 muzzleOf(LivingEntity shooter, float partialTick) {
         if (shooter instanceof Caster caster) {
             return caster.ceroMuzzle(partialTick);
         }
-        return shooter.getEyePosition(partialTick).add(shooter.getViewVector(partialTick).scale(LOOK_MUZZLE_AHEAD));
+        return shooter.getEyePosition(partialTick)
+                .add(shooter.getViewVector(partialTick).scale(LOOK_MUZZLE_AHEAD * shooter.getScale()));
     }
 
     /** The way the shooter would fire now: a {@link Caster}'s own aim (null with nothing in sight), or where it looks. */

@@ -115,9 +115,13 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * sheds into the inventory; Hollow sight comes on and the food bar is held full. Holding the real
  * Devour key on a summoned Plus opens the mask's jaw and devours it, and Sneak with the key turns the
  * sight off. The soul screen is opened a last time, and a look in first person, bare-handed, shows the
- * claws and the edge of the mask. At the very end a Gillian and an Adjuchas are summoned to stand
- * still, the Gillian's hit boxes must sit on its body, and a summoned Cero is drawn before the run
- * quits.
+ * claws and the edge of the mask. Then a Gillian and an Adjuchas are summoned to stand still, the
+ * Gillian's hit boxes must sit on its body, and a summoned Cero is drawn.
+ *
+ * <p>At the very end the player rises through the Menos forms by command. In a space cleared for it
+ * the body grows to a Gillian's height; holding the real Cero key gathers a Cero at its mouth, and
+ * letting it go past half fires it. Then the body shrinks at once to an Adjuchas and to a Vasto Lorde,
+ * each drawn as its form, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -302,6 +306,7 @@ public final class ClientSmokeTest {
         checkQuincyWorld(minecraft, player, soul);
         checkHollowPlayer(minecraft, player, soul);
         checkMenos(minecraft);
+        checkMenosPlayer(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -761,7 +766,20 @@ public final class ClientSmokeTest {
             case 3495 -> command(minecraft,
                     "summon bleach:cero_beam ~ ~1 ~-3 {Reach:[0f,0f,-30f],Radius:1.2f,Colour:14357535,Life:60}");
             case 3540 -> command(minecraft, "kill @e[type=#bleach:hollows]");
-            case 3545 -> {
+            // The player's own Menos forms, by command, in a space cleared for a Gillian's height.
+            case 3548 -> {
+                command(minecraft, "fill ~-3 ~ ~-3 ~3 ~12 ~3 air");
+                command(minecraft, "bleach reiryoku @s 600 600");
+                command(minecraft, "bleach tier @s hollow 2");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+            }
+            // The real key: held, the Cero gathers; let go at 35 of its 50 ticks, it fires at 70%.
+            case 3690 -> HollowKeys.CERO.setDown(true);
+            case 3725 -> HollowKeys.CERO.setDown(false);
+            case 3745 -> command(minecraft, "bleach tier @s hollow 3");
+            case 3775 -> command(minecraft, "bleach tier @s hollow 4");
+            case 3800 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -887,6 +905,48 @@ public final class ClientSmokeTest {
                 "the summoned Cero never drew")) {
             shot(minecraft, "cero");
         }
+    }
+
+    /** The checks of the player's own Menos forms, each window from the step it follows. */
+    private static void checkMenosPlayer(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (expectWithin(minecraft, 3550, 3680,
+                () -> soul.tier(PowerPath.HOLLOW) == 2 && player.getScale() > 5.99F
+                        && hasLook(player, HollowPlayerLogic.LOOK_GILLIAN),
+                "the player never grew into a Gillian")) {
+            shot(minecraft, "gillian_player");
+        }
+        if (expectWithin(minecraft, 3692, 3712,
+                () -> ownCero(minecraft, player, CeroBeam::isCharging) != null && HollowKeys.ceroProgress(0.0F) > 0.0F,
+                "holding the Cero key never gathered a Cero")) {
+            shot(minecraft, "cero_player_charge");
+        }
+        if (expectWithin(minecraft, 3726, 3740, () -> ownCero(minecraft, player, CeroBeam::isFired) != null,
+                "letting the Cero key go never fired the Cero")) {
+            shot(minecraft, "cero_player");
+        }
+        if (expectWithin(minecraft, 3747, 3770,
+                () -> soul.tier(PowerPath.HOLLOW) == 3 && Math.abs(player.getScale() - 1.5F) < 0.01F
+                        && hasLook(player, HollowPlayerLogic.LOOK_ADJUCHAS),
+                "the player never became an Adjuchas")) {
+            shot(minecraft, "adjuchas_player");
+        }
+        if (expectWithin(minecraft, 3777, 3795,
+                () -> soul.tier(PowerPath.HOLLOW) == 4 && Math.abs(player.getScale() - 1.0F) < 0.01F
+                        && hasLook(player, HollowPlayerLogic.LOOK_VASTO_LORDE),
+                "the player never became a Vasto Lorde")) {
+            shot(minecraft, "vasto_lorde_player");
+        }
+    }
+
+    /** Whether the player is drawn with this Hollow look bit. */
+    private static boolean hasLook(LocalPlayer player, int bit) {
+        return (ClientSouls.appearance(player).hollowLook() & bit) != 0;
+    }
+
+    /** The player's own Cero near it, in the state asked for, or null. */
+    @Nullable
+    private static CeroBeam ownCero(Minecraft minecraft, LocalPlayer player, Predicate<CeroBeam> state) {
+        return nearest(minecraft, CeroBeam.class, SUMMONED_RANGE, beam -> beam.owner() == player && state.test(beam));
     }
 
     /** Whether every armour slot is empty. */

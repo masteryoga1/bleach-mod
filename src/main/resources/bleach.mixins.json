@@ -6,6 +6,7 @@
   "mixins": [
     "AreaEffectCloudMixin",
     "CakeBlockMixin",
+    "EntitySectionStorageMixin",
     "FoodDataMixin",
     "LivingEntityMixin",
     "TargetingConditionsMixin",

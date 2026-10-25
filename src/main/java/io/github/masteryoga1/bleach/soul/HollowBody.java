@@ -37,8 +37,9 @@ import net.minecraft.world.level.Level;
  * bears none, a leap that falls further unharmed, sight in the dark, and soul hunger in place of food,
  * which drains with time and effort, pays for a fast regeneration, and starves the Hollow when it runs
  * out. A Hollow that stops being one gets its body and its food back. The numbers are in
- * {@link HollowPlayerLogic}. Server side unless said otherwise; everything takes a {@link Player},
- * so game tests can use mock players, and only messages and sounds need a real one.
+ * {@link HollowPlayerLogic}; a Menos form's size and the rest of its body are in {@link MenosBody}, and
+ * its rise and fall in {@link MenosEvolution}. Server side unless said otherwise; everything takes a
+ * {@link Player}, so game tests can use mock players, and only messages and sounds need a real one.
  *
  * <p>The hunger spent is gathered as a debt and taken off the saved value now and then (see
  * {@link #flushDebt}), so the soul is not re-sent to its owner every tick.
@@ -64,6 +65,8 @@ public final class HollowBody {
     public static final int FLUSH_INTERVAL_TICKS = 600;
     /** Ticks between two refusal-type messages (see {@link #actionBar}). */
     public static final int MESSAGE_INTERVAL_TICKS = 20;
+    /** Ticks between two looks at whether a soul holds a place among the server's Vasto Lorde. */
+    private static final int VASTO_NOTE_INTERVAL_TICKS = 20;
 
     private static final List<EquipmentSlot> ARMOR_SLOTS =
             List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
@@ -153,19 +156,31 @@ public final class HollowBody {
     // ---- The body ----
 
     /**
-     * A Hollow player's tick, from HollowPlayerEvents: the hunger starts and the body is put right, then,
-     * alive, under survival's rules and while the game runs, the armour is shed, the hunger drains (or
-     * refills on Peaceful), the bands are told, the body regenerates or starves, and a hungry Hollow
-     * smells for souls. A soul that has stopped being a Hollow gets its body back instead.
+     * A Hollow player's tick, from HollowPlayerEvents: the hunger starts, a Menos grows, shrinks or
+     * squeezes, the body is put right, the road as a Menos is kept (and an unfed Adjuchas's clock runs),
+     * and a Cero gathers; then, alive, under survival's rules and while the game runs, the armour is shed,
+     * the hunger drains (or refills on Peaceful), the bands are told, the body regenerates or starves, and
+     * a hungry Hollow smells for souls. A soul that has stopped being a Hollow gets its body back instead,
+     * and any Cero it was gathering fizzles. Every soul's place among the Vasto Lorde is kept right.
      */
     public static void tickBody(Player player, SoulData data, long now) {
+        if (player.tickCount % VASTO_NOTE_INTERVAL_TICKS == 0) {
+            MenosEvolution.noteVasto(player, data);
+        }
         if (!HollowPlayerLogic.isHollow(data)) {
+            if (HollowCero.charging(data)) {
+                HollowCero.cancel(player, data);
+            }
             leaveBodyIfWorn(player, data);
             return;
         }
         ensureHunger(data);
+        // The size first, so the reach, steadiness and fall below follow the body as it now is.
+        MenosBody.tick(player, data, now);
         // The one place claws grow: vanilla has just taken off the modifiers of whatever left the hand.
         reconcile(player, data, true);
+        MenosEvolution.tick(player, data, now);
+        HollowCero.tick(player, data, now);
         boolean alive = player.isAlive();
         if (alive && data.hollow().purifiedOnDeath()) {
             // Marked by a purifying blow whose death did not happen after all.
@@ -215,8 +230,9 @@ public final class HollowBody {
 
     /**
      * Puts the body right, and does nothing when it already is: for a Hollow, claws and their speed on
-     * a bare main hand only, the hide, the leap and the sight; for anyone else, none of them. The
-     * modifiers are transient, so this runs again on logging in and respawning (see
+     * a bare main hand only, the hide, the leap, the sight and its Menos form's body (see
+     * {@link MenosBody#reconcile}); for anyone else, none of them. The modifiers are transient but for a
+     * Menos's health, so this runs again on logging in and respawning (see
      * {@link SoulLogic#applyStatModifiers}), and each is written only when its amount changes, so the
      * attributes are not re-sent every tick. Server side.
      * <p>
@@ -245,13 +261,14 @@ public final class HollowBody {
         boolean clawed = player.getMainHandItem().isEmpty() && (growClaws || grown);
         setModifier(player, Attributes.ATTACK_DAMAGE, CLAWS_ID, clawed ? HollowPlayerLogic.clawBonus(data) : 0.0,
                 AttributeModifier.Operation.ADD_VALUE);
-        setModifier(player, Attributes.ATTACK_SPEED, CLAW_SPEED_ID, clawed ? HollowPlayerLogic.clawSpeedModifier() : 0.0,
+        setModifier(player, Attributes.ATTACK_SPEED, CLAW_SPEED_ID, clawed ? HollowPlayerLogic.clawSpeedModifier(data) : 0.0,
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         setModifier(player, Attributes.ARMOR, HIDE_ID, HollowPlayerLogic.hideArmour(data),
                 AttributeModifier.Operation.ADD_VALUE);
         setModifier(player, Attributes.SAFE_FALL_DISTANCE, LEAP_ID, BleachConfig.get(BleachConfig.HOLLOW_SAFE_FALL),
                 AttributeModifier.Operation.ADD_VALUE);
         sight(player, data);
+        MenosBody.reconcile(player, data);
         data.hollowBodyApplied = true;
     }
 
@@ -267,8 +284,9 @@ public final class HollowBody {
     }
 
     /**
-     * The soul stopped being a Hollow: the claws, hide, leap, the devourer's slowness and the Hollow
-     * sight come off, the food comes back as a fresh body's, and the hunger is unset.
+     * The soul stopped being a Hollow: the claws, hide, leap, the devourer's slowness, the Hollow sight
+     * and a Menos's body come off (it is a person's size at once), the food comes back as a fresh body's,
+     * and the hunger is unset.
      */
     public static void leaveBody(Player player, SoulData data) {
         if (!player.level().isClientSide()) {
@@ -393,12 +411,16 @@ public final class HollowBody {
 
     /**
      * A blow landed on a Hollow player's mask: it is drawn cracked for a while, and the Hollow does not
-     * regenerate until the mask pause is over, as for a Hollow mob.
+     * regenerate until the mask pause is over, as for a Hollow mob. A fresh crack is noted, as it breaks
+     * a Cero's gather (see {@link HollowCero}); a blow to a mask already cracked does not.
      *
      * @return whether the mask was whole until now (a fresh crack)
      */
     public static boolean onMaskStruck(SoulData data, long now) {
         boolean fresh = now >= data.hollowCrackedUntil;
+        if (fresh) {
+            data.hollowFreshCrackAt = now;
+        }
         data.hollowCrackedUntil = now + Hollow.CRACK_TICKS;
         data.hollowRegenPausedUntil = Math.max(data.hollowRegenPausedUntil,
                 now + BleachConfig.get(BleachConfig.MASK_REGEN_PAUSE_SECONDS) * 20L);
@@ -459,8 +481,17 @@ public final class HollowBody {
     // ---- Helpers ----
 
     /** Sets a transient modifier to this amount, or takes it off at zero, writing only when it changes. */
-    private static void setModifier(Player player, Holder<Attribute> attribute, ResourceLocation id, double amount,
-                                    AttributeModifier.Operation operation) {
+    static void setModifier(Player player, Holder<Attribute> attribute, ResourceLocation id, double amount,
+                            AttributeModifier.Operation operation) {
+        setModifier(player, attribute, id, amount, operation, false);
+    }
+
+    /**
+     * Sets a modifier to this amount, or takes it off at zero, writing only when it changes: a saved one
+     * goes into the player's save with its attributes, a transient one never does.
+     */
+    static void setModifier(Player player, Holder<Attribute> attribute, ResourceLocation id, double amount,
+                            AttributeModifier.Operation operation, boolean saved) {
         AttributeInstance instance = player.getAttribute(attribute);
         if (instance == null) {
             return;
@@ -473,6 +504,11 @@ public final class HollowBody {
         if (current != null && current.amount() == amount && current.operation() == operation) {
             return;
         }
+        if (saved) {
+            // Takes the old one off first, under whatever operation it was filed.
+            instance.addOrReplacePermanentModifier(new AttributeModifier(id, amount, operation));
+            return;
+        }
         if (current != null && current.operation() != operation) {
             // An update would leave the old one filed under its old operation.
             instance.removeModifier(id);
@@ -480,13 +516,17 @@ public final class HollowBody {
         instance.addOrUpdateTransientModifier(new AttributeModifier(id, amount, operation));
     }
 
-    /** Takes off everything the Hollow body puts on: the four modifiers, the devourer's slowness and the sight. */
+    /**
+     * Takes off everything the Hollow body puts on: the four modifiers, the devourer's slowness, the
+     * sight and every Menos modifier.
+     */
     private static void removeBody(Player player) {
         removeModifier(player, Attributes.ATTACK_DAMAGE, CLAWS_ID);
         removeModifier(player, Attributes.ATTACK_SPEED, CLAW_SPEED_ID);
         removeModifier(player, Attributes.ARMOR, HIDE_ID);
         removeModifier(player, Attributes.SAFE_FALL_DISTANCE, LEAP_ID);
         removeModifier(player, Attributes.MOVEMENT_SPEED, DevourLogic.DEVOURING_ID);
+        MenosBody.remove(player);
         MobEffectInstance sight = player.getEffect(MobEffects.NIGHT_VISION);
         if (sight != null && isOwnNightVision(sight)) {
             player.removeEffect(MobEffects.NIGHT_VISION);
