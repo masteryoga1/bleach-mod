@@ -8,10 +8,11 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * The mod's sound events. Their files are vanilla sounds, pitched and spread out in
- * {@code assets/bleach/sounds.json}. A Hollow's howl, Fishbone D's roar, the tearing sky, a Shikai
- * release, a loosed Getsuga Tenshō, a Quincy's awakening and the great Quincy arts (Letzt Stil, the
- * power's return, Heizen, Sprenger and Vollständig) carry much further than a normal mob's sounds, so
- * they are fixed-range events; the rest reach as far as their volume takes them, as usual.
+ * {@code assets/bleach/sounds.json}. A Hollow's howl, Fishbone D's roar, a Menos Grande's cries, a
+ * Cero, the tearing sky, a Shikai release, a loosed Getsuga Tenshō, a Quincy's awakening and the great
+ * Quincy arts (Letzt Stil, the power's return, Heizen, Sprenger and Vollständig) carry much further than
+ * a normal mob's sounds, so they are fixed-range events; the rest reach as far as their volume takes
+ * them, as usual.
  */
 public final class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
@@ -86,6 +87,18 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> HOLLOW_PANG = variable("player.hollow.pang");
     /** A hungry Hollow smelling a soul, played to it alone. */
     public static final DeferredHolder<SoundEvent, SoundEvent> HOLLOW_SCENT = variable("player.hollow.scent");
+    public static final DeferredHolder<SoundEvent, SoundEvent> GILLIAN_AMBIENT = fixed("entity.gillian.ambient", 96.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> GILLIAN_HURT = variable("entity.gillian.hurt");
+    public static final DeferredHolder<SoundEvent, SoundEvent> GILLIAN_DEATH = fixed("entity.gillian.death", 96.0F);
+    /** A Gillian's tread, every few blocks it walks. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GILLIAN_STEP = variable("entity.gillian.step");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ADJUCHAS_AMBIENT = fixed("entity.adjuchas.ambient", 48.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> ADJUCHAS_HURT = variable("entity.adjuchas.hurt");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ADJUCHAS_DEATH = variable("entity.adjuchas.death");
+    /** Reiatsu gathering at a Menos's mouth for a Cero. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
+    /** A Cero let go. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> CERO_FIRE = fixed("entity.cero.fire", 96.0F);
 
     private ModSounds() {
     }

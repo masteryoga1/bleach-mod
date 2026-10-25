@@ -392,6 +392,45 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue BAIT_ABANDON_MINUTES;
     public static final ModConfigSpec.IntValue CONTEST_MINUTES;
 
+    public static final ModConfigSpec.DoubleValue MENOS_FINALE_GILLIAN_CHANCE;
+    public static final ModConfigSpec.DoubleValue MENOS_ARRIVAL_SHARE;
+    public static final ModConfigSpec.DoubleValue MENOS_GILLIAN_MIN_REIATSU;
+    public static final ModConfigSpec.DoubleValue MENOS_ADJUCHAS_MIN_REIATSU;
+    public static final ModConfigSpec.DoubleValue MENOS_ADJUCHAS_SHARE;
+    public static final ModConfigSpec.IntValue MENOS_ADJUCHAS_PACK_SIZE;
+    public static final ModConfigSpec.DoubleValue MENOS_ADJUCHAS_EXTRA_AT_REIATSU;
+    public static final ModConfigSpec.IntValue MENOS_MAX_ALIVE;
+    public static final ModConfigSpec.IntValue MENOS_SPACING;
+    public static final ModConfigSpec.IntValue MENOS_LIFETIME_MINUTES;
+    public static final ModConfigSpec.DoubleValue GILLIAN_RETREAT_HEALTH;
+    public static final ModConfigSpec.IntValue GILLIAN_FEED_INTERVAL_SECONDS;
+    public static final ModConfigSpec.DoubleValue GILLIAN_FEED_REACH;
+    public static final ModConfigSpec.BooleanValue GILLIAN_TRAMPLES_LEAVES;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_HUNGER_HEALTH;
+    public static final ModConfigSpec.BooleanValue CERO_BREAKS_BLOCKS;
+    public static final ModConfigSpec.DoubleValue CERO_MAX_HARDNESS;
+    public static final ModConfigSpec.DoubleValue CERO_BLAST_SHARE;
+    public static final ModConfigSpec.DoubleValue GILLIAN_CERO_DAMAGE;
+    public static final ModConfigSpec.IntValue GILLIAN_CERO_CHARGE_TICKS;
+    public static final ModConfigSpec.IntValue GILLIAN_CERO_AIM_LOCK_TICKS;
+    public static final ModConfigSpec.DoubleValue GILLIAN_CERO_RANGE;
+    public static final ModConfigSpec.DoubleValue GILLIAN_CERO_MIN_RANGE;
+    public static final ModConfigSpec.DoubleValue GILLIAN_CERO_RADIUS;
+    public static final ModConfigSpec.DoubleValue GILLIAN_CERO_BLAST_RADIUS;
+    public static final ModConfigSpec.IntValue GILLIAN_CERO_MAX_BLOCKS;
+    public static final ModConfigSpec.IntValue GILLIAN_CERO_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue GILLIAN_CERO_KNOCKBACK;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_DAMAGE;
+    public static final ModConfigSpec.IntValue ADJUCHAS_CERO_CHARGE_TICKS;
+    public static final ModConfigSpec.IntValue ADJUCHAS_CERO_AIM_LOCK_TICKS;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_RANGE;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_MIN_RANGE;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_RADIUS;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_BLAST_RADIUS;
+    public static final ModConfigSpec.IntValue ADJUCHAS_CERO_MAX_BLOCKS;
+    public static final ModConfigSpec.IntValue ADJUCHAS_CERO_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_KNOCKBACK;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -1584,6 +1623,129 @@ public final class BleachConfig {
         CONTEST_MINUTES = builder
                 .comment("Minutes the Quincy Hunter's contest lasts: whoever destroys more Hollows in that time wins.")
                 .defineInRange("contest_minutes", 6, 1, 60);
+        builder.pop();
+
+        builder.push("menos");
+        MENOS_FINALE_GILLIAN_CHANCE = builder
+                .comment("Chance that a Gillian pushes through the cracked sky at the end of a Hollow Bait.")
+                .defineInRange("finale_gillian_chance", 1.0, 0.0, 1.0);
+        MENOS_ARRIVAL_SHARE = builder
+                .comment("Share of Garganta arrivals for strong souls that bring a Menos Grande instead.")
+                .defineInRange("arrival_share", 0.05, 0.0, 1.0);
+        MENOS_GILLIAN_MIN_REIATSU = builder
+                .comment("Maximum reiryoku a soul needs before a Gillian may come for it.")
+                .defineInRange("gillian_min_reiatsu", 300.0, 0.0, 10_000.0);
+        MENOS_ADJUCHAS_MIN_REIATSU = builder
+                .comment("Maximum reiryoku a soul needs before an Adjuchas pack may come for it.")
+                .defineInRange("adjuchas_min_reiatsu", 500.0, 0.0, 10_000.0);
+        MENOS_ADJUCHAS_SHARE = builder
+                .comment("Share of Menos arrivals that are an Adjuchas pack, for souls strong enough.")
+                .defineInRange("adjuchas_share", 0.35, 0.0, 1.0);
+        MENOS_ADJUCHAS_PACK_SIZE = builder
+                .comment("Adjuchas in a pack.")
+                .defineInRange("adjuchas_pack_size", 2, 1, 6);
+        MENOS_ADJUCHAS_EXTRA_AT_REIATSU = builder
+                .comment("Maximum reiryoku at which a pack brings one Adjuchas more.")
+                .defineInRange("adjuchas_extra_at_reiatsu", 800.0, 0.0, 10_000.0);
+        MENOS_MAX_ALIVE = builder
+                .comment("Most Menos alive in the world at once. 0 brings none.")
+                .defineInRange("max_alive", 4, 0, 32);
+        MENOS_SPACING = builder
+                .comment("No Menos comes within this many blocks of another.")
+                .defineInRange("spacing", 128, 16, 512);
+        MENOS_LIFETIME_MINUTES = builder
+                .comment("Minutes a Menos stays before it goes back through a tear.")
+                .defineInRange("lifetime_minutes", 6, 1, 60);
+        GILLIAN_RETREAT_HEALTH = builder
+                .comment("Share of its health at which a beaten Gillian pulls back into the sky.")
+                .defineInRange("gillian_retreat_health", 0.25, 0.0, 1.0);
+        GILLIAN_FEED_INTERVAL_SECONDS = builder
+                .comment("Seconds between the Hollows a Gillian draws up to its mouth.")
+                .defineInRange("gillian_feed_interval_seconds", 5, 1, 120);
+        GILLIAN_FEED_REACH = builder
+                .comment("How far, in blocks, a Gillian reaches for a Hollow to eat.")
+                .defineInRange("gillian_feed_reach", 10.0, 2.0, 24.0);
+        GILLIAN_TRAMPLES_LEAVES = builder
+                .comment("Whether a blocked Gillian tramples through leaves (mob griefing must allow it too).")
+                .define("gillian_tramples_leaves", true);
+        ADJUCHAS_HUNGER_HEALTH = builder
+                .comment("Share of its health below which an Adjuchas hunts weaker Hollows to eat.")
+                .defineInRange("adjuchas_hunger_health", 0.6, 0.0, 1.0);
+        CERO_BREAKS_BLOCKS = builder
+                .comment("Whether a Cero blasts soft blocks where it strikes (mob griefing must allow it too).")
+                .define("cero_breaks_blocks", true);
+        CERO_MAX_HARDNESS = builder
+                .comment("Hardest block a Cero can blast away.")
+                .defineInRange("cero_max_hardness", 0.8, 0.0, 50.0);
+        CERO_BLAST_SHARE = builder
+                .comment("Share of a Cero's damage dealt around where it strikes a block.")
+                .defineInRange("cero_blast_share", 0.5, 0.0, 1.0);
+
+        builder.push("gillian_cero");
+        GILLIAN_CERO_DAMAGE = builder
+                .comment("Damage of the beam on Normal, before the hollows damage multiplier.")
+                .defineInRange("damage", 18.0, 0.0, 200.0);
+        GILLIAN_CERO_CHARGE_TICKS = builder
+                .comment("Ticks the Cero gathers before it fires.")
+                .defineInRange("charge_ticks", 50, 5, 200);
+        GILLIAN_CERO_AIM_LOCK_TICKS = builder
+                .comment("Ticks before firing that the aim stops following the prey.")
+                .defineInRange("aim_lock_ticks", 12, 0, 200);
+        GILLIAN_CERO_RANGE = builder
+                .comment("Blocks the beam reaches.")
+                .defineInRange("range", 48.0, 4.0, 96.0);
+        GILLIAN_CERO_MIN_RANGE = builder
+                .comment("Closest, in blocks, the prey may be.")
+                .defineInRange("min_range", 6.0, 0.0, 32.0);
+        GILLIAN_CERO_RADIUS = builder
+                .comment("Half-width of the beam in blocks.")
+                .defineInRange("radius", 1.4, 0.1, 4.0);
+        GILLIAN_CERO_BLAST_RADIUS = builder
+                .comment("Radius of the blast where it strikes a block.")
+                .defineInRange("blast_radius", 2.5, 0.0, 8.0);
+        GILLIAN_CERO_MAX_BLOCKS = builder
+                .comment("Most blocks one blast can break.")
+                .defineInRange("max_blocks", 16, 0, 64);
+        GILLIAN_CERO_COOLDOWN_SECONDS = builder
+                .comment("Seconds between one Cero and the next.")
+                .defineInRange("cooldown_seconds", 8, 1, 120);
+        GILLIAN_CERO_KNOCKBACK = builder
+                .comment("Extra knockback along the beam.")
+                .defineInRange("knockback", 1.2, 0.0, 5.0);
+        builder.pop();
+
+        builder.push("adjuchas_cero");
+        ADJUCHAS_CERO_DAMAGE = builder
+                .comment("Damage of the beam on Normal, before the hollows damage multiplier.")
+                .defineInRange("damage", 10.0, 0.0, 200.0);
+        ADJUCHAS_CERO_CHARGE_TICKS = builder
+                .comment("Ticks the Cero gathers before it fires.")
+                .defineInRange("charge_ticks", 25, 5, 200);
+        ADJUCHAS_CERO_AIM_LOCK_TICKS = builder
+                .comment("Ticks before firing that the aim stops following the prey.")
+                .defineInRange("aim_lock_ticks", 6, 0, 200);
+        ADJUCHAS_CERO_RANGE = builder
+                .comment("Blocks the beam reaches.")
+                .defineInRange("range", 32.0, 4.0, 96.0);
+        ADJUCHAS_CERO_MIN_RANGE = builder
+                .comment("Closest, in blocks, the prey may be.")
+                .defineInRange("min_range", 4.0, 0.0, 32.0);
+        ADJUCHAS_CERO_RADIUS = builder
+                .comment("Half-width of the beam in blocks.")
+                .defineInRange("radius", 0.8, 0.1, 4.0);
+        ADJUCHAS_CERO_BLAST_RADIUS = builder
+                .comment("Radius of the blast where it strikes a block.")
+                .defineInRange("blast_radius", 1.5, 0.0, 8.0);
+        ADJUCHAS_CERO_MAX_BLOCKS = builder
+                .comment("Most blocks one blast can break.")
+                .defineInRange("max_blocks", 6, 0, 64);
+        ADJUCHAS_CERO_COOLDOWN_SECONDS = builder
+                .comment("Seconds between one Cero and the next.")
+                .defineInRange("cooldown_seconds", 6, 1, 120);
+        ADJUCHAS_CERO_KNOCKBACK = builder
+                .comment("Extra knockback along the beam.")
+                .defineInRange("knockback", 0.6, 0.0, 5.0);
+        builder.pop();
         builder.pop();
 
         SPEC = builder.build();

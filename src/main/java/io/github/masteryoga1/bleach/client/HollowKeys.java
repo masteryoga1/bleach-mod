@@ -15,6 +15,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.entity.PartEntity;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -79,7 +80,11 @@ public final class HollowKeys {
                 BleachNetwork.requestHollowKey(HollowKey.SIGHT, -1);
             } else {
                 // Only a living creature can be prey: anything else is no aim, and the server looks nearby.
+                // A giant is aimed at by any of its parts, which stand for the whole body.
                 Entity target = minecraft.crosshairPickEntity;
+                if (target instanceof PartEntity<?> part) {
+                    target = part.getParent();
+                }
                 int targetId = target instanceof LivingEntity ? target.getId() : -1;
                 BleachNetwork.requestHollowKey(HollowKey.PRESS, targetId);
                 holding = true;

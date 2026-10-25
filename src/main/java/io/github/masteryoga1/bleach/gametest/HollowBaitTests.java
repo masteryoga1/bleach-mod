@@ -75,8 +75,13 @@ public final class HollowBaitTests {
     private static final int WAVE_TRIES = 5;
     /** How far a site's own Hollows and rifts are looked for when it is cleared away. */
     private static final double SITE_SEARCH = 96.0;
-    /** The tick by which a site test must have finished; past it, everything is cleared away and it fails. */
-    private static final int GIVE_UP_TICK = 290;
+    /** Two chunks: how far around a forced chunk the ground must be loaded before its creatures tick. */
+    private static final double ENTITY_TICKING_RING = 32.0;
+    /**
+     * The tick by which a site test must have finished; past it, everything is cleared away and it fails.
+     * The test server does not wait between ticks, so this is generous: a thousand ticks pass in about a second.
+     */
+    private static final int GIVE_UP_TICK = 1190;
 
     private HollowBaitTests() {
     }
@@ -118,7 +123,12 @@ public final class HollowBaitTests {
         return null;
     }
 
-    /** Forces every chunk within this reach of the point that is not forced already, and returns those it forced. */
+    /**
+     * Forces every chunk within this reach of the point that is not forced already, and returns those it forced.
+     * A forced chunk only lets creatures tick once every chunk two around it is loaded too, so that ring is
+     * loaded here and now: the test server runs its ticks as fast as it can, and ground still being generated
+     * off the thread could outlast the test.
+     */
     private static List<ChunkPos> forceAround(ServerLevel level, Vec3 centre, double reach) {
         List<ChunkPos> forced = new ArrayList<>();
         for (ChunkPos chunk : chunksAround(centre, reach)) {
@@ -126,6 +136,9 @@ public final class HollowBaitTests {
                 level.setChunkForced(chunk.x, chunk.z, true);
                 forced.add(chunk);
             }
+        }
+        for (ChunkPos chunk : chunksAround(centre, reach + ENTITY_TICKING_RING)) {
+            level.getChunk(chunk.x, chunk.z);
         }
         return forced;
     }
@@ -439,7 +452,7 @@ public final class HollowBaitTests {
      * runs (and let go after). Ground is picked at random, so the wave is tried a few times. Its own
      * batch, so no other test's Hollows are about.
      */
-    @GameTest(template = "field", batch = "bait", timeoutTicks = 300)
+    @GameTest(template = "field", batch = "bait", timeoutTicks = 1200)
     public static void siteWaveAndFinale(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BaitSites sites = BaitSites.get(level.getServer());
@@ -455,8 +468,12 @@ public final class HollowBaitTests {
             forced.clear();
         };
         helper.runAtTickTime(GIVE_UP_TICK, () -> {
+            // Says how far it got, as the stages wait on ground and landings picked at random.
+            String stage = "ticking " + allTicking(level, mock.position(), LANDING_REACH)
+                    + ", waves " + site.waves() + ", arrived " + site.arrived()
+                    + ", Hollows about " + siteHollows(level, site).size();
             clear.run();
-            helper.fail("the bait site never got through its wave and finale");
+            helper.fail("the bait site never got through its wave and finale (" + stage + ")");
         });
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(allTicking(level, mock.position(), LANDING_REACH),

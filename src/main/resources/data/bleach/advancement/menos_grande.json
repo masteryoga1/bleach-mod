@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:mask_strike",
+  "display": {
+    "icon": {
+      "id": "bleach:mask_fragment"
+    },
+    "title": {
+      "translate": "advancements.bleach.menos_grande.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.menos_grande.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "menos_grande": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "menos_grande"
+      }
+    }
+  }
+}

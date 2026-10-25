@@ -108,7 +108,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
  * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
- * /bleach garganta &lt;players&gt; [spider|hexapodus|hound|serpent|fishbone_d]   (a tear now; not on Peaceful)
+ * /bleach garganta &lt;players&gt; [spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas] (a tear now; not on Peaceful)
  * /bleach firsthollow &lt;players&gt; &lt;reset|skip|start&gt;   (the Fishbone D encounter)
  * /bleach hollow &lt;players&gt; satiety &lt;0..100&gt;   (soul hunger, started if it had not; Hollow players only)
  * /bleach hollow &lt;players&gt; souls &lt;0..100000&gt;   (the souls devoured, for any soul)

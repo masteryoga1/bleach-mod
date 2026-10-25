@@ -131,6 +131,216 @@
       }
     ]
   },
+  "entity.gillian.ambient": {
+    "subtitle": "subtitles.bleach.entity.gillian.ambient",
+    "sounds": [
+      {
+        "name": "minecraft:mob/enderdragon/growl1",
+        "pitch": 0.5,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/enderdragon/growl2",
+        "pitch": 0.5,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/enderdragon/growl3",
+        "pitch": 0.5,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/enderdragon/growl4",
+        "pitch": 0.5,
+        "attenuation_distance": 96
+      }
+    ]
+  },
+  "entity.gillian.hurt": {
+    "subtitle": "subtitles.bleach.entity.gillian.hurt",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ravager/hurt1",
+        "pitch": 0.55
+      },
+      {
+        "name": "minecraft:mob/ravager/hurt2",
+        "pitch": 0.55
+      },
+      {
+        "name": "minecraft:mob/ravager/hurt3",
+        "pitch": 0.55
+      },
+      {
+        "name": "minecraft:mob/ravager/hurt4",
+        "pitch": 0.55
+      }
+    ]
+  },
+  "entity.gillian.death": {
+    "subtitle": "subtitles.bleach.entity.gillian.death",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ravager/death1",
+        "pitch": 0.45,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/ravager/death2",
+        "pitch": 0.45,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/ravager/death3",
+        "pitch": 0.45,
+        "attenuation_distance": 96
+      }
+    ]
+  },
+  "entity.gillian.step": {
+    "subtitle": "subtitles.bleach.entity.gillian.step",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ravager/step1",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:mob/ravager/step2",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:mob/ravager/step3",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:mob/ravager/step4",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:mob/ravager/step5",
+        "pitch": 0.5
+      }
+    ]
+  },
+  "entity.adjuchas.ambient": {
+    "subtitle": "subtitles.bleach.entity.adjuchas.ambient",
+    "sounds": [
+      {
+        "name": "minecraft:mob/zoglin/idle1",
+        "pitch": 0.75,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle2",
+        "pitch": 0.75,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle3",
+        "pitch": 0.75,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle4",
+        "pitch": 0.75,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle5",
+        "pitch": 0.75,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle6",
+        "pitch": 0.75,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.adjuchas.hurt": {
+    "subtitle": "subtitles.bleach.entity.adjuchas.hurt",
+    "sounds": [
+      {
+        "name": "minecraft:mob/zoglin/hurt1",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/zoglin/hurt2",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/zoglin/hurt3",
+        "pitch": 0.8
+      }
+    ]
+  },
+  "entity.adjuchas.death": {
+    "subtitle": "subtitles.bleach.entity.adjuchas.death",
+    "sounds": [
+      {
+        "name": "minecraft:mob/zoglin/death1",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/zoglin/death2",
+        "pitch": 0.8
+      },
+      {
+        "name": "minecraft:mob/zoglin/death3",
+        "pitch": 0.8
+      }
+    ]
+  },
+  "entity.cero.charge": {
+    "subtitle": "subtitles.bleach.entity.cero.charge",
+    "sounds": [
+      {
+        "name": "minecraft:mob/warden/sonic_charge1",
+        "pitch": 1.4,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_charge2",
+        "pitch": 1.4,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_charge3",
+        "pitch": 1.4,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_charge4",
+        "pitch": 1.4,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.cero.fire": {
+    "subtitle": "subtitles.bleach.entity.cero.fire",
+    "sounds": [
+      {
+        "name": "minecraft:mob/warden/sonic_boom1",
+        "pitch": 0.9,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_boom2",
+        "pitch": 0.9,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_boom3",
+        "pitch": 0.9,
+        "attenuation_distance": 96
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_boom4",
+        "pitch": 0.9,
+        "attenuation_distance": 96
+      }
+    ]
+  },
   "entity.garganta.open": {
     "subtitle": "subtitles.bleach.entity.garganta.open",
     "sounds": [

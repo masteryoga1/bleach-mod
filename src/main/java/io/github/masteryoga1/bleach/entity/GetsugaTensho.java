@@ -278,7 +278,8 @@ public class GetsugaTensho extends Projectile {
             }
             projectile.discard();
         }
-        List<LivingEntity> targets = level().getEntitiesOfClass(LivingEntity.class, path,
+        // A giant counts by its parts too, however far below the path it stands.
+        List<LivingEntity> targets = SpiritProjectiles.creaturesIn(level(), path,
                 target -> !struck.contains(target.getId()) && affects(target) && clearOfWielder(target, rear, heading, beside));
         if (targets.isEmpty()) {
             return true;

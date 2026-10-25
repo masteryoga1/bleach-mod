@@ -62,6 +62,14 @@ SCALE_LIGHT = rgb(70, 88, 72)
 FISH_GREY = rgb(70, 78, 90)
 FISH_STRIPE = rgb(50, 56, 66)
 
+# The Menos Grande: a Gillian's black robe and long pale hands, and an Adjuchas's dark striped hide.
+ROBE = rgb(20, 18, 24)
+ROBE_FOLD = rgb(36, 32, 42)
+HAND = rgb(200, 196, 188)
+ADJ_HIDE = rgb(46, 48, 64)
+ADJ_STRIPE = rgb(34, 36, 50)
+ADJ_BELLY = rgb(84, 86, 104)
+
 # The Denreishinki: a dark flip phone with a green screen.
 DEVICE = rgb(44, 44, 52)
 DEVICE_EDGE = rgb(80, 80, 92)
@@ -562,6 +570,91 @@ def fishbone_d_mask():
     c.rect(101, 9, 109, 12, BONE)
     for x in (102, 104, 106):
         c.put(x, 11, VOID)
+    return c
+
+
+# The Gillian's boxes (GillianModel). One spike net serves the six collar spikes front and back, and
+# another the two that stick out at the sides.
+GILLIAN_ROBE_LOWER = (0, 0, 10, 18, 8)
+GILLIAN_ROBE_UPPER = (36, 0, 9, 12, 7)
+GILLIAN_HEAD = (68, 0, 8, 8, 8)
+GILLIAN_NOSE = (100, 0, 2, 2, 7)
+GILLIAN_SPIKE = (100, 10, 1, 1, 3)
+GILLIAN_SIDE_SPIKE = (108, 10, 3, 1, 1)
+GILLIAN_ARM = (0, 26, 3, 20, 3)
+GILLIAN_FOOT = (12, 26, 3, 2, 5)
+
+
+def gillian():
+    """A black robe from the collar to the ground, long pale hands, and bone under the mask."""
+    c = Canvas(128, 64)
+    for part in (GILLIAN_ROBE_LOWER, GILLIAN_ROBE_UPPER, GILLIAN_ARM):
+        box(c, *part, ROBE)
+    for part in (GILLIAN_HEAD, GILLIAN_NOSE, GILLIAN_SPIKE, GILLIAN_SIDE_SPIKE):
+        box(c, *part, BONE_SHADE)
+    robe = faces(*GILLIAN_ROBE_LOWER)
+    paint_where(c, [robe[3], robe[5]], ROBE_FOLD, lambda x, y: x % 3 == 0)  # folds down the front and back
+    paint_where(c, faces(*GILLIAN_ARM)[2:], HAND, lambda x, y: y >= 45)  # the hands: the arms' bottom four rows
+    c.rect(6, 26, 9, 29, HAND)  # and their bottom face
+    box(c, *GILLIAN_FOOT, HAND)
+    return c
+
+
+def gillian_mask():
+    """The long-nosed mask over the whole head, with its collar of spikes."""
+    c = Canvas(128, 64)
+    for part in (GILLIAN_HEAD, GILLIAN_NOSE, GILLIAN_SPIKE, GILLIAN_SIDE_SPIKE):
+        box(c, *part, BONE)
+    c.rect(77, 10, 79, 12, VOID)   # eye holes
+    c.rect(81, 10, 83, 12, VOID)
+    c.rect(77, 14, 83, 15, VOID)   # the mouth, with two teeth
+    c.put(78, 14, BONE)
+    c.put(81, 14, BONE)
+    c.rect(76, 15, 84, 16, BONE_SHADE)  # chin
+    c.rect(*faces(*GILLIAN_NOSE)[1], BONE_SHADE)  # underside of the nose
+    return c
+
+
+# The Adjuchas's boxes (AdjuchasModel). The four dorsal spikes share one net, as do the two horns and
+# the four legs.
+ADJ_BODY = (0, 0, 10, 9, 18)
+ADJ_HEAD = (56, 0, 7, 7, 6)
+ADJ_HORN = (82, 0, 1, 4, 1)
+ADJ_SPIKE = (86, 0, 1, 4, 1)
+ADJ_LEG = (0, 27, 3, 10, 3)
+ADJ_TAIL = (12, 27, 2, 2, 12)
+ADJ_TAIL_TIP = (40, 27, 2, 2, 10)
+
+
+def adjuchas():
+    """A dark, striped beast's hide with a hole through the flank."""
+    c = Canvas(128, 64)
+    for part in (ADJ_BODY, ADJ_HEAD, ADJ_LEG, ADJ_TAIL, ADJ_TAIL_TIP):
+        box(c, *part, ADJ_HIDE)
+    box(c, *ADJ_HORN, BONE)       # bone, as the mask draws them too
+    box(c, *ADJ_SPIKE, BONE)
+    paint_where(c, faces(*ADJ_BODY), ADJ_STRIPE, lambda x, y: (x + y) % 4 == 0)
+    paint_where(c, faces(*ADJ_TAIL) + faces(*ADJ_TAIL_TIP), ADJ_STRIPE, lambda x, y: x % 3 == 0)
+    c.rect(*faces(*ADJ_BODY)[1], ADJ_BELLY)
+    c.rect(0, 37, 12, 40, BONE_SHADE)  # claws, the bottom three rows of the legs
+    c.rect(8, 20, 12, 24, VOID)        # the hole, through the right flank
+    return c
+
+
+def adjuchas_mask():
+    """A beast's skull over the snout, with slit eyes and a row of teeth."""
+    c = Canvas(128, 64)
+    c.rect(62, 6, 69, 13, BONE)    # face
+    c.rect(62, 3, 69, 6, BONE)     # the front half of the top
+    c.rect(59, 6, 62, 13, BONE)    # the front three columns of each side
+    c.rect(69, 6, 72, 13, BONE)
+    c.rect(63, 8, 65, 9, VOID)     # eye slits, mirrored about the middle column
+    c.rect(66, 8, 68, 9, VOID)
+    c.rect(62, 11, 69, 12, VOID)   # the mouth, and the teeth in it
+    for x in (63, 65, 67):
+        c.put(x, 11, BONE)
+    box(c, *ADJ_HORN, BONE)
+    box(c, *ADJ_SPIKE, BONE)
     return c
 
 
@@ -1238,6 +1331,12 @@ TEXTURES = {
     "entity/hollow/fishbone_d.png": fishbone_d,
     "entity/hollow/fishbone_d_mask.png": fishbone_d_mask,
     "entity/hollow/fishbone_d_mask_cracked.png": cracked(fishbone_d_mask, [(63, 2), (66, 8), (65, 13), (67, 17)]),
+    "entity/hollow/gillian.png": gillian,
+    "entity/hollow/gillian_mask.png": gillian_mask,
+    "entity/hollow/gillian_mask_cracked.png": cracked(gillian_mask, [(77, 8), (78, 11), (80, 13), (79, 15)]),
+    "entity/hollow/adjuchas.png": adjuchas,
+    "entity/hollow/adjuchas_mask.png": adjuchas_mask,
+    "entity/hollow/adjuchas_mask_cracked.png": cracked(adjuchas_mask, [(63, 6), (64, 9), (66, 10), (65, 12)]),
     "entity/garganta.png": garganta,
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,

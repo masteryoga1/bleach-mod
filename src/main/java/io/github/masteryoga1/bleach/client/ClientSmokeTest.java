@@ -2,8 +2,11 @@ package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.Adjuchas;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
@@ -40,6 +43,7 @@ import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -103,20 +107,23 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * Ransōtengai with the Quincy Form key's sneak press to break free and so learns it. The Hunter's
  * dialogue opens too. In the Wandenreich uniform the player opens the Tailoring Table on its
  * second page. A Hollow Bait site is opened by command, its wave comes through a Garganta, and its
- * finale cracks the sky, which closes again when the site is stopped. Ransōtengai is woven once more
- * and let go with the key, so the collapse follows, and the soul screen is opened again.
+ * finale cracks the sky, through which a Gillian comes down; the sky closes again when the site is
+ * stopped. Ransōtengai is woven once more and let go with the key, so the collapse follows, and the
+ * soul screen is opened again.
  *
  * <p>Last of all the player becomes a Hollow while still in the Wandenreich uniform, which the hide
  * sheds into the inventory; Hollow sight comes on and the food bar is held full. Holding the real
  * Devour key on a summoned Plus opens the mask's jaw and devours it, and Sneak with the key turns the
  * sight off. The soul screen is opened a last time, and a look in first person, bare-handed, shows the
- * claws and the edge of the mask before the run quits.
+ * claws and the edge of the mask. At the very end a Gillian and an Adjuchas are summoned to stand
+ * still, the Gillian's hit boxes must sit on its body, and a summoned Cero is drawn before the run
+ * quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
- * Hollow body and HUD are drawn, and screenshots of the main moments are saved for review. Any crash
- * in the mod's client code fails the run, and so does anything that did not reach the client as
- * expected.
+ * Hollow body, Menos, Cero and HUD are drawn, and screenshots of the main moments are saved for
+ * review. Any crash in the mod's client code fails the run, and so does anything that did not reach
+ * the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -294,6 +301,7 @@ public final class ClientSmokeTest {
         checkArts(minecraft, player, soul);
         checkQuincyWorld(minecraft, player, soul);
         checkHollowPlayer(minecraft, player, soul);
+        checkMenos(minecraft);
         if (finished) {
             return;
         }
@@ -741,7 +749,19 @@ public final class ClientSmokeTest {
             }
             case 3422 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             case 3432 -> shot(minecraft, "hollow_first_person");
-            case 3440 -> {
+            // The Menos Grande, by summon and standing still, so the shot is the same every run.
+            case 3436 -> {
+                command(minecraft, "effect give @s minecraft:resistance 30 4 true");
+                command(minecraft, "tp @s ~ ~ ~ 180 -25");
+                command(minecraft, "summon bleach:gillian ~ ~ ~-14 " + STILL);
+                command(minecraft, "summon bleach:adjuchas ~5 ~ ~-7 " + STILL);
+            }
+            case 3490 -> shot(minecraft, "menos");
+            // A Cero as a picture: it strikes nothing.
+            case 3495 -> command(minecraft,
+                    "summon bleach:cero_beam ~ ~1 ~-3 {Reach:[0f,0f,-30f],Radius:1.2f,Colour:14357535,Life:60}");
+            case 3540 -> command(minecraft, "kill @e[type=#bleach:hollows]");
+            case 3545 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -803,6 +823,11 @@ public final class ClientSmokeTest {
             }
             shot(minecraft, "sky_cracked");
         }
+        // A Gillian pushes through the crack and sinks to the ground.
+        expectWithin(minecraft, 3030, 3084,
+                () -> nearest(minecraft, Gillian.class, 64.0,
+                        gillian -> gillian.isAlive() && !ClientSouls.isHiddenFromViewer(gillian)) != null,
+                "the finale brought no Gillian down through the sky");
         expectWithin(minecraft, 3086, 3140,
                 () -> nearest(minecraft, GargantaRift.class, 64.0, rift -> rift.size() >= 3.0F) == null,
                 "the sky crack never closed");
@@ -837,6 +862,31 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 3389, 3410,
                 () -> !soul.hollow().sight() && !player.hasEffect(MobEffects.NIGHT_VISION),
                 "Sneak and Devour did not turn the Hollow sight off");
+    }
+
+    /** The checks of the Menos Grande, each window from the step it follows. */
+    private static void checkMenos(Minecraft minecraft) {
+        if (expectWithin(minecraft, 3438, 3480, () -> {
+            Gillian gillian = nearest(minecraft, Gillian.class, 32.0,
+                    g -> g.isAlive() && !ClientSouls.isHiddenFromViewer(g));
+            Adjuchas adjuchas = nearest(minecraft, Adjuchas.class, 32.0,
+                    a -> a.isAlive() && !ClientSouls.isHiddenFromViewer(a));
+            return gillian != null && adjuchas != null && gillian.getParts().length == 2
+                    && minecraft.level.getPartEntities().containsAll(Arrays.asList(gillian.getParts()))
+                    && gillian.head().getBoundingBox().inflate(0.01).contains(HollowMask.maskCenter(gillian));
+        }, "the summoned Menos never showed, or the Gillian's parts were not on its body")) {
+            Gillian gillian = nearest(minecraft, Gillian.class, 32.0, Gillian::isAlive);
+            if (gillian != null) {
+                // The whole Gillian, and the Adjuchas below.
+                look(minecraft, gillian.position().add(0.0, 6.0, 0.0));
+            }
+        }
+        if (expectWithin(minecraft, 3496, 3530,
+                () -> nearest(minecraft, CeroBeam.class, 16.0,
+                        beam -> beam.isFired() && beam.reach().length() > 29.0) != null,
+                "the summoned Cero never drew")) {
+            shot(minecraft, "cero");
+        }
     }
 
     /** Whether every armour slot is empty. */
