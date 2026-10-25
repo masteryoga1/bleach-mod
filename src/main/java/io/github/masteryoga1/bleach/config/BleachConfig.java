@@ -1683,7 +1683,7 @@ public final class BleachConfig {
 
         builder.push("gillian_cero");
         GILLIAN_CERO_DAMAGE = builder
-                .comment("Damage of the beam on Normal.")
+                .comment("Damage of the beam on Normal, before the hollows damage multiplier.")
                 .defineInRange("damage", 18.0, 0.0, 200.0);
         GILLIAN_CERO_CHARGE_TICKS = builder
                 .comment("Ticks the Cero gathers before it fires.")
@@ -1716,7 +1716,7 @@ public final class BleachConfig {
 
         builder.push("adjuchas_cero");
         ADJUCHAS_CERO_DAMAGE = builder
-                .comment("Damage of the beam on Normal.")
+                .comment("Damage of the beam on Normal, before the hollows damage multiplier.")
                 .defineInRange("damage", 10.0, 0.0, 200.0);
         ADJUCHAS_CERO_CHARGE_TICKS = builder
                 .comment("Ticks the Cero gathers before it fires.")

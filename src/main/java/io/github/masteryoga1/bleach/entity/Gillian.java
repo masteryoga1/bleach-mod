@@ -193,7 +193,9 @@ public class Gillian extends Menos {
 
     @Override
     protected CeroBeam.Spec ceroSpec() {
-        return new CeroBeam.Spec((float) BleachConfig.get(BleachConfig.GILLIAN_CERO_DAMAGE),
+        // The [hollows] damage multiplier reaches the Cero too, as it does every Hollow's blows.
+        return new CeroBeam.Spec((float) (BleachConfig.get(BleachConfig.GILLIAN_CERO_DAMAGE)
+                        * BleachConfig.get(BleachConfig.HOLLOW_DAMAGE_MULTIPLIER)),
                 BleachConfig.get(BleachConfig.GILLIAN_CERO_RANGE),
                 (float) BleachConfig.get(BleachConfig.GILLIAN_CERO_RADIUS),
                 (float) BleachConfig.get(BleachConfig.GILLIAN_CERO_BLAST_RADIUS),

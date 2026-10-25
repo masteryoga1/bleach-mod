@@ -90,7 +90,9 @@ public class Adjuchas extends Menos {
     /** Its Cero, the same at every size. */
     @Override
     protected CeroBeam.Spec ceroSpec() {
-        return new CeroBeam.Spec((float) BleachConfig.get(BleachConfig.ADJUCHAS_CERO_DAMAGE),
+        // The [hollows] damage multiplier reaches the Cero too, as it does every Hollow's blows.
+        return new CeroBeam.Spec((float) (BleachConfig.get(BleachConfig.ADJUCHAS_CERO_DAMAGE)
+                        * BleachConfig.get(BleachConfig.HOLLOW_DAMAGE_MULTIPLIER)),
                 BleachConfig.get(BleachConfig.ADJUCHAS_CERO_RANGE),
                 (float) BleachConfig.get(BleachConfig.ADJUCHAS_CERO_RADIUS),
                 (float) BleachConfig.get(BleachConfig.ADJUCHAS_CERO_BLAST_RADIUS),

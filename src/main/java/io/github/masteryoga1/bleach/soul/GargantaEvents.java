@@ -210,7 +210,13 @@ public final class GargantaEvents {
                 return false;
             }
         } else {
-            int count = Menos.packSize(data.maxReiryoku(), room);
+            // A natural pack never takes the world past its Menos limit; a command brings the whole pack.
+            int menosRoom = byCommand ? Integer.MAX_VALUE
+                    : BleachConfig.get(BleachConfig.MENOS_MAX_ALIVE) - Menos.aliveCount(level.getServer());
+            if (menosRoom < 1) {
+                return false;
+            }
+            int count = Menos.packSize(data.maxReiryoku(), Math.min(room, menosRoom));
             EntityType<Adjuchas> type = ModEntities.ADJUCHAS.get();
             float scale = HollowKind.ADJUCHAS.scaleMax;
             Vec3 landing = SpawnSpots.openGround(level, player, type, scale, SPOT_MIN_DISTANCE, SPOT_MAX_DISTANCE,
