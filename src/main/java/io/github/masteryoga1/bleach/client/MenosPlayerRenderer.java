@@ -13,9 +13,16 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.numbers.StyledFormat;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.scores.DisplaySlot;
+import net.minecraft.world.scores.Objective;
+import net.minecraft.world.scores.ReadOnlyScoreInfo;
+import net.minecraft.world.scores.Scoreboard;
 import net.neoforged.neoforge.client.event.RenderPlayerEvent;
 
 /**
@@ -32,6 +39,11 @@ import net.neoforged.neoforge.client.event.RenderPlayerEvent;
  * runs (see {@code mixin.client}). Both renderers are built again with every resource reload.
  */
 public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClientPlayer, EntityModel<AbstractClientPlayer>> {
+    /** Within this distance squared, as for any player, the score of a below-name objective shows under the name. */
+    private static final double SCORE_LINE_DISTANCE_SQR = 100.0;
+    /** How far the name is lifted above a score line: one line of text at the name tag's scale. */
+    private static final float SCORE_LINE_HEIGHT = 9.0F * 1.15F * 0.025F;
+
     /**
      * How much bigger than its own size each form's model is drawn, and how far an Adjuchas is shifted back,
      * in blocks for each unit of the player's size. The Gillian model stands 2.5 blocks tall with its mask
@@ -70,7 +82,8 @@ public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClie
 
     /**
      * Draws a Gillian or Adjuchas player in its Menos body instead of the player model, which is then not
-     * drawn at all. The game still draws the shadow and the name tag as for any player. A spectator keeps
+     * drawn at all. The game still draws the shadow, and the name tag is drawn as for any player, with the
+     * score of a below-name objective under it (see {@link #renderNameTag}). A spectator keeps
      * the floating head vanilla gives it.
      */
     public static void onRenderPlayer(RenderPlayerEvent.Pre event) {
@@ -107,6 +120,29 @@ public final class MenosPlayerRenderer extends LivingEntityRenderer<AbstractClie
     @Override
     public ResourceLocation getTextureLocation(AbstractClientPlayer player) {
         return texture;
+    }
+
+    /**
+     * The name tag as the player renderer draws it, which this one stands in for: with the score of a
+     * below-name objective on a line under the name for anyone close by.
+     */
+    @Override
+    protected void renderNameTag(AbstractClientPlayer player, Component name, PoseStack poseStack,
+                                 MultiBufferSource buffer, int packedLight, float partialTick) {
+        poseStack.pushPose();
+        if (entityRenderDispatcher.distanceToSqr(player) < SCORE_LINE_DISTANCE_SQR) {
+            Scoreboard scoreboard = player.getScoreboard();
+            Objective objective = scoreboard.getDisplayObjective(DisplaySlot.BELOW_NAME);
+            if (objective != null) {
+                Component score = ReadOnlyScoreInfo.safeFormatValue(scoreboard.getPlayerScoreInfo(player, objective),
+                        objective.numberFormatOrDefault(StyledFormat.NO_STYLE));
+                super.renderNameTag(player, Component.empty().append(score).append(CommonComponents.SPACE)
+                        .append(objective.getDisplayName()), poseStack, buffer, packedLight, partialTick);
+                poseStack.translate(0.0F, SCORE_LINE_HEIGHT, 0.0F);
+            }
+        }
+        super.renderNameTag(player, name, poseStack, buffer, packedLight, partialTick);
+        poseStack.popPose();
     }
 
     /**

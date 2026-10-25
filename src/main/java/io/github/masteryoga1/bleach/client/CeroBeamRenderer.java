@@ -28,7 +28,8 @@ import org.joml.Vector3f;
  * from inside as well as out. The entity gives the box it is culled by, which holds the whole beam, or
  * the orb with its motes, and is drawn from up to 128 blocks away; the unaware never see it, as with
  * every spirit (see {@code mixin.client}). A caster looking out through its own eyes does not see its own
- * orb, which would sit in the camera (a player's HUD shows the gathering instead), only the fired beam.
+ * orb, which would sit in the camera (a player's HUD shows the gathering instead), and sees the fired beam
+ * start a few blocks out with no flare at its mouth, so the shot does not cover the screen.
  */
 public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
     public static final ResourceLocation BEAM_TEXTURE =
@@ -74,6 +75,12 @@ public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
     private static final float FLARE_ALPHA = 0.6F;
     /** Shorter than this, a fired beam has no tube to draw, only its flares. */
     private static final double MIN_LENGTH = 1.0E-3;
+    /**
+     * Seen through the eyes of the one who fired it, the beam starts this far past the mouth (plus so much
+     * per block of half-width) and has no mouth flare, so the shot does not cover the screen.
+     */
+    private static final double OWN_VIEW_GAP = 3.0;
+    private static final double OWN_VIEW_GAP_PER_RADIUS = 3.0;
     /** Twelve fixed directions spread evenly over a sphere on a golden spiral, for the motes. */
     private static final Vec3[] MOTE_DIRECTIONS = spiral(MOTES);
 
@@ -92,7 +99,7 @@ public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
         super.render(beam, entityYaw, partialTick, poseStack, buffer, packedLight);
     }
 
-    /** Whether the camera looks out through the eyes of the one gathering this Cero, in first person. */
+    /** Whether the camera looks out through the eyes of the one who gathers or fired this Cero, in first person. */
     private static boolean seenFromItsMouth(CeroBeam beam) {
         Minecraft minecraft = Minecraft.getInstance();
         LivingEntity owner = beam.owner();
@@ -133,7 +140,10 @@ public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
         }
     }
 
-    /** The fired beam, from the entity (where the mouth was) along its reach, with a flare at either end. */
+    /**
+     * The fired beam, from the entity (where the mouth was) along its reach, with a flare at either end. Seen
+     * through the eyes of the one who fired it, it starts a little way out instead, with no mouth flare.
+     */
     private void renderBeam(CeroBeam beam, float partialTick, PoseStack poseStack, MultiBufferSource buffer) {
         float fade = beam.fade(partialTick);
         if (fade <= 0.0F) {
@@ -143,26 +153,32 @@ public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
         double length = reach.length();
         float radius = beam.radius();
         int colour = beam.colour();
+        boolean fromItsMouth = seenFromItsMouth(beam);
+        double gap = fromItsMouth ? Math.min(length, OWN_VIEW_GAP + OWN_VIEW_GAP_PER_RADIUS * radius) : 0.0;
         VertexConsumer consumer = buffer.getBuffer(TYPE);
         // Lit as if facing the sky whichever way the beam runs, so the normals stay in the unturned pose.
         PoseStack.Pose upright = poseStack.last();
-        if (length > MIN_LENGTH) {
+        if (length - gap > MIN_LENGTH) {
             float scroll = -beam.firedAge(partialTick) * SCROLL_PER_TICK;
             poseStack.pushPose();
             // Turned so +y runs along the beam: first about y towards it, then down from straight up.
             poseStack.mulPose(Axis.YP.rotation((float) Mth.atan2(reach.x, reach.z)));
             poseStack.mulPose(Axis.XP.rotation((float) Math.acos(Mth.clamp(reach.y / length, -1.0, 1.0))));
+            poseStack.translate(0.0, gap, 0.0);
             PoseStack.Pose along = poseStack.last();
-            tube(consumer, along, upright, (float) length, radius * (1.0F - BEAM_NARROWING + BEAM_NARROWING * fade),
+            float tubeLength = (float) (length - gap);
+            tube(consumer, along, upright, tubeLength, radius * (1.0F - BEAM_NARROWING + BEAM_NARROWING * fade),
                     scroll, colour, BEAM_ALPHA * fade);
-            tube(consumer, along, upright, (float) length, radius * CORE_SHARE, scroll, CeroBeam.HOT_CORE,
+            tube(consumer, along, upright, tubeLength, radius * CORE_SHARE, scroll, CeroBeam.HOT_CORE,
                     CORE_ALPHA * fade);
             poseStack.popPose();
         }
         Quaternionf camera = entityRenderDispatcher.cameraOrientation();
         Vector3f right = new Vector3f(1.0F, 0.0F, 0.0F).rotate(camera);
         Vector3f up = new Vector3f(0.0F, 1.0F, 0.0F).rotate(camera);
-        flare(consumer, upright, Vec3.ZERO, MUZZLE_FLARE * radius * fade, right, up, colour, FLARE_ALPHA * fade);
+        if (!fromItsMouth) {
+            flare(consumer, upright, Vec3.ZERO, MUZZLE_FLARE * radius * fade, right, up, colour, FLARE_ALPHA * fade);
+        }
         flare(consumer, upright, reach, END_FLARE * radius * fade, right, up, colour, FLARE_ALPHA * fade);
     }
 

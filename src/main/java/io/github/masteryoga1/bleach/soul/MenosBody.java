@@ -190,10 +190,13 @@ public final class MenosBody {
         return player.getScale() > GIANT_SCALE;
     }
 
-    /** Whether this player is a mindless Gillian, refused items, placing and dealing with creatures. Both sides. */
+    /**
+     * Whether this player is a mindless Gillian, refused items, placing and dealing with creatures. Both sides.
+     * Creative and spectator players are spared, as from every other Hollow refusal.
+     */
     public static boolean mindless(Player player) {
-        return BleachConfig.get(BleachConfig.GILLIAN_MINDLESS) && SoulLogic.hasSoul(player)
-                && HollowTier.of(SoulLogic.get(player)) == HollowTier.GILLIAN;
+        return BleachConfig.get(BleachConfig.GILLIAN_MINDLESS) && HollowPlayerLogic.survivalRules(player)
+                && SoulLogic.hasSoul(player) && HollowTier.of(SoulLogic.get(player)) == HollowTier.GILLIAN;
     }
 
     /**

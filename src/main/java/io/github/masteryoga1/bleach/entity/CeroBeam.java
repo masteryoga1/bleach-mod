@@ -84,6 +84,8 @@ public class CeroBeam extends Entity {
      * at its size of 1: it grows with the caster ({@link #muzzleOf}).
      */
     public static final double LOOK_MUZZLE_AHEAD = 0.6;
+    /** How far short of a wall right in front of the face a looking shooter's Cero gathers. */
+    private static final double MUZZLE_WALL_MARGIN = 0.1;
     /** How far back along the beam from where it bursts the blast looks for what it can reach, in blocks. */
     public static final double BLAST_CLEARANCE = 0.2;
     /** The volume of the hiss of a Cero that fizzles. */
@@ -488,14 +490,22 @@ public class CeroBeam extends Entity {
 
     /**
      * Where the shooter's Cero gathers: a {@link Caster}'s own muzzle, or a little ahead of the eyes, further
-     * the bigger the shooter is, so a towering Menos player gathers it clear of its own mask.
+     * the bigger the shooter is, so a towering Menos player gathers it clear of its own mask. It never gathers
+     * past a wall, door or pane right in front of the face, or the beam would start on the far side of it.
      */
     public static Vec3 muzzleOf(LivingEntity shooter, float partialTick) {
         if (shooter instanceof Caster caster) {
             return caster.ceroMuzzle(partialTick);
         }
-        return shooter.getEyePosition(partialTick)
-                .add(shooter.getViewVector(partialTick).scale(LOOK_MUZZLE_AHEAD * shooter.getScale()));
+        Vec3 eye = shooter.getEyePosition(partialTick);
+        Vec3 view = shooter.getViewVector(partialTick);
+        Vec3 ahead = eye.add(view.scale(LOOK_MUZZLE_AHEAD * shooter.getScale()));
+        BlockHitResult wall = shooter.level().clip(new ClipContext(eye, ahead, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, CollisionContext.empty()));
+        if (wall.getType() == HitResult.Type.MISS) {
+            return ahead;
+        }
+        return eye.add(view.scale(Math.max(0.0, wall.getLocation().distanceTo(eye) - MUZZLE_WALL_MARGIN)));
     }
 
     /** The way the shooter would fire now: a {@link Caster}'s own aim (null with nothing in sight), or where it looks. */
