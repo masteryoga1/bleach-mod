@@ -18,7 +18,8 @@ import net.minecraft.world.entity.monster.Monster;
 /**
  * The kinds of Hollow and everything that sets them apart, in one table so the balance lives in one
  * place: their Normal-difficulty stats, how hard they chase and bite, their reiatsu, how big they may
- * grow, where the mask sits, how they are drawn and how often they come through a Garganta.
+ * grow, where the mask sits, how they are drawn and how often they come through a Garganta. The
+ * Menos Grande rows never come by the arrival pool: {@link Menos#arrivalKind} picks them.
  */
 public enum HollowKind implements StringRepresentable {
     SPIDER("spider", new Stats(60.0, 5.0, 2.0, 0.30, 32.0, 0.0, 0.0, 0.6), 20, 1.0, 50.0F, 10,
@@ -36,7 +37,15 @@ public enum HollowKind implements StringRepresentable {
     /** The first Hollow: it only ever comes by the script, never by chance. */
     FISHBONE_D("fishbone_d", new Stats(80.0, 6.0, 4.0, 0.25, 48.0, 0.6, 1.0, 1.0), 30, 1.0, 90.0F, 30,
             null, 1.0F, 1.0F,
-            new MaskSpot(0.55, 2.72, 0.8), new Look(1.45F, 0.45F, 0.3F, 1.0F), 0, Float.MAX_VALUE);
+            new MaskSpot(0.55, 2.72, 0.8), new Look(1.45F, 0.45F, 0.3F, 1.0F), 0, Float.MAX_VALUE),
+    /** A Menos Grande of the commonest class: a towering, near-identical giant. Never in the arrival pool; see Menos. */
+    GILLIAN("gillian", new Stats(300.0, 14.0, 8.0, 0.18, 48.0, 1.0, 2.0, 2.0), 50, 1.0, 450.0F, 60,
+            null, 1.0F, 1.0F,
+            new MaskSpot(1.6, 13.5, 3.0), new Look(6.0F, 0.0F, 0.0F, 1.8F), 0, Float.MAX_VALUE),
+    /** A Menos Grande that has won its own shape by devouring: a quick beast that hunts in packs. */
+    ADJUCHAS("adjuchas", new Stats(140.0, 9.0, 10.0, 0.34, 40.0, 0.6, 0.8, 1.5), 16, 1.15, 900.0F, 50,
+            null, 0.9F, 1.15F,
+            new MaskSpot(1.05, 1.8, 0.9), new Look(1.8F, 0.3F, 0.3F, 1.0F), 0, Float.MAX_VALUE);
 
     public static final Codec<HollowKind> CODEC = StringRepresentable.fromEnum(HollowKind::values);
 
@@ -118,6 +127,11 @@ public enum HollowKind implements StringRepresentable {
                 .add(Attributes.ATTACK_KNOCKBACK, stats.attackKnockback())
                 .add(Attributes.STEP_HEIGHT, stats.stepHeight())
                 .add(Attributes.SAFE_FALL_DISTANCE, SAFE_FALL_DISTANCE);
+    }
+
+    /** Whether this kind is a Menos Grande: a Gillian or an Adjuchas. */
+    public boolean isMenos() {
+        return this == GILLIAN || this == ADJUCHAS;
     }
 
     /** A size for a new Hollow of this kind, anywhere in its range. */

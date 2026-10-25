@@ -4,8 +4,10 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
+import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.entity.Menos;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.registry.ModEntities;
@@ -793,9 +795,22 @@ public final class BaitEvents {
     }
 
     /**
-     * The sky over a bait has just cracked. Nothing more comes through it yet: this is where a Menos
-     * Grande will step through, in the round that brings the great Hollows.
+     * The sky over a bait has just cracked: a Gillian pushes through it unless one could not land, the
+     * server has as many Menos as it allows, or this is a game test. It belongs to no site, so the site
+     * neither holds it, draws it up nor counts it, and it stays to fight once the sky has closed.
      */
     public static void onFinaleOpened(ServerLevel level, BaitSite site, GargantaRift sky) {
+        MinecraftServer server = level.getServer();
+        if (server instanceof GameTestServer
+                || level.getRandom().nextDouble() >= BleachConfig.get(BleachConfig.MENOS_FINALE_GILLIAN_CHANCE)
+                || Menos.aliveCount(server) >= BleachConfig.get(BleachConfig.MENOS_MAX_ALIVE)) {
+            return;
+        }
+        Vec3 feet = Gillian.skyLanding(level, sky.position());
+        if (feet == null) {
+            return;
+        }
+        ServerPlayer owner = server.getPlayerList().getPlayer(site.owner());
+        Gillian.emerge(level, feet, owner != null && owner.level() == level ? owner : null);
     }
 }

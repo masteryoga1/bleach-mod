@@ -2,9 +2,12 @@ package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.Adjuchas;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
@@ -30,8 +33,8 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * The mod's entity types: Shinigami and Quincy NPCs, Hollows, Pluses, the Garganta, zanpakutō
- * techniques, and the Quincy's arrows, blades and Gintō spells.
+ * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Pluses, the
+ * Garganta, zanpakutō techniques, the Cero, and the Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -129,6 +132,32 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .build(BleachMod.id("fishbone_d").toString()));
 
+    /**
+     * A Gillian, the commonest Menos Grande: fifteen blocks of black robe and a long white mask, with
+     * two hit boxes of its own above its knees (see {@link Gillian.Part}). Never saved, and seen from
+     * far away.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<Gillian>> GILLIAN =
+            ENTITY_TYPES.register("gillian", () -> EntityType.Builder
+                    .<Gillian>of(Gillian::new, MobCategory.MONSTER)
+                    .sized(Gillian.WIDTH, Gillian.HEIGHT)
+                    .eyeHeight(Gillian.EYE_HEIGHT)
+                    .fireImmune()
+                    .noSave()
+                    .clientTrackingRange(16)
+                    .build(BleachMod.id("gillian").toString()));
+
+    /** An Adjuchas, a Menos Grande that hunts in packs. Never saved. */
+    public static final DeferredHolder<EntityType<?>, EntityType<Adjuchas>> ADJUCHAS =
+            ENTITY_TYPES.register("adjuchas", () -> EntityType.Builder
+                    .<Adjuchas>of(Adjuchas::new, MobCategory.MONSTER)
+                    .sized(2.0F, 2.5F)
+                    .eyeHeight(1.9F)
+                    .fireImmune()
+                    .noSave()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("adjuchas").toString()));
+
     // ---- Pluses and the Garganta ----
 
     public static final DeferredHolder<EntityType<?>, EntityType<PlusSpirit>> PLUS =
@@ -150,6 +179,22 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .updateInterval(20)
                     .build(BleachMod.id("garganta").toString()));
+
+    // ---- Hollow techniques ----
+
+    /**
+     * A Cero: the red light a Menos gathers at its mouth and lets go as a beam. It lives a few seconds
+     * at most and is never saved; clients follow its caster themselves while it gathers.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<CeroBeam>> CERO_BEAM =
+            ENTITY_TYPES.register("cero_beam", () -> EntityType.Builder
+                    .<CeroBeam>of(CeroBeam::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .noSave()
+                    .fireImmune()
+                    .clientTrackingRange(8)
+                    .updateInterval(Integer.MAX_VALUE)
+                    .build(BleachMod.id("cero_beam").toString()));
 
     // ---- Zanpakutō techniques ----
 
@@ -246,6 +291,8 @@ public final class ModEntities {
             case HOUND -> HOUND_HOLLOW.get();
             case SERPENT -> SERPENT_HOLLOW.get();
             case FISHBONE_D -> FISHBONE_D.get();
+            case GILLIAN -> GILLIAN.get();
+            case ADJUCHAS -> ADJUCHAS.get();
         };
     }
 
@@ -260,6 +307,8 @@ public final class ModEntities {
         event.put(HOUND_HOLLOW.get(), HoundHollow.createAttributes().build());
         event.put(SERPENT_HOLLOW.get(), SerpentHollow.createAttributes().build());
         event.put(FISHBONE_D.get(), FishboneD.createAttributes().build());
+        event.put(GILLIAN.get(), Gillian.createAttributes().build());
+        event.put(ADJUCHAS.get(), Adjuchas.createAttributes().build());
         event.put(PLUS.get(), PlusSpirit.createAttributes().build());
     }
 }

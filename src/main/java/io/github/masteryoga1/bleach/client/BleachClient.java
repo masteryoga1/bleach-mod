@@ -3,7 +3,9 @@ package io.github.masteryoga1.bleach.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.FishboneD;
+import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
@@ -44,7 +46,7 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * Client-only entry point: HUD, screens, key bindings, and how souls, zanpakutō techniques, the
- * Quincy's reishi and a Hollow's body are drawn.
+ * Quincy's reishi, a Hollow's body and a Cero are drawn.
  */
 @Mod(value = BleachMod.MODID, dist = Dist.CLIENT)
 public final class BleachClient {
@@ -111,8 +113,8 @@ public final class BleachClient {
      * the Academy's instructor, the wounded Shinigami, the Quincy Elder and the Quincy Hunter. Hollows
      * use the vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
      * Zanpakutō techniques and Gintō spells are drawn from plain shapes and the mod's placeholder
-     * textures, and the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
-     * in the mod's own textures.
+     * textures, the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
+     * in the mod's own textures, and a Cero as the vanilla beacon beam in its own colour.
      * The type arguments are spelled out rather than left for the compiler to infer through the lambdas.
      */
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
@@ -128,7 +130,7 @@ public final class BleachClient {
                 context -> new QuincyNpcRenderer<QuincyElder>(context, elder));
         event.registerEntityRenderer(ModEntities.QUINCY_HUNTER.get(),
                 context -> new QuincyNpcRenderer<QuincyHunter>(context, hunter));
-        // Spiders end on their backs when they die; the rest fall on their sides.
+        // Spiders end on their backs when they die; the rest fall on their sides, all but the Gillian.
         event.registerEntityRenderer(ModEntities.SPIDER_HOLLOW.get(),
                 context -> new HollowRenderer<SpiderHollow, SpiderModel<SpiderHollow>>(context,
                         new SpiderModel<>(context.bakeLayer(ModelLayers.SPIDER)),
@@ -149,6 +151,16 @@ public final class BleachClient {
                 context -> new HollowRenderer<FishboneD, FishboneDModel>(context,
                         new FishboneDModel(context.bakeLayer(BleachModelLayers.FISHBONE_D)),
                         HollowKind.FISHBONE_D, 90.0F));
+        // A dying Gillian does not fall over: a body fifteen blocks tall swinging flat would sweep through the camera.
+        event.registerEntityRenderer(ModEntities.GILLIAN.get(),
+                context -> new HollowRenderer<Gillian, GillianModel>(context,
+                        new GillianModel(context.bakeLayer(BleachModelLayers.GILLIAN)),
+                        HollowKind.GILLIAN, 0.0F));
+        event.registerEntityRenderer(ModEntities.ADJUCHAS.get(),
+                context -> new HollowRenderer<Adjuchas, AdjuchasModel>(context,
+                        new AdjuchasModel(context.bakeLayer(BleachModelLayers.ADJUCHAS)),
+                        HollowKind.ADJUCHAS, 90.0F));
+        event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.PLUS.get(), PlusRenderer::new);
         event.registerEntityRenderer(ModEntities.GARGANTA.get(), GargantaRenderer::new);
         event.registerEntityRenderer(ModEntities.GETSUGA_TENSHO.get(), GetsugaTenshoRenderer::new);

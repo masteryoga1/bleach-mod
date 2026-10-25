@@ -3,10 +3,13 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
+import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.entity.Menos;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
@@ -104,7 +107,10 @@ public final class GargantaEvents {
             return;
         }
         if (player.getRandom().nextDouble() < HollowLogic.arrivalChancePerCheck(data, level.isNight())) {
-            openArrival(player, data, null, now, false);
+            // A strong soul now and then draws a Menos Grande instead, while the server has room for one here.
+            HollowKind menos = Menos.arrivalKind(data.maxReiryoku(), player.getRandom().nextDouble(),
+                    player.getRandom().nextDouble());
+            openArrival(player, data, menos != null && Menos.mayArrive(level, player.position()) ? menos : null, now, false);
         }
     }
 
@@ -134,7 +140,9 @@ public final class GargantaEvents {
      * Opens a Garganta near the soul, with the Hollows it drew: of a kind picked by its reiatsu, or the
      * one given. Stronger souls draw Hound packs and second Hollows, never more than the cap allows.
      * A command ignores the cap and leaves the cooldown alone. The young Quincy Hunter may follow a
-     * natural arrival (see {@link QuincyNpcEvents#onNaturalArrival}).
+     * natural arrival (see {@link QuincyNpcEvents#onNaturalArrival}). A Menos Grande comes its own way,
+     * a Gillian down through its own tear and an Adjuchas pack as lesser Hollows do, and the Hunter
+     * never follows one.
      *
      * @return false, changing nothing, if there was no open ground for the Hollows to land on
      */
@@ -146,6 +154,9 @@ public final class GargantaEvents {
                 : HollowLogic.pickArrival(reiatsu, plusesNear(level, player), level.getRandom());
         int room = byCommand ? Integer.MAX_VALUE
                 : BleachConfig.get(BleachConfig.MAX_NEARBY_HOLLOWS) - hollowsNear(level, player.position());
+        if (kind.isMenos()) {
+            return openMenosArrival(player, data, kind, room, now, byCommand);
+        }
         int count = HollowLogic.groupSize(kind, reiatsu, room, level.getRandom().nextDouble());
         EntityType<? extends Hollow> type = ModEntities.hollowType(kind);
         // Room for the biggest Hollow of the kind, as each rolls its size only as it drops.
@@ -165,6 +176,57 @@ public final class GargantaEvents {
         }
         if (QuincyNpcLogic.hunterMayCome(kind, byCommand)) {
             QuincyNpcEvents.onNaturalArrival(player, data, kind, now);
+        }
+        return true;
+    }
+
+    /**
+     * A Menos Grande comes for the soul. A Gillian pushes down through a tear of its own further off,
+     * its head in the tear, and sinks to the ground (see {@link Gillian#emerge}); an Adjuchas pack drops
+     * from a small tear as lesser Hollows do, two or three strong by the soul's reiatsu and the room
+     * left. Either sets the soul's arrival cooldown unless a command brought it. No Quincy Hunter follows.
+     *
+     * @return false, changing nothing, if there was no open ground or the world refused it
+     */
+    private static boolean openMenosArrival(ServerPlayer player, SoulData data, HollowKind kind, int room, long now,
+                                            boolean byCommand) {
+        ServerLevel level = player.serverLevel();
+        if (kind == HollowKind.GILLIAN) {
+            EntityType<Gillian> type = ModEntities.GILLIAN.get();
+            Vec3 landing = SpawnSpots.openGround(level, player, type, 1.0F, Gillian.ARRIVAL_MIN_DISTANCE,
+                    Gillian.ARRIVAL_MAX_DISTANCE, SPOT_TRIES, SPOT_MAX_RISE);
+            if (landing == null) {
+                return false;
+            }
+            Vec3 feet = landing.add(0.0, SpawnSpots.clearAbove(level, type, 1.0F, landing, Gillian.ARRIVAL_RISE), 0.0);
+            GargantaRift tear = GargantaRift.arrival(level, feet.add(0.0, Gillian.EMERGE_BELOW_TEAR, 0.0), now, List.of(),
+                    player, Gillian.ARRIVAL_TEAR_SIZE);
+            if (!level.addFreshEntity(tear)) {
+                return false;
+            }
+            if (Gillian.emerge(level, feet, player) == null) {
+                // Gone before its first tick, so it never opened: no sound, no pager.
+                tear.discard();
+                return false;
+            }
+        } else {
+            int count = Menos.packSize(data.maxReiryoku(), room);
+            EntityType<Adjuchas> type = ModEntities.ADJUCHAS.get();
+            float scale = HollowKind.ADJUCHAS.scaleMax;
+            Vec3 landing = SpawnSpots.openGround(level, player, type, scale, SPOT_MIN_DISTANCE, SPOT_MAX_DISTANCE,
+                    SPOT_TRIES, SPOT_MAX_RISE);
+            if (landing == null) {
+                return false;
+            }
+            Vec3 at = landing.add(0.0, SpawnSpots.clearAbove(level, type, scale, landing, RIFT_MAX_HEIGHT), 0.0);
+            GargantaRift rift = GargantaRift.arrival(level, at, now, Collections.nCopies(count, HollowKind.ADJUCHAS),
+                    player, Adjuchas.ARRIVAL_TEAR_SIZE);
+            if (!level.addFreshEntity(rift)) {
+                return false;
+            }
+        }
+        if (!byCommand) {
+            data.setHunt(data.hunt().withLastArrivalAt(now));
         }
         return true;
     }

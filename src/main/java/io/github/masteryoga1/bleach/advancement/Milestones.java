@@ -121,6 +121,11 @@ public final class Milestones {
     public static final String SOULS_WITHIN = "souls_within";
     /** A Hollow cleansed back into a soul, by the Academy's instructor or a Shinigami's blade. Granted when it happens. */
     public static final String CLEANSED = "cleansed";
+    /**
+     * Bested a Menos Grande: killed, purified or devoured a Gillian or Adjuchas, or drove a Gillian back into the sky.
+     * Granted when it happens.
+     */
+    public static final String MENOS_GRANDE = "menos_grande";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
