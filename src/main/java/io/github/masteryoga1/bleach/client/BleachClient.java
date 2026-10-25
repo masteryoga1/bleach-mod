@@ -46,7 +46,7 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * Client-only entry point: HUD, screens, key bindings, and how souls, zanpakutō techniques, the
- * Quincy's reishi, a Hollow's body and a Cero are drawn.
+ * Quincy's reishi, a Hollow's body (a Menos player's whole body too) and a Cero are drawn.
  */
 @Mod(value = BleachMod.MODID, dist = Dist.CLIENT)
 public final class BleachClient {
@@ -73,6 +73,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachModelLayers::register);
         QuincyClient.register(modEventBus);
         HollowPlayerClient.register(NeoForge.EVENT_BUS);
+        NeoForge.EVENT_BUS.addListener(MenosPlayerRenderer::onRenderPlayer);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onClientTickPre);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onPlayerTickPre);
@@ -102,6 +103,7 @@ public final class BleachClient {
         event.register(QuincyClient.BLUT_KEY);
         event.register(QuincyClient.FORM_KEY);
         event.register(HollowKeys.DEVOUR);
+        event.register(HollowKeys.CERO);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
@@ -153,12 +155,12 @@ public final class BleachClient {
                         HollowKind.FISHBONE_D, 90.0F));
         // A dying Gillian does not fall over: a body fifteen blocks tall swinging flat would sweep through the camera.
         event.registerEntityRenderer(ModEntities.GILLIAN.get(),
-                context -> new HollowRenderer<Gillian, GillianModel>(context,
-                        new GillianModel(context.bakeLayer(BleachModelLayers.GILLIAN)),
+                context -> new HollowRenderer<Gillian, GillianModel<Gillian>>(context,
+                        new GillianModel<>(context.bakeLayer(BleachModelLayers.GILLIAN)),
                         HollowKind.GILLIAN, 0.0F));
         event.registerEntityRenderer(ModEntities.ADJUCHAS.get(),
-                context -> new HollowRenderer<Adjuchas, AdjuchasModel>(context,
-                        new AdjuchasModel(context.bakeLayer(BleachModelLayers.ADJUCHAS)),
+                context -> new HollowRenderer<Adjuchas, AdjuchasModel<Adjuchas>>(context,
+                        new AdjuchasModel<>(context.bakeLayer(BleachModelLayers.ADJUCHAS)),
                         HollowKind.ADJUCHAS, 90.0F));
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.PLUS.get(), PlusRenderer::new);
@@ -177,13 +179,15 @@ public final class BleachClient {
     }
 
     /**
-     * Adds a Hollow's body (the hole, dark forearms and claws), the chain and mask layer, the sheathed
-     * blade, Blut Vene's veins and the Quincy arts (the Sanrei Glove, Letzt Stil's burning lines, and
-     * Vollständig's wings and halo) to both player models (wide and slim arms). The body goes under the
-     * mask. The sheath takes the look of the blade the player carries, and the arts the look of the
-     * Quincy, as their appearance tells.
+     * Adds a Hollow's body (the hole, dark forearms and claws, and a Vasto Lorde's bone), the chain and
+     * mask layer, the sheathed blade, Blut Vene's veins and the Quincy arts (the Sanrei Glove, Letzt Stil's
+     * burning lines, and Vollständig's wings and halo) to both player models (wide and slim arms). The body
+     * goes under the mask. The sheath takes the look of the blade the player carries, and the arts the look
+     * of the Quincy, as their appearance tells. The bodies a Gillian or Adjuchas player is drawn in instead
+     * are built afresh here too, since this comes again with every resource reload.
      */
     private static void addLayers(EntityRenderersEvent.AddLayers event) {
+        MenosPlayerRenderer.build(event.getContext());
         for (PlayerSkin.Model skin : event.getSkins()) {
             EntityRenderer<? extends Player> renderer = event.getSkin(skin);
             if (renderer instanceof PlayerRenderer playerRenderer) {

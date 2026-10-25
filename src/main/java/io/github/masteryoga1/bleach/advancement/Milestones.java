@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.quincy.QuincyStage;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
+import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
@@ -126,6 +127,15 @@ public final class Milestones {
      * Granted when it happens.
      */
     public static final String MENOS_GRANDE = "menos_grande";
+    /**
+     * Became a Gillian by devouring. Granted when it happens and by {@link #check}, as are the two below,
+     * which also count a form set by command or reached before a purification.
+     */
+    public static final String GILLIAN = "gillian";
+    /** Rose from a Gillian to an Adjuchas. */
+    public static final String ADJUCHAS = "adjuchas";
+    /** Became a Vasto Lorde. */
+    public static final String VASTO_LORDE = "vasto_lorde";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -229,6 +239,17 @@ public final class Milestones {
         }
         if (hollow.souls() >= HollowPlayerLogic.SOULS_WITHIN) {
             trigger.trigger(player, SOULS_WITHIN);
+        }
+        // The highest form ever reached, so a soul purified since still counts, or the form set by command.
+        int form = Math.max(hollow.evolution().peakTier(), HollowTier.of(data).tier());
+        if (form >= HollowTier.GILLIAN.tier()) {
+            trigger.trigger(player, GILLIAN);
+        }
+        if (form >= HollowTier.ADJUCHAS.tier()) {
+            trigger.trigger(player, ADJUCHAS);
+        }
+        if (form >= HollowTier.VASTO_LORDE.tier()) {
+            trigger.trigger(player, VASTO_LORDE);
         }
     }
 

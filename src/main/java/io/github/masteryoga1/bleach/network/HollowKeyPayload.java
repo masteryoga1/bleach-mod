@@ -12,8 +12,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * Client to server: the Devour key went down (with the id of the creature under the crosshair, or -1),
- * came up, or was pressed while sneaking. The id is only a hint: the server checks the creature again,
- * and ignores the id for anything but a press.
+ * came up, or was pressed while sneaking; or the Cero key went down or came up, or a gathering Cero was
+ * called off. The id is only a hint: the server checks the creature again, and ignores the id for anything
+ * but a Devour press.
  */
 public record HollowKeyPayload(HollowKey key, int target) implements CustomPacketPayload {
     public static final Type<HollowKeyPayload> TYPE = new Type<>(BleachMod.id("hollow_key"));

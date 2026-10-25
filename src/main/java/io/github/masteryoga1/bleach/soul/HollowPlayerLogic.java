@@ -16,7 +16,8 @@ import net.minecraft.world.item.ItemStack;
  * for. Like {@link SoulLogic}, these read only their arguments and the config, send nothing and are
  * safe on both sides, so game tests can call them directly. What they do to a player is in
  * {@link HollowBody}. Every rule for a Hollow player asks {@link #isHollow}, so the states that count
- * as one are decided in one place (the Arrancar keep today's rules for now).
+ * as one are decided in one place (the Arrancar keep today's rules for now). A Menos form changes the
+ * claws, hide and regeneration through {@link HollowTier}'s factors, inside these same rules.
  */
 public final class HollowPlayerLogic {
     /** How hungry a Hollow is. Lower in the list is hungrier. Never sent or saved. */
@@ -29,13 +30,21 @@ public final class HollowPlayerLogic {
         STARVING
     }
 
-    // The SoulAppearance.hollowLook bits. 8 to 64 are kept for the Menos tiers and Cero.
+    // The SoulAppearance.hollowLook bits.
     /** The jaw of the mask hangs open: the Hollow is devouring. */
     public static final int LOOK_DEVOURING = 1;
     /** The mask is cracked from a blow. */
     public static final int LOOK_MASK_CRACKED = 2;
     /** The eyes burn red: the Hollow is ravenous or starving. */
     public static final int LOOK_RAVENOUS = 4;
+    /** The Hollow is a Gillian, drawn as one. */
+    public static final int LOOK_GILLIAN = 8;
+    /** The Hollow is an Adjuchas, drawn as one. */
+    public static final int LOOK_ADJUCHAS = 16;
+    /** The Hollow is a Vasto Lorde: a person's body with bone over it. */
+    public static final int LOOK_VASTO_LORDE = 32;
+    /** A Cero is gathering at the Menos's mouth. */
+    public static final int LOOK_CERO_CHARGING = 64;
     /** With {@link #LOOK_DEVOURING}: the prey is a Plus, so the hold is a Plus's (its owner's devour bar reads it). */
     public static final int LOOK_DEVOURING_PLUS = 128;
     /** How many mask shapes there are: 0 skull, 1 fanged, 2 horned, 3 beaked. */
@@ -48,6 +57,8 @@ public final class HollowPlayerLogic {
     public static final int[] SOUL_STIRRINGS = {25, 50, 100, 200};
     /** A hungry Hollow smells no soul nearer than this, which it could see for itself. */
     public static final double SCENT_MIN_DISTANCE = 12.0;
+    /** The most armour any body bears: the attribute's own cap, which a Menos hide may reach. */
+    private static final double MOST_ARMOUR = 30.0;
 
     private HollowPlayerLogic() {
     }
@@ -85,7 +96,8 @@ public final class HollowPlayerLogic {
 
     /**
      * Damage the claws add to a bare-handed blow: a base and a share of the square root of maximum
-     * reiryoku, up to a cap, and sharper still while ravenous or starving.
+     * reiryoku, up to a cap, sharper still while ravenous or starving, and multiplied by the Menos form's
+     * claws.
      */
     public static float clawBonus(SoulData data) {
         double root = Math.sqrt(Math.max(0.0F, data.maxReiryoku()));
@@ -94,7 +106,7 @@ public final class HollowPlayerLogic {
         if (band(data) != Band.FED) {
             claws *= BleachConfig.get(BleachConfig.RAVENOUS_CLAW_MULTIPLIER);
         }
-        return (float) claws;
+        return (float) (claws * HollowTier.of(data).clawMultiplier());
     }
 
     /** The attack speed modifier that makes bare-handed blows come at the configured rate, from vanilla's four a second. */
@@ -102,16 +114,25 @@ public final class HollowPlayerLogic {
         return BleachConfig.get(BleachConfig.CLAW_ATTACKS_PER_SECOND) / 4.0 - 1.0;
     }
 
-    /** Armour the hide gives: a base and a share of the square root of maximum reiryoku, up to a cap. */
+    /** {@link #clawSpeedModifier()} at the rate of this soul's form: a Gillian swings slower, an Adjuchas as fast. */
+    public static double clawSpeedModifier(SoulData data) {
+        return HollowTier.of(data).clawAttacksPerSecond() / 4.0 - 1.0;
+    }
+
+    /**
+     * Armour the hide gives: a base and a share of the square root of maximum reiryoku, up to a cap, and
+     * the Menos form's own on top, up to the most armour any body bears.
+     */
     public static float hideArmour(SoulData data) {
         double root = Math.sqrt(Math.max(0.0F, data.maxReiryoku()));
-        return (float) Math.min(BleachConfig.get(BleachConfig.HIDE_ARMOR_MAX),
+        double hide = Math.min(BleachConfig.get(BleachConfig.HIDE_ARMOR_MAX),
                 BleachConfig.get(BleachConfig.HIDE_ARMOR_BASE) + BleachConfig.get(BleachConfig.HIDE_ARMOR_PER_SQRT) * root);
+        return (float) Math.min(MOST_ARMOUR, hide + HollowTier.of(data).hideBonus());
     }
 
     /**
      * Health a Hollow regenerates a second: a base and more for every hundred maximum reiryoku, up to a
-     * cap, slower while ravenous and none while starving.
+     * cap, slower while ravenous and none while starving, and multiplied by the Menos form's healing.
      */
     public static float regenPerSecond(SoulData data) {
         Band band = band(data);
@@ -124,7 +145,7 @@ public final class HollowPlayerLogic {
         if (band == Band.RAVENOUS) {
             perSecond *= BleachConfig.get(BleachConfig.RAVENOUS_REGEN_MULTIPLIER);
         }
-        return (float) perSecond;
+        return (float) (perSecond * HollowTier.of(data).regenerationMultiplier());
     }
 
     /** How fast reiryoku refills for this soul (see ShinigamiLogic#regenMultiplier): slower for a hungry Hollow. */
@@ -220,15 +241,19 @@ public final class HollowPlayerLogic {
         return Math.floorMod(id.hashCode(), MASK_VARIANTS);
     }
 
-    /** The look bits the soul's saved data gives, so its owner's client can work them out too: red eyes while hungry. */
+    /**
+     * The look bits the soul's saved data gives, so its owner's client can work them out too: red eyes
+     * while hungry, and the Menos form.
+     */
     public static int hollowLook(SoulData data) {
-        return isHollow(data) && data.hollow().hungerStarted() && band(data) != Band.FED ? LOOK_RAVENOUS : 0;
+        int look = isHollow(data) && data.hollow().hungerStarted() && band(data) != Band.FED ? LOOK_RAVENOUS : 0;
+        return look | HollowTier.of(data).lookBit();
     }
 
     /**
      * Every look bit, with those only the server knows: the jaw open while devouring (and whether the
-     * prey is a Plus, whose hold has its own length) and the mask cracked after a blow. On a client's copy those are at
-     * their defaults and add nothing.
+     * prey is a Plus, whose hold has its own length), the mask cracked after a blow, and a Cero gathering.
+     * On a client's copy those are at their defaults and add nothing.
      */
     public static int hollowLook(SoulData data, long now) {
         int look = hollowLook(data);
@@ -238,11 +263,28 @@ public final class HollowPlayerLogic {
         if (now < data.hollowCrackedUntil) {
             look |= LOOK_MASK_CRACKED;
         }
+        if (data.ceroBeamId >= 0) {
+            look |= LOOK_CERO_CHARGING;
+        }
         return look;
     }
 
-    /** The soul screen's next step for a Hollow: how to feed before the first meal, and what feeding builds after. */
+    /**
+     * The soul screen's next step for a Hollow: how to feed before the first meal and what feeding builds
+     * after, and for a Menos what its form needs to rise, or why it rises no further.
+     */
     public static String nextStepKey(SoulData data) {
-        return data.hollow().meals() > 0 ? "hollow.fed" : "hollow";
+        HollowProgress.Evolution evolution = data.hollow().evolution();
+        return switch (HollowTier.of(data)) {
+            case HOLLOW -> data.hollow().meals() > 0 ? "hollow.fed" : "hollow";
+            case GILLIAN -> BleachConfig.get(BleachConfig.ADJUCHAS_REGRESSION) == HollowTier.Regression.CANON
+                    && evolution.regressions() >= 1 ? "hollow.gillian.lost" : "hollow.gillian";
+            case ADJUCHAS -> switch (evolution.stall()) {
+                case HollowProgress.Evolution.STALL_UNDESTINED -> "hollow.adjuchas.stalled";
+                case HollowProgress.Evolution.STALL_FULL -> "hollow.adjuchas.full";
+                default -> "hollow.adjuchas";
+            };
+            case VASTO_LORDE -> "hollow.vasto_lorde";
+        };
     }
 }

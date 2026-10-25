@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.config;
 
 import io.github.masteryoga1.bleach.quincy.BloodlineMode;
+import io.github.masteryoga1.bleach.soul.HollowTier;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -430,6 +431,38 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue ADJUCHAS_CERO_MAX_BLOCKS;
     public static final ModConfigSpec.IntValue ADJUCHAS_CERO_COOLDOWN_SECONDS;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_KNOCKBACK;
+
+    /** The numbers of one Menos form a Hollow player can rise to, each in its own section of {@code [hollow_evolution]}. */
+    public record MenosForm(ModConfigSpec.DoubleValue scale, ModConfigSpec.DoubleValue healthBonus,
+            ModConfigSpec.DoubleValue speedMultiplier, ModConfigSpec.DoubleValue clawMultiplier,
+            ModConfigSpec.DoubleValue clawAttacksPerSecond, ModConfigSpec.DoubleValue hideBonus,
+            ModConfigSpec.DoubleValue regenerationMultiplier, ModConfigSpec.DoubleValue stepBonus,
+            ModConfigSpec.DoubleValue reiryokuGrowth, ModConfigSpec.DoubleValue ceroDamage,
+            ModConfigSpec.IntValue ceroChargeTicks, ModConfigSpec.DoubleValue ceroRadius) {
+    }
+
+    public static final MenosForm GILLIAN_FORM;
+    public static final MenosForm ADJUCHAS_FORM;
+    public static final MenosForm VASTO_LORDE_FORM;
+    public static final ModConfigSpec.IntValue GILLIAN_SOULS;
+    public static final ModConfigSpec.IntValue GILLIAN_HOLLOWS;
+    public static final ModConfigSpec.IntValue ADJUCHAS_HOLLOWS;
+    public static final ModConfigSpec.IntValue ADJUCHAS_MENOS;
+    public static final ModConfigSpec.IntValue VASTO_HOLLOWS;
+    public static final ModConfigSpec.IntValue VASTO_ADJUCHAS;
+    public static final ModConfigSpec.DoubleValue VASTO_DESTINED_SHARE;
+    public static final ModConfigSpec.IntValue VASTO_MAX;
+    public static final ModConfigSpec.EnumValue<HollowTier.Regression> ADJUCHAS_REGRESSION;
+    public static final ModConfigSpec.IntValue REGRESS_MINUTES;
+    public static final ModConfigSpec.BooleanValue GILLIAN_MINDLESS;
+    public static final ModConfigSpec.DoubleValue MENOS_RIVAL_SHARE;
+    public static final ModConfigSpec.DoubleValue CERO_MIN_CHARGE;
+    public static final ModConfigSpec.DoubleValue CERO_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue CERO_MIN_COST;
+    public static final ModConfigSpec.IntValue CERO_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue CERO_DAMAGE_PER_ROOT_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue CERO_MAX_DAMAGE;
+    public static final ModConfigSpec.DoubleValue CERO_RANGE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -1748,10 +1781,118 @@ public final class BleachConfig {
         builder.pop();
         builder.pop();
 
+        builder.push("hollow_evolution");
+        GILLIAN_SOULS = builder
+                .comment("Souls a Hollow player must hold within to become a Gillian.")
+                .defineInRange("gillian_souls", 250, 0, 100_000);
+        GILLIAN_HOLLOWS = builder
+                .comment("Hollow mobs a Hollow player must have devoured in its life to become a Gillian.")
+                .defineInRange("gillian_hollows", 20, 0, 10_000);
+        ADJUCHAS_HOLLOWS = builder
+                .comment("Hollows (mobs, Menos or Hollow players) a Gillian must devour to become an Adjuchas. Under SOFT"
+                        + " regression, a Gillian that has sunk back needs this many more for each time it did.")
+                .defineInRange("adjuchas_hollows", 30, 0, 10_000);
+        ADJUCHAS_MENOS = builder
+                .comment("How many of those must be Menos, a Gillian or an Adjuchas.")
+                .defineInRange("adjuchas_menos", 2, 0, 100);
+        VASTO_HOLLOWS = builder
+                .comment("Hollows (mobs, Menos or Hollow players) an Adjuchas must devour to become a Vasto Lorde, if it is"
+                        + " destined to.")
+                .defineInRange("vasto_hollows", 40, 0, 10_000);
+        VASTO_ADJUCHAS = builder
+                .comment("How many of those must be Adjuchas.")
+                .defineInRange("vasto_adjuchas", 3, 0, 100);
+        VASTO_DESTINED_SHARE = builder
+                .comment("Share of souls destined to become a Vasto Lorde, fixed for each player in each world. 1 makes every"
+                        + " Adjuchas destined.")
+                .defineInRange("vasto_destined_share", 0.25, 0.0, 1.0);
+        VASTO_MAX = builder
+                .comment("Most Vasto Lorde the server holds by devouring, counting those offline. 0 allows none. Commands"
+                        + " ignore it.")
+                .defineInRange("vasto_max", 10, 0, 100);
+        ADJUCHAS_REGRESSION = builder
+                .comment("What an Adjuchas risks when it goes without devouring a Hollow: SOFT, it sinks back into a Gillian"
+                        + " and may rise again for more Hollows; CANON, it sinks back for good; OFF, nothing. The clock runs"
+                        + " only where Hollows come for it: in the Overworld, off Peaceful, with mob spawning and Garganta"
+                        + " arrivals on.")
+                .defineEnum("regression", HollowTier.Regression.SOFT);
+        REGRESS_MINUTES = builder
+                .comment("Minutes of play without devouring a Hollow before an Adjuchas sinks back into a Gillian.")
+                .defineInRange("regress_minutes", 30, 1, 600);
+        GILLIAN_MINDLESS = builder
+                .comment("Whether a Gillian is too mindless to use items, place blocks or deal with creatures (a bare hand"
+                        + " still opens doors and chests).")
+                .define("gillian_mindless", true);
+        MENOS_RIVAL_SHARE = builder
+                .comment("Share of the Garganta arrivals for a Menos Hollow player that bring a Menos Grande, at any"
+                        + " reiatsu.")
+                .defineInRange("menos_rival_share", 0.3, 0.0, 1.0);
+        CERO_MIN_CHARGE = builder
+                .comment("Share of its gather a player's Cero needs to fire when the key is let go. Less fizzles out.")
+                .defineInRange("cero_min_charge", 0.5, 0.05, 1.0);
+        CERO_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku a player's Cero costs when it fires.")
+                .defineInRange("cero_cost_fraction", 0.12, 0.0, 1.0);
+        CERO_MIN_COST = builder
+                .comment("Least reiryoku a player's Cero costs.")
+                .defineInRange("cero_min_cost", 5.0, 0.0, 10_000.0);
+        CERO_COOLDOWN_SECONDS = builder
+                .comment("Seconds between one Cero a player fires and the next.")
+                .defineInRange("cero_cooldown_seconds", 4, 0, 120);
+        CERO_DAMAGE_PER_ROOT_REIRYOKU = builder
+                .comment("Damage a player's Cero gains for each square root of maximum reiryoku.")
+                .defineInRange("cero_damage_per_root_reiryoku", 0.6, 0.0, 10.0);
+        CERO_MAX_DAMAGE = builder
+                .comment("Most damage a player's Cero deals.")
+                .defineInRange("cero_max_damage", 80.0, 0.0, 1_000.0);
+        CERO_RANGE = builder
+                .comment("Blocks a player's Cero reaches.")
+                .defineInRange("cero_range", 48.0, 4.0, 96.0);
+        GILLIAN_FORM = form(builder, "gillian", "a Gillian", 6.0, 60.0, 0.7, 1.5, 1.0, 4.0, 1.0, 1.4, 0.2, 10.0, 50, 1.4);
+        ADJUCHAS_FORM = form(builder, "adjuchas", "an Adjuchas", 1.5, 40.0, 1.3, 1.3, 2.0, 6.0, 1.5, 0.4, 0.4, 12.0, 25, 0.8);
+        VASTO_LORDE_FORM = form(builder, "vasto_lorde", "a Vasto Lorde", 1.0, 60.0, 1.2, 1.6, 2.5, 10.0, 2.0, 0.0, 0.65, 16.0,
+                15, 1.0);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
     private BleachConfig() {
+    }
+
+    /** One Menos form's section, {@code [hollow_evolution.<name>]}, with its defaults; {@code who} names it in comments. */
+    private static MenosForm form(ModConfigSpec.Builder builder, String name, String who, double scale, double health,
+                                  double speed, double claws, double clawRate, double hide, double regeneration, double step,
+                                  double growth, double ceroDamage, int ceroChargeTicks, double ceroRadius) {
+        builder.push(name);
+        MenosForm form = new MenosForm(
+                builder.comment("How many times a person's height " + who + " stands (a person is 1.8 blocks tall).")
+                        .defineInRange("scale", scale, 1.0, 8.0),
+                builder.comment("Maximum health " + who + " gains on top of a person's 20 (2 is a heart).")
+                        .defineInRange("health_bonus", health, 0.0, 400.0),
+                builder.comment("What the walking speed of " + who + " is multiplied by.")
+                        .defineInRange("speed_multiplier", speed, 0.2, 3.0),
+                builder.comment("What the damage the claws add is multiplied by for " + who + ".")
+                        .defineInRange("claw_multiplier", claws, 0.5, 5.0),
+                builder.comment("Bare-handed blows " + who + " strikes each second.")
+                        .defineInRange("claw_attacks_per_second", clawRate, 0.25, 20.0),
+                builder.comment("Armour points added to the hide of " + who + ", on top of a Hollow's (30 at most in all).")
+                        .defineInRange("hide_bonus", hide, 0.0, 30.0),
+                builder.comment("What a Hollow's regeneration is multiplied by for " + who + ".")
+                        .defineInRange("regeneration_multiplier", regeneration, 0.0, 10.0),
+                builder.comment("Blocks " + who + " steps up beyond a person's 0.6.")
+                        .defineInRange("step_bonus", step, 0.0, 4.0),
+                builder.comment("Share of maximum reiryoku added once, the first time a soul becomes " + who + ".")
+                        .defineInRange("reiryoku_growth", growth, 0.0, 2.0),
+                builder.comment("Damage of the Cero " + who + " fires at full gather, before the part that grows with"
+                                + " maximum reiryoku.")
+                        .defineInRange("cero_damage", ceroDamage, 0.0, 200.0),
+                builder.comment("Ticks " + who + " takes to gather a Cero.")
+                        .defineInRange("cero_charge_ticks", ceroChargeTicks, 5, 200),
+                builder.comment("Half-width, in blocks, of the Cero beam " + who + " fires.")
+                        .defineInRange("cero_radius", ceroRadius, 0.2, 4.0));
+        builder.pop();
+        return form;
     }
 
     /** The configured value, or its default when no world is loaded (for example on the title screen). */

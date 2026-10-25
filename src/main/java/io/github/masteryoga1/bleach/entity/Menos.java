@@ -174,8 +174,21 @@ public abstract class Menos extends Hollow implements CeroBeam.Caster {
      */
     @Nullable
     public static HollowKind arrivalKind(float reiatsu, double roll, double adjuchasRoll) {
-        if (reiatsu < BleachConfig.get(BleachConfig.MENOS_GILLIAN_MIN_REIATSU)
-                || roll >= BleachConfig.get(BleachConfig.MENOS_ARRIVAL_SHARE)) {
+        return arrivalKind(reiatsu, false, roll, adjuchasRoll);
+    }
+
+    /**
+     * {@link #arrivalKind(float, double, double)}, for a soul that may itself be a Menos: a Hollow player of
+     * a Menos form draws its rivals among the Menos more often and at any reiatsu, so the Menos it must
+     * devour to rise do come. An Adjuchas pack still needs the reiatsu for one.
+     */
+    @Nullable
+    public static HollowKind arrivalKind(float reiatsu, boolean menosDrawer, double roll, double adjuchasRoll) {
+        double share = BleachConfig.get(BleachConfig.MENOS_ARRIVAL_SHARE);
+        if (menosDrawer) {
+            share = Math.max(share, BleachConfig.get(BleachConfig.MENOS_RIVAL_SHARE));
+        }
+        if ((!menosDrawer && reiatsu < BleachConfig.get(BleachConfig.MENOS_GILLIAN_MIN_REIATSU)) || roll >= share) {
             return null;
         }
         if (reiatsu >= BleachConfig.get(BleachConfig.MENOS_ADJUCHAS_MIN_REIATSU)

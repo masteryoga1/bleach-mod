@@ -9,14 +9,16 @@ import java.util.EnumMap;
 import java.util.Map;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.Mth;
 
 /**
  * A soul's life as a Hollow: its soul hunger, the souls it has devoured and what they were, whether it
- * sees in the dark, when it last fed, and whether the blow that killed it purified it. The last of
- * {@link SoulData}'s sixteen saved fields, so every later Hollow field (the Menos tiers, mutations,
- * the Arrancar) goes in here or in a record nested in it. Saved with the soul and sent to its owner's
- * client. The rules are in {@link HollowPlayerLogic}, and what they do to the body in {@link HollowBody}.
- * Times are game times in ticks; {@link #NEVER} means it never happened.
+ * sees in the dark, when it last fed, whether the blow that killed it purified it, and how far it has
+ * come as a Menos Grande. The last of {@link SoulData}'s sixteen saved fields, so every later Hollow
+ * field (mutations, the Arrancar) goes in here or in a record nested in it, as {@link Evolution} does.
+ * Saved with the soul and sent to its owner's client. The rules are in {@link HollowPlayerLogic}, and
+ * what they do to the body in {@link HollowBody}. Times are game times in ticks; {@link #NEVER} means
+ * it never happened.
  *
  * @param satiety         soul hunger, from 0 (starving) to {@link #MAX_SATIETY}, or {@link #UNSET} before
  *                        the hunger starts (every soul that is not a Hollow, and a Hollow before its first tick)
@@ -28,9 +30,10 @@ import net.minecraft.network.codec.StreamCodec;
  * @param lastMealAt      when it last devoured a soul
  * @param purifiedOnDeath whether the blow that killed it purified it, from that death until the respawn it
  *                        comes back as a soul for, so logging out on the death screen does not lose it
+ * @param evolution       its road through the Menos forms (see {@link MenosEvolution})
  */
 public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKind, Integer> hollows, int players,
-                             boolean sight, long lastMealAt, boolean purifiedOnDeath) {
+                             boolean sight, long lastMealAt, boolean purifiedOnDeath, Evolution evolution) {
     public static final float UNSET = -1.0F;
     public static final float MAX_SATIETY = 100.0F;
     public static final long NEVER = Long.MIN_VALUE / 2;
@@ -42,7 +45,7 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
             SoulData.enumKeyedMap(HollowKind.class, HollowKind.values());
 
     // Every field is read leniently, so one bad value falls back to its default on its own, and a save
-    // from before Hollow players has no "hollow" at all and reads as NONE. Eight of the builder's sixteen fields.
+    // from before Hollow players has no "hollow" at all and reads as NONE. Nine of the builder's sixteen fields.
     public static final Codec<HollowProgress> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.FLOAT.lenientOptionalFieldOf("satiety", UNSET).forGetter(HollowProgress::satiety),
             Codec.INT.lenientOptionalFieldOf("souls", 0).forGetter(HollowProgress::souls),
@@ -51,7 +54,8 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
             Codec.INT.lenientOptionalFieldOf("players", 0).forGetter(HollowProgress::players),
             Codec.BOOL.lenientOptionalFieldOf("sight", true).forGetter(HollowProgress::sight),
             Codec.LONG.lenientOptionalFieldOf("last_meal_at", NEVER).forGetter(HollowProgress::lastMealAt),
-            Codec.BOOL.lenientOptionalFieldOf("purified_on_death", false).forGetter(HollowProgress::purifiedOnDeath)
+            Codec.BOOL.lenientOptionalFieldOf("purified_on_death", false).forGetter(HollowProgress::purifiedOnDeath),
+            Evolution.CODEC.lenientOptionalFieldOf("evolution", Evolution.NONE).forGetter(HollowProgress::evolution)
     ).apply(instance, HollowProgress::new));
 
     /** The record on its own, for a payload that needs it; the soul itself travels whole (see SyncSoulPayload). */
@@ -61,7 +65,7 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
      * Keeps every value in range. Satiety that is not a number or is below zero means the hunger has not
      * started, and is exactly {@link #UNSET}, so equal records compare equal (a record compares -0.0 and
      * 0.0 as different); otherwise it is at most {@link #MAX_SATIETY}. Counts are never negative, and the
-     * kinds keep only real counts.
+     * kinds keep only real counts. A missing evolution is none yet.
      */
     public HollowProgress {
         if (Float.isNaN(satiety) || satiety < 0.0F) {
@@ -73,6 +77,13 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
         pluses = Math.max(0, pluses);
         players = Math.max(0, players);
         hollows = cleanKinds(hollows);
+        evolution = evolution == null ? Evolution.NONE : evolution;
+    }
+
+    /** A soul with no road as a Menos yet, as every save from before the Menos reads. */
+    public HollowProgress(float satiety, int souls, int pluses, Map<HollowKind, Integer> hollows, int players,
+                          boolean sight, long lastMealAt, boolean purifiedOnDeath) {
+        this(satiety, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, Evolution.NONE);
     }
 
     /** An unmodifiable copy without empty keys or counts of zero or less, in kind order. */
@@ -114,15 +125,15 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
     }
 
     public HollowProgress withSatiety(float value) {
-        return new HollowProgress(value, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath);
+        return new HollowProgress(value, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution);
     }
 
     public HollowProgress withSouls(int value) {
-        return new HollowProgress(satiety, value, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath);
+        return new HollowProgress(satiety, value, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution);
     }
 
     public HollowProgress withPluses(int value) {
-        return new HollowProgress(satiety, souls, value, hollows, players, sight, lastMealAt, purifiedOnDeath);
+        return new HollowProgress(satiety, souls, value, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution);
     }
 
     /** The count for one kind; zero or less takes the kind off. */
@@ -131,30 +142,114 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
         EnumMap<HollowKind, Integer> next = new EnumMap<>(HollowKind.class);
         next.putAll(hollows);
         next.put(kind, count);
-        return new HollowProgress(satiety, souls, pluses, next, players, sight, lastMealAt, purifiedOnDeath);
+        return new HollowProgress(satiety, souls, pluses, next, players, sight, lastMealAt, purifiedOnDeath, evolution);
     }
 
     public HollowProgress withPlayers(int value) {
-        return new HollowProgress(satiety, souls, pluses, hollows, value, sight, lastMealAt, purifiedOnDeath);
+        return new HollowProgress(satiety, souls, pluses, hollows, value, sight, lastMealAt, purifiedOnDeath, evolution);
     }
 
     public HollowProgress withSight(boolean value) {
-        return new HollowProgress(satiety, souls, pluses, hollows, players, value, lastMealAt, purifiedOnDeath);
+        return new HollowProgress(satiety, souls, pluses, hollows, players, value, lastMealAt, purifiedOnDeath, evolution);
     }
 
     public HollowProgress withLastMealAt(long time) {
-        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, time, purifiedOnDeath);
+        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, time, purifiedOnDeath, evolution);
     }
 
     public HollowProgress withPurifiedOnDeath(boolean purified) {
-        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purified);
+        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purified, evolution);
+    }
+
+    public HollowProgress withEvolution(Evolution value) {
+        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, value);
     }
 
     /**
-     * No longer a Hollow: the hunger unset, the souls within gone and the purified mark cleared. What it
-     * devoured, its sight and its last meal stay on the record.
+     * No longer a Hollow: the hunger unset, the souls within gone, the purified mark cleared and the road
+     * as a Menos begun again. What it devoured, its sight, its last meal and the highest form it ever
+     * reached stay on the record.
      */
     public HollowProgress restarted() {
-        return new HollowProgress(UNSET, 0, pluses, hollows, players, sight, lastMealAt, false);
+        return new HollowProgress(UNSET, 0, pluses, hollows, players, sight, lastMealAt, false, evolution.restarted());
+    }
+
+    /**
+     * A Hollow's road through the Menos forms: what it has devoured since its present form began, how long
+     * an Adjuchas has gone without a Hollow, how often it has sunk back, and why it may grow no further.
+     * Saved with the rest, read leniently key by key, so a save from before the Menos reads as {@link #NONE}.
+     *
+     * @param atTier        the form the counts below belong to; when the form changes any other way (a
+     *                      command, sinking back), the counts start again (see MenosEvolution#tick)
+     * @param peakTier      the highest form ever reached, which a purification or sinking back keeps, so the
+     *                      reiryoku a form gives the first time is never given twice
+     * @param tierHollows   Hollows (mobs, Menos and Hollow players) devoured since the form began
+     * @param tierMenos     Menos of the soul's own class or above devoured since the form began
+     * @param hungerMinutes whole minutes of play an Adjuchas has gone without devouring a Hollow
+     * @param regressions   how often an Adjuchas has sunk back into a Gillian
+     * @param stall         why an Adjuchas grows no further: {@link #STALL_NONE}, {@link #STALL_UNDESTINED}
+     *                      or {@link #STALL_FULL}
+     */
+    public record Evolution(int atTier, int peakTier, int tierHollows, int tierMenos, int hungerMinutes,
+                            int regressions, int stall) {
+        /** Nothing holds it back. */
+        public static final int STALL_NONE = 0;
+        /** The soul is not destined to become a Vasto Lorde. */
+        public static final int STALL_UNDESTINED = 1;
+        /** The server holds as many Vasto Lorde as it allows. */
+        public static final int STALL_FULL = 2;
+
+        public static final Evolution NONE = new Evolution(1, 1, 0, 0, 0, 0, STALL_NONE);
+
+        public static final Codec<Evolution> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.INT.lenientOptionalFieldOf("at_tier", 1).forGetter(Evolution::atTier),
+                Codec.INT.lenientOptionalFieldOf("peak_tier", 1).forGetter(Evolution::peakTier),
+                Codec.INT.lenientOptionalFieldOf("tier_hollows", 0).forGetter(Evolution::tierHollows),
+                Codec.INT.lenientOptionalFieldOf("tier_menos", 0).forGetter(Evolution::tierMenos),
+                Codec.INT.lenientOptionalFieldOf("hunger_minutes", 0).forGetter(Evolution::hungerMinutes),
+                Codec.INT.lenientOptionalFieldOf("regressions", 0).forGetter(Evolution::regressions),
+                Codec.INT.lenientOptionalFieldOf("stall", STALL_NONE).forGetter(Evolution::stall)
+        ).apply(instance, Evolution::new));
+
+        /** Keeps every value in range: both forms real, the highest never below the present, and no count below zero. */
+        public Evolution {
+            atTier = HollowTier.byTier(atTier).tier();
+            peakTier = Math.max(atTier, HollowTier.byTier(peakTier).tier());
+            tierHollows = Math.max(0, tierHollows);
+            tierMenos = Math.max(0, tierMenos);
+            hungerMinutes = Math.max(0, hungerMinutes);
+            regressions = Math.max(0, regressions);
+            stall = Mth.clamp(stall, STALL_NONE, STALL_FULL);
+        }
+
+        /** A form just begun: the counts and stall cleared, the highest form raised to it, the times it sank back kept. */
+        public Evolution startedAt(int tier) {
+            return new Evolution(tier, Math.max(peakTier, tier), 0, 0, 0, regressions, STALL_NONE);
+        }
+
+        /** No longer a Hollow: all of it gone but the highest form it ever reached. */
+        public Evolution restarted() {
+            return new Evolution(1, peakTier, 0, 0, 0, 0, STALL_NONE);
+        }
+
+        public Evolution withTierHollows(int value) {
+            return new Evolution(atTier, peakTier, value, tierMenos, hungerMinutes, regressions, stall);
+        }
+
+        public Evolution withTierMenos(int value) {
+            return new Evolution(atTier, peakTier, tierHollows, value, hungerMinutes, regressions, stall);
+        }
+
+        public Evolution withHungerMinutes(int value) {
+            return new Evolution(atTier, peakTier, tierHollows, tierMenos, value, regressions, stall);
+        }
+
+        public Evolution withRegressions(int value) {
+            return new Evolution(atTier, peakTier, tierHollows, tierMenos, hungerMinutes, value, stall);
+        }
+
+        public Evolution withStall(int value) {
+            return new Evolution(atTier, peakTier, tierHollows, tierMenos, hungerMinutes, regressions, value);
+        }
     }
 }

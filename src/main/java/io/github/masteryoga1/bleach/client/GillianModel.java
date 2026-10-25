@@ -1,6 +1,5 @@
 package io.github.masteryoga1.bleach.client;
 
-import io.github.masteryoga1.bleach.entity.Gillian;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
@@ -9,15 +8,17 @@ import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
 
 /**
  * A Gillian: a towering figure in a black robe with long pale hands, a white mask over the whole head
  * with a long pointed nose, and a collar of bone spikes about the neck. It lumbers along with its
  * feet hidden under the hem, swats with its right arm and tips its face up as a Cero gathers at the
- * mouth. It is drawn at six times a mob model's size (the kind's look), so the top of its head is 15
- * blocks up. A placeholder until the mod has real art.
+ * mouth. The mob is drawn at six times a mob model's size (the kind's look), so the top of its head is
+ * 15 blocks up; a Gillian player is drawn in it too, at its own size (see {@link MenosPlayerRenderer}).
+ * A placeholder until the mod has real art.
  */
-public final class GillianModel extends HierarchicalModel<Gillian> {
+public final class GillianModel<T extends LivingEntity> extends HierarchicalModel<T> {
     /** A slow, heavy stride: under half a wolf's pace for each block walked. */
     private static final float STRIDE = 0.3F;
     /** How far the arms swing as it walks, in radians at a full stride. */
@@ -92,7 +93,7 @@ public final class GillianModel extends HierarchicalModel<Gillian> {
     }
 
     @Override
-    public void setupAnim(Gillian gillian, float limbSwing, float limbSwingAmount, float ageInTicks,
+    public void setupAnim(T gillian, float limbSwing, float limbSwingAmount, float ageInTicks,
                           float netHeadYaw, float headPitch) {
         root.getAllParts().forEach(ModelPart::resetPose);
         float stride = Mth.cos(limbSwing * STRIDE) * limbSwingAmount;
@@ -105,6 +106,6 @@ public final class GillianModel extends HierarchicalModel<Gillian> {
         rightArm.xRot -= Mth.sin(attackTime * Mth.PI) * SWAT;
         head.yRot = netHeadYaw * Mth.DEG_TO_RAD;
         head.xRot = Mth.clamp(headPitch, -HEAD_PITCH_LIMIT, HEAD_PITCH_LIMIT) * Mth.DEG_TO_RAD
-                - (gillian.isChargingCero() ? CERO_TILT : 0.0F);
+                - (MenosPlayerRenderer.chargingCero(gillian) ? CERO_TILT : 0.0F);
     }
 }

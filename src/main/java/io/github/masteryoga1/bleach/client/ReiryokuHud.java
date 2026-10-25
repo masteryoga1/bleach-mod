@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
@@ -33,7 +34,8 @@ import net.minecraft.world.item.ItemStack;
  * The reiryoku bar: a thin vertical gauge just right of the hotbar, moved further out when the
  * offhand slot or the hotbar attack indicator is on that side. It gets a white outline while
  * reiatsu is released, and a wider one in the blade's colour while the player holds their own
- * released zanpakutō, with a small bar above it that fills while a technique gathers. A Plus gets a
+ * released zanpakutō, with a small bar above it that fills while a technique gathers. A Hollow from
+ * Gillian up gets the same bar in a Menos's red while it gathers a Cero, white once full. A Plus gets a
  * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in, and is
  * outlined red while the Plus gnaws at it with the Devour key. A Hollow gets a soul hunger gauge in
  * the chain's place: bone while fed, amber while ravenous, and empty with a flashing red outline
@@ -67,6 +69,7 @@ public final class ReiryokuHud {
     /** The gather bar sits this far above the gauge, clear of both outlines. */
     private static final int GATHER_GAP = 5;
     private static final int GATHER_FULL = 0xFFFFFFFF;
+    private static final int CERO_FILL = 0xFF000000 | CeroBeam.MENOS_RED;
     private static final int REISHI_FILL = 0xFFBFE6FF;
     private static final int REISHI_FILL_LOW = 0xFF6F9CC0;
     private static final int POISON_FILL = 0xC08040C0;
@@ -145,6 +148,11 @@ public final class ReiryokuHud {
             if (gather > 0.0F) {
                 drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, gather, gather >= 1.0F ? GATHER_FULL : colour);
             }
+        }
+        // A Hollow never holds a released zanpakutō of its own, so the gather bar's place is free for its Cero.
+        float cero = HollowKeys.ceroProgress(deltaTracker.getGameTimeDeltaPartialTick(false));
+        if (cero > 0.0F) {
+            drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, cero, cero >= 1.0F ? GATHER_FULL : CERO_FILL);
         }
 
         boolean chainShown = data.state() == SoulState.PLUS && data.chainMaxTicks() > 0;

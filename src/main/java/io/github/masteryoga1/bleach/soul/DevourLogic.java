@@ -101,7 +101,8 @@ public final class DevourLogic {
     /**
      * What a meal is worth, measured before the kill.
      *
-     * @param kind        the Hollow's kind; null unless the prey is a Hollow mob
+     * @param kind        the Hollow's kind: a Hollow mob's own, a Hollow player's class of Menos (null for a plain
+     *                    Hollow, see {@link HollowTier#menosKind}), and null for any other prey
      * @param reiatsu     the prey's reiatsu
      * @param satiety     the soul hunger it restores
      * @param souls       the souls it adds, before the ten-minute gate on players
@@ -219,7 +220,7 @@ public final class DevourLogic {
 
     /**
      * What devouring this prey would be worth, measured now, before the killing blow changes it. A
-     * Hollow player's lost souls are the share it would lose by dying.
+     * Hollow player's lost souls are the share it would lose by dying, and it counts as the Menos it is.
      *
      * @throws IllegalArgumentException for a creature with no soul worth devouring (see {@link #preyOf})
      */
@@ -231,7 +232,8 @@ public final class DevourLogic {
         float reiatsu = SoulLogic.reiatsu(prey);
         boolean hollowPlayer = prey instanceof Player player && HollowPlayerLogic.isHollowPlayer(player);
         int stolen = hollowPlayer ? HollowPlayerLogic.soulsLostOnDeath(SoulLogic.get(prey).hollow().souls()) : 0;
-        HollowKind hollowKind = prey instanceof Hollow hollow ? hollow.kind() : null;
+        HollowKind hollowKind = prey instanceof Hollow hollow ? hollow.kind()
+                : hollowPlayer ? HollowTier.of(SoulLogic.get(prey)).menosKind() : null;
         return new Meal(kind, hollowKind, reiatsu, satietyFor(kind, reiatsu), soulsFor(reiatsu), stolen,
                 prey instanceof Hollow || hollowPlayer);
     }

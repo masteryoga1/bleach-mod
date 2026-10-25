@@ -7,9 +7,10 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ByIdMap;
 
 /**
- * What a Hollow (or a Plus) does with the Devour key. The key sends one message when it goes down and
- * another when it comes up, so a hold can last as long as the key does. The server checks everything
- * again (see {@link DevourEvents#onKey}). Sent by ordinal, so new keys go last (Cero comes next).
+ * What a Hollow (or a Plus) does with the Devour and Cero keys. Each key sends one message when it goes
+ * down and another when it comes up, so a hold, or a Cero gathering, can last as long as the key does.
+ * The server checks everything again (see {@link DevourEvents#onKey}). Sent by ordinal, so new keys go
+ * last: an old server would read an unknown one as a press of the Devour key.
  */
 public enum HollowKey {
     /** The key went down, with the creature under the crosshair: devour it, or gnaw at the chain as a Plus. */
@@ -17,7 +18,13 @@ public enum HollowKey {
     /** The key came up, a screen opened or the player died: let go. */
     RELEASE,
     /** The key pressed while sneaking: the Hollow sight on or off. */
-    SIGHT;
+    SIGHT,
+    /** The Cero key went down: a Menos starts gathering a Cero at its mouth (see {@link HollowCero#start}). */
+    CERO,
+    /** The Cero key came up: fire the Cero, or let it fizzle if too little has gathered yet. */
+    CERO_RELEASE,
+    /** A screen opened, or the player died or stopped being a Hollow, with the Cero key held: let it fizzle. */
+    CERO_CANCEL;
 
     private static final IntFunction<HollowKey> BY_ID =
             ByIdMap.continuous(HollowKey::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

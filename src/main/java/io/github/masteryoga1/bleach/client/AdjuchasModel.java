@@ -9,15 +9,17 @@ import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
 
 /**
  * An Adjuchas: a long, low beast on four legs with a beast's skull for a mask and a hole through its
  * flank. Each has one of three forms, horns, a row of spikes down its back or a long tail, chosen by
  * its UUID (see {@link Adjuchas#variant()}), so every client draws the same one. It trots with its
- * tail swaying, snaps its head down to bite and lifts its face as a Cero gathers. A placeholder until
- * the mod has real art.
+ * tail swaying, snaps its head down to bite and lifts its face as a Cero gathers. An Adjuchas player is
+ * drawn in it too, its form chosen by its own UUID the same way (see {@link MenosPlayerRenderer}). A
+ * placeholder until the mod has real art.
  */
-public final class AdjuchasModel extends HierarchicalModel<Adjuchas> {
+public final class AdjuchasModel<T extends LivingEntity> extends HierarchicalModel<T> {
     /** The wolf's stride. */
     private static final float STRIDE = 0.6662F;
     private static final float LEG_SWING = 1.4F;
@@ -97,7 +99,7 @@ public final class AdjuchasModel extends HierarchicalModel<Adjuchas> {
     }
 
     @Override
-    public void setupAnim(Adjuchas adjuchas, float limbSwing, float limbSwingAmount, float ageInTicks,
+    public void setupAnim(T adjuchas, float limbSwing, float limbSwingAmount, float ageInTicks,
                           float netHeadYaw, float headPitch) {
         root.getAllParts().forEach(ModelPart::resetPose);
         // Diagonal pairs swing together, as a trotting beast's legs do.
@@ -110,11 +112,12 @@ public final class AdjuchasModel extends HierarchicalModel<Adjuchas> {
         rightFrontLeg.xRot = opposite;
         head.yRot = netHeadYaw * Mth.DEG_TO_RAD;
         head.xRot = headPitch * Mth.DEG_TO_RAD + Mth.sin(attackTime * Mth.PI) * BITE
-                - (adjuchas.isChargingCero() ? CERO_TILT : 0.0F);
+                - (MenosPlayerRenderer.chargingCero(adjuchas) ? CERO_TILT : 0.0F);
         tail.yRot = Mth.cos(ageInTicks * TAIL_SWAY_SPEED) * TAIL_SWAY;
         // Resetting the pose leaves visibility alone, so the form is set every frame. The mask layer
-        // draws this same posed model, so what is hidden here is hidden under the mask too.
-        int variant = adjuchas.variant();
+        // draws this same posed model, so what is hidden here is hidden under the mask too. The same
+        // pick as Adjuchas#variant(), made here from any creature's UUID so a player gets a form too.
+        int variant = Math.floorMod(adjuchas.getUUID().hashCode(), Adjuchas.VARIANTS);
         horns.visible = variant == Adjuchas.VARIANT_HORNS;
         spikes.visible = variant == Adjuchas.VARIANT_SPIKES;
         tailTip.visible = variant == Adjuchas.VARIANT_TAIL;

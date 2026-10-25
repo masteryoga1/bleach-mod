@@ -128,18 +128,18 @@ public final class HollowPlayerTests {
     }
 
     /** A creature at this block of the floor that does nothing at all, not even fall or turn. */
-    private static <T extends Mob> T placed(GameTestHelper helper, EntityType<T> type, int x, int z) {
+    static <T extends Mob> T placed(GameTestHelper helper, EntityType<T> type, int x, int z) {
         return QuincyTests.still(helper.spawnWithNoFreeWill(type, x, 2, z));
     }
 
     @Nullable
-    private static AttributeModifier modifier(Player player, Holder<Attribute> attribute, ResourceLocation id) {
+    static AttributeModifier modifier(Player player, Holder<Attribute> attribute, ResourceLocation id) {
         AttributeInstance instance = player.getAttribute(attribute);
         return instance == null ? null : instance.getModifier(id);
     }
 
     /** Whether none of the Hollow body's modifiers is on the player: claws, claw speed, hide, leap and the jaws' slowness. */
-    private static boolean bodyOff(Player player) {
+    static boolean bodyOff(Player player) {
         return modifier(player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID) == null
                 && modifier(player, Attributes.ATTACK_SPEED, HollowBody.CLAW_SPEED_ID) == null
                 && modifier(player, Attributes.ARMOR, HollowBody.HIDE_ID) == null
@@ -148,14 +148,14 @@ public final class HollowPlayerTests {
     }
 
     /** Asserts a modifier is on the player with this amount and operation. */
-    private static void assertModifier(GameTestHelper helper, Player player, Holder<Attribute> attribute, ResourceLocation id,
-                                       double amount, AttributeModifier.Operation operation, String what) {
+    static void assertModifier(GameTestHelper helper, Player player, Holder<Attribute> attribute, ResourceLocation id,
+                               double amount, AttributeModifier.Operation operation, String what) {
         AttributeModifier found = modifier(player, attribute, id);
         helper.assertTrue(found != null && found.operation() == operation, what + " is " + found);
         assertClose(helper, found.amount(), amount, what);
     }
 
-    private static void assertClose(GameTestHelper helper, double actual, double expected, String what) {
+    static void assertClose(GameTestHelper helper, double actual, double expected, String what) {
         helper.assertTrue(Math.abs(actual - expected) < EPSILON, what + " is " + actual + ", not " + expected);
     }
 
@@ -165,12 +165,12 @@ public final class HollowPlayerTests {
         helper.assertTrue(refusal == expected, "devouring " + what + " gave " + refusal + ", not " + expected);
     }
 
-    private static long now(GameTestHelper helper) {
+    static long now(GameTestHelper helper) {
         return helper.getLevel().getGameTime();
     }
 
     /** Whether the test level is on Peaceful, where soul hunger refills instead of draining. */
-    private static boolean peaceful(GameTestHelper helper) {
+    static boolean peaceful(GameTestHelper helper) {
         return helper.getLevel().getDifficulty() == Difficulty.PEACEFUL;
     }
 
@@ -996,6 +996,8 @@ public final class HollowPlayerTests {
         helper.assertTrue(data.maxReiryoku() > maxBefore, "the first player grew nothing");
         helper.assertTrue(data.hunt().lastPlayerKillGrowthAt() == now, "the growth was stamped at "
                 + data.hunt().lastPlayerKillGrowthAt());
+        helper.assertTrue(data.hollow().evolution().tierHollows() == 1,
+                "the first player counted " + data.hollow().evolution().tierHollows() + " Hollows for the form");
 
         // The same soul again, soon after: only the souls it would lose pass over, and nothing grows.
         float maxAfter = data.maxReiryoku();
@@ -1003,6 +1005,8 @@ public final class HollowPlayerTests {
         helper.assertTrue(data.hollow().souls() == 29, "the second player gave " + (data.hollow().souls() - 19) + " souls");
         helper.assertTrue(data.hollow().players() == 2, "the players devoured are " + data.hollow().players());
         helper.assertTrue(data.maxReiryoku() == maxAfter, "the second player grew the maximum to " + data.maxReiryoku());
+        helper.assertTrue(data.hollow().evolution().tierHollows() == 1,
+                "the second player counted for the form: " + data.hollow().evolution().tierHollows());
         helper.succeed();
     }
 
