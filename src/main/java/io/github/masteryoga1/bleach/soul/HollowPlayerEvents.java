@@ -88,13 +88,17 @@ public final class HollowPlayerEvents {
 
     /**
      * Whether a bite of cake, straight from the block, is refused, as food is to a Hollow under survival's
-     * rules, telling it so. Asked by CakeBlockMixin on both sides, only when the click would really bite.
+     * rules. Asked by CakeBlockMixin on both sides whenever a click reaches the bite. Only a Hollow that
+     * vanilla would let bite (a starving one, whose food bar is held low) is told so: a fed one is full to
+     * vanilla too, and placing a block or using an item against a cake says nothing.
      */
     public static boolean refusesCake(Player player) {
         if (!HollowPlayerLogic.survivalRules(player) || !HollowPlayerLogic.isHollowPlayer(player)) {
             return false;
         }
-        refuseFood(player);
+        if (player.canEat(false)) {
+            refuseFood(player);
+        }
         return true;
     }
 
