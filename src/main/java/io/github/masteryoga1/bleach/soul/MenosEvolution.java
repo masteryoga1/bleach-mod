@@ -299,9 +299,9 @@ public final class MenosEvolution {
     }
 
     /**
-     * Keeps this player's place among the server's Vasto Lorde right: taken while it is one, given up once
-     * it is not (purified, reset or set lower by command). Every so often for every soul, so no rule that
-     * changes a form needs to remember the count.
+     * Keeps this player's place among the server's Vasto Lorde right: taken while it is one, or an Arrancar
+     * risen from one, given up once it is neither (purified, reset or set lower by command). Every so often
+     * for every soul, so no rule that changes a form needs to remember the count.
      */
     static void noteVasto(Player player, SoulData data) {
         MinecraftServer server = player.level().getServer();
@@ -309,7 +309,7 @@ public final class MenosEvolution {
             return;
         }
         VastoLordes lordes = VastoLordes.get(server);
-        if (HollowTier.of(data) == HollowTier.VASTO_LORDE) {
+        if (HollowTier.of(data) == HollowTier.VASTO_LORDE || ArrancarLogic.origin(data) == HollowTier.VASTO_LORDE) {
             lordes.add(player.getUUID());
         } else {
             lordes.remove(player.getUUID());

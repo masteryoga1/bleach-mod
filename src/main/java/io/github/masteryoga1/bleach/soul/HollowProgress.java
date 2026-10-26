@@ -13,9 +13,10 @@ import net.minecraft.util.Mth;
 
 /**
  * A soul's life as a Hollow: its soul hunger, the souls it has devoured and what they were, whether it
- * sees in the dark, when it last fed, whether the blow that killed it purified it, and how far it has
- * come as a Menos Grande. The last of {@link SoulData}'s sixteen saved fields, so every later Hollow
- * field (mutations, the Arrancar) goes in here or in a record nested in it, as {@link Evolution} does.
+ * sees in the dark, when it last fed, whether the blow that killed it purified it, how far it has come
+ * as a Menos Grande, and its road out of the mask as an Arrancar. The last of {@link SoulData}'s sixteen
+ * saved fields, so every later Hollow field (mutations, the Arrancar's arts) goes in here or in a record
+ * nested in it, as {@link Evolution} and {@link Arrancar} do.
  * Saved with the soul and sent to its owner's client. The rules are in {@link HollowPlayerLogic}, and
  * what they do to the body in {@link HollowBody}. Times are game times in ticks; {@link #NEVER} means
  * it never happened.
@@ -31,9 +32,12 @@ import net.minecraft.util.Mth;
  * @param purifiedOnDeath whether the blow that killed it purified it, from that death until the respawn it
  *                        comes back as a soul for, so logging out on the death screen does not lose it
  * @param evolution       its road through the Menos forms (see {@link MenosEvolution})
+ * @param arrancar        its road out of the mask: the tries at tearing it, the blade and the release (see
+ *                        {@link ArrancarEvents}), kept whatever the soul becomes
  */
 public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKind, Integer> hollows, int players,
-                             boolean sight, long lastMealAt, boolean purifiedOnDeath, Evolution evolution) {
+                             boolean sight, long lastMealAt, boolean purifiedOnDeath, Evolution evolution,
+                             Arrancar arrancar) {
     public static final float UNSET = -1.0F;
     public static final float MAX_SATIETY = 100.0F;
     public static final long NEVER = Long.MIN_VALUE / 2;
@@ -45,7 +49,7 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
             SoulData.enumKeyedMap(HollowKind.class, HollowKind.values());
 
     // Every field is read leniently, so one bad value falls back to its default on its own, and a save
-    // from before Hollow players has no "hollow" at all and reads as NONE. Nine of the builder's sixteen fields.
+    // from before Hollow players has no "hollow" at all and reads as NONE. Ten of the builder's sixteen fields.
     public static final Codec<HollowProgress> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.FLOAT.lenientOptionalFieldOf("satiety", UNSET).forGetter(HollowProgress::satiety),
             Codec.INT.lenientOptionalFieldOf("souls", 0).forGetter(HollowProgress::souls),
@@ -55,7 +59,8 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
             Codec.BOOL.lenientOptionalFieldOf("sight", true).forGetter(HollowProgress::sight),
             Codec.LONG.lenientOptionalFieldOf("last_meal_at", NEVER).forGetter(HollowProgress::lastMealAt),
             Codec.BOOL.lenientOptionalFieldOf("purified_on_death", false).forGetter(HollowProgress::purifiedOnDeath),
-            Evolution.CODEC.lenientOptionalFieldOf("evolution", Evolution.NONE).forGetter(HollowProgress::evolution)
+            Evolution.CODEC.lenientOptionalFieldOf("evolution", Evolution.NONE).forGetter(HollowProgress::evolution),
+            Arrancar.CODEC.lenientOptionalFieldOf("arrancar", Arrancar.NONE).forGetter(HollowProgress::arrancar)
     ).apply(instance, HollowProgress::new));
 
     /** The record on its own, for a payload that needs it; the soul itself travels whole (see SyncSoulPayload). */
@@ -65,7 +70,7 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
      * Keeps every value in range. Satiety that is not a number or is below zero means the hunger has not
      * started, and is exactly {@link #UNSET}, so equal records compare equal (a record compares -0.0 and
      * 0.0 as different); otherwise it is at most {@link #MAX_SATIETY}. Counts are never negative, and the
-     * kinds keep only real counts. A missing evolution is none yet.
+     * kinds keep only real counts. A missing evolution or Arrancar record is none yet.
      */
     public HollowProgress {
         if (Float.isNaN(satiety) || satiety < 0.0F) {
@@ -78,12 +83,19 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
         players = Math.max(0, players);
         hollows = cleanKinds(hollows);
         evolution = evolution == null ? Evolution.NONE : evolution;
+        arrancar = arrancar == null ? Arrancar.NONE : arrancar;
     }
 
     /** A soul with no road as a Menos yet, as every save from before the Menos reads. */
     public HollowProgress(float satiety, int souls, int pluses, Map<HollowKind, Integer> hollows, int players,
                           boolean sight, long lastMealAt, boolean purifiedOnDeath) {
         this(satiety, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, Evolution.NONE);
+    }
+
+    /** A soul that has never torn at its mask, as every save from before the Arrancar reads. */
+    public HollowProgress(float satiety, int souls, int pluses, Map<HollowKind, Integer> hollows, int players,
+                          boolean sight, long lastMealAt, boolean purifiedOnDeath, Evolution evolution) {
+        this(satiety, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution, Arrancar.NONE);
     }
 
     /** An unmodifiable copy without empty keys or counts of zero or less, in kind order. */
@@ -125,15 +137,18 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
     }
 
     public HollowProgress withSatiety(float value) {
-        return new HollowProgress(value, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution);
+        return new HollowProgress(value, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution,
+                arrancar);
     }
 
     public HollowProgress withSouls(int value) {
-        return new HollowProgress(satiety, value, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution);
+        return new HollowProgress(satiety, value, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution,
+                arrancar);
     }
 
     public HollowProgress withPluses(int value) {
-        return new HollowProgress(satiety, souls, value, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution);
+        return new HollowProgress(satiety, souls, value, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution,
+                arrancar);
     }
 
     /** The count for one kind; zero or less takes the kind off. */
@@ -142,36 +157,48 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
         EnumMap<HollowKind, Integer> next = new EnumMap<>(HollowKind.class);
         next.putAll(hollows);
         next.put(kind, count);
-        return new HollowProgress(satiety, souls, pluses, next, players, sight, lastMealAt, purifiedOnDeath, evolution);
+        return new HollowProgress(satiety, souls, pluses, next, players, sight, lastMealAt, purifiedOnDeath, evolution,
+                arrancar);
     }
 
     public HollowProgress withPlayers(int value) {
-        return new HollowProgress(satiety, souls, pluses, hollows, value, sight, lastMealAt, purifiedOnDeath, evolution);
+        return new HollowProgress(satiety, souls, pluses, hollows, value, sight, lastMealAt, purifiedOnDeath, evolution,
+                arrancar);
     }
 
     public HollowProgress withSight(boolean value) {
-        return new HollowProgress(satiety, souls, pluses, hollows, players, value, lastMealAt, purifiedOnDeath, evolution);
+        return new HollowProgress(satiety, souls, pluses, hollows, players, value, lastMealAt, purifiedOnDeath, evolution,
+                arrancar);
     }
 
     public HollowProgress withLastMealAt(long time) {
-        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, time, purifiedOnDeath, evolution);
+        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, time, purifiedOnDeath, evolution,
+                arrancar);
     }
 
     public HollowProgress withPurifiedOnDeath(boolean purified) {
-        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purified, evolution);
+        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purified, evolution,
+                arrancar);
     }
 
     public HollowProgress withEvolution(Evolution value) {
-        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, value);
+        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, value,
+                arrancar);
+    }
+
+    public HollowProgress withArrancar(Arrancar value) {
+        return new HollowProgress(satiety, souls, pluses, hollows, players, sight, lastMealAt, purifiedOnDeath, evolution,
+                value);
     }
 
     /**
      * No longer a Hollow: the hunger unset, the souls within gone, the purified mark cleared and the road
-     * as a Menos begun again. What it devoured, its sight, its last meal and the highest form it ever
-     * reached stay on the record.
+     * as a Menos begun again. What it devoured, its sight, its last meal, the highest form it ever
+     * reached and its Arrancar record (so an old blade never counts as current again) stay on the record.
      */
     public HollowProgress restarted() {
-        return new HollowProgress(UNSET, 0, pluses, hollows, players, sight, lastMealAt, false, evolution.restarted());
+        return new HollowProgress(UNSET, 0, pluses, hollows, players, sight, lastMealAt, false, evolution.restarted(),
+                arrancar);
     }
 
     /**
@@ -250,6 +277,66 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
 
         public Evolution withStall(int value) {
             return new Evolution(atTier, peakTier, tierHollows, tierMenos, hungerMinutes, regressions, value);
+        }
+    }
+
+    /**
+     * The road out of the mask: never torn, or torn naturally (perfected false) or by the Hōgyoku (true).
+     * Saved with the rest, read leniently key by key, so a save from before the Arrancar reads as
+     * {@link #NONE}. The form the Arrancar rose from is not kept here: it is the soul's Hollow tier.
+     *
+     * @param perfected      whether the Hōgyoku made it, which a later natural road never takes away
+     * @param failures       tries at tearing the mask that failed, each making the next likelier
+     * @param lastTearAt     when it last tried and failed, for the wait before the next try
+     * @param releaseReadyAt no Resurrección before this game time: the wait after the last one ended
+     * @param forging        how many times its blade has been forged; only a blade of this forging is its own,
+     *                       so every older copy crumbles, and 0 means it never had one
+     */
+    public record Arrancar(boolean perfected, int failures, long lastTearAt, long releaseReadyAt, int forging) {
+        public static final Arrancar NONE = new Arrancar(false, 0, NEVER, NEVER, 0);
+
+        public static final Codec<Arrancar> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.BOOL.lenientOptionalFieldOf("perfected", false).forGetter(Arrancar::perfected),
+                Codec.INT.lenientOptionalFieldOf("failures", 0).forGetter(Arrancar::failures),
+                Codec.LONG.lenientOptionalFieldOf("last_tear_at", NEVER).forGetter(Arrancar::lastTearAt),
+                Codec.LONG.lenientOptionalFieldOf("release_ready_at", NEVER).forGetter(Arrancar::releaseReadyAt),
+                Codec.INT.lenientOptionalFieldOf("forging", 0).forGetter(Arrancar::forging)
+        ).apply(instance, Arrancar::new));
+
+        /** Keeps the counts from going below zero. */
+        public Arrancar {
+            failures = Math.max(0, failures);
+            forging = Math.max(0, forging);
+        }
+
+        /** Whether its blade was ever forged: false for a save from before the Arrancar, or a state set some other way. */
+        public boolean forged() {
+            return forging > 0;
+        }
+
+        /**
+         * The soul has just become an Arrancar: perfected if this road or an earlier one was the Hōgyoku's, a
+         * blade forged anew (so any older one crumbles), and no wait before its first release. The failed
+         * tries and the last one are kept.
+         */
+        public Arrancar becoming(boolean perfected) {
+            return new Arrancar(this.perfected || perfected, failures, lastTearAt, NEVER, forging + 1);
+        }
+
+        public Arrancar withFailures(int value) {
+            return new Arrancar(perfected, value, lastTearAt, releaseReadyAt, forging);
+        }
+
+        public Arrancar withLastTearAt(long time) {
+            return new Arrancar(perfected, failures, time, releaseReadyAt, forging);
+        }
+
+        public Arrancar withReleaseReadyAt(long time) {
+            return new Arrancar(perfected, failures, lastTearAt, time, forging);
+        }
+
+        public Arrancar withForging(int value) {
+            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, value);
         }
     }
 }

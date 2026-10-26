@@ -126,6 +126,24 @@ public final class ModItems {
     public static final DeferredItem<HollowBaitItem> HOLLOW_BAIT = ITEMS.register("hollow_bait",
             () -> new HollowBaitItem(new Item.Properties().stacksTo(16)));
 
+    /**
+     * An Arrancar's zanpakutō: the torn piece of its mask, become a sealed blade that holds its Hollow power.
+     * An iron-tier katana that never breaks, forged for one soul only: an older copy crumbles, and a lost one
+     * forms again (see {@link io.github.masteryoga1.bleach.soul.ArrancarEvents}). It has no Shikai and is
+     * no Shinigami's blade, so it stays out of the zanpakutō tag. One from the creative tab belongs to nobody
+     * and is a plain katana.
+     */
+    public static final DeferredItem<SwordItem> ARRANCAR_BLADE = ITEMS.register("arrancar_blade",
+            () -> new SwordItem(Tiers.IRON, new Item.Properties()
+                    .attributes(SwordItem.createAttributes(Tiers.IRON, 3, -2.4F))
+                    .component(DataComponents.UNBREAKABLE, new Unbreakable(false))) {
+                @Override
+                public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip,
+                                            TooltipFlag flag) {
+                    tooltip.add(Component.translatable("tooltip.bleach.arrancar_blade").withStyle(ChatFormatting.GRAY));
+                }
+            });
+
     public static final DeferredItem<DeferredSpawnEggItem> ACADEMY_INSTRUCTOR_SPAWN_EGG = ITEMS.register(
             "academy_instructor_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.ACADEMY_INSTRUCTOR, 0x1A1A1A, 0xF2F2F2, new Item.Properties()));

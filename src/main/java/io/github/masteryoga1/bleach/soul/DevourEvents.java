@@ -64,7 +64,8 @@ public final class DevourEvents {
      * The Devour and Cero keys, from {@link io.github.masteryoga1.bleach.network.HollowKeyPayload} on the
      * server thread. A press of the Devour key starts a hold (a Hollow) or the gnawing (a Plus); letting go
      * ends either; sneaking with it turns the Hollow sight on or off. The target id is only the client's
-     * hint. The Cero key starts, fires or lets fizzle a Menos's Cero ({@link HollowCero}).
+     * hint. The Cero key starts, fires or lets fizzle a Menos's or an Arrancar's Cero ({@link HollowCero}); an
+     * Arrancar's other Hollow keys do nothing, as it no longer devours.
      */
     public static void onKey(ServerPlayer player, HollowKey key, int targetId) {
         if (!SoulLogic.hasSoul(player)) {
@@ -105,7 +106,7 @@ public final class DevourEvents {
                 }
             }
             case CERO -> {
-                if (player.isAlive() && !player.isSpectator() && HollowPlayerLogic.isHollow(data)) {
+                if (player.isAlive() && !player.isSpectator() && HollowPlayerLogic.isHollowOrArrancar(data)) {
                     HollowCero.Refusal refusal = HollowCero.start(player, data, now);
                     if (refusal != null) {
                         player.displayClientMessage(Component.translatable(refusal.messageKey())

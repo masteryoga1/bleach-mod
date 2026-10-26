@@ -338,7 +338,8 @@ public final class ZanpakutoEvents {
 
     /**
      * Takes the soul's own blades out of its death drops, if the server keeps them, and holds sealed
-     * copies until it respawns. Someone else's blade drops as anything else does.
+     * copies until it respawns: its zanpakutō, or the blade an Arrancar's Hollow power is sealed in.
+     * Someone else's blade drops as anything else does.
      */
     public static void keepBlades(Player player, Collection<ItemEntity> drops) {
         if (!BleachConfig.get(BleachConfig.KEEP_ON_DEATH)) {
@@ -348,7 +349,7 @@ public final class ZanpakutoEvents {
         Iterator<ItemEntity> it = drops.iterator();
         while (it.hasNext()) {
             ItemStack stack = it.next().getItem();
-            if (ZanpakutoLogic.isOwnBlade(stack, player)) {
+            if (ZanpakutoLogic.isOwnBlade(stack, player) || ArrancarLogic.isOwnBlade(stack, player)) {
                 ItemStack copy = stack.copy();
                 ShikaiEvents.sealStack(copy, player.level());
                 kept.add(copy);

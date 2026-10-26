@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
+import io.github.masteryoga1.bleach.registry.ModItems;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -40,11 +41,11 @@ public final class ShinigamiLogic {
 
     /**
      * Whether this soul holds a Shinigami's power: a Shinigami, or anyone with a Shinigami tier. A
-     * Hollow's Shinigami power is lost under the mask; a Visored (a Shinigami with a Hollow tier)
-     * keeps it.
+     * Hollow's Shinigami power is lost under the mask, and an Arrancar's stays lost when the mask comes
+     * away, as its power is a Hollow's; a Visored (a Shinigami with a Hollow tier) keeps it.
      */
     public static boolean hasShinigamiPower(SoulData data) {
-        return data.state() != SoulState.HOLLOW
+        return data.state() != SoulState.HOLLOW && data.state() != SoulState.ARRANCAR
                 && (data.state() == SoulState.SHINIGAMI || data.tier(PowerPath.SHINIGAMI) > 0);
     }
 
@@ -410,21 +411,26 @@ public final class ShinigamiLogic {
 
     /**
      * Which blade a player wears sheathed: the {@code custom_model_data} of the first zanpakutō on
-     * their hotbar (0 for a plain Asauchi), so others see Zabimaru's red saya or Zangetsu wrapped
-     * across the back. -1 when neither hand is free of a blade or the hotbar holds none.
+     * their hotbar (0 for a plain Asauchi, or an Arrancar's blade), so others see Zabimaru's red saya or
+     * Zangetsu wrapped across the back. -1 when neither hand is free of a blade or the hotbar holds none.
      */
     public static int sheathedModel(LivingEntity entity) {
         if (!(entity instanceof Player player)
-                || player.getMainHandItem().is(BleachTags.ZANPAKUTO) || player.getOffhandItem().is(BleachTags.ZANPAKUTO)) {
+                || sheathable(player.getMainHandItem()) || sheathable(player.getOffhandItem())) {
             return -1;
         }
         for (int slot = 0; slot < Inventory.getSelectionSize(); slot++) {
             ItemStack stack = player.getInventory().getItem(slot);
-            if (stack.is(BleachTags.ZANPAKUTO)) {
+            if (sheathable(stack)) {
                 CustomModelData model = stack.get(DataComponents.CUSTOM_MODEL_DATA);
                 return model == null ? 0 : Math.max(0, model.value());
             }
         }
         return -1;
+    }
+
+    /** Whether this stack is a blade worn sheathed: a zanpakutō, or an Arrancar's blade. */
+    private static boolean sheathable(ItemStack stack) {
+        return stack.is(BleachTags.ZANPAKUTO) || stack.is(ModItems.ARRANCAR_BLADE.get());
     }
 }

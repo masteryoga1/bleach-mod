@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.advancement;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.quincy.QuincyStage;
+import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HollowTier;
@@ -136,6 +137,13 @@ public final class Milestones {
     public static final String ADJUCHAS = "adjuchas";
     /** Became a Vasto Lorde. */
     public static final String VASTO_LORDE = "vasto_lorde";
+    /**
+     * Became an Arrancar. It is the state's own milestone, which {@link #check} already grants under the state's
+     * name; the constant only names it.
+     */
+    public static final String ARRANCAR = "arrancar";
+    /** Called out an Arrancar's Resurrección. Granted when it happens. */
+    public static final String RESURRECCION = "resurreccion";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -240,8 +248,10 @@ public final class Milestones {
         if (hollow.souls() >= HollowPlayerLogic.SOULS_WITHIN) {
             trigger.trigger(player, SOULS_WITHIN);
         }
-        // The highest form ever reached, so a soul purified since still counts, or the form set by command.
-        int form = Math.max(hollow.evolution().peakTier(), HollowTier.of(data).tier());
+        // The highest form ever reached, so a soul purified since still counts, or the form set by command, or
+        // the form an Arrancar rose from.
+        int form = Math.max(hollow.evolution().peakTier(),
+                Math.max(HollowTier.of(data).tier(), ArrancarLogic.origin(data).tier()));
         if (form >= HollowTier.GILLIAN.tier()) {
             trigger.trigger(player, GILLIAN);
         }

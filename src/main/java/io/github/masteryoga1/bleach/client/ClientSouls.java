@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
@@ -18,16 +19,24 @@ public final class ClientSouls {
     /**
      * How an entity's soul looks: the local player's from its own data, others' from what the server sent.
      * The local player's Hollow jaw (and how long its hold is) and cracked mask come from the server too,
-     * which alone knows them.
+     * which alone knows them, and so does an Arrancar's Resurrección, with the Vasto Lorde's bone it brings
+     * back to one that rose from a Vasto Lorde.
      */
     public static SoulAppearance appearance(Entity entity) {
         LocalPlayer self = Minecraft.getInstance().player;
         if (entity == self) {
             SoulAppearance own = SoulAppearance.of(self, self.getData(SoulAttachments.SOUL));
-            // The devouring and cracked bits live only on the server, which sends them to the owner too.
+            // The devouring and cracked bits live only on the server, which sends them to the owner too, and so
+            // does an Arrancar's release, a transient, with the Vasto Lorde's bone it brings back. Those two are
+            // taken for an Arrancar only: a Hollow's own data tells its form more freshly than a look sent
+            // before the form changed.
+            int fromServer = HollowPlayerLogic.LOOK_DEVOURING | HollowPlayerLogic.LOOK_DEVOURING_PLUS
+                    | HollowPlayerLogic.LOOK_MASK_CRACKED;
+            if (own.state() == SoulState.ARRANCAR) {
+                fromServer |= HollowPlayerLogic.LOOK_RESURRECCION | HollowPlayerLogic.LOOK_VASTO_LORDE;
+            }
             int sent = self.hasData(SoulAttachments.APPEARANCE)
-                    ? self.getData(SoulAttachments.APPEARANCE).hollowLook() & (HollowPlayerLogic.LOOK_DEVOURING
-                            | HollowPlayerLogic.LOOK_DEVOURING_PLUS | HollowPlayerLogic.LOOK_MASK_CRACKED)
+                    ? self.getData(SoulAttachments.APPEARANCE).hollowLook() & fromServer
                     : 0;
             return sent == 0 ? own : own.withHollowLook(own.hollowLook() | sent);
         }

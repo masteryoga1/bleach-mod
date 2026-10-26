@@ -464,6 +464,38 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue CERO_MAX_DAMAGE;
     public static final ModConfigSpec.DoubleValue CERO_RANGE;
 
+    public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
+    public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
+    public static final ModConfigSpec.DoubleValue VASTO_TEAR_CHANCE;
+    public static final ModConfigSpec.DoubleValue TEAR_CHANCE_PER_FAILURE;
+    public static final ModConfigSpec.IntValue TEAR_CHANNEL_SECONDS;
+    public static final ModConfigSpec.IntValue TEAR_RETRY_MINUTES;
+    public static final ModConfigSpec.IntValue TEAR_CALM_SECONDS;
+    public static final ModConfigSpec.DoubleValue TEAR_MIN_REIRYOKU_FRACTION;
+    public static final ModConfigSpec.DoubleValue TEAR_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue TEAR_FAILURE_HEALTH_FRACTION;
+    public static final ModConfigSpec.IntValue TEAR_FAILURE_PAUSE_SECONDS;
+    public static final ModConfigSpec.IntValue BLADE_REFORM_MINUTES;
+    public static final ModConfigSpec.DoubleValue RESURRECCION_MIN_FRACTION;
+    public static final ModConfigSpec.DoubleValue RESURRECCION_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue RESURRECCION_END_FRACTION;
+    public static final ModConfigSpec.IntValue RESURRECCION_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue RESURRECCION_CERO_MULTIPLIER;
+
+    /**
+     * The numbers of an Arrancar by the Menos form it rose from, each in its own section of {@code [arrancar]}:
+     * what it is worth sealed and in Resurrección, its blade, what becoming one adds, and the release's drain.
+     */
+    public record ArrancarOrigin(ModConfigSpec.DoubleValue sealedHealthBonus, ModConfigSpec.DoubleValue releasedHealthBonus,
+            ModConfigSpec.DoubleValue releasedSpeedBonus, ModConfigSpec.DoubleValue releasedDamageMultiplier,
+            ModConfigSpec.DoubleValue bladeDamage, ModConfigSpec.DoubleValue reiryokuGrowth,
+            ModConfigSpec.DoubleValue releaseDrainPerSecond) {
+    }
+
+    public static final ArrancarOrigin GILLIAN_ARRANCAR;
+    public static final ArrancarOrigin ADJUCHAS_ARRANCAR;
+    public static final ArrancarOrigin VASTO_LORDE_ARRANCAR;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -856,7 +888,7 @@ public final class BleachConfig {
                 .comment("Extra blocks a Hollow player can fall unharmed.")
                 .defineInRange("safe_fall_extra", 3.0, 0.0, 64.0);
         VILLAGERS_TRADE_WITH_HOLLOWS = builder
-                .comment("Whether villagers and wandering traders trade with Hollow players.")
+                .comment("Whether villagers and wandering traders trade with Hollow and Arrancar players.")
                 .define("villagers_trade", false);
         DEVOUR_HOLD_TICKS = builder
                 .comment("Ticks the Devour key must be held on a Hollow or a player.")
@@ -1854,6 +1886,72 @@ public final class BleachConfig {
                 15, 1.0);
         builder.pop();
 
+        builder.push("arrancar");
+        NATURAL_ARRANCAR = builder
+                .comment("Whether an Adjuchas or Vasto Lorde Hollow player can tear off its own mask and become an Arrancar"
+                        + " (Release Zanpakutō twice, then hold still). Commands make one either way.")
+                .define("natural_arrancar", true);
+        ADJUCHAS_TEAR_CHANCE = builder
+                .comment("Chance an Adjuchas's first try at tearing off its mask succeeds: 0.15 is 3 in 20.")
+                .defineInRange("adjuchas_tear_chance", 0.15, 0.0, 1.0);
+        VASTO_TEAR_CHANCE = builder
+                .comment("Chance a Vasto Lorde's first try at tearing off its mask succeeds: 0.9 is 9 in 10.")
+                .defineInRange("vasto_tear_chance", 0.9, 0.0, 1.0);
+        TEAR_CHANCE_PER_FAILURE = builder
+                .comment("Chance each failed try adds to the next, so no Adjuchas is shut out for good (at the defaults it"
+                        + " needs about 4 tries, about an hour with the waits).")
+                .defineInRange("tear_chance_per_failure", 0.05, 0.0, 1.0);
+        TEAR_CHANNEL_SECONDS = builder
+                .comment("Seconds a Hollow must hold still, tearing at its mask, before it comes away or fails. A step of"
+                        + " more than a block, a jump, a blow, a devour or a Cero breaks it for free.")
+                .defineInRange("tear_channel_seconds", 5, 1, 60);
+        TEAR_RETRY_MINUTES = builder
+                .comment("Minutes from one failed try at tearing the mask to the next.")
+                .defineInRange("tear_retry_minutes", 20, 0, 1440);
+        TEAR_CALM_SECONDS = builder
+                .comment("Seconds a Hollow must go unhurt before it can start tearing at its mask.")
+                .defineInRange("tear_calm_seconds", 30, 0, 600);
+        TEAR_MIN_REIRYOKU_FRACTION = builder
+                .comment("Share of maximum reiryoku a Hollow needs to start tearing at its mask.")
+                .defineInRange("tear_min_reiryoku_fraction", 0.9, 0.0, 1.0);
+        TEAR_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku each try at tearing the mask costs, won or lost (it never leaves less"
+                        + " than 0.5).")
+                .defineInRange("tear_cost_fraction", 0.5, 0.0, 1.0);
+        TEAR_FAILURE_HEALTH_FRACTION = builder
+                .comment("Share of maximum health a failed try tears away. It never leaves less than half a heart.")
+                .defineInRange("tear_failure_health_fraction", 0.5, 0.0, 1.0);
+        TEAR_FAILURE_PAUSE_SECONDS = builder
+                .comment("Seconds a failed try stops a Hollow's regeneration and leaves its mask cracked.")
+                .defineInRange("tear_failure_pause_seconds", 60, 0, 600);
+        BLADE_REFORM_MINUTES = builder
+                .comment("Minutes an Arrancar goes without its blade before a new one forms from its mask, and every older"
+                        + " one crumbles. 0 never forms one again.")
+                .defineInRange("blade_reform_minutes", 5, 0, 120);
+        RESURRECCION_MIN_FRACTION = builder
+                .comment("Share of maximum reiryoku an Arrancar needs to call out its Resurrección.")
+                .defineInRange("release_min_fraction", 0.5, 0.0, 1.0);
+        RESURRECCION_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku a Resurrección costs to call out.")
+                .defineInRange("release_cost_fraction", 0.15, 0.0, 1.0);
+        RESURRECCION_END_FRACTION = builder
+                .comment("A Resurrección seals itself once reiryoku falls below this share of the maximum.")
+                .defineInRange("release_end_fraction", 0.05, 0.0, 1.0);
+        RESURRECCION_COOLDOWN_SECONDS = builder
+                .comment("Seconds after a Resurrección ends, however it ends, before the next. Logging out does not skip it.")
+                .defineInRange("release_cooldown_seconds", 120, 0, 3600);
+        RESURRECCION_CERO_MULTIPLIER = builder
+                .comment("What a Cero's damage is multiplied by in Resurrección, after the cap on a player's Cero (1.25 takes"
+                        + " the most from 80 to 100).")
+                .defineInRange("release_cero_multiplier", 1.25, 1.0, 5.0);
+        GILLIAN_ARRANCAR = arrancarOrigin(builder, "gillian", "a Gillian-born Arrancar", 4.0, 20.0, 0.1, 1.15, 6.0, 0.05,
+                0.008);
+        ADJUCHAS_ARRANCAR = arrancarOrigin(builder, "adjuchas", "an Adjuchas-born Arrancar", 10.0, 40.0, 0.25, 1.3, 7.0, 0.15,
+                0.006);
+        VASTO_LORDE_ARRANCAR = arrancarOrigin(builder, "vasto_lorde", "a Vasto Lorde-born Arrancar", 20.0, 60.0, 0.35, 1.5,
+                8.0, 0.25, 0.005);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -1893,6 +1991,36 @@ public final class BleachConfig {
                         .defineInRange("cero_radius", ceroRadius, 0.2, 4.0));
         builder.pop();
         return form;
+    }
+
+    /**
+     * One origin's section, {@code [arrancar.<name>]}, with its defaults; {@code who} names it in comments. The
+     * released health replaces the sealed health, and does not add to it.
+     */
+    private static ArrancarOrigin arrancarOrigin(ModConfigSpec.Builder builder, String name, String who, double sealedHealth,
+                                                 double releasedHealth, double releasedSpeed, double releasedDamage,
+                                                 double bladeDamage, double growth, double drain) {
+        builder.push(name);
+        ArrancarOrigin origin = new ArrancarOrigin(
+                builder.comment("Maximum health " + who + " gains on top of a person's 20 while sealed (2 is a heart).")
+                        .defineInRange("sealed_health_bonus", sealedHealth, 0.0, 400.0),
+                builder.comment("Maximum health " + who + " gains on top of a person's 20 in Resurrección, in place of the"
+                                + " sealed bonus.")
+                        .defineInRange("released_health_bonus", releasedHealth, 0.0, 400.0),
+                builder.comment("Share of walking speed " + who + " gains in Resurrección (a person walks 4.3 blocks a"
+                                + " second).")
+                        .defineInRange("released_speed_bonus", releasedSpeed, 0.0, 2.0),
+                builder.comment("What every melee blow of " + who + " in Resurrección is multiplied by, blade or claws.")
+                        .defineInRange("released_damage_multiplier", releasedDamage, 1.0, 5.0),
+                builder.comment("Damage the sealed blade of " + who + " deals (an Asauchi deals 6).")
+                        .defineInRange("blade_damage", bladeDamage, 1.0, 100.0),
+                builder.comment("Share of maximum reiryoku added once, the first time a soul becomes " + who + ".")
+                        .defineInRange("reiryoku_growth", growth, 0.0, 2.0),
+                builder.comment("Share of maximum reiryoku the Resurrección of " + who + " drains each second, less with"
+                                + " Reiatsu Control.")
+                        .defineInRange("release_drain_per_second", drain, 0.0, 0.1));
+        builder.pop();
+        return origin;
     }
 
     /** The configured value, or its default when no world is loaded (for example on the title screen). */

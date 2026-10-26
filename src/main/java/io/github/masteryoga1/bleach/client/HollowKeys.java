@@ -27,11 +27,12 @@ import org.lwjgl.glfw.GLFW;
  * holds it to gnaw at its own Chain of Fate; pressed while sneaking, it turns a Hollow's sight on or off
  * instead. The press goes to the server with the creature under the crosshair, and letting go (or a
  * screen opening, or dying) goes after it, so a hold lasts as long as the key does. Cero (Y): a Hollow
- * holds it to gather a Cero at its mouth and lets go to fire it; a screen opening, dying or no longer
- * being a Hollow while it is held lets the Cero fizzle instead. The server decides everything and says
- * why when it refuses (a plain Hollow is told only a Menos can gather one); this only sends the presses,
- * and keeps a guess at the hold and the gathering Cero for the HUD. Nothing is sent for a soul that is
- * neither a Hollow nor a Plus, and nothing for the Cero key but a Hollow's.
+ * or an Arrancar holds it to gather a Cero at its mouth and lets go to fire it; a screen opening, dying or
+ * no longer being a Hollow or an Arrancar while it is held lets the Cero fizzle instead. The server decides
+ * everything and says why when it refuses (a plain Hollow is told only a Menos can gather one); this only
+ * sends the presses, and keeps a guess at the hold and the gathering Cero for the HUD. Nothing is sent for
+ * the Devour key but a Hollow's or a Plus's (an Arrancar no longer devours), and nothing for the Cero key
+ * but a Hollow's or an Arrancar's.
  *
  * <p>It also tells {@link MenosBody} how tall the giants this client sees stand, every second.
  */
@@ -130,11 +131,13 @@ public final class HollowKeys {
 
     /**
      * The Cero key: down sends the start, and up the release, which fires it; a screen opening, dying or no
-     * longer being a Hollow cancels it. A tap is let go before anything has gathered, so it fizzles. While the
-     * key is held, this looks for the player's own gathering Cero, so the HUD and the model can show it.
+     * longer being a Hollow or an Arrancar cancels it. A tap is let go before anything has gathered, so it
+     * fizzles. While the key is held, this looks for the player's own gathering Cero, so the HUD and the
+     * model can show it.
      */
     private static void tickCero(Minecraft minecraft, LocalPlayer player, SoulData data, boolean down, boolean rising) {
-        boolean hollow = data.isInitialized() && data.state() == SoulState.HOLLOW && !player.isSpectator();
+        boolean hollow = data.isInitialized() && (data.state() == SoulState.HOLLOW || data.state() == SoulState.ARRANCAR)
+                && !player.isSpectator();
         // A screen opening releases every key, so check for one before taking the key's release as a shot.
         if (ceroHolding && (minecraft.screen != null || !player.isAlive() || !hollow)) {
             BleachNetwork.requestHollowKey(HollowKey.CERO_CANCEL, -1);

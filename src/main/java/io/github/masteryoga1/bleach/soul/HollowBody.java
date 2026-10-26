@@ -36,10 +36,12 @@ import net.minecraft.world.level.Level;
  * What being a Hollow does to a player's body: claws on a bare hand, a hide that gives armour and
  * bears none, a leap that falls further unharmed, sight in the dark, and soul hunger in place of food,
  * which drains with time and effort, pays for a fast regeneration, and starves the Hollow when it runs
- * out. A Hollow that stops being one gets its body and its food back. The numbers are in
+ * out. A Hollow that stops being one gets its body and its food back. An Arrancar's Resurrección
+ * puts the claws, hide and leap of the form it rose from back on, but none of the rest. The numbers are in
  * {@link HollowPlayerLogic}; a Menos form's size and the rest of its body are in {@link MenosBody}, and
- * its rise and fall in {@link MenosEvolution}. Server side unless said otherwise; everything takes a
- * {@link Player}, so game tests can use mock players, and only messages and sounds need a real one.
+ * its rise and fall in {@link MenosEvolution}; the Arrancar's own tick is in {@link ArrancarEvents}. Server
+ * side unless said otherwise; everything takes a {@link Player}, so game tests can use mock players, and
+ * only messages and sounds need a real one.
  *
  * <p>The hunger spent is gathered as a debt and taken off the saved value now and then (see
  * {@link #flushDebt}), so the soul is not re-sent to its owner every tick.
@@ -65,7 +67,10 @@ public final class HollowBody {
     public static final int FLUSH_INTERVAL_TICKS = 600;
     /** Ticks between two refusal-type messages (see {@link #actionBar}). */
     public static final int MESSAGE_INTERVAL_TICKS = 20;
-    /** Ticks between two looks at whether a soul holds a place among the server's Vasto Lorde. */
+    /**
+     * Ticks between two looks at whether a soul holds a place among the server's Vasto Lorde, and between two
+     * checks of an Arrancar's body and blades (see {@link ArrancarEvents#reconcile}).
+     */
     private static final int VASTO_NOTE_INTERVAL_TICKS = 20;
 
     private static final List<EquipmentSlot> ARMOR_SLOTS =
@@ -158,16 +163,26 @@ public final class HollowBody {
     /**
      * A Hollow player's tick, from HollowPlayerEvents: the hunger starts, a Menos grows, shrinks or
      * squeezes, the body is put right, the road as a Menos is kept (and an unfed Adjuchas's clock runs),
-     * and a Cero gathers; then, alive, under survival's rules and while the game runs, the armour is shed,
-     * the hunger drains (or refills on Peaceful), the bands are told, the body regenerates or starves, and
-     * a hungry Hollow smells for souls. A soul that has stopped being a Hollow gets its body back instead,
-     * and any Cero it was gathering fizzles. Every soul's place among the Vasto Lorde is kept right.
+     * a Cero gathers and a tear at the mask goes on (see {@link ArrancarEvents#tickTear}), which ends the
+     * tick if the mask came away; then, alive, under survival's rules and while the game runs, the armour is
+     * shed, the hunger drains (or refills on Peaceful), the bands are told, the body regenerates or starves,
+     * and a hungry Hollow smells for souls. An Arrancar has its own tick instead (see
+     * {@link ArrancarEvents#tick}). Any other soul gets its body back, any Cero it was gathering fizzles and
+     * any tear is let go of. Every soul's place among the Vasto Lorde, and its Arrancar body and blades, are
+     * kept right every second.
      */
     public static void tickBody(Player player, SoulData data, long now) {
         if (player.tickCount % VASTO_NOTE_INTERVAL_TICKS == 0) {
             MenosEvolution.noteVasto(player, data);
+            ArrancarEvents.reconcile(player, data, now);
+        }
+        if (ArrancarLogic.isArrancar(data)) {
+            ArrancarEvents.tick(player, data, now);
+            return;
         }
         if (!HollowPlayerLogic.isHollow(data)) {
+            // A command, a purification or any other road out of the Hollow state lets go of the mask.
+            ArrancarEvents.clearTear(data);
             if (HollowCero.charging(data)) {
                 HollowCero.cancel(player, data);
             }
@@ -181,6 +196,9 @@ public final class HollowBody {
         reconcile(player, data, true);
         MenosEvolution.tick(player, data, now);
         HollowCero.tick(player, data, now);
+        if (ArrancarEvents.tickTear(player, data, now)) {
+            return;
+        }
         boolean alive = player.isAlive();
         if (alive && data.hollow().purifiedOnDeath()) {
             // Marked by a purifying blow whose death did not happen after all.
@@ -231,10 +249,12 @@ public final class HollowBody {
     /**
      * Puts the body right, and does nothing when it already is: for a Hollow, claws and their speed on
      * a bare main hand only, the hide, the leap, the sight and its Menos form's body (see
-     * {@link MenosBody#reconcile}); for anyone else, none of them. The modifiers are transient but for a
-     * Menos's health, so this runs again on logging in and respawning (see
-     * {@link SoulLogic#applyStatModifiers}), and each is written only when its amount changes, so the
-     * attributes are not re-sent every tick. Server side.
+     * {@link MenosBody#reconcile}); for an Arrancar in Resurrección, the claws, hide and leap of the form it
+     * rose from (see {@link HollowPlayerLogic#bodyForm}); for anyone else, none of them. First, for every
+     * soul, an Arrancar's health, speed and damage are put right (see {@link ArrancarEvents#reconcileBody}).
+     * The modifiers are transient but for a Menos's and an Arrancar's health, so this runs again on logging
+     * in and respawning (see {@link SoulLogic#applyStatModifiers}), and each is written only when its amount
+     * changes, so the attributes are not re-sent every tick. Server side.
      * <p>
      * The claws come off a hand that holds something at once, but grow only on the player's tick (see
      * {@link #tickBody}), after vanilla's equipment check. Between ticks, a hand just emptied by a hotbar
@@ -244,11 +264,16 @@ public final class HollowBody {
         reconcile(player, data, false);
     }
 
-    private static void reconcile(Player player, SoulData data, boolean growClaws) {
+    /**
+     * {@link #reconcile(Player, SoulData)}, letting the claws grow on a bare hand when {@code growClaws}: only
+     * from a body tick, a Hollow's here or a released Arrancar's (see {@link ResurreccionEvents#upkeep}).
+     */
+    static void reconcile(Player player, SoulData data, boolean growClaws) {
         if (player.level().isClientSide()) {
             return;
         }
-        if (!HollowPlayerLogic.isHollow(data)) {
+        ArrancarEvents.reconcileBody(player, data);
+        if (!HollowPlayerLogic.wearsHollowBody(data)) {
             removeBody(player);
             data.hollowBodyApplied = false;
             return;
@@ -267,6 +292,11 @@ public final class HollowBody {
                 AttributeModifier.Operation.ADD_VALUE);
         setModifier(player, Attributes.SAFE_FALL_DISTANCE, LEAP_ID, BleachConfig.get(BleachConfig.HOLLOW_SAFE_FALL),
                 AttributeModifier.Operation.ADD_VALUE);
+        if (!HollowPlayerLogic.isHollow(data)) {
+            // A released Arrancar: no sight and a person's size, and never marked as wearing the Hollow's body,
+            // so sealing it again never gives it a fresh body's food.
+            return;
+        }
         sight(player, data);
         MenosBody.reconcile(player, data);
         data.hollowBodyApplied = true;

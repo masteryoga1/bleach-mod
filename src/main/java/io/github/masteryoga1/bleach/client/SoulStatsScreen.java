@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.BaitRecord;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
@@ -46,11 +47,12 @@ import net.minecraft.world.level.Level;
 
 /**
  * The soul screen: state, reiryoku, a Plus's Chain of Fate or a Hollow's soul hunger, the zanpakutō
- * (or until it has a name, the Asauchi bond), Hollows purified and slain and Pluses sent on, Hollow
- * Bait crushed and contests with the Quincy Hunter, the souls a Hollow has devoured and what they
- * were, Quincy blood (its reishi and Blut, the Hollow poison in it, souls destroyed and how rich the
- * reishi is here, how far its arts have come, and the Quincy Elder's lessons), stats with training
- * progress, awakened powers and what comes next.
+ * (or until it has a name, the Asauchi bond; for an Arrancar, its own blade and whether it is released),
+ * Hollows purified and slain and Pluses sent on, Hollow Bait crushed and contests with the Quincy Hunter,
+ * the souls a Hollow has devoured and what they were, Quincy blood (its reishi and Blut, the Hollow
+ * poison in it, souls destroyed and how rich the reishi is here, how far its arts have come, and the
+ * Quincy Elder's lessons), stats with training progress, awakened powers (an Arrancar's with the form it
+ * rose from) and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -224,13 +226,22 @@ public final class SoulStatsScreen extends Screen {
         boolean anyPower = false;
         for (PowerPath path : PowerPath.values()) {
             int tier = data.tier(path);
-            if (tier > 0) {
+            // An Arrancar always rose from some form, even one an old command left at tier 0: it reads as a Gillian.
+            boolean arrancar = path == PowerPath.HOLLOW && ArrancarLogic.isArrancar(data);
+            if (tier > 0 || arrancar) {
                 anyPower = true;
-                // A Hollow's tier is its form: Hollow, Gillian, Adjuchas or Vasto Lorde.
-                Component row = path == PowerPath.HOLLOW && HollowPlayerLogic.isHollow(data)
-                        ? Component.translatable("screen.bleach.soul.tier.hollow", path.displayName(),
-                                HollowTier.of(data).displayName())
-                        : Component.translatable("screen.bleach.soul.tier", path.displayName(), tier);
+                // A Hollow's tier is its form: Hollow, Gillian, Adjuchas or Vasto Lorde; an Arrancar's, the form it
+                // rose from.
+                Component row;
+                if (path == PowerPath.HOLLOW && HollowPlayerLogic.isHollow(data)) {
+                    row = Component.translatable("screen.bleach.soul.tier.hollow", path.displayName(),
+                            HollowTier.of(data).displayName());
+                } else if (arrancar) {
+                    row = Component.translatable("screen.bleach.soul.tier.arrancar", path.displayName(),
+                            ArrancarLogic.origin(data).displayName());
+                } else {
+                    row = Component.translatable("screen.bleach.soul.tier", path.displayName(), tier);
+                }
                 text(graphics, row, left + 6, y, WHITE);
                 y += line;
             }
@@ -378,9 +389,26 @@ public final class SoulStatsScreen extends Screen {
      * The zanpakutō's name and whether it is sealed, in Shikai or always released; before the name,
      * how far the Asauchi bond has grown, once it has begun or while a nameless Asauchi is carried.
      * Null when there is nothing to say. Whether it is in Shikai is read from the player's own blade.
+     * An Arrancar's line is its own blade's instead: in Resurrección (as the server last showed it),
+     * sealed and settling with the time left before it can be released again, or sealed.
      */
     @Nullable
     private static Component zanpakutoLine(Player player, SoulData data) {
+        if (ArrancarLogic.isArrancar(data)) {
+            long now = player.level().getGameTime();
+            long ready = data.hollow().arrancar().releaseReadyAt();
+            Component state;
+            if ((ClientSouls.appearance(player).hollowLook() & HollowPlayerLogic.LOOK_RESURRECCION) != 0) {
+                state = Component.translatable("screen.bleach.soul.zanpakuto.resurreccion");
+            } else if (now < ready) {
+                state = Component.translatable("screen.bleach.soul.zanpakuto.settling",
+                        StringUtil.formatTickDuration((int) Math.min(Integer.MAX_VALUE, ready - now), TICKS_PER_SECOND));
+            } else {
+                state = Component.translatable("screen.bleach.soul.zanpakuto.sealed");
+            }
+            Component name = ArrancarLogic.blade(player.getUUID()).displayName();
+            return Component.translatable("screen.bleach.soul.zanpakuto", name, state);
+        }
         ZanpakutoBond bond = data.zanpakuto();
         if (bond.named()) {
             String state;
@@ -405,7 +433,9 @@ public final class SoulStatsScreen extends Screen {
      * direction too, and a Plus who could gnaw its own chain is told it can, with the Devour key. A
      * Hollow is told how to feed with that key and, once it has, how many souls are within it. A Menos
      * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
-     * how long it may go without a Hollow before it sinks back, wherever the server lets it.
+     * how long it may go without a Hollow before it sinks back, wherever the server lets it. An Adjuchas
+     * or Vasto Lorde is told it can tear off its mask, where the server lets it; an Arrancar, the name of
+     * its blade and the keys that release and seal it, and the Cero key.
      */
     private static Component nextStep(Player player, SoulData data) {
         String key = ShinigamiLogic.nextStepKey(data, player.level().getGameTime());
@@ -418,7 +448,16 @@ public final class SoulStatsScreen extends Screen {
         }
         Component menos = menosStep(key, data, devour);
         if (menos != null) {
-            return menos;
+            if (!ArrancarLogic.canTear(HollowTier.of(data)) || !BleachConfig.get(BleachConfig.NATURAL_ARRANCAR)) {
+                return menos;
+            }
+            return menos.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.hollow.tear",
+                    ZanpakutoKeys.RELEASE.getTranslatedKeyMessage()));
+        }
+        if (key.equals("arrancar")) {
+            return Component.translatable("screen.bleach.soul.next.arrancar",
+                    ArrancarLogic.blade(player.getUUID()).displayName(), ZanpakutoKeys.RELEASE.getTranslatedKeyMessage(),
+                    ZanpakutoKeys.SEAL.getTranslatedKeyMessage(), HollowKeys.CERO.getTranslatedKeyMessage());
         }
         if (!key.equals("plus")) {
             return Component.translatable("screen.bleach.soul.next." + key);

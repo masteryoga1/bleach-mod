@@ -14,10 +14,12 @@ import net.minecraft.client.renderer.RenderType;
 
 /**
  * A Hollow player's bone mask: a face plate and a jaw, with tusks, horns or a beak by shape (see
- * {@code HollowPlayerLogic#maskVariant}). Built in head space (the head spans -4 to 4 across, -8 to 0
- * down and -4 to 4 deep, its face at -4), so it only has to follow the posed head to be worn. The plate
- * stands a pixel off the face, half a pixel clear of the hat layer in front, and the plate and jaw are
- * grown a hair so that none of their faces shares a plane with the hat or the head, which would flicker.
+ * {@code HollowPlayerLogic#maskVariant}), and the remnant an Arrancar keeps of it (see
+ * {@link #setupFragment}). Built in head space (the head spans -4 to 4 across, -8 to 0 down and -4 to 4
+ * deep, its face at -4), so it only has to follow the posed head to be worn. The plate stands a pixel off
+ * the face, half a pixel clear of the hat layer in front, and the plate and jaw are grown a hair so that
+ * none of their faces shares a plane with the hat or the head, which would flicker. Standing off the face,
+ * a remnant hovers just clear of the skin, as an Arrancar's does.
  */
 public final class HollowMaskModel extends Model {
     /** Where the jaw hangs, shut, and how far it drops and swings its lower edge forward while devouring. */
@@ -33,11 +35,13 @@ public final class HollowMaskModel extends Model {
     private static final CubeDeformation PLATE_GROWTH = new CubeDeformation(0.05F);
     private static final CubeDeformation JAW_GROWTH = new CubeDeformation(0.03F);
 
+    private static final int SKULL = 0;
     private static final int FANGED = 1;
     private static final int HORNED = 2;
     private static final int BEAKED = 3;
 
     private final ModelPart root;
+    private final ModelPart plate;
     private final ModelPart jaw;
     private final ModelPart leftTusk;
     private final ModelPart rightTusk;
@@ -48,6 +52,7 @@ public final class HollowMaskModel extends Model {
     public HollowMaskModel(ModelPart root) {
         super(RenderType::entityCutoutNoCull);
         this.root = root;
+        this.plate = root.getChild("plate");
         this.jaw = root.getChild("jaw");
         this.leftTusk = jaw.getChild("left_tusk");
         this.rightTusk = jaw.getChild("right_tusk");
@@ -84,11 +89,14 @@ public final class HollowMaskModel extends Model {
     }
 
     /**
-     * Shows the parts of this shape (0 the plain skull, 1 fanged, 2 horned, 3 beaked) and hangs the jaw
-     * open while the Hollow devours: it drops a pixel and a half and swings its lower edge forward,
-     * showing the face beneath.
+     * Shows the whole mask with the parts of this shape (0 the plain skull, 1 fanged, 2 horned, 3 beaked) and
+     * hangs the jaw open while the Hollow devours: it drops a pixel and a half and swings its lower edge
+     * forward, showing the face beneath. The plate and jaw are shown every time, as one model draws the
+     * Hollows' masks and the Arrancar's remnants.
      */
     public void setup(int variant, boolean jawOpen) {
+        plate.visible = true;
+        jaw.visible = true;
         leftTusk.visible = variant == FANGED;
         rightTusk.visible = variant == FANGED;
         leftHorn.visible = variant == HORNED;
@@ -96,6 +104,23 @@ public final class HollowMaskModel extends Model {
         beak.visible = variant == BEAKED;
         jaw.y = jawOpen ? JAW_OPEN_Y : JAW_SHUT_Y;
         jaw.xRot = jawOpen ? JAW_OPEN_X_ROT : 0.0F;
+    }
+
+    /**
+     * Shows only the remnant an Arrancar keeps of a mask of this shape, hovering where it was, with no face
+     * plate: a skull mask leaves its jawbone, a fanged one the jaw and its tusks, a horned one a single horn
+     * and a beaked one its beak. The jaw is shut, as an Arrancar no longer devours.
+     */
+    public void setupFragment(int variant) {
+        plate.visible = false;
+        jaw.visible = variant == SKULL || variant == FANGED;
+        leftTusk.visible = variant == FANGED;
+        rightTusk.visible = variant == FANGED;
+        leftHorn.visible = variant == HORNED;
+        rightHorn.visible = false;
+        beak.visible = variant == BEAKED;
+        jaw.y = JAW_SHUT_Y;
+        jaw.xRot = 0.0F;
     }
 
     @Override

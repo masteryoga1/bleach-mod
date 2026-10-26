@@ -99,9 +99,18 @@ public final class ShikaiEvents {
         bus.addListener(ShikaiEvents::onLoggedOut);
     }
 
-    /** A zanpakutō key pressed on the client. Refusals are shown above the hotbar. */
+    /**
+     * A zanpakutō key pressed on the client. Refusals are shown above the hotbar. A Hollow's and an
+     * Arrancar's keys go to {@link ArrancarEvents#onKey} instead, which has no Shikai for them: there,
+     * release and seal tear at a Menos's mask, or call out and end an Arrancar's Resurrección.
+     */
     public static void onKey(ServerPlayer player, ZanpakutoKey key) {
         if (!player.isAlive() || player.isSpectator()) {
+            return;
+        }
+        SoulData data = SoulLogic.get(player);
+        if (HollowPlayerLogic.isHollowOrArrancar(data)) {
+            ArrancarEvents.onKey(player, data, key, player.level().getGameTime());
             return;
         }
         switch (key) {
@@ -124,7 +133,7 @@ public final class ShikaiEvents {
                 }
             }
             case TECHNIQUE_RELEASE -> fire(player);
-            case TECHNIQUE_CANCEL -> cancelGather(player, SoulLogic.get(player));
+            case TECHNIQUE_CANCEL -> cancelGather(player, data);
             default -> {
             }
         }

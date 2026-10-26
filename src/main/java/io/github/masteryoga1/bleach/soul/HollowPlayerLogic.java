@@ -16,8 +16,11 @@ import net.minecraft.world.item.ItemStack;
  * for. Like {@link SoulLogic}, these read only their arguments and the config, send nothing and are
  * safe on both sides, so game tests can call them directly. What they do to a player is in
  * {@link HollowBody}. Every rule for a Hollow player asks {@link #isHollow}, so the states that count
- * as one are decided in one place (the Arrancar keep today's rules for now). A Menos form changes the
- * claws, hide and regeneration through {@link HollowTier}'s factors, inside these same rules.
+ * as one are decided in one place. An Arrancar is no Hollow to them: only the rules that ask
+ * {@link #isHollowOrArrancar} (the villagers', the Cero's) count it as one, and, in Resurrección, the claws
+ * and hide it takes back ({@link #wearsHollowBody}, {@link #bodyForm}); its own rules are in
+ * {@link ArrancarLogic}. A Menos form changes the claws, hide and regeneration through {@link HollowTier}'s
+ * factors, inside these same rules.
  */
 public final class HollowPlayerLogic {
     /** How hungry a Hollow is. Lower in the list is hungrier. Never sent or saved. */
@@ -47,6 +50,8 @@ public final class HollowPlayerLogic {
     public static final int LOOK_CERO_CHARGING = 64;
     /** With {@link #LOOK_DEVOURING}: the prey is a Plus, so the hold is a Plus's (its owner's devour bar reads it). */
     public static final int LOOK_DEVOURING_PLUS = 128;
+    /** An Arrancar in Resurrección: its Hollow skin and full mask (with {@link #LOOK_VASTO_LORDE}, a Vasto Lorde's bone). */
+    public static final int LOOK_RESURRECCION = 256;
     /** How many mask shapes there are: 0 skull, 1 fanged, 2 horned, 3 beaked. */
     public static final int MASK_VARIANTS = 4;
     /** The food level a starving Hollow is held at: exactly the client's own limit for sprinting. */
@@ -71,6 +76,25 @@ public final class HollowPlayerLogic {
     /** Whether this player is a Hollow. Never gives a player without one a soul. */
     public static boolean isHollowPlayer(Player player) {
         return SoulLogic.hasSoul(player) && isHollow(SoulLogic.get(player));
+    }
+
+    /** Whether this soul is a Hollow or an Arrancar: to the living, and to its Cero, still a Hollow. */
+    public static boolean isHollowOrArrancar(SoulData data) {
+        return isHollow(data) || ArrancarLogic.isArrancar(data);
+    }
+
+    /** Whether this soul wears the Hollow body, its claws, hide and leap: a Hollow, or an Arrancar in Resurrección. */
+    public static boolean wearsHollowBody(SoulData data) {
+        return isHollow(data) || ArrancarLogic.released(data);
+    }
+
+    /**
+     * The form whose claws, claw speed and hide this soul's body has: a Hollow's own, or the body a released
+     * Arrancar takes back (see {@link ArrancarLogic#releasedBody}). Never the regeneration's, which an Arrancar
+     * has traded away.
+     */
+    public static HollowTier bodyForm(SoulData data) {
+        return ArrancarLogic.released(data) ? ArrancarLogic.releasedBody(data) : HollowTier.of(data);
     }
 
     /** Whether the player plays by survival's rules: in survival or adventure mode. */
@@ -106,7 +130,7 @@ public final class HollowPlayerLogic {
         if (band(data) != Band.FED) {
             claws *= BleachConfig.get(BleachConfig.RAVENOUS_CLAW_MULTIPLIER);
         }
-        return (float) (claws * HollowTier.of(data).clawMultiplier());
+        return (float) (claws * bodyForm(data).clawMultiplier());
     }
 
     /** The attack speed modifier that makes bare-handed blows come at the configured rate, from vanilla's four a second. */
@@ -116,7 +140,7 @@ public final class HollowPlayerLogic {
 
     /** {@link #clawSpeedModifier()} at the rate of this soul's form: a Gillian swings slower, an Adjuchas as fast. */
     public static double clawSpeedModifier(SoulData data) {
-        return HollowTier.of(data).clawAttacksPerSecond() / 4.0 - 1.0;
+        return bodyForm(data).clawAttacksPerSecond() / 4.0 - 1.0;
     }
 
     /**
@@ -127,7 +151,7 @@ public final class HollowPlayerLogic {
         double root = Math.sqrt(Math.max(0.0F, data.maxReiryoku()));
         double hide = Math.min(BleachConfig.get(BleachConfig.HIDE_ARMOR_MAX),
                 BleachConfig.get(BleachConfig.HIDE_ARMOR_BASE) + BleachConfig.get(BleachConfig.HIDE_ARMOR_PER_SQRT) * root);
-        return (float) Math.min(MOST_ARMOUR, hide + HollowTier.of(data).hideBonus());
+        return (float) Math.min(MOST_ARMOUR, hide + bodyForm(data).hideBonus());
     }
 
     /**
@@ -230,10 +254,13 @@ public final class HollowPlayerLogic {
         return stack.getFoodProperties(eater) != null && !stack.is(BleachTags.HOLLOW_EDIBLE);
     }
 
-    /** Whether villagers and wandering traders turn away from this player: a Hollow under survival's rules. */
+    /**
+     * Whether villagers and wandering traders turn away from this player: a Hollow or an Arrancar, which to the
+     * living is a Hollow still, under survival's rules.
+     */
     public static boolean shunnedByVillagers(Player player) {
         return !BleachConfig.get(BleachConfig.VILLAGERS_TRADE_WITH_HOLLOWS) && survivalRules(player)
-                && isHollowPlayer(player);
+                && SoulLogic.hasSoul(player) && isHollowOrArrancar(SoulLogic.get(player));
     }
 
     /** Which shape of mask a Hollow player wears: the same on every client and in every session. */
@@ -252,11 +279,12 @@ public final class HollowPlayerLogic {
 
     /**
      * Every look bit, with those only the server knows: the jaw open while devouring (and whether the
-     * prey is a Plus, whose hold has its own length), the mask cracked after a blow, and a Cero gathering.
-     * On a client's copy those are at their defaults and add nothing.
+     * prey is a Plus, whose hold has its own length), the mask cracked after a blow (or while it is torn at),
+     * a Cero gathering, and an Arrancar's Resurrección (see {@link ArrancarLogic#lookBits}). On a client's copy
+     * those are at their defaults and add nothing.
      */
     public static int hollowLook(SoulData data, long now) {
-        int look = hollowLook(data);
+        int look = hollowLook(data) | ArrancarLogic.lookBits(data);
         if (data.devourTargetId >= 0) {
             look |= data.devourPlus ? LOOK_DEVOURING | LOOK_DEVOURING_PLUS : LOOK_DEVOURING;
         }

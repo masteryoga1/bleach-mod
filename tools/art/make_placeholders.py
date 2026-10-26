@@ -1270,6 +1270,15 @@ def hollow_vasto_lorde():
     return c
 
 
+def arrancar_hole():
+    """An Arrancar's hole over its skin, in the player skin layout: hollow_player's hole alone, through the chest
+    front and back, on the body and on the jacket layer. SoulLayer moves it to the throat or the belly by player."""
+    c = Canvas(64, 64)
+    for x, y in ((22, 23), (34, 23), (22, 39), (34, 39)):  # body front, body back, jacket front, jacket back
+        hole(c, x, y)
+    return c
+
+
 def hollow_player_mask():
     """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
     between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
@@ -1409,6 +1418,7 @@ TEXTURES = {
     "entity/ginto_cast.png": ginto_cast,
     "entity/hollow_player.png": hollow_player,
     "entity/hollow_vasto_lorde.png": hollow_vasto_lorde,
+    "entity/arrancar_hole.png": arrancar_hole,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,

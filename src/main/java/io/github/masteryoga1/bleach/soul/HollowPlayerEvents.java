@@ -31,7 +31,8 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * before a blow, a Hollow devoured by the Hollow that killed it, and the way back to being a soul, by
  * the Academy instructor's blade or a purifying blow. The rules are in {@link HollowPlayerLogic} and
  * what they do to the body in {@link HollowBody} and {@link MenosBody}. The refusals run on both sides,
- * so the client does not first show what the server then undoes.
+ * so the client does not first show what the server then undoes. The listeners of an Arrancar's
+ * Resurrección ({@link ResurreccionEvents}) are registered here too.
  */
 public final class HollowPlayerEvents {
     private HollowPlayerEvents() {
@@ -50,6 +51,7 @@ public final class HollowPlayerEvents {
         bus.addListener(EventPriority.LOW, HollowPlayerEvents::onDeath);
         bus.addListener(HollowPlayerEvents::onRespawn);
         MenosBody.register(bus);
+        ResurreccionEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -162,8 +164,8 @@ public final class HollowPlayerEvents {
 
     /**
      * Just before a blow, the claws are put right for what is in hand now, so a hotbar swap since the last
-     * tick never carries the claws onto a sword. A hand just emptied gets them on the next tick instead
-     * (see {@link HollowBody#reconcile}).
+     * tick never carries the claws onto a sword: a Hollow's, or a released Arrancar's. A hand just emptied
+     * gets them on the next tick instead (see {@link HollowBody#reconcile}).
      */
     private static void onAttackEntity(AttackEntityEvent event) {
         Player player = event.getEntity();
@@ -171,7 +173,7 @@ public final class HollowPlayerEvents {
             return;
         }
         SoulData data = SoulLogic.get(player);
-        if (HollowPlayerLogic.isHollow(data) || data.hollowBodyApplied) {
+        if (HollowPlayerLogic.wearsHollowBody(data) || data.hollowBodyApplied) {
             HollowBody.reconcile(player, data);
         }
     }
