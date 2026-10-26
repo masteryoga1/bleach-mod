@@ -342,7 +342,11 @@ public final class GranReyCeroTests {
             CeroBeam full = onlyBeam(helper);
             GranReyCero.release(player, data, now + 21L);
             helper.assertTrue(!GranReyCero.charging(data) && full.isFired(), "a fully gathered Gran Rey Cero did not fire");
-            HollowPlayerTests.assertClose(helper, data.reiryoku(), 960.0, "the reiryoku after a Gran Rey Cero");
+            // The kill grows the maximum a little before the fire is paid for, as with the Cero, so the cost is read
+            // after it: 640 and a twentieth.
+            helper.assertTrue(data.maxReiryoku() > STRONG, "killing the Spider Hollow did not grow the maximum");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), STRONG - GranReyCero.cost(data),
+                    "the reiryoku after a Gran Rey Cero");
             helper.assertTrue(readyAt(data) == now + 21L + 1_200L,
                     "the next is ready at " + readyAt(data) + ", not a minute after it fired");
             CeroBeam.Shot shot = full.lastShot();
