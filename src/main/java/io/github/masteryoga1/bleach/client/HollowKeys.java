@@ -183,6 +183,8 @@ public final class HollowKeys {
      */
     private static void tickMarks(Minecraft minecraft) {
         if (MARKS.isEmpty()) {
+            // Nothing left to outline, so let the world go: holding it would keep it in memory past a dimension change.
+            markLevel = null;
             return;
         }
         if (minecraft.level != markLevel) {
