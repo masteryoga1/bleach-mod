@@ -27,6 +27,16 @@ public final class ModComponents {
             COMPONENTS.registerComponentType("seele_formed",
                     builder -> builder.persistent(Codec.BOOL).networkSynchronized(ByteBufCodecs.BOOL));
 
+    /**
+     * Which forging of its owner's blade an Arrancar's blade is: only the newest is its own, so every older copy
+     * crumbles (see
+     * {@link io.github.masteryoga1.bleach.soul.ArrancarEvents#reconcileBlades}). Saved, and sent to clients, so
+     * a creative player's inventory edit keeps it.
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> ARRANCAR_FORGING =
+            COMPONENTS.registerComponentType("arrancar_forging",
+                    builder -> builder.persistent(Codec.INT).networkSynchronized(ByteBufCodecs.VAR_INT));
+
     private ModComponents() {
     }
 }

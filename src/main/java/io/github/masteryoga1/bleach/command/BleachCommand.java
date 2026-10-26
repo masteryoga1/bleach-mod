@@ -20,6 +20,8 @@ import io.github.masteryoga1.bleach.quincy.QuincyStage;
 import io.github.masteryoga1.bleach.registry.ModComponents;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.ArrancarEvents;
+import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.BaitLogic;
 import io.github.masteryoga1.bleach.soul.BaitSite;
@@ -32,6 +34,7 @@ import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
+import io.github.masteryoga1.bleach.soul.MenosEvolution;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
 import io.github.masteryoga1.bleach.soul.QuincyArtsEvents;
@@ -44,6 +47,7 @@ import io.github.masteryoga1.bleach.soul.QuincyNpcLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
 import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
 import io.github.masteryoga1.bleach.soul.QuincyTeaching;
+import io.github.masteryoga1.bleach.soul.ResurreccionEvents;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
@@ -101,11 +105,11 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  *
  * <pre>
  * /bleach info [player]
- * /bleach soul &lt;players&gt; &lt;state&gt;      (a Shinigami also gets their first tier)
+ * /bleach soul &lt;players&gt; &lt;state&gt;      (a Shinigami also gets their first tier; arrancar tears the mask, below)
  * /bleach enroll &lt;players&gt;           (Rukongai souls only)
  * /bleach reiryoku &lt;players&gt; &lt;max&gt; [current]
  * /bleach stat &lt;players&gt; &lt;stat&gt; &lt;level&gt;
- * /bleach tier &lt;players&gt; &lt;path&gt; &lt;tier&gt;
+ * /bleach tier &lt;players&gt; &lt;path&gt; &lt;tier&gt;   (on an Arrancar, hollow sets the form it rose from)
  * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
  * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
@@ -114,6 +118,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach hollow &lt;players&gt; satiety &lt;0..100&gt;   (soul hunger, started if it had not; Hollow players only)
  * /bleach hollow &lt;players&gt; souls &lt;0..100000&gt;   (the souls devoured, for any soul)
  * /bleach hollow &lt;players&gt; reset   (the Hollow record starts over; a Hollow's hunger starts again on its next tick)
+ *                                    (an Arrancar's failed tears and release cooldown go too, but not its blade)
  * /bleach bait &lt;players&gt; &lt;start|stop|wave|finale|status&gt;   (start skips every refusal but the world and Peaceful, and counts as a crush)
  * /bleach bait list
  * /bleach npc &lt;players&gt; &lt;elder|hunter&gt;   (a visit now, with no gates, chance or cooldown)
@@ -136,6 +141,11 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach quincy &lt;players&gt; lessons reset   (the Elder's lessons and visits start over; Ransōtengai stays known)
  * /bleach quincy &lt;players&gt; reset   (no Quincy power, and the bloodline is asked again)
  * </pre>
+ *
+ * <p>{@code /bleach soul … arrancar} makes an Arrancar, with its blade, from the Hollow form the player holds,
+ * as if it had torn its own mask: anything below a Gillian (a plain Hollow, or a soul with no Hollow tier)
+ * counts as Gillian-born. Setting any other state on an Arrancar ends its Resurrección first, and its blade
+ * crumbles within a second.
  */
 public final class BleachCommand {
     /** The most Quincy training the command sets. */
@@ -360,6 +370,11 @@ public final class BleachCommand {
         if (!data.hollow().equals(HollowProgress.NONE)) {
             line.accept(hollowLine(data));
         }
+        if (ArrancarLogic.isArrancar(data)) {
+            line.accept(arrancarLine(player, data, now));
+        } else if (HollowPlayerLogic.isHollow(data) && data.hollow().arrancar().failures() > 0) {
+            line.accept(tearLine(data, now));
+        }
         ZanpakutoBond bond = data.zanpakuto();
         line.accept(Component.translatable("commands.bleach.info.zanpakuto", bond.bond(), ZanpakutoBond.FULL,
                 bond.spirit().map(ResourceLocation::toString).orElse("-"),
@@ -398,6 +413,41 @@ public final class BleachCommand {
                 Component.translatable("commands.bleach.info.hollow.band." + band), hollow.souls(), hollow.pluses(),
                 hollow.totalHollows(), hollow.players(), Component.translatable(hollow.sight()
                         ? "commands.bleach.info.hollow.sight.on" : "commands.bleach.info.hollow.sight.off"));
+    }
+
+    /**
+     * The Arrancar for {@code /bleach info}: the form it rose from, whether it tore free or was perfected, its
+     * blade, and whether it is released, settling after a release (with the seconds left) or sealed.
+     */
+    private static Component arrancarLine(ServerPlayer player, SoulData data, long now) {
+        HollowProgress.Arrancar record = data.hollow().arrancar();
+        Component release;
+        if (ArrancarLogic.released(data)) {
+            release = Component.translatable("commands.bleach.info.arrancar.released");
+        } else if (now < record.releaseReadyAt()) {
+            release = Component.translatable("commands.bleach.info.arrancar.settling",
+                    secondsUntil(record.releaseReadyAt(), now));
+        } else {
+            release = Component.translatable("commands.bleach.info.arrancar.sealed");
+        }
+        return Component.translatable("commands.bleach.info.arrancar", ArrancarLogic.origin(data).displayName(),
+                Component.translatable(record.perfected()
+                        ? "commands.bleach.info.arrancar.perfected" : "commands.bleach.info.arrancar.natural"),
+                ArrancarLogic.blade(player.getUUID()).displayName(), release);
+    }
+
+    /** A Hollow's failed tries at its own mask for {@code /bleach info}, and the seconds before it may try again. */
+    private static Component tearLine(SoulData data, long now) {
+        HollowProgress.Arrancar record = data.hollow().arrancar();
+        long retryAt = record.lastTearAt()
+                + BleachConfig.get(BleachConfig.TEAR_RETRY_MINUTES) * (long) MenosEvolution.MINUTE_TICKS;
+        return Component.translatable("commands.bleach.info.tear", record.failures(), secondsUntil(retryAt, now));
+    }
+
+    /** Whole seconds, rounded up, from now until a game time; 0 once it has passed. */
+    private static long secondsUntil(long time, long now) {
+        long ticks = time - now;
+        return ticks <= 0L ? 0L : (ticks + 19L) / 20L;
     }
 
     /** The glove in a word for {@code /bleach info}: none, given, worn, mastered (on the hand) or torn (off it, after Letzt Stil). */
@@ -591,7 +641,8 @@ public final class BleachCommand {
 
     /**
      * Starts the Hollow record over: no hunger, no souls, no meals, sight on. A Hollow's hunger starts
-     * again at the start value on its next tick.
+     * again at the start value on its next tick. An Arrancar's failed tears and release cooldown go too,
+     * but its blade's forging is kept, so the blade it holds stays its own.
      */
     private static int resetHollow(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
@@ -599,7 +650,8 @@ public final class BleachCommand {
             SoulData data = SoulLogic.get(player);
             // Settle what is still owed first, so none of it comes off the fresh hunger.
             HollowBody.flushDebt(data);
-            data.setHollow(HollowProgress.NONE);
+            int forging = data.hollow().arrancar().forging();
+            data.setHollow(HollowProgress.NONE.withArrancar(HollowProgress.Arrancar.NONE.withForging(forging)));
             BleachNetwork.syncSoul(player, data);
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.hollow.reset.success",
@@ -779,6 +831,10 @@ public final class BleachCommand {
         return count;
     }
 
+    /**
+     * Sets each player's state. {@code arrancar} makes one through the tear's own road, blade and all, unless it
+     * is one already; any other state ends an Arrancar's release first and puts its body right after.
+     */
     private static int setState(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "state");
         SoulState state = byName(SoulState.values(), name);
@@ -788,7 +844,21 @@ public final class BleachCommand {
         }
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
         for (ServerPlayer player : players) {
-            SoulLogic.changeState(SoulLogic.get(player), state);
+            SoulData data = SoulLogic.get(player);
+            if (state == SoulState.ARRANCAR) {
+                if (!ArrancarLogic.isArrancar(data)) {
+                    ArrancarEvents.become(player, data, ArrancarLogic.originFor(data), false);
+                }
+                continue;
+            }
+            boolean was = ArrancarLogic.isArrancar(data);
+            if (was) {
+                ResurreccionEvents.end(player, data, player.level().getGameTime(), null);
+            }
+            SoulLogic.changeState(data, state);
+            if (was) {
+                HollowBody.reconcile(player, data);
+            }
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.soul.success",
                 state.displayName(), players.size()), true);

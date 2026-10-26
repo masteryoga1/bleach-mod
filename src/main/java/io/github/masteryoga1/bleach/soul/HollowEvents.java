@@ -250,8 +250,8 @@ public final class HollowEvents {
      * A Hollow or Arrancar player killed by another player is worth as much as a Hollow of their
      * reiatsu, but grows the killer's reiryoku only once in a while: they come back as they were. A
      * Quincy's arrow counts the soul as destroyed. A Hollow purified by the blow comes back as a soul
-     * (see {@link HollowBody#markPurifiedOnDeath}). One devoured counts for nothing here: its devourer
-     * was fed already, and it is never purified.
+     * (see {@link HollowBody#markPurifiedOnDeath}). An Arrancar is never purified: it counts as slain.
+     * One devoured counts for nothing here: its devourer was fed already, and it is never purified.
      */
     private static void onHollowPlayerDeath(Player victim, DamageSource source) {
         if (DevourLogic.isDevoured(source) || !(source.getEntity() instanceof Player killer) || killer == victim
@@ -264,7 +264,7 @@ public final class HollowEvents {
         }
         SoulData data = SoulLogic.get(killer);
         long now = killer.level().getGameTime();
-        boolean purified = HollowLogic.purifies(source, data, now);
+        boolean purified = victimData.state() == SoulState.HOLLOW && HollowLogic.purifies(source, data, now);
         if (purified) {
             HollowBody.markPurifiedOnDeath(victimData);
         }

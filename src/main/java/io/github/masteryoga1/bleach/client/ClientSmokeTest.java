@@ -30,6 +30,7 @@ import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
@@ -121,12 +122,18 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * <p>At the very end the player rises through the Menos forms by command. In a space cleared for it
  * the body grows to a Gillian's height; holding the real Cero key gathers a Cero at its mouth, and
  * letting it go past half fires it. Then the body shrinks at once to an Adjuchas and to a Vasto Lorde,
- * each drawn as its form, before the run quits.
+ * each drawn as its form.
+ *
+ * <p>Then the bare-handed Vasto Lorde becomes an Arrancar by command, seen from in front: a person's
+ * size again, with the fragment of its mask, its hole and its own blade in hand. The soul screen is
+ * opened on it, and the real Release key calls out its Resurrección, which must draw the released
+ * Vasto Lorde and raise its health; the Seal key seals it again, and the wait before the next release
+ * must reach the client before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
- * Hollow body, Menos, Cero and HUD are drawn, and screenshots of the main moments are saved for
- * review. Any crash in the mod's client code fails the run, and so does anything that did not reach
+ * Hollow body, Menos, Cero, Arrancar and HUD are drawn, and screenshots of the main moments are saved
+ * for review. Any crash in the mod's client code fails the run, and so does anything that did not reach
  * the client as expected.
  */
 public final class ClientSmokeTest {
@@ -307,6 +314,7 @@ public final class ClientSmokeTest {
         checkHollowPlayer(minecraft, player, soul);
         checkMenos(minecraft);
         checkMenosPlayer(minecraft, player, soul);
+        checkArrancar(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -779,7 +787,19 @@ public final class ClientSmokeTest {
             case 3725 -> HollowKeys.CERO.setDown(false);
             case 3745 -> command(minecraft, "bleach tier @s hollow 3");
             case 3775 -> command(minecraft, "bleach tier @s hollow 4");
+            // The Vasto Lorde tears free by command, and is seen from in front: fragment, hole and blade.
             case 3800 -> {
+                command(minecraft, "item replace entity @s weapon.mainhand with minecraft:air");
+                command(minecraft, "bleach soul @s arrancar");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+            }
+            case 3832 -> minecraft.setScreen(new SoulStatsScreen());
+            case 3836 -> shot(minecraft, "stats_arrancar");
+            case 3838 -> minecraft.setScreen(null);
+            // The real keys: Release calls out the Resurrección of the blade in hand, and Seal ends it.
+            case 3840 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+            case 3875 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.SEAL);
+            case 3900 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -936,6 +956,29 @@ public final class ClientSmokeTest {
                 "the player never became a Vasto Lorde")) {
             shot(minecraft, "vasto_lorde_player");
         }
+    }
+
+    /** The checks of the Arrancar and its Resurrección, each window from the step it follows. */
+    private static void checkArrancar(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (expectWithin(minecraft, 3802, 3830,
+                () -> soul.state() == SoulState.ARRANCAR && soul.tier(PowerPath.HOLLOW) == 4
+                        && ArrancarLogic.isOwnBlade(player.getMainHandItem(), player)
+                        && !hasLook(player, HollowPlayerLogic.LOOK_RESURRECCION)
+                        && Math.abs(player.getScale() - 1.0F) < 0.01F,
+                "the Vasto Lorde never became an Arrancar with its own blade in hand")) {
+            shot(minecraft, "arrancar");
+        }
+        if (expectWithin(minecraft, 3842, 3870,
+                () -> hasLook(player, HollowPlayerLogic.LOOK_RESURRECCION)
+                        && hasLook(player, HollowPlayerLogic.LOOK_VASTO_LORDE)
+                        && player.getMaxHealth() > 79.9F,
+                "the Release key never called out the Resurrección")) {
+            shot(minecraft, "resurreccion");
+        }
+        expectWithin(minecraft, 3877, 3895,
+                () -> !hasLook(player, HollowPlayerLogic.LOOK_RESURRECCION)
+                        && soul.hollow().arrancar().releaseReadyAt() > player.level().getGameTime(),
+                "the Seal key never sealed the Resurrección, or its wait never reached the client");
     }
 
     /** Whether the player is drawn with this Hollow look bit. */

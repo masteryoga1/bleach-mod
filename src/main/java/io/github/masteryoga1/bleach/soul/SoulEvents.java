@@ -150,14 +150,14 @@ public final class SoulEvents {
     /**
      * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
      * the release ends and the reiatsu settles; standing on reishi footing paid in reiryoku, holding a
-     * Shikai that can seal, or weaving Ransōtengai's threads spends it as it comes. A Quincy's footing
-     * is paid in reishi instead.
+     * Shikai that can seal or an Arrancar's Resurrección, or weaving Ransōtengai's threads spends it as
+     * it comes. A Quincy's footing is paid in reishi instead.
      */
     public static boolean mayRegenerate(Player player, SoulData data) {
         boolean footingOnReiryoku = ReishiFooting.isActive(player)
                 && !QuincyLogic.footingOnReishi(data, player.level().getGameTime());
         return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !footingOnReiryoku
-                && !data.isShikaiActive() && !QuincyRansotengai.isWoven(data);
+                && !data.isShikaiActive() && !QuincyRansotengai.isWoven(data) && !ArrancarLogic.released(data);
     }
 
     /**

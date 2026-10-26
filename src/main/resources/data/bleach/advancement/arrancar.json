@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:adjuchas",
+  "display": {
+    "icon": {
+      "id": "bleach:mask_fragment"
+    },
+    "title": {
+      "translate": "advancements.bleach.arrancar.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.arrancar.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "arrancar": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "arrancar"
+      }
+    }
+  }
+}

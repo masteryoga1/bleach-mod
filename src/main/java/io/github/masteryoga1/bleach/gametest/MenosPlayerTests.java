@@ -90,7 +90,11 @@ public final class MenosPlayerTests {
     private static final Vec3 ROOM = new Vec3(1.5, 1.0, 1.5);
     /** A fed Hollow's soul hunger, so neither ravenous claws nor slower healing change the numbers. */
     private static final float FED = 60.0F;
-    /** How many random souls are asked whether they are destined, and how far their share may stray. */
+    /**
+     * The share of destined souls the destiny test sets, as rare as in canon, how many random souls it asks
+     * whether they are destined, and how far their share may stray.
+     */
+    private static final double DESTINY_SHARE = 0.25;
     private static final int DESTINY_SAMPLE = 2_000;
     private static final double DESTINY_SHARE_MIN = 0.20, DESTINY_SHARE_MAX = 0.30;
     /** How many random souls may be asked to find one destined and one not. */
@@ -421,7 +425,7 @@ public final class MenosPlayerTests {
         UUID undestinedId = null;
         for (int i = 0; i < DESTINY_SEARCH && (destinedId == null || undestinedId == null); i++) {
             UUID id = UUID.randomUUID();
-            if (MenosEvolution.destined(id, seed)) {
+            if (MenosEvolution.destined(id, seed, DESTINY_SHARE)) {
                 destinedId = destinedId == null ? id : destinedId;
             } else {
                 undestinedId = undestinedId == null ? id : undestinedId;
@@ -430,11 +434,14 @@ public final class MenosPlayerTests {
         helper.assertTrue(destinedId != null && undestinedId != null,
                 "no destined soul, or none that is not, among " + DESTINY_SEARCH);
         UUID same = new UUID(destinedId.getMostSignificantBits(), destinedId.getLeastSignificantBits());
-        helper.assertTrue(MenosEvolution.destined(same, seed) && MenosEvolution.destined(destinedId, seed)
-                && !MenosEvolution.destined(undestinedId, seed), "destiny changed for the same soul in the same world");
+        helper.assertTrue(MenosEvolution.destined(same, seed, DESTINY_SHARE)
+                && MenosEvolution.destined(destinedId, seed, DESTINY_SHARE)
+                && !MenosEvolution.destined(undestinedId, seed, DESTINY_SHARE),
+                "destiny changed for the same soul in the same world");
+        helper.assertTrue(MenosEvolution.destined(undestinedId, seed, 1.0), "a share of 1 left a soul undestined");
         int destined = 0;
         for (int i = 0; i < DESTINY_SAMPLE; i++) {
-            if (MenosEvolution.destined(UUID.randomUUID(), seed)) {
+            if (MenosEvolution.destined(UUID.randomUUID(), seed, DESTINY_SHARE)) {
                 destined++;
             }
         }
@@ -445,6 +452,10 @@ public final class MenosPlayerTests {
         MenosEvolution.VastoLordes lordes = MenosEvolution.VastoLordes.get(server);
         int most = BleachConfig.get(BleachConfig.VASTO_MAX);
         List<UUID> added = new ArrayList<>();
+        // Every soul is destined by default, so the rest of this sets the canon share for its own few calls,
+        // all in this one tick, and puts the server's back before any other test runs.
+        double configured = BleachConfig.get(BleachConfig.VASTO_DESTINED_SHARE);
+        BleachConfig.VASTO_DESTINED_SHARE.set(DESTINY_SHARE);
         try {
             helper.assertTrue(lordes.count() < most, "the test world already holds " + lordes.count() + " Vasto Lorde");
             while (lordes.count() < most) {
@@ -489,6 +500,7 @@ public final class MenosPlayerTests {
                     "a soul not destined has the stall " + evolution(undestinedData).stall());
             helper.assertFalse(lordes.contains(undestinedId), "a soul not destined is counted");
         } finally {
+            BleachConfig.VASTO_DESTINED_SHARE.set(configured);
             added.forEach(lordes::remove);
             lordes.remove(destinedId);
             lordes.remove(undestinedId);

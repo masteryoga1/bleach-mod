@@ -11,17 +11,19 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * A Hollow player's Cero, from Gillian up: held on the Cero key, it gathers at the mouth, and it fires
- * when the key comes up, or by itself once fully gathered. It runs on the Menos mobs' engine
- * ({@link CeroBeam}) with no aim lock, so the beam goes where the crosshair is at the moment it fires.
- * Let go at least half gathered ({@link BleachConfig#CERO_MIN_CHARGE}), it fires at the share gathered;
- * sooner, it fizzles. The reiryoku is paid only when it fires, as a Getsuga Tenshō's is, never leaving
- * less than the {@link ZanpakutoLogic#RESERVE}, and the cooldown starts then. A fizzle is free.
+ * A Hollow player's Cero, from Gillian up, and an Arrancar's, which gathers and hits as the form it rose
+ * from did ({@link ArrancarLogic#ceroForm}), and harder in Resurrección. Held on the Cero key, it gathers
+ * at the mouth, and it fires when the key comes up, or by itself once fully gathered. It runs on the Menos
+ * mobs' engine ({@link CeroBeam}) with no aim lock, so the beam goes where the crosshair is at the moment
+ * it fires. Let go at least half gathered ({@link BleachConfig#CERO_MIN_CHARGE}), it fires at the share
+ * gathered; sooner, it fizzles. The reiryoku is paid only when it fires, as a Getsuga Tenshō's is, never
+ * leaving less than the {@link ZanpakutoLogic#RESERVE}, and the cooldown starts then. A fizzle is free.
  *
  * <p>The gather breaks, for free, on a fresh crack in the mask (a blow to a mask that was already cracked
- * does not count, as for the Menos mobs), a devour hold starting, the soul ceasing to be a Menos, and
- * spectator mode; the engine itself lets it fizzle if the player dies, logs out or changes dimension.
- * Whom it strikes and what it breaks follow every soul's projectile rules ({@link CeroBeam#mayStrike}).
+ * does not count, as for the Menos mobs), a devour hold starting, the soul ceasing to be a Menos or an
+ * Arrancar, and spectator mode; the engine itself lets it fizzle if the player dies, logs out or changes
+ * dimension. Whom it strikes and what it breaks follow every soul's projectile rules
+ * ({@link CeroBeam#mayStrike}).
  *
  * <p>The beam and the times live in the soul as transients, so nothing about a Cero is saved.
  */
@@ -67,7 +69,7 @@ public final class HollowCero {
                 return null;
             }
         }
-        HollowTier tier = HollowTier.of(data);
+        HollowTier tier = ArrancarLogic.ceroForm(data);
         if (!tier.isMenos()) {
             return Refusal.NOT_MENOS;
         }
@@ -129,7 +131,7 @@ public final class HollowCero {
 
     /**
      * Lets a gathering Cero fizzle, for free: a screen opened, a devour hold began, or the soul stopped
-     * being a Hollow. One that already fired is paid for instead.
+     * being a Hollow or an Arrancar. One that already fired is paid for instead.
      */
     public static void cancel(Player player, SoulData data) {
         if (!charging(data)) {
@@ -145,9 +147,10 @@ public final class HollowCero {
     }
 
     /**
-     * Each body tick of a Hollow: a Cero that fired by itself is paid for and the cooldown starts; one that
-     * has gone without firing is forgotten; and one still gathering fizzles if the mask cracked fresh since
-     * it began, a devour hold is on, the soul is no longer a Menos, or the player watches as a spectator.
+     * Each body tick of a Hollow or an Arrancar: a Cero that fired by itself is paid for and the cooldown
+     * starts; one that has gone without firing is forgotten; and one still gathering fizzles if the mask
+     * cracked fresh since it began, a devour hold is on, the soul is no longer a Menos (an Arrancar always
+     * counts as the form it rose from), or the player watches as a spectator.
      */
     public static void tick(Player player, SoulData data, long now) {
         if (!charging(data)) {
@@ -164,8 +167,8 @@ public final class HollowCero {
             return;
         }
         // Stamped only by a fresh crack, and strictly after the start, so a crack in the start's own tick came first.
-        if (!HollowTier.of(data).isMenos() || data.devourTargetId >= 0 || data.hollowFreshCrackAt > data.ceroStartedAt
-                || player.isSpectator()) {
+        if (!ArrancarLogic.ceroForm(data).isMenos() || data.devourTargetId >= 0
+                || data.hollowFreshCrackAt > data.ceroStartedAt || player.isSpectator()) {
             beam.cancel();
             clear(data);
         }
@@ -190,13 +193,15 @@ public final class HollowCero {
 
     /**
      * A fully gathered Cero's damage: the form's own, and more for each square root of maximum reiryoku,
-     * up to {@link BleachConfig#CERO_MAX_DAMAGE}. The Hollow mobs' damage multiplier is a mob setting and
-     * does not reach it.
+     * up to {@link BleachConfig#CERO_MAX_DAMAGE}; then, for an Arrancar in Resurrección, the release's
+     * multiplier, so a released Cero is the one that can pass the cap. The Hollow mobs' damage multiplier
+     * is a mob setting and does not reach it.
      */
     public static float damage(SoulData data, HollowTier tier) {
         double perRoot = BleachConfig.get(BleachConfig.CERO_DAMAGE_PER_ROOT_REIRYOKU);
         double damage = BleachConfig.get(form(tier).ceroDamage()) + perRoot * Math.sqrt(Math.max(0.0F, data.maxReiryoku()));
-        return (float) Math.min(BleachConfig.get(BleachConfig.CERO_MAX_DAMAGE), damage);
+        double capped = Math.min(BleachConfig.get(BleachConfig.CERO_MAX_DAMAGE), damage);
+        return (float) (capped * ArrancarLogic.ceroMultiplier(data));
     }
 
     /** The reiryoku a Cero costs when it fires: a share of the maximum, but never less than the least cost. */

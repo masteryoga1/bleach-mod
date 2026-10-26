@@ -21,8 +21,9 @@ public final class BleachNetwork {
      * Bump when a payload changes shape, so mismatched clients are refused instead of breaking.
      * 10: the Devour key, and the Hollow look in SoulAppearance.
      * 11: the Cero keys, and the Menos record in HollowProgress.
+     * 12: the Arrancar record in HollowProgress.
      */
-    private static final String VERSION = "11";
+    private static final String VERSION = "12";
 
     private BleachNetwork() {
     }

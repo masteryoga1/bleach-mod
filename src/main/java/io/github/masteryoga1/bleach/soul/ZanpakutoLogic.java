@@ -22,8 +22,8 @@ import net.minecraft.world.item.ItemStack;
 /**
  * The rules of the Asauchi and the zanpakutō it becomes, with no side effects: who bonds, how much
  * each source is worth, the hidden leaning and the spirit it picks, which stacks count, and what
- * Shikai and Getsuga Tenshō cost. The events that apply them are in {@link ZanpakutoEvents} and
- * {@link ShikaiEvents}.
+ * Shikai and Getsuga Tenshō cost (an Arrancar's Resurrección drains by the same Reiatsu Control share).
+ * The events that apply them are in {@link ZanpakutoEvents} and {@link ShikaiEvents}.
  */
 public final class ZanpakutoLogic {
     /** Reiryoku a technique always leaves behind; spending below it exhausts the soul. */
@@ -261,11 +261,18 @@ public final class ZanpakutoLogic {
 
     /** Reiryoku a Shikai drains each tick. Reiatsu Control shrinks it, down to the configured floor. */
     public static float shikaiDrainPerTick(SoulData data, ZanpakutoSpirit spirit) {
+        return (float) (data.maxReiryoku() * (double) spirit.drain()
+                * BleachConfig.get(BleachConfig.SHIKAI_DRAIN_MULTIPLIER) * drainFraction(data) / 20.0);
+    }
+
+    /**
+     * The share of a release's drain this soul pays: Reiatsu Control shrinks it, down to the configured
+     * floor. Shikai and an Arrancar's Resurrección both drain by it.
+     */
+    public static double drainFraction(SoulData data) {
         double control = 1.0 - BleachConfig.get(BleachConfig.DRAIN_REDUCTION_PER_REIATSU_CONTROL_LEVEL)
                 * data.level(Stat.REIATSU_CONTROL);
-        double fraction = Math.max(BleachConfig.get(BleachConfig.MIN_DRAIN_FRACTION), control);
-        return (float) (data.maxReiryoku() * (double) spirit.drain()
-                * BleachConfig.get(BleachConfig.SHIKAI_DRAIN_MULTIPLIER) * fraction / 20.0);
+        return Math.max(BleachConfig.get(BleachConfig.MIN_DRAIN_FRACTION), control);
     }
 
     /**

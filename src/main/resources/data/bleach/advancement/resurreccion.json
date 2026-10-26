@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:arrancar",
+  "display": {
+    "icon": {
+      "id": "bleach:arrancar_blade"
+    },
+    "title": {
+      "translate": "advancements.bleach.resurreccion.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.resurreccion.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "resurreccion": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "resurreccion"
+      }
+    }
+  }
+}

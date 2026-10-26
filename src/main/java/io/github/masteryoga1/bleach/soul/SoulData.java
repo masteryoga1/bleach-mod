@@ -234,6 +234,25 @@ public final class SoulData {
     long lastCeroAt = NEVER;
     /** Game time a blow last cracked this Hollow's whole mask, or {@link #NEVER}: a fresh crack breaks a Cero's gather. */
     long hollowFreshCrackAt = NEVER;
+    /**
+     * Game time of the first press that arms a Menos's tear at its own mask, waiting for the second, or
+     * {@link #NEVER} (see {@link ArrancarEvents}).
+     */
+    long tearArmedAt = NEVER;
+    /** Game time the tear at the mask began, held still, or {@link #NEVER} when it is not being torn. */
+    long tearStartedAt = NEVER;
+    /** Where the tear began: a step more than a block from here breaks it. */
+    @Nullable
+    Vec3 tearFrom;
+    /**
+     * Whether this Arrancar is in Resurrección (see {@link ResurreccionEvents}). Not saved: a release does
+     * not outlast the session, and the wait after it is on the saved record.
+     */
+    boolean resurreccionActive;
+    /** Game time the Resurrección began, or {@link #NEVER}. */
+    long resurreccionStartedAt = NEVER;
+    /** Ticks this Arrancar has gone without its own blade, until a new one forms from its mask. */
+    int arrancarBladelessTicks;
 
     public SoulData() {
     }
@@ -548,6 +567,14 @@ public final class SoulData {
     /** Whether a zanpakutō that can seal is released. Server side only: the client reads the blade itself. */
     public boolean isShikaiActive() {
         return shikaiActive;
+    }
+
+    /**
+     * Whether the Resurrección flag is up, as it stands. Server side only. The rules ask
+     * {@link ArrancarLogic#released}, which also asks that the soul is an Arrancar.
+     */
+    public boolean isResurreccionActive() {
+        return resurreccionActive;
     }
 
     /** Whether a Getsuga Tenshō is gathering. Server side only. */
