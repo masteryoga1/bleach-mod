@@ -57,7 +57,8 @@ public final class FlashStep {
 
     /**
      * The player pressed the flash step key while steering this way (each from -1 to 1, as the
-     * movement keys give them). A Quincy may Hirenkyaku instead (see {@link QuincyLogic#movementFor}).
+     * movement keys give them). An Arrancar uses Sonído instead (see {@link Sonido}), and a Quincy may
+     * Hirenkyaku (see {@link QuincyLogic#movementFor}).
      */
     public static void perform(ServerPlayer player, float forward, float left) {
         if (!SoulLogic.hasSoul(player) || !player.isAlive() || player.isSpectator() || player.isPassenger()
@@ -67,6 +68,10 @@ public final class FlashStep {
         SoulData data = SoulLogic.get(player);
         ServerLevel level = player.serverLevel();
         long now = level.getGameTime();
+        if (ArrancarLogic.isArrancar(data)) {
+            Sonido.perform(player, data, forward, left, now);
+            return;
+        }
         if (QuincyLogic.movementFor(data, QuincyLogic.holdsCross(player), now) == QuincyLogic.Movement.HIRENKYAKU) {
             Hirenkyaku.perform(player, data, forward, left);
             return;
@@ -79,7 +84,9 @@ public final class FlashStep {
             return;
         }
         if (!ShinigamiLogic.canFlashStep(data, now)) {
-            refuse(player, ShinigamiLogic.hasShinigamiPower(data) && ShinigamiLogic.isPowerLent(data, now)
+            // A Hollow is told that Sonído is an Arrancar's, not that it never learned Shunpo.
+            refuse(player, HollowPlayerLogic.isHollow(data) ? "message.bleach.sonido.hollow"
+                    : ShinigamiLogic.hasShinigamiPower(data) && ShinigamiLogic.isPowerLent(data, now)
                     ? "message.bleach.power_lent" : "message.bleach.flash_step.untrained");
             return;
         }

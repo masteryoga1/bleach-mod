@@ -36,8 +36,8 @@ import org.joml.Vector3f;
  * blade kept right. An Adjuchas or Vasto Lorde presses Release Zanpakutō twice to begin, holds still while it
  * tears, and Seal lets go; when the channel is done it pays half its maximum reiryoku and the mask comes away
  * or it fails, at a cost (see {@link ArrancarLogic#tearChance}). An Arrancar's Release and Seal call out and
- * seal its Resurrección instead ({@link ResurreccionEvents}). The rules and numbers are in
- * {@link ArrancarLogic}.
+ * seal its Resurrección instead ({@link ResurreccionEvents}), and its Technique key fires a {@link Bala}. The
+ * rules and numbers are in {@link ArrancarLogic}.
  *
  * <p>It registers no listener: {@link HollowBody#tickBody} drives the tear, the Arrancar's own tick and the
  * check every second, and death, logging out and cloning belong to {@link ResurreccionEvents}. The tear is
@@ -79,9 +79,10 @@ public final class ArrancarEvents {
     // ---- The keys ----
 
     /**
-     * Release Zanpakutō and Seal, for a Hollow or an Arrancar (from ShikaiEvents). An Arrancar calls out its
-     * Resurrección and seals it, told what came of it unless it worked; a Hollow tears at its mask and lets go.
-     * The Technique key does nothing for either yet.
+     * Release Zanpakutō, Seal and the Technique key, for a Hollow or an Arrancar (from ShikaiEvents). An Arrancar
+     * calls out its Resurrección and seals it, told what came of it unless it worked, and fires its Bala on the
+     * Technique key for as long as it holds it ({@link Bala}); a Hollow tears at its mask and lets go, and its
+     * Technique key does nothing.
      */
     public static void onKey(Player player, SoulData data, ZanpakutoKey key, long now) {
         if (ArrancarLogic.isArrancar(data)) {
@@ -98,6 +99,8 @@ public final class ArrancarEvents {
                         ResurreccionEvents.tell(player, data, result, now);
                     }
                 }
+                case TECHNIQUE_PRESS -> Bala.press(player, data, now);
+                case TECHNIQUE_RELEASE, TECHNIQUE_CANCEL -> Bala.release(data);
                 default -> {
                 }
             }
@@ -324,18 +327,21 @@ public final class ArrancarEvents {
 
     /**
      * An Arrancar's body tick, in place of a Hollow's (see {@link HollowBody#tickBody}): a Hollow body some road
-     * left on comes off, its Cero gathers, and a release is kept up or ends (its claws grow there).
+     * left on comes off, its Cero gathers, a release is kept up or ends (its claws grow there), a Pesquisa focus
+     * holds or sends its pulse out ({@link Pesquisa#tick}), and a held Bala key fires again ({@link Bala#tick}).
      */
     public static void tick(Player player, SoulData data, long now) {
         HollowBody.leaveBodyIfWorn(player, data);
         HollowCero.tick(player, data, now);
         ResurreccionEvents.upkeep(player, data, now);
+        Pesquisa.tick(player, data, now);
+        Bala.tick(player, data, now);
     }
 
     /**
      * Every second, for every soul (from {@link HollowBody#tickBody}): a release left on a soul that is no longer
-     * an Arrancar ends, the Arrancar's health, speed and damage are put right (taken off anyone else), and the
-     * blades are kept right ({@link #reconcileBlades}). Server side.
+     * an Arrancar ends, and so do a Pesquisa focus and a held Bala key, the Arrancar's health, speed and damage
+     * are put right (taken off anyone else), and the blades are kept right ({@link #reconcileBlades}). Server side.
      */
     public static void reconcile(Player player, SoulData data, long now) {
         if (player.level().isClientSide()) {
@@ -343,6 +349,11 @@ public final class ArrancarEvents {
         }
         if (data.resurreccionActive && !ArrancarLogic.isArrancar(data)) {
             ResurreccionEvents.end(player, data, now, null);
+        }
+        if (!ArrancarLogic.isArrancar(data)) {
+            // Only an Arrancar's tick keeps them, so one left behind would wake again if the soul became one anew.
+            Pesquisa.release(data);
+            Bala.release(data);
         }
         reconcileBody(player, data);
         reconcileBlades(player, data, now);

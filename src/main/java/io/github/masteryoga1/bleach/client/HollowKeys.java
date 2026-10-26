@@ -11,10 +11,14 @@ import io.github.masteryoga1.bleach.soul.MenosBody;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -31,10 +35,12 @@ import org.lwjgl.glfw.GLFW;
  * no longer being a Hollow or an Arrancar while it is held lets the Cero fizzle instead. The server decides
  * everything and says why when it refuses (a plain Hollow is told only a Menos can gather one); this only
  * sends the presses, and keeps a guess at the hold and the gathering Cero for the HUD. Nothing is sent for
- * the Devour key but a Hollow's or a Plus's (an Arrancar no longer devours), and nothing for the Cero key
- * but a Hollow's or an Arrancar's.
+ * the Devour key but a Hollow's, a Plus's or an Arrancar's (an Arrancar no longer devours: held still, its
+ * Devour key sends out Pesquisa), and nothing for the Cero key but a Hollow's or an Arrancar's.
  *
- * <p>It also tells {@link MenosBody} how tall the giants this client sees stand, every second.
+ * <p>It also keeps the souls an Arrancar's last Pesquisa felt, which this client outlines through walls for a
+ * few seconds (see {@link #marked}), and tells {@link MenosBody} how tall the giants this client sees stand,
+ * every second.
  */
 public final class HollowKeys {
     public static final KeyMapping DEVOUR = new KeyMapping("key.bleach.devour", KeyConflictContext.IN_GAME,
@@ -51,7 +57,7 @@ public final class HollowKeys {
     /** Every so many ticks this client tells {@link MenosBody} about the giants it sees, as the server does. */
     private static final int GIANT_REFRESH_TICKS = 20;
 
-    /** Client ticks counted here: the clock the devour bar runs on. */
+    /** Client ticks counted here: the clock the devour bar and the Pesquisa outlines run on. */
     private static int ticks;
     /** Whether the key was down last tick, so holding it (and key repeat) sends only once. */
     private static boolean wasDown;
@@ -67,6 +73,11 @@ public final class HollowKeys {
     /** This player's own gathering Cero, once the server's beam has come; looked for each tick until then. */
     @Nullable
     private static CeroBeam ownCero;
+    /** Ids the last Pesquisa marked, each to the client tick its outline fades. Cleared with no world or on a new one. */
+    private static final Int2IntOpenHashMap MARKS = new Int2IntOpenHashMap();
+    /** The world the marks' ids belong to. */
+    @Nullable
+    private static ClientLevel markLevel;
 
     private HollowKeys() {
     }
@@ -99,11 +110,19 @@ public final class HollowKeys {
             holding = false;
             ceroHolding = false;
             ownCero = null;
+            MARKS.clear();
+            markLevel = null;
             return;
         }
+        tickMarks(minecraft);
         SoulData data = player.getData(SoulAttachments.SOUL);
-        boolean eligible = data.isInitialized() && (data.state() == SoulState.HOLLOW || data.state() == SoulState.PLUS)
-                && !player.isSpectator();
+        // The outlines are the Arrancar's art: they go at death (a same-world respawn keeps the world) or with the state.
+        if (!player.isAlive() || player.isSpectator() || !data.isInitialized() || data.state() != SoulState.ARRANCAR) {
+            MARKS.clear();
+            markLevel = null;
+        }
+        boolean eligible = data.isInitialized() && (data.state() == SoulState.HOLLOW || data.state() == SoulState.PLUS
+                || data.state() == SoulState.ARRANCAR) && !player.isSpectator();
         // A screen opening releases every key, so it lets go as the key coming up does.
         if (holding && (!down || minecraft.screen != null || !player.isAlive() || !eligible)) {
             BleachNetwork.requestHollowKey(HollowKey.RELEASE, -1);
@@ -156,6 +175,56 @@ public final class HollowKeys {
         } else if (!gathering(ownCero, player)) {
             ownCero = findOwnCero(player);
         }
+    }
+
+    /**
+     * The Pesquisa outlines: all of them go when the world changes (the ids were another world's), and each
+     * when its time is up.
+     */
+    private static void tickMarks(Minecraft minecraft) {
+        if (MARKS.isEmpty()) {
+            // Nothing left to outline, so let the world go: holding it would keep it in memory past a dimension change.
+            markLevel = null;
+            return;
+        }
+        if (minecraft.level != markLevel) {
+            MARKS.clear();
+            markLevel = null;
+            return;
+        }
+        for (ObjectIterator<Int2IntMap.Entry> entries = MARKS.int2IntEntrySet().fastIterator(); entries.hasNext(); ) {
+            if (entries.next().getIntValue() <= ticks) {
+                entries.remove();
+            }
+        }
+    }
+
+    /**
+     * Outlines these souls, felt by this player's Pesquisa, for this many ticks. A pulse's marks replace the
+     * last one's, and belong to the world this client is in now.
+     */
+    static void mark(List<Integer> ids, int ticks) {
+        MARKS.clear();
+        markLevel = Minecraft.getInstance().level;
+        if (markLevel == null) {
+            return;
+        }
+        int fades = HollowKeys.ticks + Math.max(0, ticks);
+        for (int id : ids) {
+            MARKS.put(id, fades);
+        }
+    }
+
+    /**
+     * Whether this entity is outlined through walls for this player, as one its last Pesquisa felt and whose
+     * outline has not yet faded (see {@code MinecraftMixin}).
+     */
+    public static boolean marked(Entity entity) {
+        if (MARKS.isEmpty() || entity.level() != markLevel) {
+            return false;
+        }
+        int id = entity.getId();
+        return MARKS.containsKey(id) && MARKS.get(id) > ticks;
     }
 
     /** The player's own Cero that is gathering about its mouth, if the server has sent one. */

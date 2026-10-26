@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.client;
 import io.github.masteryoga1.bleach.entity.DialogueNpc;
 import io.github.masteryoga1.bleach.network.OpenDialoguePayload;
 import io.github.masteryoga1.bleach.network.OpenJinzenPayload;
+import io.github.masteryoga1.bleach.network.PesquisaPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -49,5 +50,10 @@ public final class ClientPayloads {
         if (!(Minecraft.getInstance().screen instanceof BloodlineScreen)) {
             QuincyClient.bloodlinePending = true;
         }
+    }
+
+    /** Outlines the souls this player's Pesquisa felt, in place of the last pulse's (see {@link HollowKeys#marked}). */
+    public static void pesquisa(PesquisaPayload payload) {
+        HollowKeys.mark(payload.ids(), payload.ticks());
     }
 }

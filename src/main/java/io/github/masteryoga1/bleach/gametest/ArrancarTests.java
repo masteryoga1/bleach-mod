@@ -115,7 +115,7 @@ public final class ArrancarTests {
      * hand. The maximum reiryoku is put back to the one asked for after becoming, so the one-time growth does
      * not change the numbers, and the reiryoku is full.
      */
-    private static Player arrancar(GameTestHelper helper, HollowTier origin, float maxReiryoku, Vec3 at) {
+    static Player arrancar(GameTestHelper helper, HollowTier origin, float maxReiryoku, Vec3 at) {
         Player player = HollowPlayerTests.soulPlayer(helper, GameType.SURVIVAL, SoulState.HUMAN, maxReiryoku, at);
         SoulData data = SoulLogic.get(player);
         ArrancarEvents.become(player, data, origin, false);
@@ -128,7 +128,7 @@ public final class ArrancarTests {
      * Runs the body this many times, as the player's own ticks would, its tick count going on with them.
      * The game time stands still: every call is in this one tick of the test.
      */
-    private static void tickBody(GameTestHelper helper, Player player, int ticks) {
+    static void tickBody(GameTestHelper helper, Player player, int ticks) {
         SoulData data = SoulLogic.get(player);
         for (int i = 0; i < ticks; i++) {
             player.tickCount++;
@@ -600,7 +600,7 @@ public final class ArrancarTests {
         HollowPlayerTests.assertModifier(helper, player, Attributes.ATTACK_DAMAGE, ArrancarLogic.DAMAGE_ID, 0.5,
                 AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, "the released Arrancar's melee damage");
 
-        // A Vasto Lorde's claws and hide: 3 and a quarter of the root of 400, times 1.6; the 5a hide and 10 more.
+        // A Vasto Lorde's claws: 3 and a quarter of the root of 400, times 1.6.
         float claws = HollowPlayerLogic.clawBonus(data);
         HollowPlayerTests.assertClose(helper, claws, 12.8, "the released Vasto Lorde-born Arrancar's claws");
         HollowPlayerTests.assertModifier(helper, player, Attributes.ATTACK_DAMAGE, HollowBody.CLAWS_ID, claws,
@@ -608,10 +608,9 @@ public final class ArrancarTests {
         HollowPlayerTests.assertModifier(helper, player, Attributes.ATTACK_SPEED, HollowBody.CLAW_SPEED_ID,
                 HollowTier.VASTO_LORDE.clawAttacksPerSecond() / 4.0 - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
                 "the released Arrancar's claw speed");
-        float plainHide = HollowPlayerLogic.hideArmour(ShinigamiTests.soul(SoulState.HOLLOW, 400.0F));
-        HollowPlayerTests.assertModifier(helper, player, Attributes.ARMOR, HollowBody.HIDE_ID,
-                plainHide + HollowTier.VASTO_LORDE.hideBonus(), AttributeModifier.Operation.ADD_VALUE,
-                "the released Arrancar's hide");
+        // Hierro takes the hide's place (see ArrancarArtsTests): no Hollow hide, sealed or released.
+        helper.assertTrue(HollowPlayerTests.modifier(player, Attributes.ARMOR, HollowBody.HIDE_ID) == null,
+                "the released Arrancar wears a Hollow hide");
         HollowPlayerTests.assertModifier(helper, player, Attributes.SAFE_FALL_DISTANCE, HollowBody.LEAP_ID,
                 BleachConfig.get(BleachConfig.HOLLOW_SAFE_FALL), AttributeModifier.Operation.ADD_VALUE,
                 "the released Arrancar's leap");

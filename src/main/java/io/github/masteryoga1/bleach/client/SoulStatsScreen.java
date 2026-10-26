@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.BaitRecord;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
+import io.github.masteryoga1.bleach.soul.Hierro;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HollowTier;
@@ -435,7 +436,8 @@ public final class SoulStatsScreen extends Screen {
      * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
      * how long it may go without a Hollow before it sinks back, wherever the server lets it. An Adjuchas
      * or Vasto Lorde is told it can tear off its mask, where the server lets it; an Arrancar, the name of
-     * its blade and the keys that release and seal it, and the Cero key.
+     * its blade and the keys that release and seal it, the Cero key, the keys for Sonído, Bala and Pesquisa,
+     * and how much of a blow from a soul as strong as it is its Hierro turns aside, released or not as it is now.
      */
     private static Component nextStep(Player player, SoulData data) {
         String key = ShinigamiLogic.nextStepKey(data, player.level().getGameTime());
@@ -455,9 +457,15 @@ public final class SoulStatsScreen extends Screen {
                     ZanpakutoKeys.RELEASE.getTranslatedKeyMessage()));
         }
         if (key.equals("arrancar")) {
+            // The release is the server's to know: this client sees it only in the look the server sends.
+            boolean released = (ClientSouls.appearance(player).hollowLook() & HollowPlayerLogic.LOOK_RESURRECCION) != 0;
             return Component.translatable("screen.bleach.soul.next.arrancar",
                     ArrancarLogic.blade(player.getUUID()).displayName(), ZanpakutoKeys.RELEASE.getTranslatedKeyMessage(),
-                    ZanpakutoKeys.SEAL.getTranslatedKeyMessage(), HollowKeys.CERO.getTranslatedKeyMessage());
+                    ZanpakutoKeys.SEAL.getTranslatedKeyMessage(), HollowKeys.CERO.getTranslatedKeyMessage())
+                    .append(" ").append(Component.translatable("screen.bleach.soul.next.arrancar.arts",
+                            BleachClient.FLASH_STEP_KEY.getTranslatedKeyMessage(),
+                            ZanpakutoKeys.TECHNIQUE.getTranslatedKeyMessage(), devour,
+                            Math.round(Hierro.share(data, released) * 100.0F)));
         }
         if (!key.equals("plus")) {
             return Component.translatable("screen.bleach.soul.next." + key);

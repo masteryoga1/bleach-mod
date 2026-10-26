@@ -18,9 +18,9 @@ import net.minecraft.world.item.ItemStack;
  * {@link HollowBody}. Every rule for a Hollow player asks {@link #isHollow}, so the states that count
  * as one are decided in one place. An Arrancar is no Hollow to them: only the rules that ask
  * {@link #isHollowOrArrancar} (the villagers', the Cero's) count it as one, and, in Resurrección, the claws
- * and hide it takes back ({@link #wearsHollowBody}, {@link #bodyForm}); its own rules are in
- * {@link ArrancarLogic}. A Menos form changes the claws, hide and regeneration through {@link HollowTier}'s
- * factors, inside these same rules.
+ * it takes back ({@link #wearsHollowBody}, {@link #bodyForm}), with its Hierro in the hide's place; its own
+ * rules are in {@link ArrancarLogic}. A Menos form changes the claws, hide and regeneration through
+ * {@link HollowTier}'s factors, inside these same rules.
  */
 public final class HollowPlayerLogic {
     /** How hungry a Hollow is. Lower in the list is hungrier. Never sent or saved. */
@@ -83,15 +83,18 @@ public final class HollowPlayerLogic {
         return isHollow(data) || ArrancarLogic.isArrancar(data);
     }
 
-    /** Whether this soul wears the Hollow body, its claws, hide and leap: a Hollow, or an Arrancar in Resurrección. */
+    /**
+     * Whether this soul wears the Hollow body, its claws and leap (and, for a Hollow, its hide): a Hollow, or an
+     * Arrancar in Resurrección.
+     */
     public static boolean wearsHollowBody(SoulData data) {
         return isHollow(data) || ArrancarLogic.released(data);
     }
 
     /**
-     * The form whose claws, claw speed and hide this soul's body has: a Hollow's own, or the body a released
-     * Arrancar takes back (see {@link ArrancarLogic#releasedBody}). Never the regeneration's, which an Arrancar
-     * has traded away.
+     * The form whose claws and claw speed this soul's body has (and whose hide a Hollow's has): a Hollow's own, or
+     * the body a released Arrancar takes back (see {@link ArrancarLogic#releasedBody}), with its Hierro in the
+     * hide's place. Never the regeneration's, which an Arrancar has traded away.
      */
     public static HollowTier bodyForm(SoulData data) {
         return ArrancarLogic.released(data) ? ArrancarLogic.releasedBody(data) : HollowTier.of(data);
@@ -145,9 +148,13 @@ public final class HollowPlayerLogic {
 
     /**
      * Armour the hide gives: a base and a share of the square root of maximum reiryoku, up to a cap, and
-     * the Menos form's own on top, up to the most armour any body bears.
+     * the Menos form's own on top, up to the most armour any body bears. None for an Arrancar, released or
+     * not: an Arrancar has Hierro instead (see {@link Hierro}).
      */
     public static float hideArmour(SoulData data) {
+        if (ArrancarLogic.isArrancar(data)) {
+            return 0.0F;
+        }
         double root = Math.sqrt(Math.max(0.0F, data.maxReiryoku()));
         double hide = Math.min(BleachConfig.get(BleachConfig.HIDE_ARMOR_MAX),
                 BleachConfig.get(BleachConfig.HIDE_ARMOR_BASE) + BleachConfig.get(BleachConfig.HIDE_ARMOR_PER_SQRT) * root);

@@ -63,6 +63,10 @@ import org.joml.Vector3f;
  * already struck) and blasting soft blocks away where mob griefing allows. What is left is the picture
  * of the beam, which fades over {@link #FADE_TICKS}.
  *
+ * <p>Other shots strike the same way, as a {@link Kind} of their own: an Arrancar's Bala is a quiet one that
+ * stops at the first creature (see {@link io.github.masteryoga1.bleach.soul.Bala}), and is seen as a short
+ * {@link #trace}.
+ *
  * <p>The server decides everything; a client only keeps the orb at the caster's mouth and draws it, then
  * the beam, from the synced data. It is never saved. A {@code /summon} with {@code Reach} raises a
  * beam as a picture that strikes nothing (see {@link #readAdditionalSaveData}).
@@ -121,6 +125,9 @@ public class CeroBeam extends Entity {
     private static final float BLAST_PITCH = 1.2F;
     private static final int BLAST_SMOKE = 12;
     private static final double BLAST_SMOKE_SPREAD = 0.6;
+    /** The puff a quiet shot ({@link Kind#quiet}) leaves where a wall or a shield stops it, in place of a burst. */
+    private static final int QUIET_SMOKE = 4;
+    private static final double QUIET_SMOKE_SPREAD = 0.1;
     private static final double SMOKE_SPEED = 0.02;
     /** Below this squared length the beam runs too nearly straight up or down to push anything along it. */
     private static final double FLAT_EPSILON = 1.0E-6;
@@ -199,13 +206,28 @@ public class CeroBeam extends Entity {
 
     /**
      * What one Cero did: where it started and where it stopped, whether it burst on a block (not when a
-     * shield took it first) and whether a shield stopped it, the creatures the beam struck, nearest first
-     * (not those only the blast caught), and how many blocks the blast broke.
+     * shield, or the last creature its {@link Kind} may strike, took it first) and whether a shield stopped
+     * it, the creatures the beam struck, nearest first (not those only the blast caught), and how many
+     * blocks the blast broke.
      */
     public record Shot(Vec3 from, Vec3 to, boolean hitBlock, boolean blocked, List<LivingEntity> struck,
                        int blocksBroken) {
         public Shot {
             struck = List.copyOf(struck);
+        }
+    }
+
+    /**
+     * How a beam strikes: its damage type, whether it is quiet (no Cero sound, and a puff of smoke in place
+     * of a burst where a wall or a shield stops it), and how many creatures the beam may strike that it
+     * meets before it stops, hurt or not. Those it may not strike ({@link #mayStrike}) it passes, uncounted.
+     */
+    public record Kind(ResourceKey<DamageType> damage, boolean quiet, int pierce) {
+        /** A Cero: loud, bursting, and on through every creature in its way. */
+        public static final Kind CERO = new Kind(DAMAGE, false, Integer.MAX_VALUE);
+
+        public Kind {
+            pierce = Math.max(1, pierce);
         }
     }
 
@@ -383,20 +405,32 @@ public class CeroBeam extends Entity {
     }
 
     /**
+     * Strikes the line at once as a Cero does ({@link Kind#CERO}): see
+     * {@link #fire(ServerLevel, LivingEntity, Entity, Vec3, Vec3, Spec, Kind)}.
+     */
+    public static Shot fire(ServerLevel level, @Nullable LivingEntity shooter, @Nullable Entity direct, Vec3 from,
+                            Vec3 dir, Spec spec) {
+        return fire(level, shooter, direct, from, dir, spec, Kind.CERO);
+    }
+
+    /**
      * Strikes the line from {@code from} along {@code dir} at once, for {@code shooter} (who may be
      * gone), and returns what it did. The beam reaches the spec's range, short of the first block that
      * would stop a creature (fluids pass) and of ground that is not loaded. It strikes every creature the
      * shooter may strike ({@link #mayStrike}) whose box, or one of whose parts' boxes, it passes within
-     * its half-width of with nothing solid between, nearest first and each once; one whose shield, raised
-     * towards the muzzle, takes the hit ends the beam there. Those it hurts are also pushed along it. If
-     * it then meets a block, it bursts: what it may strike within the blast radius and in the open from
-     * there takes the blast's share of the damage, and soft blocks about the struck one are blasted away,
-     * nearest first, where the spec, the server config, mob griefing and the shooter's rights allow (see
-     * {@link GetsugaTensho#cuttable} and {@link GetsugaTensho#permitted}). {@code direct} is what fired it,
-     * which a shield faces: the Cero, or the shooter itself when null.
+     * its half-width of with nothing solid between, nearest first and each once, with the kind's damage
+     * type; one whose shield, raised towards the muzzle, takes the hit ends the beam there, and so does the
+     * last creature the kind may strike ({@link Kind#pierce}), hurt or not. Those it hurts are also pushed
+     * along it. If it then meets a block, it bursts: what it may strike within the blast radius and in the
+     * open from there takes the blast's share of the damage, and soft blocks about the struck one are blasted
+     * away, nearest first, where the spec, the server config, mob griefing and the shooter's rights allow (see
+     * {@link GetsugaTensho#cuttable} and {@link GetsugaTensho#permitted}). A quiet kind makes no Cero sound,
+     * and leaves only a puff of smoke where a wall or a shield stops it. {@code direct} is what fired it,
+     * which a shield faces: the Cero, or the shooter itself when null. A shot with no beam of its own should
+     * pass a stand-in rather than null, as a living direct entity makes a blocked hit a blow from its hand.
      */
     public static Shot fire(ServerLevel level, @Nullable LivingEntity shooter, @Nullable Entity direct, Vec3 from,
-                            Vec3 dir, Spec spec) {
+                            Vec3 dir, Spec spec, Kind kind) {
         Vec3 heading = dir.normalize();
         // A direction of zero (or not a number) goes nowhere and strikes nothing.
         if (!(heading.lengthSqr() >= 0.5)) {
@@ -421,10 +455,13 @@ public class CeroBeam extends Entity {
         entries.sort(Comparator.comparingDouble(entry -> entry.at().distanceToSqr(from)));
 
         DamageSource source = new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
-                .getHolderOrThrow(DAMAGE), direct != null ? direct : shooter, shooter);
+                .getHolderOrThrow(kind.damage()), direct != null ? direct : shooter, shooter);
         Vec3 push = pushAlong(heading, shooter);
         List<LivingEntity> struck = new ArrayList<>();
         boolean blocked = false;
+        // Whether it ran out of creatures it may strike before the wall: a Cero never does.
+        boolean stopped = false;
+        int met = 0;
         Vec3 to = end;
         for (Entry entry : entries) {
             LivingEntity target = entry.target();
@@ -441,9 +478,14 @@ public class CeroBeam extends Entity {
                 to = entry.at();
                 break;
             }
+            if (++met >= kind.pierce()) {
+                stopped = true;
+                to = entry.at();
+                break;
+            }
         }
 
-        boolean hitBlock = wall && !blocked;
+        boolean hitBlock = wall && !blocked && !stopped;
         int broken = 0;
         if (hitBlock) {
             blast(level, shooter, source, end, heading, spec, struck);
@@ -452,15 +494,48 @@ public class CeroBeam extends Entity {
             }
         }
         SoundSource category = shooter != null ? shooter.getSoundSource() : SoundSource.HOSTILE;
-        if (hitBlock || blocked) {
+        if ((hitBlock || blocked) && kind.quiet()) {
+            SpiritSenses.particles(level, ParticleTypes.SMOKE, to.x, to.y, to.z, QUIET_SMOKE, QUIET_SMOKE_SPREAD,
+                    QUIET_SMOKE_SPREAD, QUIET_SMOKE_SPREAD, SMOKE_SPEED);
+        } else if (hitBlock || blocked) {
             SpiritSenses.particles(level, ParticleTypes.EXPLOSION, to.x, to.y, to.z, 1, 0.0, 0.0, 0.0, 0.0);
             SpiritSenses.particles(level, ParticleTypes.LARGE_SMOKE, to.x, to.y, to.z, BLAST_SMOKE, BLAST_SMOKE_SPREAD,
                     BLAST_SMOKE_SPREAD, BLAST_SMOKE_SPREAD, SMOKE_SPEED);
             SpiritSenses.play(level, to.x, to.y, to.z, SoundEvents.GENERIC_EXPLODE.value(), category, BLAST_VOLUME,
                     BLAST_PITCH, false);
         }
-        SpiritSenses.play(level, from.x, from.y, from.z, ModSounds.CERO_FIRE.get(), category, FIRE_VOLUME, 1.0F, false);
+        if (!kind.quiet()) {
+            SpiritSenses.play(level, from.x, from.y, from.z, ModSounds.CERO_FIRE.get(), category, FIRE_VOLUME, 1.0F,
+                    false);
+        }
         return new Shot(from, to, hitBlock, blocked, struck, broken);
+    }
+
+    /**
+     * A picture of a shot that strikes nothing: a fired beam from {@code shot.from()} to {@code shot.to()},
+     * this wide and this colour, seen for {@code life} ticks (1 to {@link #MAX_DISPLAY_LIFE}), all of them
+     * fading, and drawn from the owner's eyes as the owner's own (so it starts a little way out for it in
+     * first person). Like any Cero it is shown only to those who see spirits. Returns null, adding nothing,
+     * if the level refuses it.
+     */
+    @Nullable
+    public static CeroBeam trace(ServerLevel level, @Nullable LivingEntity owner, Shot shot, float radius, int colour,
+                                 int life) {
+        CeroBeam beam = new CeroBeam(ModEntities.CERO_BEAM.get(), level);
+        Vec3 from = shot.from();
+        beam.moveTo(from.x, from.y, from.z, owner != null ? owner.getYHeadRot() : 0.0F,
+                owner != null ? owner.getXRot() : 0.0F);
+        if (owner != null) {
+            beam.entityData.set(DATA_OWNER, owner.getId());
+        }
+        beam.entityData.set(DATA_RADIUS, within(radius, 0.05F, 8.0F));
+        beam.entityData.set(DATA_COLOUR, colour & 0xFFFFFF);
+        beam.entityData.set(DATA_REACH, shot.to().subtract(from).toVector3f());
+        beam.entityData.set(DATA_FIRED, true);
+        beam.entityData.set(DATA_LIFE, Mth.clamp(life, 1, MAX_DISPLAY_LIFE));
+        // With no spec it never strikes: the fired branch of the server's tick only lets it go after its life.
+        beam.firedAt = beam.tickCount;
+        return level.addFreshEntity(beam) ? beam : null;
     }
 
     /**

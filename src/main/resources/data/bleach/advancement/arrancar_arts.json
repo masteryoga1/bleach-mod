@@ -1,0 +1,35 @@
+{
+  "parent": "bleach:arrancar",
+  "display": {
+    "icon": {
+      "id": "minecraft:fire_charge"
+    },
+    "title": {
+      "translate": "advancements.bleach.arrancar_arts.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.arrancar_arts.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "sonido": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "sonido"
+      }
+    },
+    "bala": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "bala"
+      }
+    },
+    "pesquisa": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "pesquisa"
+      }
+    }
+  }
+}

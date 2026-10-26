@@ -75,9 +75,9 @@ public final class ArrancarLogic {
     }
 
     /**
-     * The Hollow body a released Arrancar takes back, for its claws, their speed and its hide: the form it
-     * rose from, but a plain Hollow's for a Gillian-born one, as a Gillian's are a giant's. A plain Hollow
-     * for any soul not released.
+     * The Hollow body a released Arrancar takes back, for its claws and their speed (its {@link Hierro} takes
+     * the hide's place): the form it rose from, but a plain Hollow's for a Gillian-born one, as a Gillian's
+     * are a giant's. A plain Hollow for any soul not released.
      */
     public static HollowTier releasedBody(SoulData data) {
         if (!released(data)) {

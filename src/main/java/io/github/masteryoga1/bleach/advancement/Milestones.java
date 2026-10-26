@@ -144,6 +144,12 @@ public final class Milestones {
     public static final String ARRANCAR = "arrancar";
     /** Called out an Arrancar's Resurrección. Granted when it happens. */
     public static final String RESURRECCION = "resurreccion";
+    /** Used Sonído. Granted when it happens, as are the two below. */
+    public static final String SONIDO = "sonido";
+    /** Fired a Bala. */
+    public static final String BALA = "bala";
+    /** Sent out a Pesquisa. */
+    public static final String PESQUISA = "pesquisa";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;

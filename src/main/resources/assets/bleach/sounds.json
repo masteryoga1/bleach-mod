@@ -558,6 +558,98 @@
       }
     ]
   },
+  "player.sonido": {
+    "subtitle": "subtitles.bleach.player.sonido",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ravager/step1",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/ravager/step2",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/ravager/step3",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/ravager/step4",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/ravager/step5",
+        "pitch": 0.6
+      }
+    ]
+  },
+  "player.hierro": {
+    "subtitle": "subtitles.bleach.player.hierro",
+    "sounds": [
+      {
+        "name": "minecraft:block/chain/break1",
+        "pitch": 1.6
+      },
+      {
+        "name": "minecraft:block/chain/break2",
+        "pitch": 1.6
+      },
+      {
+        "name": "minecraft:block/chain/break3",
+        "pitch": 1.6
+      },
+      {
+        "name": "minecraft:block/chain/break4",
+        "pitch": 1.6
+      }
+    ]
+  },
+  "player.pesquisa": {
+    "subtitle": "subtitles.bleach.player.pesquisa",
+    "sounds": [
+      {
+        "name": "minecraft:block/amethyst/resonate1",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:block/amethyst/resonate2",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:block/amethyst/resonate3",
+        "pitch": 0.5
+      },
+      {
+        "name": "minecraft:block/amethyst/resonate4",
+        "pitch": 0.5
+      }
+    ]
+  },
+  "player.bala": {
+    "subtitle": "subtitles.bleach.player.bala",
+    "sounds": [
+      {
+        "name": "minecraft:random/explode1",
+        "pitch": 1.9,
+        "volume": 0.4
+      },
+      {
+        "name": "minecraft:random/explode2",
+        "pitch": 1.9,
+        "volume": 0.4
+      },
+      {
+        "name": "minecraft:random/explode3",
+        "pitch": 1.9,
+        "volume": 0.4
+      },
+      {
+        "name": "minecraft:random/explode4",
+        "pitch": 1.9,
+        "volume": 0.4
+      }
+    ]
+  },
   "player.blut": {
     "subtitle": "subtitles.bleach.player.blut",
     "sounds": [
