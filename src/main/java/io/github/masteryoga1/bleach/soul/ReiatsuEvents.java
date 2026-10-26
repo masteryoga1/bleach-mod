@@ -78,7 +78,9 @@ public final class ReiatsuEvents {
 
     /**
      * Reiatsu difference: a soul whose reiatsu dwarfs its attacker's shrugs off most of the hit. Blut
-     * Arterie makes the attacker's reiatsu count for more (see {@link QuincyLogic#reiatsuFactor}).
+     * Arterie makes the attacker's reiatsu count for more (see {@link QuincyLogic#reiatsuFactor}). An
+     * Arrancar's Hierro is weighed here too, and only the larger of the two cuts is made, as both are the
+     * same gap in reiatsu (see {@link Hierro}); the Hierro rings when it is the one that held.
      */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
         LivingEntity victim = event.getEntity();
@@ -87,10 +89,17 @@ public final class ReiatsuEvents {
                 || !(source.getEntity() instanceof LivingEntity attacker) || attacker == victim) {
             return;
         }
-        float multiplier = SoulLogic.reiatsuDamageMultiplier(
-                SoulLogic.reiatsu(attacker) * QuincyLogic.reiatsuFactor(attacker), SoulLogic.reiatsu(victim));
+        float attackerReiatsu = SoulLogic.reiatsu(attacker) * QuincyLogic.reiatsuFactor(attacker);
+        float victimReiatsu = SoulLogic.reiatsu(victim);
+        float difference = SoulLogic.reiatsuDamageMultiplier(attackerReiatsu, victimReiatsu);
+        float hierro = Hierro.multiplier(victim, source, attackerReiatsu, victimReiatsu);
+        float multiplier = Math.min(difference, hierro);
         if (multiplier < 1.0F) {
-            event.setAmount(event.getAmount() * multiplier);
+            float before = event.getAmount();
+            event.setAmount(before * multiplier);
+            if (hierro < difference) {
+                Hierro.ring(victim, source, before - before * multiplier);
+            }
         }
     }
 

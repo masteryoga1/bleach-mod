@@ -33,15 +33,15 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 
 /**
- * What being a Hollow does to a player's body: claws on a bare hand, a hide that gives armour and
- * bears none, a leap that falls further unharmed, sight in the dark, and soul hunger in place of food,
- * which drains with time and effort, pays for a fast regeneration, and starves the Hollow when it runs
- * out. A Hollow that stops being one gets its body and its food back. An Arrancar's Resurrección
- * puts the claws, hide and leap of the form it rose from back on, but none of the rest. The numbers are in
- * {@link HollowPlayerLogic}; a Menos form's size and the rest of its body are in {@link MenosBody}, and
- * its rise and fall in {@link MenosEvolution}; the Arrancar's own tick is in {@link ArrancarEvents}. Server
- * side unless said otherwise; everything takes a {@link Player}, so game tests can use mock players, and
- * only messages and sounds need a real one.
+ * What being a Hollow does to a player's body: claws on a bare hand, a hide that gives armour and bears none,
+ * a leap that falls further unharmed, sight in the dark, and soul hunger in place of food, which drains with
+ * time and effort, pays for a fast regeneration, and starves the Hollow when it runs out. A Hollow that stops
+ * being one gets its body and its food back. An Arrancar's Resurrección puts the claws and leap of the form
+ * it rose from back on, but none of the rest (its {@link Hierro} stands in for the hide). The numbers are in
+ * {@link HollowPlayerLogic}; a Menos form's size and the rest of its body are in {@link MenosBody}, and its
+ * rise and fall in {@link MenosEvolution}; the Arrancar's own tick is in {@link ArrancarEvents}. Server side
+ * unless said otherwise; everything takes a {@link Player}, so game tests can use mock players, and only
+ * messages and sounds need a real one.
  *
  * <p>The hunger spent is gathered as a debt and taken off the saved value now and then (see
  * {@link #flushDebt}), so the soul is not re-sent to its owner every tick.
@@ -247,14 +247,15 @@ public final class HollowBody {
     }
 
     /**
-     * Puts the body right, and does nothing when it already is: for a Hollow, claws and their speed on
-     * a bare main hand only, the hide, the leap, the sight and its Menos form's body (see
-     * {@link MenosBody#reconcile}); for an Arrancar in Resurrección, the claws, hide and leap of the form it
-     * rose from (see {@link HollowPlayerLogic#bodyForm}); for anyone else, none of them. First, for every
-     * soul, an Arrancar's health, speed and damage are put right (see {@link ArrancarEvents#reconcileBody}).
-     * The modifiers are transient but for a Menos's and an Arrancar's health, so this runs again on logging
-     * in and respawning (see {@link SoulLogic#applyStatModifiers}), and each is written only when its amount
-     * changes, so the attributes are not re-sent every tick. Server side.
+     * Puts the body right, and does nothing when it already is: for a Hollow, claws and their speed on a bare
+     * main hand only, the hide, the leap, the sight and its Menos form's body (see
+     * {@link MenosBody#reconcile}); for an Arrancar in Resurrección, the claws and leap of the form it rose
+     * from (see {@link HollowPlayerLogic#bodyForm}), with no hide, as it has Hierro instead; for anyone else,
+     * none of them. First, for every soul, an Arrancar's health, speed and damage are put right (see
+     * {@link ArrancarEvents#reconcileBody}). The modifiers are transient but for a Menos's and an Arrancar's
+     * health, so this runs again on logging in and respawning (see {@link SoulLogic#applyStatModifiers}), and
+     * each is written only when its amount changes, so the attributes are not re-sent every tick. Server
+     * side.
      * <p>
      * The claws come off a hand that holds something at once, but grow only on the player's tick (see
      * {@link #tickBody}), after vanilla's equipment check. Between ticks, a hand just emptied by a hotbar

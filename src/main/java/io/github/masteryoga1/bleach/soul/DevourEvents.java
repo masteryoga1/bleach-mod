@@ -65,7 +65,8 @@ public final class DevourEvents {
      * server thread. A press of the Devour key starts a hold (a Hollow) or the gnawing (a Plus); letting go
      * ends either; sneaking with it turns the Hollow sight on or off. The target id is only the client's
      * hint. The Cero key starts, fires or lets fizzle a Menos's or an Arrancar's Cero ({@link HollowCero}); an
-     * Arrancar's other Hollow keys do nothing, as it no longer devours.
+     * Arrancar no longer devours: its Devour press and release start and end a Pesquisa focus
+     * ({@link Pesquisa}), and its sight key does nothing.
      */
     public static void onKey(ServerPlayer player, HollowKey key, int targetId) {
         if (!SoulLogic.hasSoul(player)) {
@@ -92,6 +93,9 @@ public final class DevourEvents {
                         HollowBody.actionBar(player, data, Component.translatable("message.bleach.devour." + refusal.key())
                                 .withStyle(ChatFormatting.GRAY), now);
                     }
+                } else if (ArrancarLogic.isArrancar(data) && !player.isSpectator()) {
+                    // The client's aim means nothing to it: Pesquisa feels all about it.
+                    Pesquisa.press(player, data, now);
                 }
             }
             case RELEASE -> {
@@ -99,6 +103,7 @@ public final class DevourEvents {
                 if (data.devourTargetId >= 0) {
                     stopDevour(player, data, null, now);
                 }
+                Pesquisa.release(data);
             }
             case SIGHT -> {
                 if (player.isAlive() && HollowPlayerLogic.isHollow(data)) {

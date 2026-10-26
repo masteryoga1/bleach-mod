@@ -21,9 +21,9 @@ import org.joml.Vector3f;
 /**
  * An Arrancar's Resurrección on the server. Holding its own sealed blade, it calls out the release, the
  * blade's command and name, and takes back the Hollow it sealed away: the Hollow's skin and full mask, the
- * claws and hide of the form it rose from, more health, speed and melee damage by that form (see
- * {@link ArrancarLogic}), a full heal and a stronger Cero, but not a Hollow's fast healing. The release
- * drains reiryoku every tick, and reiryoku does not refill while it lasts (see
+ * claws of the form it rose from (its {@link Hierro} stands in for the hide), more health, speed and melee
+ * damage by that form (see {@link ArrancarLogic}), a full heal and a stronger Cero, but not a Hollow's fast
+ * healing. The release drains reiryoku every tick, and reiryoku does not refill while it lasts (see
  * {@link SoulEvents#mayRegenerate}).
  *
  * <p>It ends on the seal key, when the reiryoku runs low, on death, in bed, in spectator mode, on logging

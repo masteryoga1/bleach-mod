@@ -128,7 +128,9 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * size again, with the fragment of its mask, its hole and its own blade in hand. The soul screen is
  * opened on it, and the real Release key calls out its Resurrección, which must draw the released
  * Vasto Lorde and raise its health; the Seal key seals it again, and the wait before the next release
- * must reach the client before the run quits.
+ * must reach the client. Last, the sealed Arrancar's Sonído, through the real flash step request, must
+ * carry it further than a first Shunpo, and holding the real Devour key still sends out Pesquisa, which
+ * must outline a Plus standing behind a stone wall before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -145,6 +147,8 @@ public final class ClientSmokeTest {
     /** How far the flash step must carry the player, and how high above the ground footing must hold them. */
     private static final double DASH_MIN_DISTANCE = 4.0;
     private static final double FOOTING_MIN_HEIGHT = 8.0;
+    /** How far the Arrancar's Sonído must carry the player: further than a first Shunpo goes. */
+    private static final double SONIDO_MIN_DISTANCE = 8.0;
     /** How far around the player the summoned Hollows and Plus, and the Garganta, are looked for. */
     private static final double SUMMONED_RANGE = 24.0;
     private static final double RIFT_RANGE = 40.0;
@@ -799,7 +803,25 @@ public final class ClientSmokeTest {
             // The real keys: Release calls out the Resurrección of the blade in hand, and Seal ends it.
             case 3840 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
             case 3875 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.SEAL);
+            // Sonído through the real flash step request, in a lane cleared south: further than a first Shunpo.
             case 3900 -> {
+                command(minecraft, "fill ~-2 ~ ~1 ~2 ~3 ~24 air");
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            }
+            case 3902 -> {
+                dashFrom = player.position();
+                BleachNetwork.requestFlashStep(1.0F, 0.0F);
+            }
+            // Pesquisa through the real Devour key: a Plus stands still behind a stone wall, and the pulse marks it.
+            case 3920 -> {
+                command(minecraft, "fill ~-2 ~ ~3 ~2 ~3 ~3 stone");
+                command(minecraft, "summon bleach:plus ~ ~ ~6 " + STILL);
+            }
+            case 3925 -> HollowKeys.DEVOUR.setDown(true);
+            case 3950 -> HollowKeys.DEVOUR.setDown(false);
+            case 3975 -> command(minecraft, "kill @e[type=bleach:plus]");
+            case 3990 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -958,7 +980,7 @@ public final class ClientSmokeTest {
         }
     }
 
-    /** The checks of the Arrancar and its Resurrección, each window from the step it follows. */
+    /** The checks of the Arrancar, its Resurrección and its arts, each window from the step it follows. */
     private static void checkArrancar(Minecraft minecraft, LocalPlayer player, SoulData soul) {
         if (expectWithin(minecraft, 3802, 3830,
                 () -> soul.state() == SoulState.ARRANCAR && soul.tier(PowerPath.HOLLOW) == 4
@@ -979,6 +1001,14 @@ public final class ClientSmokeTest {
                 () -> !hasLook(player, HollowPlayerLogic.LOOK_RESURRECCION)
                         && soul.hollow().arrancar().releaseReadyAt() > player.level().getGameTime(),
                 "the Seal key never sealed the Resurrección, or its wait never reached the client");
+        expectWithin(minecraft, 3904, 3915,
+                () -> horizontalDistance(player.position(), dashFrom) >= SONIDO_MIN_DISTANCE,
+                "the Arrancar's Sonído never went further than a first Shunpo");
+        if (expectWithin(minecraft, 3947, 3970,
+                () -> nearest(minecraft, PlusSpirit.class, 12.0, HollowKeys::marked) != null,
+                "Pesquisa never marked the Plus behind the wall")) {
+            shot(minecraft, "pesquisa");
+        }
     }
 
     /** Whether the player is drawn with this Hollow look bit. */

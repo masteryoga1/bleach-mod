@@ -99,6 +99,14 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_FIRE = fixed("entity.cero.fire", 96.0F);
+    /** The low thud of an Arrancar's Sonído, at both ends of the step. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SONIDO = variable("player.sonido");
+    /** A blow ringing off an Arrancar's Hierro. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HIERRO = variable("player.hierro");
+    /** An Arrancar's Pesquisa going out. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> PESQUISA = variable("player.pesquisa");
+    /** The crack of a Bala fired. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> BALA = variable("player.bala");
 
     private ModSounds() {
     }

@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
 import io.github.masteryoga1.bleach.quincy.QuincyKey;
 import io.github.masteryoga1.bleach.soul.HollowKey;
+import io.github.masteryoga1.bleach.soul.Pesquisa;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenPage;
@@ -22,8 +23,9 @@ public final class BleachNetwork {
      * 10: the Devour key, and the Hollow look in SoulAppearance.
      * 11: the Cero keys, and the Menos record in HollowProgress.
      * 12: the Arrancar record in HollowProgress.
+     * 13: the Pesquisa marks payload.
      */
-    private static final String VERSION = "12";
+    private static final String VERSION = "13";
 
     private BleachNetwork() {
     }
@@ -48,7 +50,8 @@ public final class BleachNetwork {
                 .playToServer(BloodlineChoicePayload.TYPE, BloodlineChoicePayload.STREAM_CODEC,
                         BloodlineChoicePayload::handle)
                 .playToServer(QuincyKeyPayload.TYPE, QuincyKeyPayload.STREAM_CODEC, QuincyKeyPayload::handle)
-                .playToServer(HollowKeyPayload.TYPE, HollowKeyPayload.STREAM_CODEC, HollowKeyPayload::handle);
+                .playToServer(HollowKeyPayload.TYPE, HollowKeyPayload.STREAM_CODEC, HollowKeyPayload::handle)
+                .playToClient(PesquisaPayload.TYPE, PesquisaPayload.STREAM_CODEC, PesquisaPayload::handle);
     }
 
     /** Sends a player their own soul data and marks it as up to date. */
@@ -89,6 +92,14 @@ public final class BleachNetwork {
     /** Sends the answer the player picked in an NPC's dialogue. */
     public static void requestNpcAction(int entityId, NpcAction action) {
         PacketDistributor.sendToServer(new NpcActionPayload(entityId, action));
+    }
+
+    /**
+     * Tells an Arrancar which souls its Pesquisa felt, to outline for this many ticks. See {@link PesquisaPayload};
+     * past {@link Pesquisa#MAX_MARKS} the list is cut short here, as the codec would refuse it on the way out.
+     */
+    public static void sendPesquisa(ServerPlayer player, List<Integer> ids, int ticks) {
+        PacketDistributor.sendToPlayer(player, new PesquisaPayload(first(ids, Pesquisa.MAX_MARKS), ticks));
     }
 
     /** Tells a player whether their reishi footing holds, and at what height. */

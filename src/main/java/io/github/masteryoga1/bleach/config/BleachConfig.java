@@ -484,17 +484,55 @@ public final class BleachConfig {
 
     /**
      * The numbers of an Arrancar by the Menos form it rose from, each in its own section of {@code [arrancar]}:
-     * what it is worth sealed and in Resurrección, its blade, what becoming one adds, and the release's drain.
+     * what it is worth sealed and in Resurrección, its blade, what becoming one adds, the release's drain, and
+     * where its Sonído's reach, its Hierro's share and its Bala's damage start before reiryoku adds to them.
      */
     public record ArrancarOrigin(ModConfigSpec.DoubleValue sealedHealthBonus, ModConfigSpec.DoubleValue releasedHealthBonus,
             ModConfigSpec.DoubleValue releasedSpeedBonus, ModConfigSpec.DoubleValue releasedDamageMultiplier,
             ModConfigSpec.DoubleValue bladeDamage, ModConfigSpec.DoubleValue reiryokuGrowth,
-            ModConfigSpec.DoubleValue releaseDrainPerSecond) {
+            ModConfigSpec.DoubleValue releaseDrainPerSecond, ModConfigSpec.DoubleValue sonidoDistance,
+            ModConfigSpec.DoubleValue hierroShare, ModConfigSpec.DoubleValue balaDamage) {
     }
 
     public static final ArrancarOrigin GILLIAN_ARRANCAR;
     public static final ArrancarOrigin ADJUCHAS_ARRANCAR;
     public static final ArrancarOrigin VASTO_LORDE_ARRANCAR;
+
+    public static final ModConfigSpec.DoubleValue SONIDO_DISTANCE_PER_ROOT;
+    public static final ModConfigSpec.DoubleValue SONIDO_MAX_DISTANCE;
+    public static final ModConfigSpec.DoubleValue SONIDO_RELEASED_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue SONIDO_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue SONIDO_MIN_COST;
+    public static final ModConfigSpec.IntValue SONIDO_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue SONIDO_RELEASED_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue SONIDO_UNSENSED_TICKS;
+
+    public static final ModConfigSpec.DoubleValue HIERRO_SHARE_PER_ROOT;
+    public static final ModConfigSpec.DoubleValue HIERRO_RELEASED_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue HIERRO_MAX_SHARE;
+    public static final ModConfigSpec.DoubleValue HIERRO_PIERCE_RATIO;
+
+    public static final ModConfigSpec.DoubleValue PESQUISA_RANGE;
+    public static final ModConfigSpec.DoubleValue PESQUISA_RANGE_PER_LEVEL;
+    public static final ModConfigSpec.DoubleValue PESQUISA_MAX_RANGE;
+    public static final ModConfigSpec.DoubleValue PESQUISA_RELEASED_MULTIPLIER;
+    public static final ModConfigSpec.IntValue PESQUISA_FOCUS_TICKS;
+    public static final ModConfigSpec.DoubleValue PESQUISA_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue PESQUISA_MIN_COST;
+    public static final ModConfigSpec.IntValue PESQUISA_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue PESQUISA_MARK_SECONDS;
+    public static final ModConfigSpec.IntValue PESQUISA_TRAINING_XP;
+    public static final ModConfigSpec.DoubleValue PESQUISA_MIN_REIATSU;
+
+    public static final ModConfigSpec.DoubleValue BALA_DAMAGE_PER_ROOT;
+    public static final ModConfigSpec.DoubleValue BALA_MAX_DAMAGE;
+    public static final ModConfigSpec.DoubleValue BALA_RELEASED_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BALA_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue BALA_MIN_COST;
+    public static final ModConfigSpec.IntValue BALA_COOLDOWN_TICKS;
+    public static final ModConfigSpec.DoubleValue BALA_RANGE;
+    public static final ModConfigSpec.DoubleValue BALA_RADIUS;
+    public static final ModConfigSpec.DoubleValue BALA_KNOCKBACK;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -1945,11 +1983,130 @@ public final class BleachConfig {
                         + " the most from 80 to 100).")
                 .defineInRange("release_cero_multiplier", 1.25, 1.0, 5.0);
         GILLIAN_ARRANCAR = arrancarOrigin(builder, "gillian", "a Gillian-born Arrancar", 4.0, 20.0, 0.1, 1.15, 6.0, 0.05,
-                0.008);
+                0.008, 7.0, 0.15, 3.0);
         ADJUCHAS_ARRANCAR = arrancarOrigin(builder, "adjuchas", "an Adjuchas-born Arrancar", 10.0, 40.0, 0.25, 1.3, 7.0, 0.15,
-                0.006);
+                0.006, 8.0, 0.25, 3.5);
         VASTO_LORDE_ARRANCAR = arrancarOrigin(builder, "vasto_lorde", "a Vasto Lorde-born Arrancar", 20.0, 60.0, 0.35, 1.5,
-                8.0, 0.25, 0.005);
+                8.0, 0.25, 0.005, 9.0, 0.35, 4.0);
+
+        builder.push("sonido");
+        SONIDO_DISTANCE_PER_ROOT = builder
+                .comment("Blocks a Sonído gains for each square root of maximum reiryoku, on top of the origin's"
+                        + " sonido_distance: 0.15 adds 3 at 400.")
+                .defineInRange("distance_per_root_reiryoku", 0.15, 0.0, 2.0);
+        SONIDO_MAX_DISTANCE = builder
+                .comment("The furthest a Sonído goes in blocks, released or not.")
+                .defineInRange("max_distance", 16.0, 1.0, 32.0);
+        SONIDO_RELEASED_MULTIPLIER = builder
+                .comment("What a Sonído's reach is multiplied by in Resurrección, before the cap.")
+                .defineInRange("released_distance_multiplier", 1.25, 1.0, 4.0);
+        SONIDO_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku a Sonído costs: 0.03 is 12 at 400.")
+                .defineInRange("cost_fraction", 0.03, 0.0, 0.5);
+        SONIDO_MIN_COST = builder
+                .comment("Least reiryoku a Sonído costs.")
+                .defineInRange("min_cost", 1.0, 0.0, 100.0);
+        SONIDO_COOLDOWN_TICKS = builder
+                .comment("Ticks between one Sonído and the next while sealed (20 is a second).")
+                .defineInRange("cooldown_ticks", 20, 0, 200);
+        SONIDO_RELEASED_COOLDOWN_TICKS = builder
+                .comment("Ticks between one Sonído and the next in Resurrección.")
+                .defineInRange("released_cooldown_ticks", 12, 0, 200);
+        SONIDO_UNSENSED_TICKS = builder
+                .comment("Ticks after a Sonído during which Pesquisa cannot find the Arrancar that used it. 0 lets Pesquisa"
+                        + " always find it.")
+                .defineInRange("unsensed_ticks", 20, 0, 200);
+        builder.pop();
+
+        builder.push("hierro");
+        HIERRO_SHARE_PER_ROOT = builder
+                .comment("Share of a blow Hierro turns aside for each square root of maximum reiryoku, on top of the"
+                        + " origin's hierro_share: 0.004 adds 0.08 at 400.")
+                .defineInRange("share_per_root_reiryoku", 0.004, 0.0, 0.1);
+        HIERRO_RELEASED_MULTIPLIER = builder
+                .comment("What Hierro's share is multiplied by in Resurrección, before the cap.")
+                .defineInRange("released_multiplier", 1.6, 1.0, 5.0);
+        HIERRO_MAX_SHARE = builder
+                .comment("Most of any blow Hierro turns aside, released or not.")
+                .defineInRange("max_share", 0.75, 0.0, 0.95);
+        HIERRO_PIERCE_RATIO = builder
+                .comment("How many times the Arrancar's reiatsu an attacker needs for Hierro to stop nothing. Hierro holds"
+                        + " fully against an attacker no stronger than the Arrancar and gives way evenly in between: at 2, an"
+                        + " attacker half as strong again meets half of it. It never adds to the reiatsu difference: the"
+                        + " larger cut wins.")
+                .defineInRange("pierce_ratio", 2.0, 1.01, 10.0);
+        builder.pop();
+
+        builder.push("pesquisa");
+        PESQUISA_RANGE = builder
+                .comment("Blocks a Pesquisa reaches at Reiatsu Control 0.")
+                .defineInRange("range", 32.0, 4.0, 256.0);
+        PESQUISA_RANGE_PER_LEVEL = builder
+                .comment("Blocks a Pesquisa's reach gains for each Reiatsu Control level.")
+                .defineInRange("range_per_reiatsu_control_level", 1.0, 0.0, 8.0);
+        PESQUISA_MAX_RANGE = builder
+                .comment("The furthest a Pesquisa reaches in blocks, released or not.")
+                .defineInRange("max_range", 96.0, 4.0, 256.0);
+        PESQUISA_RELEASED_MULTIPLIER = builder
+                .comment("What a Pesquisa's reach is multiplied by in Resurrección, before the cap.")
+                .defineInRange("released_range_multiplier", 1.25, 1.0, 4.0);
+        PESQUISA_FOCUS_TICKS = builder
+                .comment("Ticks the Devour key must be held, standing still, before the pulse goes out (20 is a second). 0"
+                        + " sends it out at once.")
+                .defineInRange("focus_ticks", 20, 0, 200);
+        PESQUISA_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku a pulse costs, paid when it goes out: 0.05 is 20 at 400. A focus broken"
+                        + " or let go before then is free.")
+                .defineInRange("cost_fraction", 0.05, 0.0, 0.5);
+        PESQUISA_MIN_COST = builder
+                .comment("Least reiryoku a pulse costs.")
+                .defineInRange("min_cost", 2.0, 0.0, 100.0);
+        PESQUISA_COOLDOWN_SECONDS = builder
+                .comment("Seconds between one pulse and the next.")
+                .defineInRange("cooldown_seconds", 10, 0, 600);
+        PESQUISA_MARK_SECONDS = builder
+                .comment("Seconds the souls a pulse finds stay outlined, through walls, for the Arrancar that sent it.")
+                .defineInRange("mark_seconds", 5, 1, 60);
+        PESQUISA_TRAINING_XP = builder
+                .comment("Reiatsu Control XP each pulse trains.")
+                .defineInRange("training_xp", 3, 0, 100);
+        PESQUISA_MIN_REIATSU = builder
+                .comment("Reiatsu weaker than this is not felt. A Plus has 12.")
+                .defineInRange("min_reiatsu", 10.0, 0.0, 10_000.0);
+        builder.pop();
+
+        builder.push("bala");
+        BALA_DAMAGE_PER_ROOT = builder
+                .comment("Damage a Bala gains for each square root of maximum reiryoku, on top of the origin's"
+                        + " bala_damage: 0.1 adds 2 at 400.")
+                .defineInRange("damage_per_root_reiryoku", 0.1, 0.0, 5.0);
+        BALA_MAX_DAMAGE = builder
+                .comment("Most damage a sealed Bala deals.")
+                .defineInRange("max_damage", 12.0, 0.0, 200.0);
+        BALA_RELEASED_MULTIPLIER = builder
+                .comment("What a Bala's damage and knockback are multiplied by in Resurrección, after the cap.")
+                .defineInRange("released_multiplier", 1.25, 1.0, 5.0);
+        BALA_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku a Bala costs: 0.04 is 16 at 400.")
+                .defineInRange("cost_fraction", 0.04, 0.0, 0.5);
+        BALA_MIN_COST = builder
+                .comment("Least reiryoku a Bala costs.")
+                .defineInRange("min_cost", 2.0, 0.0, 100.0);
+        BALA_COOLDOWN_TICKS = builder
+                .comment("Ticks between one Bala and the next, held or pressed again. Below 10, a second Bala on the same"
+                        + " target comes while it still cannot be hurt again, and does nothing.")
+                .defineInRange("cooldown_ticks", 10, 1, 200);
+        BALA_RANGE = builder
+                .comment("Blocks a Bala reaches.")
+                .defineInRange("range", 24.0, 2.0, 64.0);
+        BALA_RADIUS = builder
+                .comment("Half-width of a Bala in blocks, for what it hits and for the trace it leaves.")
+                .defineInRange("radius", 0.15, 0.05, 1.0);
+        BALA_KNOCKBACK = builder
+                .comment("How hard a Bala pushes its target along the shot, on top of the blow's own: 0.8 is as hard as a"
+                        + " Vasto Lorde-born Arrancar's Cero.")
+                .defineInRange("knockback", 0.8, 0.0, 5.0);
+        builder.pop();
         builder.pop();
 
         SPEC = builder.build();
@@ -1999,7 +2156,8 @@ public final class BleachConfig {
      */
     private static ArrancarOrigin arrancarOrigin(ModConfigSpec.Builder builder, String name, String who, double sealedHealth,
                                                  double releasedHealth, double releasedSpeed, double releasedDamage,
-                                                 double bladeDamage, double growth, double drain) {
+                                                 double bladeDamage, double growth, double drain, double sonido,
+                                                 double hierro, double bala) {
         builder.push(name);
         ArrancarOrigin origin = new ArrancarOrigin(
                 builder.comment("Maximum health " + who + " gains on top of a person's 20 while sealed (2 is a heart).")
@@ -2018,7 +2176,16 @@ public final class BleachConfig {
                         .defineInRange("reiryoku_growth", growth, 0.0, 2.0),
                 builder.comment("Share of maximum reiryoku the Resurrección of " + who + " drains each second, less with"
                                 + " Reiatsu Control.")
-                        .defineInRange("release_drain_per_second", drain, 0.0, 0.1));
+                        .defineInRange("release_drain_per_second", drain, 0.0, 0.1),
+                builder.comment("Blocks the Sonído of " + who + " goes before maximum reiryoku adds to it (see"
+                                + " [arrancar.sonido]).")
+                        .defineInRange("sonido_distance", sonido, 1.0, 32.0),
+                builder.comment("Share of a blow from a soul as strong as " + who + " that its Hierro turns aside, before"
+                                + " maximum reiryoku adds to it (see [arrancar.hierro]).")
+                        .defineInRange("hierro_share", hierro, 0.0, 1.0),
+                builder.comment("Damage the Bala of " + who + " deals before maximum reiryoku adds to it (see"
+                                + " [arrancar.bala]).")
+                        .defineInRange("bala_damage", bala, 0.0, 100.0));
         builder.pop();
         return origin;
     }

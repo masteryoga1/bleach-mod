@@ -253,6 +253,17 @@ public final class SoulData {
     long resurreccionStartedAt = NEVER;
     /** Ticks this Arrancar has gone without its own blade, until a new one forms from its mask. */
     int arrancarBladelessTicks;
+    /** Game time this Arrancar began to still itself for Pesquisa, or {@link #NEVER} (see {@link Pesquisa}). */
+    long pesquisaStartedAt = NEVER;
+    /** Where the Pesquisa focus began, or null when not focusing: a step more than a block from here breaks it. */
+    @Nullable
+    Vec3 pesquisaFrom;
+    /** Game time of this Arrancar's last Pesquisa pulse, for the cooldown. */
+    long lastPesquisaAt = NEVER;
+    /** Game time of this Arrancar's last Bala, for the cooldown. */
+    long lastBalaAt = NEVER;
+    /** Whether the Technique key is held for Bala, so it keeps firing (see {@link Bala}). */
+    boolean balaHeld;
 
     public SoulData() {
     }
