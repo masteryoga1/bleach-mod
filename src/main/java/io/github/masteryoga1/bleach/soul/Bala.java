@@ -15,6 +15,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Marker;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
@@ -163,7 +165,12 @@ public final class Bala {
         CeroBeam.Spec spec = spec(data);
         Vec3 from = CeroBeam.muzzleOf(player, 1.0F);
         Vec3 aim = CeroBeam.aimOf(player);
-        CeroBeam.Shot shot = CeroBeam.fire(level, player, null, from, aim != null ? aim : player.getLookAngle(), spec,
+        // The shot, not the hand, is what a shield meets: with the Arrancar itself as the direct entity, vanilla
+        // would take a blocked Bala for a blow from its hand (an axe held would disable the shield from afar, and
+        // a Guardian's spikes would answer it). A marker at the muzzle, never added to the world, stands in.
+        Marker bullet = new Marker(EntityType.MARKER, level);
+        bullet.setPos(from);
+        CeroBeam.Shot shot = CeroBeam.fire(level, player, bullet, from, aim != null ? aim : player.getLookAngle(), spec,
                 KIND);
         CeroBeam.trace(level, player, shot, spec.radius(), COLOUR, TRACE_TICKS);
         player.swing(InteractionHand.MAIN_HAND, true);

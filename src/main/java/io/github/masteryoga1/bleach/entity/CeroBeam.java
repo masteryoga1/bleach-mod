@@ -426,7 +426,8 @@ public class CeroBeam extends Entity {
      * away, nearest first, where the spec, the server config, mob griefing and the shooter's rights allow (see
      * {@link GetsugaTensho#cuttable} and {@link GetsugaTensho#permitted}). A quiet kind makes no Cero sound,
      * and leaves only a puff of smoke where a wall or a shield stops it. {@code direct} is what fired it,
-     * which a shield faces: the Cero, or the shooter itself when null.
+     * which a shield faces: the Cero, or the shooter itself when null. A shot with no beam of its own should
+     * pass a stand-in rather than null, as a living direct entity makes a blocked hit a blow from its hand.
      */
     public static Shot fire(ServerLevel level, @Nullable LivingEntity shooter, @Nullable Entity direct, Vec3 from,
                             Vec3 dir, Spec spec, Kind kind) {

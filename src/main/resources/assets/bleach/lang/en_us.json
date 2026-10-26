@@ -265,7 +265,7 @@
   "screen.bleach.soul.next.hollow.vasto_lorde": "You are a Vasto Lorde, one of the rarest Hollows of all, as strong as a captain of the Gotei 13 and free of the Adjuchas's need to keep devouring. Gather a Cero with %1$s.",
   "screen.bleach.soul.next.hollow.tear": "Press %s twice to tear off your mask and become an Arrancar: it may fail, and there is no going back.",
   "screen.bleach.soul.next.arrancar": "Your Hollow power is sealed in %1$s. Hold it and press %2$s to call out its release, and %3$s to seal it again. Gather a Cero with %4$s.",
-  "screen.bleach.soul.next.arrancar.arts": "Use Sonído with %1$s and fire a Bala with %2$s (hold it to keep firing). Hold %3$s still for a moment for Pesquisa. Your Hierro turns aside %4$s%% of a blow from a soul as strong as you.",
+  "screen.bleach.soul.next.arrancar.arts": "Sonído: %1$s. Bala: %2$s (hold to keep firing). Pesquisa: hold %3$s still. Hierro turns aside %4$s%% of an equal's blow.",
 
   "screen.bleach.bloodline": "Your Blood",
   "screen.bleach.bloodline.body": "Quincy are born, not made: their power comes down the blood, pure (Echt) or mixed (Gemischt). Is there Quincy blood in you? You are asked once, and it cannot be changed.",

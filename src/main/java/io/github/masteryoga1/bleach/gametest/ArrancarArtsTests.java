@@ -432,6 +432,11 @@ public final class ArrancarArtsTests {
             Bala.Result first = Bala.fire(shooter, data, now);
             helper.assertTrue(first == Bala.Result.FIRED, "the first Bala gave " + first);
             helper.assertFalse(unhurt(spider), "the Bala did not hurt the Spider Hollow");
+            // The shot, not the shooter's hand, strikes, so a shield never takes it for a melee blow.
+            DamageSource struck = spider.getLastDamageSource();
+            helper.assertTrue(struck != null && struck.getEntity() == shooter
+                    && !(struck.getDirectEntity() instanceof LivingEntity) && struck.getSourcePosition() != null,
+                    "the Bala struck as " + (struck == null ? null : struck.getDirectEntity()));
             HollowPlayerTests.assertClose(helper, data.reiryoku(), 384.0, "the reiryoku after a Bala");
             Bala.Result soon = Bala.fire(shooter, data, now + 5L);
             helper.assertTrue(soon == Bala.Result.COOLDOWN, "a Bala a quarter of a second later gave " + soon);
