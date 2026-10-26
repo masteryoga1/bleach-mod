@@ -83,15 +83,18 @@ public final class HollowPlayerLogic {
         return isHollow(data) || ArrancarLogic.isArrancar(data);
     }
 
-    /** Whether this soul wears the Hollow body, its claws, hide and leap: a Hollow, or an Arrancar in Resurrección. */
+    /**
+     * Whether this soul wears the Hollow body, its claws and leap (and, for a Hollow, its hide): a Hollow, or an
+     * Arrancar in Resurrección.
+     */
     public static boolean wearsHollowBody(SoulData data) {
         return isHollow(data) || ArrancarLogic.released(data);
     }
 
     /**
-     * The form whose claws, claw speed and hide this soul's body has: a Hollow's own, or the body a released
-     * Arrancar takes back (see {@link ArrancarLogic#releasedBody}). Never the regeneration's, which an Arrancar
-     * has traded away.
+     * The form whose claws and claw speed this soul's body has (and whose hide a Hollow's has): a Hollow's own, or
+     * the body a released Arrancar takes back (see {@link ArrancarLogic#releasedBody}), with its Hierro in the
+     * hide's place. Never the regeneration's, which an Arrancar has traded away.
      */
     public static HollowTier bodyForm(SoulData data) {
         return ArrancarLogic.released(data) ? ArrancarLogic.releasedBody(data) : HollowTier.of(data);

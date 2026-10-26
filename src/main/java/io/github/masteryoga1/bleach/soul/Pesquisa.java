@@ -201,8 +201,8 @@ public final class Pesquisa {
 
     /**
      * The pulse goes out, ending the focus: it is paid for (told and let go if the reiryoku has run too low
-     * since the press), the cooldown starts, Reiatsu Control trains, and the caster hears and sees it go and
-     * is told what it felt. A real player is also sent the souls to outline, the nearest {@link #MAX_MARKS}.
+     * since the press), the cooldown starts, the caster hears and sees it go and is told what it felt, and
+     * Reiatsu Control trains. A real player is also sent the souls to outline, the nearest {@link #MAX_MARKS}.
      */
     static void pulse(Player player, SoulData data, long now) {
         release(data);
@@ -214,9 +214,10 @@ public final class Pesquisa {
         data.lastPesquisaAt = now;
         // Felt before the training, so a level gained by this pulse widens only the next.
         Reading reading = sense(player, now);
-        SoulLogic.addStatXp(player, data, Stat.REIATSU_CONTROL, BleachConfig.get(BleachConfig.PESQUISA_TRAINING_XP));
         effects(player);
         player.displayClientMessage(describe(player, reading), true);
+        // Trained after the reading is shown, so a level gained here is the action bar's last word, not lost under it.
+        SoulLogic.addStatXp(player, data, Stat.REIATSU_CONTROL, BleachConfig.get(BleachConfig.PESQUISA_TRAINING_XP));
         if (player instanceof ServerPlayer server) {
             Milestones.grant(server, Milestones.PESQUISA);
             List<Integer> ids = reading.sensed().stream().limit(MAX_MARKS).map(Entity::getId).toList();

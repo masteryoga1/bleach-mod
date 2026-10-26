@@ -306,7 +306,8 @@ public final class ArrancarArtsTests {
             helper.assertTrue(sensed.contains(plus) && sensed.contains(spider),
                     "Pesquisa did not feel the Plus and the Spider Hollow behind the wall: " + sensed);
             helper.assertFalse(sensed.contains(cow), "Pesquisa felt a cow");
-            helper.assertFalse(sensed.contains(caster), "Pesquisa felt its caster");
+            // The mock caster is not in the level, so ask about it directly: only the caster check can refuse it.
+            helper.assertFalse(Pesquisa.senses(caster, caster, now), "Pesquisa felt its caster");
 
             // Anything left about from earlier tests may be felt too, so the strongest is checked against all.
             LivingEntity strongest = reading.strongest();

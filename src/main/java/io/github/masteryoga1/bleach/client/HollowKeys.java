@@ -116,6 +116,11 @@ public final class HollowKeys {
         }
         tickMarks(minecraft);
         SoulData data = player.getData(SoulAttachments.SOUL);
+        // The outlines are the Arrancar's art: they go at death (a same-world respawn keeps the world) or with the state.
+        if (!player.isAlive() || player.isSpectator() || !data.isInitialized() || data.state() != SoulState.ARRANCAR) {
+            MARKS.clear();
+            markLevel = null;
+        }
         boolean eligible = data.isInitialized() && (data.state() == SoulState.HOLLOW || data.state() == SoulState.PLUS
                 || data.state() == SoulState.ARRANCAR) && !player.isSpectator();
         // A screen opening releases every key, so it lets go as the key coming up does.
