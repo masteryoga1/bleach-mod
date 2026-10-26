@@ -24,8 +24,9 @@ public final class BleachNetwork {
      * 11: the Cero keys, and the Menos record in HollowProgress.
      * 12: the Arrancar record in HollowProgress.
      * 13: the Pesquisa marks payload.
+     * 14: the Gran Rey Cero key and the Arrancar record's Gran Rey Cero wait.
      */
-    private static final String VERSION = "13";
+    private static final String VERSION = "14";
 
     private BleachNetwork() {
     }

@@ -107,6 +107,15 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> PESQUISA = variable("player.pesquisa");
     /** The crack of a Bala fired. */
     public static final DeferredHolder<SoundEvent, SoundEvent> BALA = variable("player.bala");
+    /** An Arrancar cutting itself on its blade or claws for the blood of a Gran Rey Cero. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GRAN_REY_CERO_CUT = variable("player.gran_rey_cero.cut");
+    /** A Gran Rey Cero let go, heard over the Cero's own roar and further. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GRAN_REY_CERO_FIRE =
+            fixed("entity.gran_rey_cero.fire", 128.0F);
+    /** The pillar of Negación coming down. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> NEGACION_DESCEND = fixed("entity.negacion.descend", 64.0F);
+    /** The pillar of Negación carrying what it holds away. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> NEGACION_DEPART = fixed("entity.negacion.depart", 64.0F);
 
     private ModSounds() {
     }

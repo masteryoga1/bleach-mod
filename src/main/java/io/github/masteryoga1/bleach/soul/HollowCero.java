@@ -23,7 +23,8 @@ import net.minecraft.world.entity.player.Player;
  * does not count, as for the Menos mobs), a devour hold starting, the soul ceasing to be a Menos or an
  * Arrancar, and spectator mode; the engine itself lets it fizzle if the player dies, logs out or changes
  * dimension. Whom it strikes and what it breaks follow every soul's projectile rules
- * ({@link CeroBeam#mayStrike}).
+ * ({@link CeroBeam#mayStrike}). It cannot begin while the soul is held in a Negación light, nor while an
+ * Arrancar's {@link GranReyCero} gathers, as only one beam gathers at a time.
  *
  * <p>The beam and the times live in the soul as transients, so nothing about a Cero is saved.
  */
@@ -37,7 +38,9 @@ public final class HollowCero {
         /** The last Cero fired too short a while ago. */
         COOLDOWN,
         /** Paying for it would leave less than the reserve. */
-        TOO_WEAK;
+        TOO_WEAK,
+        /** Held in a Negación light, which lets the soul touch nothing (see {@link Negacion#held}). */
+        HELD;
 
         /** {@code message.bleach.cero.<name>}. */
         public String messageKey() {
@@ -55,8 +58,8 @@ public final class HollowCero {
 
     /**
      * Starts gathering a Cero at the mouth, the first check that fails winning. A second press while one
-     * gathers does nothing, and nothing is told when the world will not have the Cero (a dead player, or
-     * no server level).
+     * gathers does nothing, and so does one while a Gran Rey Cero gathers; nothing is told when the world
+     * will not have the Cero (a dead player, or no server level).
      *
      * @return the refusal, or null when it began (or was already gathering)
      */
@@ -68,6 +71,13 @@ public final class HollowCero {
             if (charging(data)) {
                 return null;
             }
+        }
+        if (Negacion.held(player)) {
+            return Refusal.HELD;
+        }
+        // One beam at a time: a Gran Rey Cero gathering keeps the mouth busy, and says so itself.
+        if (GranReyCero.charging(data)) {
+            return null;
         }
         HollowTier tier = ArrancarLogic.ceroForm(data);
         if (!tier.isMenos()) {
@@ -150,7 +160,7 @@ public final class HollowCero {
      * Each body tick of a Hollow or an Arrancar: a Cero that fired by itself is paid for and the cooldown
      * starts; one that has gone without firing is forgotten; and one still gathering fizzles if the mask
      * cracked fresh since it began, a devour hold is on, the soul is no longer a Menos (an Arrancar always
-     * counts as the form it rose from), or the player watches as a spectator.
+     * counts as the form it rose from), the player watches as a spectator, or it is held in a Negación light.
      */
     public static void tick(Player player, SoulData data, long now) {
         if (!charging(data)) {
@@ -168,7 +178,7 @@ public final class HollowCero {
         }
         // Stamped only by a fresh crack, and strictly after the start, so a crack in the start's own tick came first.
         if (!ArrancarLogic.ceroForm(data).isMenos() || data.devourTargetId >= 0
-                || data.hollowFreshCrackAt > data.ceroStartedAt || player.isSpectator()) {
+                || data.hollowFreshCrackAt > data.ceroStartedAt || player.isSpectator() || Negacion.held(player)) {
             beam.cancel();
             clear(data);
         }
@@ -198,10 +208,18 @@ public final class HollowCero {
      * is a mob setting and does not reach it.
      */
     public static float damage(SoulData data, HollowTier tier) {
+        return (float) (baseDamage(data, tier) * ArrancarLogic.ceroMultiplier(data));
+    }
+
+    /**
+     * The capped part of a fully gathered Cero's damage, before any release: the form's own, and more for each
+     * square root of maximum reiryoku, up to {@link BleachConfig#CERO_MAX_DAMAGE}. A Gran Rey Cero is a multiple
+     * of it (see {@link GranReyCero#damage}).
+     */
+    public static double baseDamage(SoulData data, HollowTier tier) {
         double perRoot = BleachConfig.get(BleachConfig.CERO_DAMAGE_PER_ROOT_REIRYOKU);
         double damage = BleachConfig.get(form(tier).ceroDamage()) + perRoot * Math.sqrt(Math.max(0.0F, data.maxReiryoku()));
-        double capped = Math.min(BleachConfig.get(BleachConfig.CERO_MAX_DAMAGE), damage);
-        return (float) (capped * ArrancarLogic.ceroMultiplier(data));
+        return Math.min(BleachConfig.get(BleachConfig.CERO_MAX_DAMAGE), damage);
     }
 
     /** The reiryoku a Cero costs when it fires: a share of the maximum, but never less than the least cost. */

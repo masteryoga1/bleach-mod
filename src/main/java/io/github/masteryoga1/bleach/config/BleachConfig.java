@@ -431,6 +431,22 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue ADJUCHAS_CERO_MAX_BLOCKS;
     public static final ModConfigSpec.IntValue ADJUCHAS_CERO_COOLDOWN_SECONDS;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_CERO_KNOCKBACK;
+    public static final ModConfigSpec.BooleanValue NEGACION_MOB_RESCUE;
+    public static final ModConfigSpec.IntValue NEGACION_MOB_INTERVAL_SECONDS;
+    public static final ModConfigSpec.DoubleValue NEGACION_MOB_CHANCE;
+    public static final ModConfigSpec.IntValue NEGACION_MOB_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue NEGACION_MOB_REACH;
+    public static final ModConfigSpec.DoubleValue NEGACION_RESCUE_HEALTH;
+    public static final ModConfigSpec.BooleanValue NEGACION_PLAYER_CAST;
+    public static final ModConfigSpec.DoubleValue NEGACION_PLAYER_RANGE;
+    public static final ModConfigSpec.DoubleValue NEGACION_PLAYER_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue NEGACION_PLAYER_MIN_COST;
+    public static final ModConfigSpec.IntValue NEGACION_PLAYER_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue NEGACION_OFFER_SECONDS;
+    public static final ModConfigSpec.IntValue NEGACION_HOLD_SECONDS;
+    public static final ModConfigSpec.DoubleValue NEGACION_RISE_SPEED;
+    public static final ModConfigSpec.BooleanValue NEGACION_PLAYER_TO_RESPAWN;
+    public static final ModConfigSpec.IntValue NEGACION_FALL_GUARD_SECONDS;
 
     /** The numbers of one Menos form a Hollow player can rise to, each in its own section of {@code [hollow_evolution]}. */
     public record MenosForm(ModConfigSpec.DoubleValue scale, ModConfigSpec.DoubleValue healthBonus,
@@ -533,6 +549,22 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BALA_RANGE;
     public static final ModConfigSpec.DoubleValue BALA_RADIUS;
     public static final ModConfigSpec.DoubleValue BALA_KNOCKBACK;
+
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_MIN_MAX_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_MAX_DAMAGE;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_CHARGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_RANGE;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_RADIUS;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_BLAST_RADIUS;
+    public static final ModConfigSpec.IntValue GRAN_REY_CERO_MAX_BLOCKS;
+    public static final ModConfigSpec.BooleanValue GRAN_REY_CERO_BREAKS_BLOCKS;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_KNOCKBACK;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_COST_FRACTION;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_MIN_COST;
+    public static final ModConfigSpec.IntValue GRAN_REY_CERO_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_BLOOD_HEALTH;
+    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_MIN_HEALTH_LEFT;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -1849,6 +1881,61 @@ public final class BleachConfig {
                 .comment("Extra knockback along the beam.")
                 .defineInRange("knockback", 0.6, 0.0, 5.0);
         builder.pop();
+
+        builder.push("negacion");
+        NEGACION_MOB_RESCUE = builder
+                .comment("Whether a Gillian calls down Negación, the pillar of light, on a beaten Hollow ally to lift it"
+                        + " away.")
+                .define("mob_rescue", true);
+        NEGACION_MOB_INTERVAL_SECONDS = builder
+                .comment("Seconds between a Gillian's looks for an ally to rescue.")
+                .defineInRange("mob_interval_seconds", 2, 1, 60);
+        NEGACION_MOB_CHANCE = builder
+                .comment("Chance that a look which finds a beaten ally calls the light down: 0.5 is half the time.")
+                .defineInRange("mob_chance", 0.5, 0.0, 1.0);
+        NEGACION_MOB_COOLDOWN_SECONDS = builder
+                .comment("Seconds before the same Gillian calls down Negación again.")
+                .defineInRange("mob_cooldown_seconds", 20, 1, 600);
+        NEGACION_MOB_REACH = builder
+                .comment("Blocks across that a Gillian looks for an ally to rescue (it always looks 32 up or down).")
+                .defineInRange("mob_reach", 24.0, 4.0, 64.0);
+        NEGACION_RESCUE_HEALTH = builder
+                .comment("Share of its maximum health at or below which a Hollow ally, just hurt by something that is not"
+                        + " a Hollow, is rescued.")
+                .defineInRange("rescue_health", 0.25, 0.01, 1.0);
+        NEGACION_PLAYER_CAST = builder
+                .comment("Whether a Gillian player can call down Negación on a comrade with the Technique key.")
+                .define("player_cast", true);
+        NEGACION_PLAYER_RANGE = builder
+                .comment("Blocks a Gillian player's aim reaches for the comrade to lift.")
+                .defineInRange("player_range", 32.0, 4.0, 64.0);
+        NEGACION_PLAYER_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku a Gillian player's Negación costs: 0.15 is 60 at 400.")
+                .defineInRange("player_cost_fraction", 0.15, 0.0, 1.0);
+        NEGACION_PLAYER_MIN_COST = builder
+                .comment("Least reiryoku a Gillian player's Negación costs.")
+                .defineInRange("player_min_cost", 10.0, 0.0, 10_000.0);
+        NEGACION_PLAYER_COOLDOWN_SECONDS = builder
+                .comment("Seconds between one Negación of a Gillian player and the next.")
+                .defineInRange("player_cooldown_seconds", 20, 1, 600);
+        NEGACION_OFFER_SECONDS = builder
+                .comment("Seconds a player has to use the light offered to it before it fades. A player is never taken"
+                        + " unwilling.")
+                .defineInRange("offer_seconds", 10, 2, 60);
+        NEGACION_HOLD_SECONDS = builder
+                .comment("Seconds the light rises with what it holds before it carries it off into the Garganta.")
+                .defineInRange("hold_seconds", 5, 1, 30);
+        NEGACION_RISE_SPEED = builder
+                .comment("Blocks a second the light rises; a roof, the build height or unloaded ground stops it sooner.")
+                .defineInRange("rise_speed", 1.6, 0.2, 8.0);
+        NEGACION_PLAYER_TO_RESPAWN = builder
+                .comment("Whether a carried player is set down at its respawn point, when that is in the same world;"
+                        + " otherwise, and when this is off, where the light found it.")
+                .define("player_to_respawn", true);
+        NEGACION_FALL_GUARD_SECONDS = builder
+                .comment("Seconds of Slow Falling a player keeps after leaving the light, so the drop cannot hurt it.")
+                .defineInRange("fall_guard_seconds", 5, 0, 30);
+        builder.pop();
         builder.pop();
 
         builder.push("hollow_evolution");
@@ -2106,6 +2193,61 @@ public final class BleachConfig {
                 .comment("How hard a Bala pushes its target along the shot, on top of the blow's own: 0.8 is as hard as a"
                         + " Vasto Lorde-born Arrancar's Cero.")
                 .defineInRange("knockback", 0.8, 0.0, 5.0);
+        builder.pop();
+
+        builder.push("gran_rey_cero");
+        GRAN_REY_CERO_MIN_MAX_REIRYOKU = builder
+                .comment("Maximum reiryoku an Arrancar needs before it can fire a Gran Rey Cero (Sneak and the Cero key), a"
+                        + " stand-in until Arrancar ranks arrive.")
+                .defineInRange("min_max_reiryoku", 1500.0, 0.0, 10_000.0);
+        GRAN_REY_CERO_DAMAGE_MULTIPLIER = builder
+                .comment("How many times the Arrancar's own Cero a Gran Rey Cero deals, before the release.")
+                .defineInRange("damage_multiplier", 3.0, 1.0, 10.0);
+        GRAN_REY_CERO_MAX_DAMAGE = builder
+                .comment("Most damage a sealed Gran Rey Cero deals. Resurrección multiplies after the cap, as for the Cero,"
+                        + " but never past 1000.")
+                .defineInRange("max_damage", 240.0, 1.0, 1000.0);
+        GRAN_REY_CERO_CHARGE_MULTIPLIER = builder
+                .comment("What the gather time of the Cero of the form the Arrancar rose from is multiplied by. A Gran Rey"
+                        + " Cero fires itself when full; let go sooner, it scatters, the blood spent.")
+                .defineInRange("charge_multiplier", 1.0, 0.25, 4.0);
+        GRAN_REY_CERO_RANGE = builder
+                .comment("Blocks a Gran Rey Cero reaches.")
+                .defineInRange("range", 64.0, 8.0, 128.0);
+        GRAN_REY_CERO_RADIUS = builder
+                .comment("Half-width of the beam in blocks.")
+                .defineInRange("radius", 2.0, 0.5, 8.0);
+        GRAN_REY_CERO_BLAST_RADIUS = builder
+                .comment("Radius of the blast where it strikes a block.")
+                .defineInRange("blast_radius", 4.0, 0.0, 16.0);
+        GRAN_REY_CERO_MAX_BLOCKS = builder
+                .comment("Most blocks one blast can break.")
+                .defineInRange("max_blocks", 48, 0, 256);
+        GRAN_REY_CERO_BREAKS_BLOCKS = builder
+                .comment("Whether a Gran Rey Cero blasts soft blocks where it strikes ([menos] cero_breaks_blocks, mob"
+                        + " griefing and the right to build there must allow it too).")
+                .define("breaks_blocks", true);
+        GRAN_REY_CERO_KNOCKBACK = builder
+                .comment("Extra knockback along the beam: a Vasto Lorde-born Arrancar's Cero has 0.8.")
+                .defineInRange("knockback", 1.6, 0.0, 10.0);
+        GRAN_REY_CERO_COST_FRACTION = builder
+                .comment("Share of maximum reiryoku a Gran Rey Cero costs when it fires: 0.4 is 640 at 1600. One that"
+                        + " scatters costs none.")
+                .defineInRange("cost_fraction", 0.4, 0.0, 1.0);
+        GRAN_REY_CERO_MIN_COST = builder
+                .comment("Least reiryoku a Gran Rey Cero costs.")
+                .defineInRange("min_cost", 50.0, 0.0, 10_000.0);
+        GRAN_REY_CERO_COOLDOWN_SECONDS = builder
+                .comment("Seconds after a Gran Rey Cero fires before the next. Logging out does not skip it.")
+                .defineInRange("cooldown_seconds", 60, 1, 3600);
+        GRAN_REY_CERO_BLOOD_HEALTH = builder
+                .comment("Health the Arrancar's own blood costs when the gather starts (4 is 2 hearts). Nothing softens it,"
+                        + " and creative pays none.")
+                .defineInRange("blood_health", 4.0, 0.0, 20.0);
+        GRAN_REY_CERO_MIN_HEALTH_LEFT = builder
+                .comment("Health that must remain after the blood is spilt, or the Gran Rey Cero is refused, so it can"
+                        + " never kill.")
+                .defineInRange("min_health_left", 4.0, 1.0, 40.0);
         builder.pop();
         builder.pop();
 

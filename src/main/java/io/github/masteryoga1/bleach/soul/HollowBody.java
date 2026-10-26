@@ -168,8 +168,8 @@ public final class HollowBody {
      * shed, the hunger drains (or refills on Peaceful), the bands are told, the body regenerates or starves,
      * and a hungry Hollow smells for souls. An Arrancar has its own tick instead (see
      * {@link ArrancarEvents#tick}). Any other soul gets its body back, any Cero it was gathering fizzles and
-     * any tear is let go of. Every soul's place among the Vasto Lorde, and its Arrancar body and blades, are
-     * kept right every second.
+     * any tear is let go of; a Gran Rey Cero fizzles on any soul but an Arrancar. Every soul's place among the
+     * Vasto Lorde, and its Arrancar body and blades, are kept right every second.
      */
     public static void tickBody(Player player, SoulData data, long now) {
         if (player.tickCount % VASTO_NOTE_INTERVAL_TICKS == 0) {
@@ -179,6 +179,11 @@ public final class HollowBody {
         if (ArrancarLogic.isArrancar(data)) {
             ArrancarEvents.tick(player, data, now);
             return;
+        }
+        // Only an Arrancar gathers a Gran Rey Cero: one left on a soul that is no longer one (a Hollow again by
+        // command, too) fizzles.
+        if (GranReyCero.charging(data)) {
+            GranReyCero.cancel(player, data);
         }
         if (!HollowPlayerLogic.isHollow(data)) {
             // A command, a purification or any other road out of the Hollow state lets go of the mask.

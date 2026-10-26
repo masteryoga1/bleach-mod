@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.EnumSet;
@@ -143,11 +144,14 @@ public abstract class Menos extends Hollow implements CeroBeam.Caster {
         return toward.lengthSqr() < 1.0E-6 ? null : toward.normalize();
     }
 
-    /** A charge holds while the Menos stands free: not held, reeling, leaving, dissolving or masking. */
+    /**
+     * A charge holds while the Menos stands free: not held in jaws or in Negación's light, reeling, leaving,
+     * dissolving or masking.
+     */
     @Override
     public boolean keepsCharging() {
         return isAlive() && !isSeized() && !isRetreating() && !isPurifying() && !isDeparting() && !isMaskForming()
-                && level().getGameTime() - lastReelAt >= REEL_TICKS;
+                && level().getGameTime() - lastReelAt >= REEL_TICKS && !Negacion.held(this);
     }
 
     @Override

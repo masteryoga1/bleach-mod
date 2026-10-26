@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:arrancar_arts",
+  "display": {
+    "icon": {
+      "id": "minecraft:end_crystal"
+    },
+    "title": {
+      "translate": "advancements.bleach.gran_rey_cero.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.gran_rey_cero.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "gran_rey_cero": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "gran_rey_cero"
+      }
+    }
+  }
+}

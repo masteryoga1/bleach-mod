@@ -163,6 +163,7 @@ public final class BleachClient {
                         new AdjuchasModel<>(context.bakeLayer(BleachModelLayers.ADJUCHAS)),
                         HollowKind.ADJUCHAS, 90.0F));
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
+        event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
         event.registerEntityRenderer(ModEntities.PLUS.get(), PlusRenderer::new);
         event.registerEntityRenderer(ModEntities.GARGANTA.get(), GargantaRenderer::new);
         event.registerEntityRenderer(ModEntities.GETSUGA_TENSHO.get(), GetsugaTenshoRenderer::new);

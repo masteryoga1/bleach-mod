@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
+import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -65,7 +66,8 @@ import org.joml.Vector3f;
  * mask, one much like the next. It lumbers straight at its prey and swats it, for it is far too big to
  * find a path (see {@link Navigation}); boxed in, it tramples through leaves, then gives up for a while
  * and gathers a Cero instead. Every few seconds it reaches for the nearest lesser Hollow and draws it up
- * to its mouth to eat, as one did at the cracked sky over Karakura.
+ * to its mouth to eat, as one did at the cracked sky over Karakura. A beaten ally it sees it may rescue
+ * instead, calling down Negación's light to lift it away into a Garganta ({@link #tryRescue}).
  *
  * <p>It comes down from the sky through a tear of its own or a bait's cracked sky ({@link #emerge}),
  * sinking slowly to land heavily. Badly hurt, frightened by stronger reiatsu, past its lifetime or left
@@ -112,6 +114,8 @@ public class Gillian extends Menos {
     public static final double FEED_SWALLOW_DISTANCE = 2.0;
     /** A Hollow pulled this much further than the reach is let go. */
     public static final double FEED_LET_GO_SLACK = 6.0;
+    /** How far above or below itself a Gillian looks for an ally to rescue. */
+    public static final double RESCUE_VERTICAL_REACH = 32.0;
     /** The tear it pulls itself up into: its size and how far above its feet it opens. */
     public static final float RETREAT_TEAR_SIZE = 2.5F;
     public static final double RETREAT_TEAR_RISE = 10.0;
@@ -157,6 +161,8 @@ public class Gillian extends Menos {
     private Hollow feedingOn;
     private long feedStart = NEVER;
     private long restUntil = NEVER;        // read by StrideGoal
+    private long nextRescueAt = NEVER;
+    private long rescueReadyAt = NEVER;
 
     public Gillian(EntityType<? extends Gillian> type, Level level) {
         super(type, level);
@@ -436,7 +442,7 @@ public class Gillian extends Menos {
         tickParts();
     }
 
-    /** Driven off by its wounds or by stronger reiatsu; otherwise it feeds. */
+    /** Driven off by its wounds or by stronger reiatsu; otherwise it looks for an ally to rescue, and feeds. */
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
@@ -447,6 +453,9 @@ public class Gillian extends Menos {
         if (nextFeedAt == NEVER) {
             nextFeedAt = now + FEED_FIRST_DELAY_TICKS;
         }
+        if (nextRescueAt == NEVER) {
+            nextRescueAt = now + rescueInterval();
+        }
         if (getHealth() <= BleachConfig.get(BleachConfig.GILLIAN_RETREAT_HEALTH) * getMaxHealth()
                 || ReiatsuFleeGoal.isFrightened(this)) {
             beginRetreat(true);
@@ -454,7 +463,58 @@ public class Gillian extends Menos {
                 return;
             }
         }
+        if (feedingOn == null && now >= nextRescueAt) {
+            nextRescueAt = now + rescueInterval();
+            tryRescue(level, now);
+        }
         tickFeeding(level, now);
+    }
+
+    /**
+     * One look for an ally to rescue: if the switch is on, this Gillian's wait is over and an ally needs it,
+     * the chance decides, and then Negación's light comes down on that ally. Whether one came down.
+     */
+    public boolean tryRescue(ServerLevel level, long now) {
+        if (!BleachConfig.get(BleachConfig.NEGACION_MOB_RESCUE) || now < rescueReadyAt) {
+            return false;
+        }
+        Hollow ally = rescueTarget();
+        if (ally == null || random.nextDouble() >= BleachConfig.get(BleachConfig.NEGACION_MOB_CHANCE)) {
+            return false;
+        }
+        if (Negacion.lift(level, ally) == null) {
+            return false;
+        }
+        rescueReadyAt = now + BleachConfig.get(BleachConfig.NEGACION_MOB_COOLDOWN_SECONDS) * 20L;
+        getLookControl().setLookAt(ally, 30.0F, 30.0F);
+        return true;
+    }
+
+    /**
+     * The ally this Gillian would lift away now, ignoring the chance and the wait: the nearest Hollow in
+     * reach and in sight, other than a Gillian, that the light may hold, that is beaten down to the rescue
+     * share of its health, and that was last hurt by something other than a Hollow.
+     */
+    @Nullable
+    public Hollow rescueTarget() {
+        double reach = BleachConfig.get(BleachConfig.NEGACION_MOB_REACH);
+        double beaten = BleachConfig.get(BleachConfig.NEGACION_RESCUE_HEALTH);
+        List<Hollow> allies = new ArrayList<>(level().getEntitiesOfClass(Hollow.class,
+                getBoundingBox().inflate(reach, RESCUE_VERTICAL_REACH, reach),
+                hollow -> hollow != this && !(hollow instanceof Gillian) && Negacion.mayHold(hollow)
+                        && hollow.getHealth() <= beaten * hollow.getMaxHealth()
+                        && hollow.getLastHurtByMob() != null && !(hollow.getLastHurtByMob() instanceof Hollow)));
+        allies.sort(Comparator.comparingDouble(this::distanceToSqr));
+        for (Hollow ally : allies) {
+            if (hasLineOfSight(ally)) {
+                return ally;
+            }
+        }
+        return null;
+    }
+
+    private static long rescueInterval() {
+        return BleachConfig.get(BleachConfig.NEGACION_MOB_INTERVAL_SECONDS) * 20L;
     }
 
     /** Pulling back into the sky, it goes after no one. */
@@ -610,8 +670,8 @@ public class Gillian extends Menos {
     }
 
     /**
-     * The nearest lesser Hollow within reach across the ground and in sight: no Menos, none held,
-     * dissolving or leaving, and none stronger than this Gillian. One a bait holds will do.
+     * The nearest lesser Hollow within reach across the ground and in sight: no Menos, none held (in jaws or
+     * in Negación's light), dissolving or leaving, and none stronger than this Gillian. One a bait holds will do.
      */
     @Nullable
     private Hollow nearestMeal() {
@@ -621,7 +681,7 @@ public class Gillian extends Menos {
                 getX() + reach, getY() + FEED_VERTICAL_REACH, getZ() + reach);
         List<Hollow> meals = new ArrayList<>(level().getEntitiesOfClass(Hollow.class, box,
                 hollow -> !(hollow instanceof Menos) && hollow.isAlive() && !hollow.isSeized() && !hollow.isPurifying()
-                        && !hollow.isDeparting() && horizontalDistanceSqr(hollow) <= reach * reach
+                        && !hollow.isDeparting() && !Negacion.held(hollow) && horizontalDistanceSqr(hollow) <= reach * reach
                         && SoulLogic.reiatsu(hollow) <= own));
         meals.sort(Comparator.comparingDouble(this::distanceToSqr));
         for (Hollow meal : meals) {

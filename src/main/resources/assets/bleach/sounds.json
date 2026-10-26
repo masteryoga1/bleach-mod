@@ -341,6 +341,31 @@
       }
     ]
   },
+  "entity.gran_rey_cero.fire": {
+    "subtitle": "subtitles.bleach.entity.gran_rey_cero.fire",
+    "sounds": [
+      {
+        "name": "minecraft:mob/warden/sonic_boom1",
+        "pitch": 0.55,
+        "attenuation_distance": 128
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_boom2",
+        "pitch": 0.55,
+        "attenuation_distance": 128
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_boom3",
+        "pitch": 0.55,
+        "attenuation_distance": 128
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_boom4",
+        "pitch": 0.55,
+        "attenuation_distance": 128
+      }
+    ]
+  },
   "entity.garganta.open": {
     "subtitle": "subtitles.bleach.entity.garganta.open",
     "sounds": [
@@ -357,6 +382,26 @@
       {
         "name": "minecraft:random/glass3",
         "pitch": 0.5,
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "entity.negacion.descend": {
+    "subtitle": "subtitles.bleach.entity.negacion.descend",
+    "sounds": [
+      {
+        "name": "minecraft:block/beacon/activate",
+        "pitch": 0.6,
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "entity.negacion.depart": {
+    "subtitle": "subtitles.bleach.entity.negacion.depart",
+    "sounds": [
+      {
+        "name": "minecraft:block/beacon/deactivate",
+        "pitch": 0.6,
         "attenuation_distance": 64
       }
     ]
@@ -647,6 +692,31 @@
         "name": "minecraft:random/explode4",
         "pitch": 1.9,
         "volume": 0.4
+      }
+    ]
+  },
+  "player.gran_rey_cero.cut": {
+    "subtitle": "subtitles.bleach.player.gran_rey_cero.cut",
+    "sounds": [
+      {
+        "name": "minecraft:enchant/thorns/hit1",
+        "pitch": 1.4,
+        "volume": 0.7
+      },
+      {
+        "name": "minecraft:enchant/thorns/hit2",
+        "pitch": 1.4,
+        "volume": 0.7
+      },
+      {
+        "name": "minecraft:enchant/thorns/hit3",
+        "pitch": 1.4,
+        "volume": 0.7
+      },
+      {
+        "name": "minecraft:enchant/thorns/hit4",
+        "pitch": 1.4,
+        "volume": 0.7
       }
     ]
   },

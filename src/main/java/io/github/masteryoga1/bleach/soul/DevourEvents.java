@@ -64,9 +64,9 @@ public final class DevourEvents {
      * The Devour and Cero keys, from {@link io.github.masteryoga1.bleach.network.HollowKeyPayload} on the
      * server thread. A press of the Devour key starts a hold (a Hollow) or the gnawing (a Plus); letting go
      * ends either; sneaking with it turns the Hollow sight on or off. The target id is only the client's
-     * hint. The Cero key starts, fires or lets fizzle a Menos's or an Arrancar's Cero ({@link HollowCero}); an
-     * Arrancar no longer devours: its Devour press and release start and end a Pesquisa focus
-     * ({@link Pesquisa}), and its sight key does nothing.
+     * hint. The Cero key starts, fires or lets fizzle a Menos's or an Arrancar's Cero ({@link HollowCero}), and
+     * pressed by a sneaking Arrancar, its Gran Rey Cero ({@link GranReyCero}); an Arrancar no longer devours: its
+     * Devour press and release start and end a Pesquisa focus ({@link Pesquisa}), and its sight key does nothing.
      */
     public static void onKey(ServerPlayer player, HollowKey key, int targetId) {
         if (!SoulLogic.hasSoul(player)) {
@@ -112,15 +112,42 @@ public final class DevourEvents {
             }
             case CERO -> {
                 if (player.isAlive() && !player.isSpectator() && HollowPlayerLogic.isHollowOrArrancar(data)) {
-                    HollowCero.Refusal refusal = HollowCero.start(player, data, now);
-                    if (refusal != null) {
-                        player.displayClientMessage(Component.translatable(refusal.messageKey())
-                                .withStyle(ChatFormatting.GRAY), true);
+                    startCero(player, data, now);
+                }
+            }
+            // The release and the cancel go to whichever beam gathers: the key is the same.
+            case CERO_RELEASE -> {
+                if (GranReyCero.charging(data)) {
+                    GranReyCero.release(player, data, now);
+                } else {
+                    HollowCero.release(player, data, now);
+                }
+            }
+            case CERO_CANCEL -> {
+                HollowCero.cancel(player, data);
+                GranReyCero.cancel(player, data);
+            }
+            case GRAN_REY_CERO -> {
+                if (player.isAlive() && !player.isSpectator() && HollowPlayerLogic.isHollowOrArrancar(data)) {
+                    if (!ArrancarLogic.isArrancar(data)) {
+                        // A Hollow sneaking with the Cero key still gathers a Cero.
+                        startCero(player, data, now);
+                    } else {
+                        GranReyCero.Refusal refusal = GranReyCero.start(player, data, now);
+                        if (refusal != null) {
+                            player.displayClientMessage(GranReyCero.message(refusal, data, now), true);
+                        }
                     }
                 }
             }
-            case CERO_RELEASE -> HollowCero.release(player, data, now);
-            case CERO_CANCEL -> HollowCero.cancel(player, data);
+        }
+    }
+
+    /** Starts a Cero for a Hollow or an Arrancar, telling a refusal on the action bar. */
+    private static void startCero(ServerPlayer player, SoulData data, long now) {
+        HollowCero.Refusal refusal = HollowCero.start(player, data, now);
+        if (refusal != null) {
+            player.displayClientMessage(Component.translatable(refusal.messageKey()).withStyle(ChatFormatting.GRAY), true);
         }
     }
 

@@ -49,6 +49,7 @@ public final class HollowEvents {
         bus.addListener(HollowEvents::onDamageTaken);
         bus.addListener(HollowEvents::onDeath);
         DevourEvents.register(bus);
+        Negacion.register(bus);
     }
 
     /**

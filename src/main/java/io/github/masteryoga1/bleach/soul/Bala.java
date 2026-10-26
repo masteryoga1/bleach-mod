@@ -28,7 +28,7 @@ import net.minecraft.world.phys.Vec3;
  * ({@link CeroBeam#fire} with {@link #KIND}), so it keeps every rule a Cero keeps on PvP, teams, pets and
  * shields; it bursts on nothing, breaks no blocks and knocks back hard. Its damage follows the form the
  * Arrancar rose from and its maximum reiryoku, up to a cap, and a quarter more in Resurrección. It cannot be
- * fired while a Cero gathers, as the hand is busy with it.
+ * fired while a Cero or a Gran Rey Cero gathers, as the hand is busy with it.
  *
  * <p>The keys reach here through {@link ArrancarEvents#onKey}, and {@link ArrancarEvents#tick} keeps a held
  * key firing. The cooldown and the hold are transients in the soul, so nothing is saved. Everything takes a
@@ -142,19 +142,20 @@ public final class Bala {
 
     /**
      * Fires a Bala where the Arrancar looks, from just ahead of its eyes, the first check that fails winning:
-     * one that cannot fire at all (not an Arrancar, dead, a spectator or not in a server world), the cooldown,
-     * a Cero gathering, and enough reiryoku. It is paid for and the cooldown starts; the shot strikes, its trace
-     * is drawn, the main hand swings for the thrown fist and the crack is heard at the muzzle.
+     * one that cannot fire at all (not an Arrancar, dead, a spectator, held in a Negación light or not in a
+     * server world), the cooldown, a Cero or a Gran Rey Cero gathering, and enough reiryoku. It is paid for and
+     * the cooldown starts; the shot strikes, its trace is drawn, the main hand swings for the thrown fist and the
+     * crack is heard at the muzzle.
      */
     public static Result fire(Player player, SoulData data, long now) {
-        if (!ArrancarLogic.isArrancar(data) || !player.isAlive() || player.isSpectator()
+        if (!ArrancarLogic.isArrancar(data) || !player.isAlive() || player.isSpectator() || Negacion.held(player)
                 || !(player.level() instanceof ServerLevel level)) {
             return Result.UNABLE;
         }
         if (now - data.lastBalaAt < cooldownTicks()) {
             return Result.COOLDOWN;
         }
-        if (HollowCero.charging(data)) {
+        if (HollowCero.charging(data) || GranReyCero.charging(data)) {
             return Result.GATHERING;
         }
         float cost = cost(data);

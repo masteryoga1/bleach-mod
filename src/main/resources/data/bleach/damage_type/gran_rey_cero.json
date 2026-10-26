@@ -1,0 +1,5 @@
+{
+  "message_id": "bleach.gran_rey_cero",
+  "exhaustion": 0.1,
+  "scaling": "when_caused_by_living_non_player"
+}
