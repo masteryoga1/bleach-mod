@@ -551,6 +551,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         setLeader(null);
         clearRestriction();
         endYield();
+        // Its time is up now rather than never, so if it is saved before the tear takes it, it leaves again on reload.
+        setLeaveAt(level().getGameTime());
         depart();
     }
 
@@ -1243,7 +1245,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
     /** Only those who can see it are kept from sleeping by one. */
     @Override
     public boolean isPreventingPlayerRest(Player player) {
-        return SoulLogic.seesSpirits(player);
+        // A Fracción is no threat to rest: it serves an Espada and hunts nothing of its own.
+        return !pledged && SoulLogic.seesSpirits(player);
     }
 
     /** Every sound, footsteps included, goes only to those who can hear spirits. Nothing is played on the client. */

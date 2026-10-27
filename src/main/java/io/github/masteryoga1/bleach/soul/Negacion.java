@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
@@ -20,6 +21,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.entity.projectile.ThrownEnderpearl;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -28,6 +30,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.entity.PartEntity;
+import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -99,6 +102,7 @@ public final class Negacion {
         bus.addListener(Negacion::onEntityInteract);
         bus.addListener(Negacion::onEntityInteractAt);
         bus.addListener(Negacion::onBreakBlock);
+        bus.addListener(Negacion::onPearlLands);
         bus.addListener(Negacion::onLoggedOut);
         bus.addListener(Negacion::onChangedDimension);
     }
@@ -334,6 +338,19 @@ public final class Negacion {
         }
         if (held(event.getEntity()) || held(source.getEntity()) || held(source.getDirectEntity())) {
             event.setCanceled(true);
+        }
+    }
+
+    /**
+     * An ender pearl thrown before a Caja closed is lost when it lands, rather than pulling its thrower out of the
+     * Caja (a landing pearl gets its owner off any mount before it teleports). Negación's light, which its rider
+     * may leave at will, keeps the vanilla landing.
+     */
+    private static void onPearlLands(ProjectileImpactEvent event) {
+        if (event.getProjectile() instanceof ThrownEnderpearl pearl && !pearl.level().isClientSide()
+                && CajaNegacion.shutAway(pearl.getOwner())) {
+            event.setCanceled(true);
+            pearl.discard();
         }
     }
 

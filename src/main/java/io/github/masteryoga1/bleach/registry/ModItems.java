@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
@@ -172,6 +173,12 @@ public final class ModItems {
                 @Override
                 public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity target,
                                                               InteractionHand hand) {
+                    // An empty main hand already gave a pledged Fracción the click (its status or dismiss); the
+                    // client cannot tell it is pledged, so it sends the off hand's turn too, which must not close on it.
+                    if (hand == InteractionHand.OFF_HAND && player.getMainHandItem().isEmpty()
+                            && target instanceof ArrancarNpc npc && npc.isPledged()) {
+                        return InteractionResult.PASS;
+                    }
                     return CajaNegacion.useCube(player, target);
                 }
 

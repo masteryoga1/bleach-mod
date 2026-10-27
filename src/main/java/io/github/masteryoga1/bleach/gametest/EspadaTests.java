@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -44,12 +45,15 @@ import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ThrownEnderpearl;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -402,6 +406,13 @@ public final class EspadaTests {
             // What ArrancarNpc.isImmobile reads, so it stands frozen.
             helper.assertTrue(Negacion.holderOf(npc) == caja[0], "the Número is held by " + Negacion.holderOf(npc));
             helper.assertTrue(caja[0].phase() == CajaNegacion.Phase.CLOSING, "a new Caja is " + caja[0].phase());
+            // A pearl thrown before the Caja closed is lost on landing, rather than carrying its thrower out.
+            BlockHitResult ground = BlockHitResult.miss(stood, Direction.UP, npc.blockPosition());
+            ThrownEnderpearl pearl = new ThrownEnderpearl(level, npc);
+            helper.assertTrue(EventHooks.onProjectileImpact(pearl, ground) && pearl.isRemoved(),
+                    "a landing pearl would take the Número out of the Caja");
+            ThrownEnderpearl free = new ThrownEnderpearl(level, spider);
+            helper.assertFalse(EventHooks.onProjectileImpact(free, ground), "a free thrower's pearl was lost on landing");
 
             helper.assertTrue(caja[0].landsHere(npc), "the Número would not be set down where it was taken");
             ServerLevel nether = server.getLevel(Level.NETHER);
@@ -660,6 +671,8 @@ public final class EspadaTests {
         try {
             pledge(helper, fraccion, espada);
             follower.setLeader(privaron.getUUID());
+            // With PvP on, nothing but the no-prey rule keeps a Fracción off a player its Espada may harm.
+            server.setPvpAllowed(true);
 
             // On Peaceful no mob may attack a player at all.
             boolean peaceful = HollowPlayerTests.peaceful(helper);
@@ -667,6 +680,15 @@ public final class EspadaTests {
             helper.assertFalse(fraccion.canAttack(human), "a Fracción hunts an aware Human of its own accord");
             helper.assertFalse(CeroBeam.mayStrike(fraccion, human), "a Fracción's Cero may strike an aware Human");
             helper.assertFalse(fraccion.canAttack(espada), "a Fracción may attack its Espada");
+            helper.assertTrue(wild.isPreventingPlayerRest(espada), "a wild Número lets an Arrancar sleep beside it");
+            helper.assertFalse(fraccion.isPreventingPlayerRest(espada), "a Fracción keeps its own Espada from sleeping");
+            // An empty main hand gives a Fracción the click; the cube in the off hand must not close on it as well.
+            ItemStack cube = new ItemStack(ModItems.CAJA_NEGACION.get());
+            espada.setItemInHand(InteractionHand.OFF_HAND, cube);
+            InteractionResult offHand = cube.interactLivingEntity(espada, fraccion, InteractionHand.OFF_HAND);
+            espada.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
+            helper.assertTrue(offHand == InteractionResult.PASS && !Negacion.held(fraccion),
+                    "the off-hand cube closed on a Fracción its Espada clicked with an empty hand: " + offHand);
 
             helper.assertFalse(fraccion.canAttack(spider), "a Fracción may attack a Spider Hollow no one struck");
             espada.setLastHurtMob(spider);

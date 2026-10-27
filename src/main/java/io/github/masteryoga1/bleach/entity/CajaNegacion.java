@@ -494,6 +494,8 @@ public class CajaNegacion extends Entity implements Negacion.HoldingVehicle {
         }
         lastSweepAt = tickCount;
         dropFights(rider);
+        // A use already under way (a chorus fruit being eaten, a bow drawn) would finish inside and carry it out.
+        rider.stopUsingItem();
         if (rider instanceof Player player) {
             MutableComponent told = userName != null
                     ? Component.translatable(SHUT_IN, userName, holdSeconds())
