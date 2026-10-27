@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:gillian",
+  "display": {
+    "icon": {
+      "id": "minecraft:beacon"
+    },
+    "title": {
+      "translate": "advancements.bleach.negacion.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.negacion.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "negacion": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "negacion"
+      }
+    }
+  }
+}

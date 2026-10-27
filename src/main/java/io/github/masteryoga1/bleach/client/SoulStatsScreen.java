@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.BaitRecord;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
+import io.github.masteryoga1.bleach.soul.GranReyCero;
 import io.github.masteryoga1.bleach.soul.Hierro;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
@@ -101,17 +102,18 @@ public final class SoulStatsScreen extends Screen {
         }
         SoulData data = player.getData(SoulAttachments.SOUL);
         List<FormattedCharSequence> next = font.split(nextStep(player, data), PANEL_WIDTH);
-        // Everything stays above the Done button: when the next step would reach it, the rows close up;
-        // when even the closed-up rows would, they close up to a line of text each and start higher; when
-        // those still would (the most a soul shows, such as a Hollow that was a Quincy), the two section
+        // Everything stays above the Done button: when the rows and the next step would reach it, the rows
+        // close up; when they still would, the rows close up to a line of text each and start higher; when
+        // they still would (the most a soul shows, such as a Hollow that was a Quincy), the two section
         // headings go; and what still does not fit of the next step is left out.
         int bottom = height - DONE_TOP - 4;
+        int below = next.size() * font.lineHeight;
         int y;
-        if (drawRows(null, player, data, TOP, LINE, GAP, true) + next.size() * font.lineHeight <= bottom) {
+        if (drawRows(null, player, data, TOP, LINE, GAP, true) + below <= bottom) {
             y = drawRows(graphics, player, data, TOP, LINE, GAP, true);
-        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0, true) <= bottom) {
+        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0, true) + below <= bottom) {
             y = drawRows(graphics, player, data, TOP, COMPACT_LINE, 0, true);
-        } else if (drawRows(null, player, data, TIGHT_TOP, TIGHT_LINE, 0, true) <= bottom) {
+        } else if (drawRows(null, player, data, TIGHT_TOP, TIGHT_LINE, 0, true) + below <= bottom) {
             y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0, true);
         } else {
             y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0, false);
@@ -434,10 +436,12 @@ public final class SoulStatsScreen extends Screen {
      * direction too, and a Plus who could gnaw its own chain is told it can, with the Devour key. A
      * Hollow is told how to feed with that key and, once it has, how many souls are within it. A Menos
      * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
-     * how long it may go without a Hollow before it sinks back, wherever the server lets it. An Adjuchas
-     * or Vasto Lorde is told it can tear off its mask, where the server lets it; an Arrancar, the name of
-     * its blade and the keys that release and seal it, the Cero key, the keys for Sonído, Bala and Pesquisa,
-     * and how much of a blow from a soul as strong as it is its Hierro turns aside, released or not as it is now.
+     * how long it may go without a Hollow before it sinks back, wherever the server lets it, and a Gillian how
+     * to call down Negación, where the server lets it. An Adjuchas or Vasto Lorde is told it can tear off its
+     * mask, where the server lets it; an Arrancar, the name of its blade and the keys that release and seal it,
+     * the Cero key, the keys for Sonído, Bala and Pesquisa, how much of a blow from a soul as strong as it is its
+     * Hierro turns aside, released or not as it is now, and what a Gran Rey Cero costs or how much maximum
+     * reiryoku it still needs.
      */
     private static Component nextStep(Player player, SoulData data) {
         String key = ShinigamiLogic.nextStepKey(data, player.level().getGameTime());
@@ -465,7 +469,8 @@ public final class SoulStatsScreen extends Screen {
                     .append(" ").append(Component.translatable("screen.bleach.soul.next.arrancar.arts",
                             BleachClient.FLASH_STEP_KEY.getTranslatedKeyMessage(),
                             ZanpakutoKeys.TECHNIQUE.getTranslatedKeyMessage(), devour,
-                            Math.round(Hierro.share(data, released) * 100.0F)));
+                            Math.round(Hierro.share(data, released) * 100.0F)))
+                    .append(" ").append(granReyCero(data));
         }
         if (!key.equals("plus")) {
             return Component.translatable("screen.bleach.soul.next." + key);
@@ -490,8 +495,9 @@ public final class SoulStatsScreen extends Screen {
 
     /**
      * The next step of a Menos, by its step key, or null for any other key. The counts are those the server
-     * last sent, read against the server's own settings, as the HUD reads them. Each Adjuchas step ends with
-     * the minutes left before it sinks back, unless the server has regression off.
+     * last sent, read against the server's own settings, as the HUD reads them. Each Gillian step ends with
+     * how to call down Negación, unless the server has it off for players, and each Adjuchas step with the
+     * minutes left before it sinks back, unless the server has regression off.
      */
     @Nullable
     private static Component menosStep(String key, SoulData data, Component devour) {
@@ -512,11 +518,30 @@ public final class SoulStatsScreen extends Screen {
             case "hollow.vasto_lorde" -> Component.translatable("screen.bleach.soul.next.hollow.vasto_lorde", cero);
             default -> null;
         };
+        if (step != null && key.startsWith("hollow.gillian") && BleachConfig.get(BleachConfig.NEGACION_PLAYER_CAST)) {
+            step = step.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.hollow.gillian.negacion",
+                    ZanpakutoKeys.TECHNIQUE.getTranslatedKeyMessage()));
+        }
         if (step == null || !key.startsWith("hollow.adjuchas") || regression == HollowTier.Regression.OFF) {
             return step;
         }
         return step.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.hollow.adjuchas.clock",
                 MenosEvolution.minutesLeft(data)));
+    }
+
+    /**
+     * An Arrancar's Gran Rey Cero: how to fire it and what it costs (its blood in hearts, its reiryoku and the
+     * wait after it), or, until it is strong enough, the maximum reiryoku it needs and has. Both read only the
+     * synced soul and the server's settings, which this client has.
+     */
+    private static Component granReyCero(SoulData data) {
+        if (GranReyCero.eligible(data)) {
+            return Component.translatable("screen.bleach.soul.next.arrancar.gran_rey_cero",
+                    HollowKeys.CERO.getTranslatedKeyMessage(), GranReyCero.bloodHearts(), Math.round(GranReyCero.cost(data)),
+                    BleachConfig.get(BleachConfig.GRAN_REY_CERO_COOLDOWN_SECONDS));
+        }
+        return Component.translatable("screen.bleach.soul.next.arrancar.gran_rey_cero.locked",
+                Math.round(GranReyCero.requiredMaxReiryoku()), Math.round(data.maxReiryoku()));
     }
 
     @Override

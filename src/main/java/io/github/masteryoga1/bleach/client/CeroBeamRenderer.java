@@ -185,10 +185,10 @@ public final class CeroBeamRenderer extends EntityRenderer<CeroBeam> {
     /**
      * A square tube of this half-width from 0 to {@code length} along the pose's +y, its texture wrapped
      * once round each side and repeating along it once every width, starting at {@code scroll}. Its ends
-     * are open: the flares cover them.
+     * are open: a Cero's flares cover them. Negación's column is drawn with it too (see NegacionLightRenderer).
      */
-    private static void tube(VertexConsumer consumer, PoseStack.Pose pose, PoseStack.Pose normal, float length,
-                             float halfWidth, float scroll, int rgb, float alpha) {
+    static void tube(VertexConsumer consumer, PoseStack.Pose pose, PoseStack.Pose normal, float length,
+                     float halfWidth, float scroll, int rgb, float alpha) {
         float v1 = scroll + length / (2.0F * halfWidth);
         // The corners in turn round the beam; each side runs from one to the next.
         float[] xs = {-halfWidth, halfWidth, halfWidth, -halfWidth};

@@ -36,8 +36,9 @@ import org.joml.Vector3f;
  * blade kept right. An Adjuchas or Vasto Lorde presses Release Zanpakutō twice to begin, holds still while it
  * tears, and Seal lets go; when the channel is done it pays half its maximum reiryoku and the mask comes away
  * or it fails, at a cost (see {@link ArrancarLogic#tearChance}). An Arrancar's Release and Seal call out and
- * seal its Resurrección instead ({@link ResurreccionEvents}), and its Technique key fires a {@link Bala}. The
- * rules and numbers are in {@link ArrancarLogic}.
+ * seal its Resurrección instead ({@link ResurreccionEvents}), and its Technique key fires a {@link Bala}; a
+ * Hollow's Technique key calls down {@link Negacion} as a Gillian. The rules and numbers are in
+ * {@link ArrancarLogic}.
  *
  * <p>It registers no listener: {@link HollowBody#tickBody} drives the tear, the Arrancar's own tick and the
  * check every second, and death, logging out and cloning belong to {@link ResurreccionEvents}. The tear is
@@ -82,7 +83,7 @@ public final class ArrancarEvents {
      * Release Zanpakutō, Seal and the Technique key, for a Hollow or an Arrancar (from ShikaiEvents). An Arrancar
      * calls out its Resurrección and seals it, told what came of it unless it worked, and fires its Bala on the
      * Technique key for as long as it holds it ({@link Bala}); a Hollow tears at its mask and lets go, and its
-     * Technique key does nothing.
+     * Technique key calls down Negación, which only a Gillian can ({@link Negacion#press}).
      */
     public static void onKey(Player player, SoulData data, ZanpakutoKey key, long now) {
         if (ArrancarLogic.isArrancar(data)) {
@@ -110,6 +111,7 @@ public final class ArrancarEvents {
             switch (key) {
                 case RELEASE -> pressTear(player, data, now);
                 case SEAL -> cancelTear(player, data);
+                case TECHNIQUE_PRESS -> Negacion.press(player, data, now);
                 default -> {
                 }
             }
@@ -327,12 +329,14 @@ public final class ArrancarEvents {
 
     /**
      * An Arrancar's body tick, in place of a Hollow's (see {@link HollowBody#tickBody}): a Hollow body some road
-     * left on comes off, its Cero gathers, a release is kept up or ends (its claws grow there), a Pesquisa focus
-     * holds or sends its pulse out ({@link Pesquisa#tick}), and a held Bala key fires again ({@link Bala#tick}).
+     * left on comes off, its Cero and its Gran Rey Cero gather ({@link GranReyCero#tick}), a release is kept up or
+     * ends (its claws grow there), a Pesquisa focus holds or sends its pulse out ({@link Pesquisa#tick}), and a
+     * held Bala key fires again ({@link Bala#tick}).
      */
     public static void tick(Player player, SoulData data, long now) {
         HollowBody.leaveBodyIfWorn(player, data);
         HollowCero.tick(player, data, now);
+        GranReyCero.tick(player, data, now);
         ResurreccionEvents.upkeep(player, data, now);
         Pesquisa.tick(player, data, now);
         Bala.tick(player, data, now);

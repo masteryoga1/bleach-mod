@@ -150,6 +150,10 @@ public final class Milestones {
     public static final String BALA = "bala";
     /** Sent out a Pesquisa. */
     public static final String PESQUISA = "pesquisa";
+    /** Fired a Gran Rey Cero. Granted when it happens, as is the one below. */
+    public static final String GRAN_REY_CERO = "gran_rey_cero";
+    /** Called down Negación on a comrade, as a Gillian. */
+    public static final String NEGACION = "negacion";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;

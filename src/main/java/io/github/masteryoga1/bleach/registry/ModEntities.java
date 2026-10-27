@@ -15,6 +15,7 @@ import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
@@ -34,7 +35,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Pluses, the
- * Garganta, zanpakutō techniques, the Cero, and the Quincy's arrows, blades and Gintō spells.
+ * Garganta, zanpakutō techniques, the Cero and Negación's light, and the Quincy's arrows, blades and
+ * Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -195,6 +197,21 @@ public final class ModEntities {
                     .clientTrackingRange(8)
                     .updateInterval(Integer.MAX_VALUE)
                     .build(BleachMod.id("cero_beam").toString()));
+
+    /**
+     * Negación's pillar of light, which a Gillian calls down on a comrade, who rides it as it rises. It lasts
+     * seconds and is never saved, so a player saved while riding it loads on foot; clients hear of every step
+     * of its rise.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<NegacionLight>> NEGACION =
+            ENTITY_TYPES.register("negacion", () -> EntityType.Builder
+                    .<NegacionLight>of(NegacionLight::new, MobCategory.MISC)
+                    .sized(0.9F, 2.0F)
+                    .noSave()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(1)
+                    .build(BleachMod.id("negacion").toString()));
 
     // ---- Zanpakutō techniques ----
 

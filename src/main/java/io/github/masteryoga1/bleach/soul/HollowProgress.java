@@ -283,30 +283,40 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
     /**
      * The road out of the mask: never torn, or torn naturally (perfected false) or by the Hōgyoku (true).
      * Saved with the rest, read leniently key by key, so a save from before the Arrancar reads as
-     * {@link #NONE}. The form the Arrancar rose from is not kept here: it is the soul's Hollow tier.
+     * {@link #NONE}, and one from before the Gran Rey Cero as having no wait for it. The form the Arrancar rose
+     * from is not kept here: it is the soul's Hollow tier.
      *
-     * @param perfected      whether the Hōgyoku made it, which a later natural road never takes away
-     * @param failures       tries at tearing the mask that failed, each making the next likelier
-     * @param lastTearAt     when it last tried and failed, for the wait before the next try
-     * @param releaseReadyAt no Resurrección before this game time: the wait after the last one ended
-     * @param forging        how many times its blade has been forged; only a blade of this forging is its own,
-     *                       so every older copy crumbles, and 0 means it never had one
+     * @param perfected          whether the Hōgyoku made it, which a later natural road never takes away
+     * @param failures           tries at tearing the mask that failed, each making the next likelier
+     * @param lastTearAt         when it last tried and failed, for the wait before the next try
+     * @param releaseReadyAt     no Resurrección before this game time: the wait after the last one ended
+     * @param forging            how many times its blade has been forged; only a blade of this forging is its own,
+     *                           so every older copy crumbles, and 0 means it never had one
+     * @param granReyCeroReadyAt no Gran Rey Cero before this game time: the wait after the last one fired, kept
+     *                           across a relog as the release's is (see {@link GranReyCero})
      */
-    public record Arrancar(boolean perfected, int failures, long lastTearAt, long releaseReadyAt, int forging) {
-        public static final Arrancar NONE = new Arrancar(false, 0, NEVER, NEVER, 0);
+    public record Arrancar(boolean perfected, int failures, long lastTearAt, long releaseReadyAt, int forging,
+                           long granReyCeroReadyAt) {
+        public static final Arrancar NONE = new Arrancar(false, 0, NEVER, NEVER, 0, NEVER);
 
         public static final Codec<Arrancar> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.BOOL.lenientOptionalFieldOf("perfected", false).forGetter(Arrancar::perfected),
                 Codec.INT.lenientOptionalFieldOf("failures", 0).forGetter(Arrancar::failures),
                 Codec.LONG.lenientOptionalFieldOf("last_tear_at", NEVER).forGetter(Arrancar::lastTearAt),
                 Codec.LONG.lenientOptionalFieldOf("release_ready_at", NEVER).forGetter(Arrancar::releaseReadyAt),
-                Codec.INT.lenientOptionalFieldOf("forging", 0).forGetter(Arrancar::forging)
+                Codec.INT.lenientOptionalFieldOf("forging", 0).forGetter(Arrancar::forging),
+                Codec.LONG.lenientOptionalFieldOf("gran_rey_cero_ready_at", NEVER).forGetter(Arrancar::granReyCeroReadyAt)
         ).apply(instance, Arrancar::new));
 
         /** Keeps the counts from going below zero. */
         public Arrancar {
             failures = Math.max(0, failures);
             forging = Math.max(0, forging);
+        }
+
+        /** The five-part record of 5e, with no Gran Rey Cero wait. */
+        public Arrancar(boolean perfected, int failures, long lastTearAt, long releaseReadyAt, int forging) {
+            this(perfected, failures, lastTearAt, releaseReadyAt, forging, NEVER);
         }
 
         /** Whether its blade was ever forged: false for a save from before the Arrancar, or a state set some other way. */
@@ -316,27 +326,31 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
 
         /**
          * The soul has just become an Arrancar: perfected if this road or an earlier one was the Hōgyoku's, a
-         * blade forged anew (so any older one crumbles), and no wait before its first release. The failed
-         * tries and the last one are kept.
+         * blade forged anew (so any older one crumbles), and no wait before its first release or its first Gran
+         * Rey Cero, as a new life starts with none. The failed tries and the last one are kept.
          */
         public Arrancar becoming(boolean perfected) {
-            return new Arrancar(this.perfected || perfected, failures, lastTearAt, NEVER, forging + 1);
+            return new Arrancar(this.perfected || perfected, failures, lastTearAt, NEVER, forging + 1, NEVER);
         }
 
         public Arrancar withFailures(int value) {
-            return new Arrancar(perfected, value, lastTearAt, releaseReadyAt, forging);
+            return new Arrancar(perfected, value, lastTearAt, releaseReadyAt, forging, granReyCeroReadyAt);
         }
 
         public Arrancar withLastTearAt(long time) {
-            return new Arrancar(perfected, failures, time, releaseReadyAt, forging);
+            return new Arrancar(perfected, failures, time, releaseReadyAt, forging, granReyCeroReadyAt);
         }
 
         public Arrancar withReleaseReadyAt(long time) {
-            return new Arrancar(perfected, failures, lastTearAt, time, forging);
+            return new Arrancar(perfected, failures, lastTearAt, time, forging, granReyCeroReadyAt);
         }
 
         public Arrancar withForging(int value) {
-            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, value);
+            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, value, granReyCeroReadyAt);
+        }
+
+        public Arrancar withGranReyCeroReadyAt(long time) {
+            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, forging, time);
         }
     }
 }

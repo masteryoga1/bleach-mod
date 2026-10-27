@@ -264,6 +264,12 @@ public final class SoulData {
     long lastBalaAt = NEVER;
     /** Whether the Technique key is held for Bala, so it keeps firing (see {@link Bala}). */
     boolean balaHeld;
+    /** The Gran Rey Cero this Arrancar is gathering, by entity id, or -1 (see {@link GranReyCero}). */
+    int granReyCeroBeamId = -1;
+    /** Game time the Gran Rey Cero being gathered started, or {@link #NEVER}. */
+    long granReyCeroStartedAt = NEVER;
+    /** Game time this Gillian last called down Negación, for the cooldown (see {@link Negacion}). */
+    long lastNegacionAt = NEVER;
 
     public SoulData() {
     }

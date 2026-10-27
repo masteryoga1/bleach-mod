@@ -11,6 +11,7 @@ import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -65,7 +66,8 @@ import org.joml.Vector3f;
  *
  * <p>Other shots strike the same way, as a {@link Kind} of their own: an Arrancar's Bala is a quiet one that
  * stops at the first creature (see {@link io.github.masteryoga1.bleach.soul.Bala}), and is seen as a short
- * {@link #trace}.
+ * {@link #trace}; an Arrancar's Gran Rey Cero gathers and fires as this entity, with a kind of its own (see
+ * {@link io.github.masteryoga1.bleach.soul.GranReyCero}).
  *
  * <p>The server decides everything; a client only keeps the orb at the caster's mouth and draws it, then
  * the beam, from the synced data. It is never saved. A {@code /summon} with {@code Reach} raises a
@@ -137,6 +139,8 @@ public class CeroBeam extends Entity {
     /** What this Cero does when it fires. Server only; null on a summoned picture. */
     @Nullable
     private Spec spec;
+    /** How it strikes when it fires: a Cero unless charged as another kind. Server only, and never saved. */
+    private Kind kind = Kind.CERO;
     /** The caster, kept as charged. Server only; a client finds it by {@link #DATA_OWNER}. */
     @Nullable
     private LivingEntity shooter;
@@ -145,6 +149,9 @@ public class CeroBeam extends Entity {
     private Vec3 lockedAim;
     @Nullable
     private Shot lastShot;
+    /** Told in the tick it fires, after its caster: a player's own code settles the price there. Server only. */
+    @Nullable
+    private Consumer<CeroBeam> onFired;
     /** {@link #tickCount} when it fired; on a client, when it learned that it had. */
     private int firedAt = -1;
 
@@ -246,10 +253,20 @@ public class CeroBeam extends Entity {
      * the charge's sound. It fires by itself once the spec's charge is gathered, the way the shooter aimed
      * ({@link #aimOf}) when the aim locked; a caller may fire it sooner, at full strength ({@link #fireNow()})
      * or weaker ({@link #fireNow(float)}), or let it fizzle ({@link #cancel}). Returns null, adding nothing,
-     * when the shooter is dead or in another level, or the level refuses the Cero.
+     * when the shooter is dead or in another level, or the level refuses the Cero. It strikes as a Cero
+     * ({@link Kind#CERO}).
      */
     @Nullable
     public static CeroBeam charge(ServerLevel level, LivingEntity shooter, Spec spec) {
+        return charge(level, shooter, spec, Kind.CERO);
+    }
+
+    /**
+     * Starts a beam gathering as {@link #charge(ServerLevel, LivingEntity, Spec)} does, which strikes as this
+     * kind when it fires, by itself or sooner: a Gran Rey Cero is gathered so.
+     */
+    @Nullable
+    public static CeroBeam charge(ServerLevel level, LivingEntity shooter, Spec spec, Kind kind) {
         if (!shooter.isAlive() || shooter.level() != level) {
             return null;
         }
@@ -257,6 +274,7 @@ public class CeroBeam extends Entity {
         Vec3 muzzle = muzzleOf(shooter, 1.0F);
         beam.moveTo(muzzle.x, muzzle.y, muzzle.z, shooter.getYHeadRot(), shooter.getXRot());
         beam.spec = spec;
+        beam.kind = kind;
         beam.shooter = shooter;
         beam.entityData.set(DATA_OWNER, shooter.getId());
         beam.entityData.set(DATA_CHARGE_TICKS, spec.chargeTicks());
@@ -271,9 +289,9 @@ public class CeroBeam extends Entity {
     }
 
     /**
-     * Fires now, unless it already has: along the locked aim, or where the shooter aims now if the aim
-     * has not locked yet. A Cero whose shooter has gone, or has nothing in sight to fire at, fizzles
-     * instead. The beam is then seen for {@link #FADE_TICKS} and goes. Server only.
+     * Fires now, as the kind it was charged as, unless it already has: along the locked aim, or where the
+     * shooter aims now if the aim has not locked yet. A Cero whose shooter has gone, or has nothing in sight
+     * to fire at, fizzles instead. The beam is then seen for {@link #FADE_TICKS} and goes. Server only.
      */
     public void fireNow() {
         if (isFired() || isRemoved() || spec == null || !(level() instanceof ServerLevel server)) {
@@ -292,12 +310,23 @@ public class CeroBeam extends Entity {
         firedAt = tickCount;
         entityData.set(DATA_FIRED, true);
         entityData.set(DATA_LIFE, FADE_TICKS);
-        Shot shot = fire(server, owner, this, position(), direction, spec);
+        Shot shot = fire(server, owner, this, position(), direction, spec, kind);
         lastShot = shot;
         entityData.set(DATA_REACH, shot.to().subtract(shot.from()).toVector3f());
         if (owner instanceof Caster caster) {
             caster.onCeroFired(shot);
         }
+        if (onFired != null) {
+            onFired.accept(this);
+        }
+    }
+
+    /**
+     * What to do as it fires, by itself or sooner, in that same tick: a player is no {@link Caster}, so a Gran Rey
+     * Cero is paid for here, with no tick between for a logout or a change of world to slip into. Server only.
+     */
+    public void whenFired(Consumer<CeroBeam> action) {
+        onFired = action;
     }
 
     /**
@@ -337,6 +366,11 @@ public class CeroBeam extends Entity {
     @Nullable
     public Shot lastShot() {
         return lastShot;
+    }
+
+    /** How it strikes when it fires, as it was charged. Server only: a client always reads a Cero. */
+    public Kind kind() {
+        return kind;
     }
 
     /** Whoever charges it, or null for none or one gone from view. */

@@ -12,6 +12,7 @@ import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
@@ -128,15 +129,18 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * size again, with the fragment of its mask, its hole and its own blade in hand. The soul screen is
  * opened on it, and the real Release key calls out its Resurrección, which must draw the released
  * Vasto Lorde and raise its health; the Seal key seals it again, and the wait before the next release
- * must reach the client. Last, the sealed Arrancar's Sonído, through the real flash step request, must
+ * must reach the client. Then the sealed Arrancar's Sonído, through the real flash step request, must
  * carry it further than a first Shunpo, and holding the real Devour key still sends out Pesquisa, which
- * must outline a Plus standing behind a stone wall before the run quits.
+ * must outline a Plus standing behind a stone wall. Made strong enough by command, the Arrancar sneaks and
+ * holds the real Cero key, which gathers a Gran Rey Cero in its blade's colour that fires by itself and is
+ * paid for. Last, it is mounted by command on a summoned Negación light, which must lift it, and sneaking
+ * must leave the light, falling slowly, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
- * Hollow body, Menos, Cero, Arrancar and HUD are drawn, and screenshots of the main moments are saved
- * for review. Any crash in the mod's client code fails the run, and so does anything that did not reach
- * the client as expected.
+ * Hollow body, Menos, Cero, Arrancar, Negación light and HUD are drawn, and screenshots of the main
+ * moments are saved for review. Any crash in the mod's client code fails the run, and so does anything
+ * that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -149,6 +153,8 @@ public final class ClientSmokeTest {
     private static final double FOOTING_MIN_HEIGHT = 8.0;
     /** How far the Arrancar's Sonído must carry the player: further than a first Shunpo goes. */
     private static final double SONIDO_MIN_DISTANCE = 8.0;
+    /** How high the Negación light must lift the player before it is left. */
+    private static final double NEGACION_MIN_RISE = 2.0;
     /** How far around the player the summoned Hollows and Plus, and the Garganta, are looked for. */
     private static final double SUMMONED_RANGE = 24.0;
     private static final double RIFT_RANGE = 40.0;
@@ -173,6 +179,9 @@ public final class ClientSmokeTest {
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** Where the player stood before the flash step. */
     private static Vec3 dashFrom;
+    /** Where the player stood as it was mounted on the Negación light, or null before then. */
+    @Nullable
+    private static Vec3 negacionFrom;
     /** What the current step acts on: the Hollow to strike, the Plus to send on, or the Quincy to talk to. */
     @Nullable
     private static Entity subject;
@@ -821,7 +830,27 @@ public final class ClientSmokeTest {
             case 3925 -> HollowKeys.DEVOUR.setDown(true);
             case 3950 -> HollowKeys.DEVOUR.setDown(false);
             case 3975 -> command(minecraft, "kill @e[type=bleach:plus]");
+            // The Gran Rey Cero through the real keys: strong enough by command, sneaking, the Cero key held until it
+            // fires itself.
             case 3990 -> {
+                command(minecraft, "bleach reiryoku @s 2000 2000");
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                minecraft.options.keyShift.setDown(true);
+            }
+            case 3994 -> HollowKeys.CERO.setDown(true);
+            case 4020 -> {
+                HollowKeys.CERO.setDown(false);
+                minecraft.options.keyShift.setDown(false);
+            }
+            // Negación by command: a summoned light, mounted, rises; sneaking leaves it.
+            case 4040 -> command(minecraft, "summon bleach:negacion ~ ~ ~");
+            case 4042 -> {
+                negacionFrom = player.position();
+                command(minecraft, "ride @s mount @e[type=bleach:negacion,limit=1,sort=nearest]");
+            }
+            case 4095 -> minecraft.options.keyShift.setDown(true);
+            case 4099 -> minecraft.options.keyShift.setDown(false);
+            case 4130 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1009,6 +1038,26 @@ public final class ClientSmokeTest {
                 "Pesquisa never marked the Plus behind the wall")) {
             shot(minecraft, "pesquisa");
         }
+        if (expectWithin(minecraft, 3996, 4015,
+                () -> ownCero(minecraft, player, beam -> beam.radius() > 1.9F
+                        && beam.colour() == ArrancarLogic.blade(player.getUUID()).colour()) != null,
+                "the sneaking Cero key never gathered a Gran Rey Cero in the blade's colour")) {
+            shot(minecraft, "gran_rey_cero");
+        }
+        expectWithin(minecraft, 4012, 4035,
+                () -> soul.hollow().arrancar().granReyCeroReadyAt() > player.level().getGameTime()
+                        && soul.reiryoku() < 1300.0F,
+                "the Gran Rey Cero never fired and was paid for");
+        expectWithin(minecraft, 4043, 4050, () -> player.getVehicle() instanceof NegacionLight,
+                "the player never stood in the Negación light");
+        if (expectWithin(minecraft, 4060, 4092,
+                () -> negacionFrom != null && player.getY() - negacionFrom.y >= NEGACION_MIN_RISE,
+                "the Negación light never lifted the player")) {
+            shot(minecraft, "negacion");
+        }
+        expectWithin(minecraft, 4097, 4115,
+                () -> !player.isPassenger() && player.hasEffect(MobEffects.SLOW_FALLING),
+                "sneaking never left the Negación light, or left it without Slow Falling");
     }
 
     /** Whether the player is drawn with this Hollow look bit. */

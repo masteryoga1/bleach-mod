@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
+import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.PlusEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -771,10 +772,13 @@ public abstract class Hollow extends Monster {
         return false;
     }
 
-    /** Frozen while the mask forms, while a tear takes it, and while a Hollow player's jaws hold it. */
+    /**
+     * Frozen while the mask forms, while a tear takes it, while a Hollow player's jaws hold it, and while
+     * Negación's light holds it, so none of its goals run.
+     */
     @Override
     protected boolean isImmobile() {
-        return super.isImmobile() || isMaskForming() || departing || isSeized();
+        return super.isImmobile() || isMaskForming() || departing || isSeized() || Negacion.held(this);
     }
 
     @Override
