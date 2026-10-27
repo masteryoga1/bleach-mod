@@ -181,8 +181,11 @@ public final class Sonido {
         return slowness != null ? slowness.getAmplifier() : -1;
     }
 
-    /** A smudge of dark dust and a puff of smoke at the feet, and the thud, for those who see spirits. */
-    private static void effects(ServerLevel level, Vec3 feet) {
+    /**
+     * A smudge of dark dust and a puff of smoke at the feet, and the thud, for those who see spirits (an Arrancar
+     * NPC's too).
+     */
+    public static void effects(ServerLevel level, Vec3 feet) {
         SpiritSenses.particles(level, SHIMMER, feet.x, feet.y + SHIMMER_HEIGHT, feet.z, SHIMMER_COUNT, 0.3, 0.6, 0.3, 0.0);
         SpiritSenses.particles(level, ParticleTypes.SMOKE, feet.x, feet.y + 0.1, feet.z, SMOKE_COUNT, 0.25, 0.05, 0.25,
                 0.0);

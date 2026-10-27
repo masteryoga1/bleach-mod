@@ -107,6 +107,10 @@ public final class GargantaEvents {
             return;
         }
         if (player.getRandom().nextDouble() < HollowLogic.arrivalChancePerCheck(data, level.isNight())) {
+            // Now and then, at night, a strong soul draws Arrancar instead (see ArrancarNpcEvents).
+            if (ArrancarNpcEvents.tryNaturalArrival(player, data, now)) {
+                return;
+            }
             // A strong soul now and then draws a Menos Grande instead, while the server has room for one here,
             // and a Menos Hollow player more often, so the Menos it must devour to rise do come.
             HollowKind menos = Menos.arrivalKind(data.maxReiryoku(), HollowTier.of(data).isMenos(),

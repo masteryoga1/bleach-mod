@@ -22,6 +22,7 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarEvents;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
+import io.github.masteryoga1.bleach.soul.ArrancarNpcEvents;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
 import io.github.masteryoga1.bleach.soul.ArrancarRoster;
 import io.github.masteryoga1.bleach.soul.BaitEvents;
@@ -78,6 +79,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -116,7 +118,9 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
  * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
- * /bleach garganta &lt;players&gt; [spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas] (a tear now; not on Peaceful)
+ * /bleach garganta &lt;players&gt; [kind|numero|privaron]   (a tear now; not on Peaceful)
+ *                                    (kind: spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas)
+ *                                    (numero: a lone Número; privaron: a Privaron Espada and its Fracción)
  * /bleach firsthollow &lt;players&gt; &lt;reset|skip|start&gt;   (the Fishbone D encounter)
  * /bleach hollow &lt;players&gt; satiety &lt;0..100&gt;   (soul hunger, started if it had not; Hollow players only)
  * /bleach hollow &lt;players&gt; souls &lt;0..100000&gt;   (the souls devoured, for any soul)
@@ -158,10 +162,16 @@ public final class BleachCommand {
     private static final int MAX_TRAINING = 100000;
     /** The most souls devoured the command sets. */
     private static final int MAX_SOULS = 100000;
+    /** The {@code /bleach garganta} kinds that bring Arrancar: a lone Número, or a Privaron Espada and its Fracción. */
+    private static final String NUMERO = "numero";
+    private static final String PRIVARON = "privaron";
     private static final SuggestionProvider<CommandSourceStack> STATES = suggest(SoulState.values());
     private static final SuggestionProvider<CommandSourceStack> STATS = suggest(Stat.values());
     private static final SuggestionProvider<CommandSourceStack> PATHS = suggest(PowerPath.values());
-    private static final SuggestionProvider<CommandSourceStack> HOLLOW_KINDS = suggest(HollowKind.values());
+    /** What a Garganta can bring: the Hollow kinds, and the Arrancar. */
+    private static final SuggestionProvider<CommandSourceStack> GARGANTA_KINDS = (context, builder) ->
+            SharedSuggestionProvider.suggest(Stream.concat(Arrays.stream(HollowKind.values())
+                    .map(HollowKind::getSerializedName), Stream.of(NUMERO, PRIVARON)), builder);
     private static final SuggestionProvider<CommandSourceStack> TYPES = suggest(ZanpakutoType.values());
     private static final SuggestionProvider<CommandSourceStack> BLOODLINES = suggest(Bloodline.values());
     private static final SuggestionProvider<CommandSourceStack> BLUT_MODES = suggest(BlutMode.values());
@@ -227,7 +237,7 @@ public final class BleachCommand {
                         .then(Commands.argument("players", EntityArgument.players())
                                 .executes(context -> garganta(context, null))
                                 .then(Commands.argument("kind", StringArgumentType.word())
-                                        .suggests(HOLLOW_KINDS)
+                                        .suggests(GARGANTA_KINDS)
                                         .executes(context -> garganta(context,
                                                 StringArgumentType.getString(context, "kind"))))))
                 .then(Commands.literal("firsthollow")
@@ -534,10 +544,14 @@ public final class BleachCommand {
      * Opens a Garganta near each player now, with Hollows of the kind given or of one their reiatsu
      * draws. It ignores the chance, the cooldown, the cap on nearby Hollows and whether the soul could
      * draw one at all, and leaves the cooldown as it was; it only needs open ground to land on. Peaceful
-     * refuses it, since the Hollows would vanish at once.
+     * refuses it, since the Hollows would vanish at once. {@code numero} and {@code privaron} bring
+     * Arrancar instead (see {@link #arrancarGarganta}).
      */
     private static int garganta(CommandContext<CommandSourceStack> context, @Nullable String name)
             throws CommandSyntaxException {
+        if (NUMERO.equals(name) || PRIVARON.equals(name)) {
+            return arrancarGarganta(context, PRIVARON.equals(name));
+        }
         HollowKind kind = null;
         if (name != null) {
             kind = byName(HollowKind.values(), name);
@@ -552,6 +566,34 @@ public final class BleachCommand {
         int opened = 0;
         for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
             if (GargantaEvents.openArrival(player, SoulLogic.get(player), kind, player.level().getGameTime(), true)) {
+                opened++;
+            } else {
+                context.getSource().sendFailure(Component.translatable("commands.bleach.garganta.failed",
+                        player.getDisplayName()));
+            }
+        }
+        if (opened == 0) {
+            return 0;
+        }
+        int count = opened;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.garganta.success", count), true);
+        return count;
+    }
+
+    /**
+     * Opens a Garganta near each player now that brings Arrancar: a lone Número, or with {@code group} a
+     * Privaron Espada and its Fracción. It ignores the chance, the night, the soul's reiatsu, the cooldown,
+     * the server's limit and the spacing, and leaves the cooldown as it was; they still leave after their
+     * lifetime, or once idle. Peaceful refuses it, since they would vanish at once.
+     */
+    private static int arrancarGarganta(CommandContext<CommandSourceStack> context, boolean group)
+            throws CommandSyntaxException {
+        if (peaceful(context.getSource())) {
+            return 0;
+        }
+        int opened = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            if (ArrancarNpcEvents.openArrival(player, SoulLogic.get(player), group, player.level().getGameTime(), true)) {
                 opened++;
             } else {
                 context.getSource().sendFailure(Component.translatable("commands.bleach.garganta.failed",

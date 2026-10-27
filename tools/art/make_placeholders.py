@@ -121,6 +121,8 @@ ARRANCAR_WHITE = rgb(242, 242, 238)
 ARRANCAR_FOLD = rgb(214, 214, 208)
 ARRANCAR_BLACK = rgb(30, 30, 34)
 TATTOO_GLYPH = rgb(255, 255, 255)
+# An Arrancar NPC's pale skin.
+ARRANCAR_SKIN = rgb(226, 214, 200)
 # The later arts: Letzt Stil's pale gold, Ginrei Kojaku's silver-blue, Vollständig's halo and its
 # translucent wings, the cloud of a Gintō spell, and the Sanrei Glove's blue cuff.
 LETZT = rgb(255, 214, 160)
@@ -1387,6 +1389,25 @@ def arrancar_digits():
     return c
 
 
+def arrancar_npc():
+    """The skin every Arrancar NPC wears under its uniform, in the player skin layout with wide arms: pale skin on the
+    head, body, arms and legs, black hair over the top, back and sides of the head and down the face to its third row,
+    and two dark eyes beneath, with no mouth. Every overlay layer (hat, jacket, sleeves, trousers) stays clear. The
+    hole, the mask remnant and the tattoo are drawn over it by the renderer, so a bare chest shows them."""
+    c = Canvas(64, 64)
+    # Head, body, right arm, left arm, right leg, left leg: where each net starts, and the box's size.
+    for u, v, w, h, d in ((0, 0, 8, 8, 8), (16, 16, 8, 12, 4), (40, 16, 4, 12, 4), (32, 48, 4, 12, 4),
+                          (0, 16, 4, 12, 4), (16, 48, 4, 12, 4)):
+        box(c, u, v, w, h, d, ARRANCAR_SKIN)
+    c.rect(8, 0, 16, 8, HOLLOW_BLACK)     # the top of the head
+    c.rect(0, 8, 8, 16, HOLLOW_BLACK)     # its right side
+    c.rect(16, 8, 32, 16, HOLLOW_BLACK)   # its left side and back
+    c.rect(8, 8, 16, 11, HOLLOW_BLACK)    # the hair down the face, to its third row
+    c.rect(9, 12, 11, 13, VOID)           # the eyes, two pixels wide, either side of the middle
+    c.rect(13, 12, 15, 13, VOID)
+    return c
+
+
 def hollow_player_mask():
     """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
     between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
@@ -1533,6 +1554,7 @@ TEXTURES = {
     "entity/hollow_vasto_lorde.png": hollow_vasto_lorde,
     "entity/arrancar_hole.png": arrancar_hole,
     "entity/arrancar_digits.png": arrancar_digits,
+    "entity/arrancar.png": arrancar_npc,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,

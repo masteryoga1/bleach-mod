@@ -186,6 +186,9 @@ public final class ModItems {
     public static final DeferredItem<DeferredSpawnEggItem> PLUS_SPAWN_EGG = ITEMS.register(
             "plus_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.PLUS, 0xB4C8D8, 0x6E6E6E, new Item.Properties()));
+    public static final DeferredItem<DeferredSpawnEggItem> ARRANCAR_SPAWN_EGG = ITEMS.register(
+            "arrancar_spawn_egg",
+            () -> new DeferredSpawnEggItem(ModEntities.ARRANCAR, 0xF0F0EC, 0x1A1A1A, new Item.Properties()));
 
     private ModItems() {
     }

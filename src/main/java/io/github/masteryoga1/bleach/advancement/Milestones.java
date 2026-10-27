@@ -160,6 +160,10 @@ public final class Milestones {
     public static final String ESPADA = "espada";
     /** As an Arrancar, wore the white jacket, hakama and zōri. */
     public static final String ARRANCAR_UNIFORM = "arrancar_uniform";
+    /** Slew an Arrancar NPC. Granted when it happens (ArrancarNpcEvents), as is the one below. */
+    public static final String ARRANCAR_SLAIN = "arrancar_slain";
+    /** Saw a beaten Privaron Espada and its Fracción lifted away by Negación. */
+    public static final String ARRANCAR_RECALLED = "arrancar_recalled";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;

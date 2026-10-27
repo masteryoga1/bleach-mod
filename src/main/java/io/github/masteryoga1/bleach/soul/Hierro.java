@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -76,12 +77,13 @@ public final class Hierro {
     }
 
     /**
-     * What this blow is multiplied by through the victim's Hierro: 1 unless the victim is an Arrancar player and
-     * the blow comes from a living attacker other than itself and is not one armour lets through. Reads whether
+     * What this blow is multiplied by through the victim's Hierro: 1 unless the victim is an Arrancar player or NPC
+     * and the blow comes from a living attacker other than itself and is not one armour lets through. Reads whether
      * it is released, so it means something on the server only, where blows land.
      */
     public static float multiplier(LivingEntity victim, DamageSource source, float attackerReiatsu, float victimReiatsu) {
-        if (!(victim instanceof Player) || !SoulLogic.hasSoul(victim) || source.is(DamageTypeTags.BYPASSES_ARMOR)
+        if (!(victim instanceof Player || victim instanceof ArrancarNpc) || !SoulLogic.hasSoul(victim)
+                || source.is(DamageTypeTags.BYPASSES_ARMOR)
                 || !(source.getEntity() instanceof LivingEntity attacker) || attacker == victim) {
             return 1.0F;
         }

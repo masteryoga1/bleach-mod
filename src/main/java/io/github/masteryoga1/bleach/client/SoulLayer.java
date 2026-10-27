@@ -28,7 +28,8 @@ import org.joml.Vector3f;
  * shorter as it wears away; a Hollow's bone mask in one of four shapes, its jaw hanging open while it
  * devours, cracked after a blow, and with red eyes while it is ravenous; and an Arrancar's hole and the
  * remnant of its mask, and, released, its Hollow body and mask. The chain is built from vanilla models;
- * the mask, the hole and the Hollow body are placeholder art drawn by the art script.
+ * the mask, the hole and the Hollow body are placeholder art drawn by the art script. The hole and the
+ * remnant are drawn by two helpers that an Arrancar NPC's renderer borrows too ({@link ArrancarNpcRenderer}).
  */
 public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
     public static final ResourceLocation MASK = BleachMod.id("textures/entity/hollow_player_mask.png");
@@ -129,26 +130,42 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
      */
     private void renderFragment(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                 AbstractClientPlayer player, SoulAppearance look) {
-        poseStack.pushPose();
-        getParentModel().getHead().translateAndRotate(poseStack);
-        mask.setupFragment(HollowPlayerLogic.maskVariant(player.getUUID()));
-        ResourceLocation texture = (look.hollowLook() & HollowPlayerLogic.LOOK_MASK_CRACKED) != 0 ? MASK_CRACKED : MASK;
-        mask.renderToBuffer(poseStack, buffer.getBuffer(RenderType.entityCutoutNoCull(texture)), packedLight,
-                LivingEntityRenderer.getOverlayCoords(player, 0.0F), -1);
-        poseStack.popPose();
+        renderFragment(mask, getParentModel().getHead(), poseStack, buffer, packedLight,
+                LivingEntityRenderer.getOverlayCoords(player, 0.0F), HollowPlayerLogic.maskVariant(player.getUUID()),
+                (look.hollowLook() & HollowPlayerLogic.LOOK_MASK_CRACKED) != 0);
     }
 
     /**
-     * A sealed Arrancar's hole, at its throat, sternum or belly by player. The texture is clear but for the
-     * hole, front and back, so only the hole is drawn, on the body's own faces and the jacket's; it is moved
-     * along the body in the body's own frame, so it stays on the chest as the body leans. A chestplate
-     * hides it by depth, as it should.
+     * A mask remnant of this variant on the posed head, cracked or not: the part of the mask of that shape
+     * the mask model leaves for a remnant ({@link HollowMaskModel#setupFragment}), built in head space, so
+     * the head's own pose is all it needs. A player's and an Arrancar NPC's are drawn alike.
      */
+    static void renderFragment(HollowMaskModel mask, ModelPart head, PoseStack poseStack, MultiBufferSource buffer,
+                               int packedLight, int overlay, int variant, boolean cracked) {
+        poseStack.pushPose();
+        head.translateAndRotate(poseStack);
+        mask.setupFragment(variant);
+        ResourceLocation texture = cracked ? MASK_CRACKED : MASK;
+        mask.renderToBuffer(poseStack, buffer.getBuffer(RenderType.entityCutoutNoCull(texture)), packedLight, overlay, -1);
+        poseStack.popPose();
+    }
+
+    /** A sealed Arrancar player's hole, at its throat, sternum or belly by player. */
     private void renderHole(PoseStack poseStack, MultiBufferSource buffer, int packedLight, AbstractClientPlayer player) {
-        PlayerModel<AbstractClientPlayer> model = getParentModel();
-        float shift = HOLE_SHIFT_PIXELS[ArrancarLogic.holePlace(player.getUUID())] / 16.0F;
+        renderHole(getParentModel(), poseStack, buffer, packedLight, LivingEntityRenderer.getOverlayCoords(player, 0.0F),
+                ArrancarLogic.holePlace(player.getUUID()));
+    }
+
+    /**
+     * A sealed Arrancar's hole at this place (0 throat, 1 sternum, 2 belly), on the body's and the jacket layer's
+     * faces. The texture is clear but for the hole, front and back, so only the hole is drawn; it is moved along
+     * the body in the body's own frame, so it stays on the chest as the body leans. A chestplate hides it by depth,
+     * as it should. A player's and an Arrancar NPC's are drawn alike.
+     */
+    static void renderHole(PlayerModel<?> model, PoseStack poseStack, MultiBufferSource buffer, int packedLight,
+                           int overlay, int place) {
+        float shift = HOLE_SHIFT_PIXELS[place] / 16.0F;
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(HOLE));
-        int overlay = LivingEntityRenderer.getOverlayCoords(player, 0.0F);
         renderShifted(model.body, poseStack, consumer, packedLight, overlay, shift);
         // Hidden while the skin's jacket layer is turned off, as the jacket itself is.
         renderShifted(model.jacket, poseStack, consumer, packedLight, overlay, shift);

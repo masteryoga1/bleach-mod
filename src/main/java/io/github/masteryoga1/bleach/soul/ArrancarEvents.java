@@ -23,6 +23,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
@@ -441,6 +442,22 @@ public final class ArrancarEvents {
         stack.set(ModComponents.ARRANCAR_FORGING.get(), data.hollow().arrancar().forging());
         stack.set(DataComponents.ITEM_NAME, kind.displayName());
         refreshBlade(stack, ArrancarLogic.originFor(data));
+        return stack;
+    }
+
+    /**
+     * A sealed blade for an Arrancar NPC: an Arrancar Blade bound to the creature's UUID and named after it, coloured
+     * and named as its UUID chooses (see {@link ArrancarLogic#blade}), with the damage of this origin. It never drops
+     * (drop chance 0) and no player can call it their own ({@link ArrancarLogic#isOwnBlade} compares the player's
+     * UUID).
+     */
+    public static ItemStack npcBlade(Entity owner, HollowTier origin) {
+        ArrancarLogic.Blade kind = ArrancarLogic.blade(owner.getUUID());
+        ItemStack stack = new ItemStack(ModItems.ARRANCAR_BLADE.get());
+        stack.set(ModComponents.ZANPAKUTO_BLADE.get(), new ZanpakutoBlade(Optional.of(owner.getUUID()),
+                owner.getName().getString(), Optional.empty(), false, false, kind.colour()));
+        stack.set(DataComponents.ITEM_NAME, kind.displayName());
+        refreshBlade(stack, origin);
         return stack;
     }
 
