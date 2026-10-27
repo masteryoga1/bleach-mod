@@ -56,14 +56,15 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
 /**
- * Tests for the Gran Rey Cero: its numbers by origin, release and setting, the order of its refusals, the blood it
- * spills, the full gather it needs before it fires and what firing costs, the Cero rules it keeps on pets and
- * griefing, and the wait it saves. Mock players are plain {@link Player}s that are not in the world and never tick,
- * so every test calls the rules directly ({@link GranReyCero} and {@link CeroBeam#fire}), and no test can see a
- * milestone, which only a real player earns. The game time stands still within a test, and a gathering beam does not
- * tick between calls, so a later time passed in stands for a later tick. Players stand at {@link #ROOM} in the
- * {@code empty} template and at {@link #SPOT} in the {@code field}, facing south. A setting changed for a test is
- * put back before the test's tick ends.
+ * Tests for the Gran Rey Cero: its numbers by origin, release and setting, the seat among the Espada it needs, the
+ * order of its refusals, the blood it spills, the full gather it needs before it fires and what firing costs, the
+ * Cero rules it keeps on pets and griefing, and the wait it saves. Mock players are plain {@link Player}s that are not
+ * in the world and never tick, so every test calls the rules directly ({@link GranReyCero} and {@link CeroBeam#fire}),
+ * no test can see a milestone, which only a real player earns, and no mock reaches the server's roster of ranks: a
+ * seat is written into the record ({@link ArrancarRankTests#seat}). The game time stands still within a test, and a
+ * gathering beam does not tick between calls, so a later time passed in stands for a later tick. Players stand at
+ * {@link #ROOM} in the {@code empty} template and at {@link #SPOT} in the {@code field}, facing south. A setting
+ * changed for a test is put back before the test's tick ends.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -74,7 +75,7 @@ public final class GranReyCeroTests {
     private static final Vec3 SPOT = new Vec3(8.5, 2.0, 6.5);
     /** The forms an Arrancar may rise from, weakest first. */
     private static final List<HollowTier> ORIGINS = List.of(HollowTier.GILLIAN, HollowTier.ADJUCHAS, HollowTier.VASTO_LORDE);
-    /** Strong enough for a Gran Rey Cero at the default settings, which ask for 1500. */
+    /** Strong enough to pay for a Gran Rey Cero; a seat comes from {@link ArrancarRankTests#seat}. */
     private static final float STRONG = 1_600.0F;
 
     private GranReyCeroTests() {
@@ -172,8 +173,10 @@ public final class GranReyCeroTests {
         HollowPlayerTests.assertClose(helper, GranReyCero.cost(vasto), 640.0, "a Gran Rey Cero's cost at 1600");
         HollowPlayerTests.assertClose(helper, GranReyCero.cost(soul(HollowTier.VASTO_LORDE, 100.0F)), 50.0,
                 "a Gran Rey Cero's cost at 100");
-        helper.assertFalse(GranReyCero.eligible(soul(HollowTier.VASTO_LORDE, 1_499.0F)), "an Arrancar at 1499 has it");
-        helper.assertTrue(GranReyCero.eligible(soul(HollowTier.VASTO_LORDE, 1_500.0F)), "an Arrancar at 1500 lacks it");
+        helper.assertFalse(GranReyCero.eligible(soul(HollowTier.VASTO_LORDE, STRONG)), "an Arrancar with no seat has it");
+        SoulData seated = soul(HollowTier.VASTO_LORDE, 100.0F);
+        ArrancarRankTests.seat(seated, 10);
+        helper.assertTrue(GranReyCero.eligible(seated), "the Diez Espada lacks it");
 
         Player sealed = ArrancarTests.arrancar(helper, HollowTier.VASTO_LORDE, STRONG, ROOM);
         CeroBeam.Spec spec = GranReyCero.spec(sealed, SoulLogic.get(sealed));
@@ -231,10 +234,14 @@ public final class GranReyCeroTests {
             assertRefusal(helper, player, data, now, GranReyCero.Refusal.LOCKED, "at 1000");
             Component locked = GranReyCero.message(GranReyCero.Refusal.LOCKED, data, now);
             helper.assertTrue(locked.getContents() instanceof TranslatableContents contents
-                    && contents.getKey().equals("message.bleach.gran_rey_cero.locked") && contents.getArgs().length == 1
-                    && String.valueOf(contents.getArgs()[0]).equals("1500"), "the locked message is " + locked);
+                    && contents.getKey().equals("message.bleach.gran_rey_cero.locked") && contents.getArgs().length == 2
+                    && contents.getArgs()[0] instanceof Component rank
+                    && rank.getContents() instanceof TranslatableContents label
+                    && label.getKey().equals("rank.bleach.unnumbered")
+                    && String.valueOf(contents.getArgs()[1]).equals("1500"), "the locked message is " + locked);
             data.setMaxReiryoku(STRONG);
             data.setReiryoku(STRONG);
+            ArrancarRankTests.seat(data, 1);
             assertRefusal(helper, player, data, now, null, "at 1600, ready");
 
             readyAt(data, now + 100L);
@@ -304,6 +311,7 @@ public final class GranReyCeroTests {
         long now = HollowPlayerTests.now(helper);
         Player player = ArrancarTests.arrancar(helper, HollowTier.VASTO_LORDE, STRONG, SPOT);
         SoulData data = SoulLogic.get(player);
+        ArrancarRankTests.seat(data, 1);
         player.setHealth(20.0F);
         SpiderHollow spider = HollowPlayerTests.placed(helper, ModEntities.SPIDER_HOLLOW.get(), 8, 12);
         // A Spider Hollow stands lower than the eyes, so the shot is aimed down at it.

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:arrancar",
+  "display": {
+    "icon": {
+      "id": "bleach:arrancar_jacket"
+    },
+    "title": {
+      "translate": "advancements.bleach.arrancar_uniform.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.arrancar_uniform.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "arrancar_uniform": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "arrancar_uniform"
+      }
+    }
+  }
+}

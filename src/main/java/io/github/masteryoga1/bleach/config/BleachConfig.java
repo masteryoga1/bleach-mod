@@ -550,7 +550,6 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BALA_RADIUS;
     public static final ModConfigSpec.DoubleValue BALA_KNOCKBACK;
 
-    public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_MIN_MAX_REIRYOKU;
     public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_DAMAGE_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_MAX_DAMAGE;
     public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_CHARGE_MULTIPLIER;
@@ -565,6 +564,11 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue GRAN_REY_CERO_COOLDOWN_SECONDS;
     public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_BLOOD_HEALTH;
     public static final ModConfigSpec.DoubleValue GRAN_REY_CERO_MIN_HEALTH_LEFT;
+    public static final ModConfigSpec.BooleanValue GRAN_REY_CERO_PRIVARON_FIRES;
+    public static final ModConfigSpec.DoubleValue ESPADA_MIN_MAX_REIRYOKU;
+    public static final ModConfigSpec.IntValue RANK_ABSENT_HOURS;
+    public static final ModConfigSpec.BooleanValue PRIVARON_ESPADA;
+    public static final ModConfigSpec.BooleanValue NUMERO_TATTOO;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -2196,10 +2200,10 @@ public final class BleachConfig {
         builder.pop();
 
         builder.push("gran_rey_cero");
-        GRAN_REY_CERO_MIN_MAX_REIRYOKU = builder
-                .comment("Maximum reiryoku an Arrancar needs before it can fire a Gran Rey Cero (Sneak and the Cero key), a"
-                        + " stand-in until Arrancar ranks arrive.")
-                .defineInRange("min_max_reiryoku", 1500.0, 0.0, 10_000.0);
+        GRAN_REY_CERO_PRIVARON_FIRES = builder
+                .comment("Whether a Privaron Espada (an Arrancar that lost its seat) may fire a Gran Rey Cero too. Otherwise"
+                        + " only the Espada have it; [arrancar.ranks] says who holds a seat.")
+                .define("privaron_fires", false);
         GRAN_REY_CERO_DAMAGE_MULTIPLIER = builder
                 .comment("How many times the Arrancar's own Cero a Gran Rey Cero deals, before the release.")
                 .defineInRange("damage_multiplier", 3.0, 1.0, 10.0);
@@ -2248,6 +2252,26 @@ public final class BleachConfig {
                 .comment("Health that must remain after the blood is spilt, or the Gran Rey Cero is refused, so it can"
                         + " never kill.")
                 .defineInRange("min_health_left", 4.0, 1.0, 40.0);
+        builder.pop();
+
+        builder.push("ranks");
+        ESPADA_MIN_MAX_REIRYOKU = builder
+                .comment("Maximum reiryoku an Arrancar needs to hold a seat among the Espada. The ten strongest at or above"
+                        + " it hold the seats, the strongest the first; the rest are Números, numbered in the order they"
+                        + " were born. (This was [arrancar.gran_rey_cero] min_max_reiryoku.)")
+                .defineInRange("espada_min_max_reiryoku", 1500.0, 0.0, 10_000.0);
+        RANK_ABSENT_HOURS = builder
+                .comment("Hours of the server running an Arrancar may stay away before it gives up its seat, and its"
+                        + " Número once all 89 are in use. 0 keeps them for the absent forever.")
+                .defineInRange("absent_hours", 168, 0, 8760);
+        PRIVARON_ESPADA = builder
+                .comment("Whether an Arrancar that loses its seat becomes a Privaron Espada, numbered 100 and the last digit"
+                        + " of its old seat, rather than going back to its Número.")
+                .define("privaron_espada", true);
+        NUMERO_TATTOO = builder
+                .comment("Whether a Número's number is tattooed on its body too. Canon shows only the Espada's (and a"
+                        + " Privaron Espada keeps its old seat's).")
+                .define("numero_tattoo", false);
         builder.pop();
         builder.pop();
 

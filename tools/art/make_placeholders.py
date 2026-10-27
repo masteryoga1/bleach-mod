@@ -115,6 +115,12 @@ BAIT_WHITE = rgb(226, 220, 206)
 BAIT_EDGE = rgb(150, 140, 124)
 BAIT_RED = rgb(150, 30, 36)
 BAIT_CORE = rgb(70, 14, 18)
+# The white Arrancar uniform, the Shihakusho in reversed colours: white cloth with a black sash, and black
+# tabi under white zori. The number tattoo's digits are pure white, because TattooLayer inks them by vertex colour.
+ARRANCAR_WHITE = rgb(242, 242, 238)
+ARRANCAR_FOLD = rgb(214, 214, 208)
+ARRANCAR_BLACK = rgb(30, 30, 34)
+TATTOO_GLYPH = rgb(255, 255, 255)
 # The later arts: Letzt Stil's pale gold, Ginrei Kojaku's silver-blue, Vollständig's halo and its
 # translucent wings, the cloud of a Gintō spell, and the Sanrei Glove's blue cuff.
 LETZT = rgb(255, 214, 160)
@@ -894,6 +900,81 @@ def wandenreich_armor_layer_2():
     return c
 
 
+def arrancar_jacket_icon():
+    c = Canvas(16, 16)
+    c.rect(4, 2, 12, 15, ARRANCAR_WHITE)      # body
+    c.rect(1, 3, 4, 12, ARRANCAR_WHITE)       # sleeves, with black cuffs
+    c.rect(12, 3, 15, 12, ARRANCAR_WHITE)
+    c.rect(1, 11, 4, 12, ARRANCAR_BLACK)
+    c.rect(12, 11, 15, 12, ARRANCAR_BLACK)
+    for x, y in [(5, 2), (6, 3), (7, 4), (10, 2), (9, 3), (8, 4)]:  # the lapels' edges, meeting in a V
+        c.put(x, y, ARRANCAR_BLACK)
+    c.rect(4, 10, 12, 12, ARRANCAR_BLACK)     # sash
+    c.rect(5, 12, 6, 15, ARRANCAR_FOLD)       # a fold below it
+    return c
+
+
+def arrancar_hakama_icon():
+    c = Canvas(16, 16)
+    c.rect(3, 2, 13, 4, ARRANCAR_WHITE)       # waist, under the black sash
+    c.rect(3, 2, 13, 3, ARRANCAR_BLACK)
+    c.rect(2, 4, 7, 15, ARRANCAR_WHITE)       # wide legs
+    c.rect(9, 4, 14, 15, ARRANCAR_WHITE)
+    c.rect(7, 4, 9, 7, ARRANCAR_WHITE)        # crotch
+    c.rect(4, 6, 5, 15, ARRANCAR_FOLD)        # pleats
+    c.rect(11, 6, 12, 15, ARRANCAR_FOLD)
+    return c
+
+
+def arrancar_zori_icon():
+    c = Canvas(16, 16)
+    for left in (2, 9):
+        c.rect(left + 1, 6, left + 4, 12, ARRANCAR_BLACK)  # tabi
+        c.rect(left, 12, left + 5, 14, ARRANCAR_WHITE)     # sole
+        c.put(left + 1, 11, ARRANCAR_WHITE)                # the thong over the foot
+        c.put(left + 3, 11, ARRANCAR_WHITE)
+    return c
+
+
+def arrancar_uniform_layer_1():
+    """The jacket on the body and arms, and the zori over black tabi on the legs (the zori use this layer). The head
+    stays clear: the uniform has no headpiece."""
+    c = Canvas(64, 32)
+    # Body: a white jacket whose lapels meet in a black-edged V at the front, a black sash low round the waist,
+    # and folds at the sides.
+    c.rect(20, 16, 36, 20, ARRANCAR_WHITE)
+    c.rect(16, 20, 40, 32, ARRANCAR_WHITE)
+    for x, y in [(21, 20), (22, 21), (23, 22), (23, 23), (26, 20), (25, 21), (24, 22), (24, 23)]:
+        c.put(x, y, ARRANCAR_BLACK)
+    c.rect(16, 28, 40, 30, ARRANCAR_BLACK)
+    c.rect(17, 22, 18, 28, ARRANCAR_FOLD)
+    c.rect(33, 22, 34, 28, ARRANCAR_FOLD)
+    # Arms: sleeves to the wrist, with black cuffs.
+    c.rect(44, 16, 52, 20, ARRANCAR_WHITE)
+    c.rect(40, 20, 56, 32, ARRANCAR_WHITE)
+    c.rect(40, 31, 56, 32, ARRANCAR_BLACK)
+    # Legs: black tabi over the bottom rows, the white edge and underside of the sole, and a white thong across
+    # the front of the foot.
+    c.rect(0, 28, 16, 31, ARRANCAR_BLACK)
+    c.rect(0, 31, 16, 32, ARRANCAR_WHITE)
+    c.rect(8, 16, 12, 20, ARRANCAR_WHITE)
+    for x, y in [(4, 29), (5, 30), (6, 30), (7, 29)]:
+        c.put(x, y, ARRANCAR_WHITE)
+    return c
+
+
+def arrancar_uniform_layer_2():
+    """The hakama, from a black sash low on the waist down to the tabi, pleated all round."""
+    c = Canvas(64, 32)
+    c.rect(16, 26, 40, 32, ARRANCAR_WHITE)    # the waist, low on the body
+    c.rect(16, 27, 40, 29, ARRANCAR_BLACK)    # sash
+    c.rect(4, 16, 8, 20, ARRANCAR_WHITE)      # top of the legs
+    c.rect(0, 20, 16, 30, ARRANCAR_WHITE)
+    for u in range(1, 16, 2):                 # pleats, every other column
+        c.rect(u, 22, u + 1, 30, ARRANCAR_FOLD)
+    return c
+
+
 def mask_fragment_icon():
     """A jagged shard of bone with a crack across it. The shade falls on its lower right: the
     right-most pixel of each row, and the bottom-most of each column."""
@@ -1279,6 +1360,33 @@ def arrancar_hole():
     return c
 
 
+# The digits of an Arrancar's number tattoo, 0 to 9, each three pixels wide and five tall, a row to a string.
+DIGIT_GLYPHS = [
+    ("###", "#.#", "#.#", "#.#", "###"),
+    (".#.", "##.", ".#.", ".#.", "###"),
+    ("###", "..#", "###", "#..", "###"),
+    ("###", "..#", ".##", "..#", "###"),
+    ("#.#", "#.#", "###", "..#", "..#"),
+    ("###", "#..", "###", "..#", "###"),
+    ("###", "#..", "###", "#.#", "###"),
+    ("###", "..#", "..#", ".#.", ".#."),
+    ("###", "#.#", "###", "#.#", "###"),
+    ("###", "#.#", "###", "..#", "###"),
+]
+
+
+def arrancar_digits():
+    """The atlas TattooLayer draws an Arrancar's number from: digit d at x 4d to 4d+2, y 1 to 5, in white, which
+    the layer inks by vertex colour (dark on skin, pale on a released forearm). Everything else stays clear."""
+    c = Canvas(40, 8)
+    for d, glyph in enumerate(DIGIT_GLYPHS):
+        for y, row in enumerate(glyph):
+            for x, cell in enumerate(row):
+                if cell == "#":
+                    c.put(4 * d + x, 1 + y, TATTOO_GLYPH)
+    return c
+
+
 def hollow_player_mask():
     """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
     between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
@@ -1393,6 +1501,11 @@ TEXTURES = {
     "item/wandenreich_boots.png": wandenreich_boots_icon,
     "models/armor/wandenreich_layer_1.png": wandenreich_armor_layer_1,
     "models/armor/wandenreich_layer_2.png": wandenreich_armor_layer_2,
+    "item/arrancar_jacket.png": arrancar_jacket_icon,
+    "item/arrancar_hakama.png": arrancar_hakama_icon,
+    "item/arrancar_zori.png": arrancar_zori_icon,
+    "models/armor/arrancar_uniform_layer_1.png": arrancar_uniform_layer_1,
+    "models/armor/arrancar_uniform_layer_2.png": arrancar_uniform_layer_2,
     "item/mask_fragment.png": mask_fragment_icon,
     "item/hollow_bait.png": hollow_bait_icon,
     "entity/heilig_pfeil.png": heilig_pfeil,
@@ -1419,6 +1532,7 @@ TEXTURES = {
     "entity/hollow_player.png": hollow_player,
     "entity/hollow_vasto_lorde.png": hollow_vasto_lorde,
     "entity/arrancar_hole.png": arrancar_hole,
+    "entity/arrancar_digits.png": arrancar_digits,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,

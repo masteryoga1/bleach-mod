@@ -26,9 +26,9 @@ import org.joml.Vector3f;
 /**
  * An Arrancar's Gran Rey Cero, the strongest Cero, sealed or released: blood from its own body mixed into the
  * Cero (Ch. 280, where Grimmjow plants his sword and cuts his finger on it), in a colour of its own, here its
- * blade's. Only an Arrancar with enough maximum reiryoku has it ({@link #eligible}, a stand-in until Arrancar
- * ranks arrive); it sneaks and presses the Cero key. Sealed, it needs its own blade in the main hand to draw the
- * blood on; released, its claws do the cutting.
+ * blade's. Only the Espada have it ({@link #eligible}: the rank the server's {@link ArrancarRoster} gives); one
+ * sneaks and presses the Cero key. Sealed, it needs its own blade in the main hand to draw the blood on; released,
+ * its claws do the cutting.
  *
  * <p>The blood is paid when the gather starts, as health and never as a blow, so nothing softens it and it can
  * never kill: it is refused unless enough health would be left, and creative pays none. The beam gathers as long
@@ -60,7 +60,7 @@ public final class GranReyCero {
     public enum Refusal {
         /** Held in a Negación light, which lets the soul touch nothing (see {@link Negacion#held}). */
         HELD,
-        /** Not yet strong enough: too little maximum reiryoku. */
+        /** Not an Espada, or a Privaron Espada the server does not let fire: see {@link ArrancarRank#firesGranReyCero}. */
         LOCKED,
         /** The last one fired too short a while ago. */
         COOLDOWN,
@@ -112,14 +112,12 @@ public final class GranReyCero {
 
     // ---- The numbers (all safe on the client: config and synced soul only) ----
 
-    /** Whether this soul has the Gran Rey Cero: an Arrancar with at least {@link #requiredMaxReiryoku}. */
+    /**
+     * Whether this soul has the Gran Rey Cero: an Espada, or a Privaron Espada where the server allows (see
+     * {@link ArrancarRank#firesGranReyCero}).
+     */
     public static boolean eligible(SoulData data) {
-        return ArrancarLogic.isArrancar(data) && data.maxReiryoku() >= requiredMaxReiryoku();
-    }
-
-    /** The maximum reiryoku an Arrancar needs for a Gran Rey Cero, standing in for its rank. */
-    public static float requiredMaxReiryoku() {
-        return (float) BleachConfig.get(BleachConfig.GRAN_REY_CERO_MIN_MAX_REIRYOKU);
+        return ArrancarRank.firesGranReyCero(data);
     }
 
     /**
@@ -357,12 +355,13 @@ public final class GranReyCero {
     }
 
     /**
-     * A refusal as told above the hotbar, in grey: the maximum reiryoku needed for one that is locked, and the
-     * seconds left for one on its wait.
+     * A refusal as told above the hotbar, in grey: the rank held and the maximum reiryoku a seat needs for one that
+     * is locked, and the seconds left for one on its wait.
      */
     public static Component message(Refusal refusal, SoulData data, long now) {
         MutableComponent message = switch (refusal) {
-            case LOCKED -> Component.translatable(refusal.messageKey(), Math.round(requiredMaxReiryoku()));
+            case LOCKED -> Component.translatable(refusal.messageKey(), ArrancarRank.of(data).label(),
+                    Math.round(ArrancarRank.espadaMinMaxReiryoku()));
             case COOLDOWN -> Component.translatable(refusal.messageKey(), secondsToReady(data, now));
             default -> Component.translatable(refusal.messageKey());
         };

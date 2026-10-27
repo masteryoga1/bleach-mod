@@ -1,9 +1,11 @@
 package io.github.masteryoga1.bleach.advancement;
 
+import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.quincy.QuincyStage;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
+import io.github.masteryoga1.bleach.soul.ArrancarRank;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HollowTier;
@@ -154,6 +156,10 @@ public final class Milestones {
     public static final String GRAN_REY_CERO = "gran_rey_cero";
     /** Called down Negación on a comrade, as a Gillian. */
     public static final String NEGACION = "negacion";
+    /** Took a seat among the Espada. Granted when it happens (ArrancarRoster.keep), and caught up here from the record. */
+    public static final String ESPADA = "espada";
+    /** As an Arrancar, wore the white jacket, hakama and zōri. */
+    public static final String ARRANCAR_UNIFORM = "arrancar_uniform";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -223,6 +229,12 @@ public final class Milestones {
         }
         if (QuincyGarbItem.isWandenreichSet(player)) {
             trigger.trigger(player, WANDENREICH);
+        }
+        if (ArrancarRank.of(data).kind() == ArrancarRank.Kind.ESPADA) {
+            trigger.trigger(player, ESPADA);
+        }
+        if (ArrancarLogic.isArrancar(data) && ArrancarUniformItem.isFullSet(player)) {
+            trigger.trigger(player, ARRANCAR_UNIFORM);
         }
         // Read from the record, so a soul taught or met by command counts too.
         QuincyTeaching teaching = data.quincy().teaching();

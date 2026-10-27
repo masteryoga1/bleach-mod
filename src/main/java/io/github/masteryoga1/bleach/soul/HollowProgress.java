@@ -283,8 +283,8 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
     /**
      * The road out of the mask: never torn, or torn naturally (perfected false) or by the Hōgyoku (true).
      * Saved with the rest, read leniently key by key, so a save from before the Arrancar reads as
-     * {@link #NONE}, and one from before the Gran Rey Cero as having no wait for it. The form the Arrancar rose
-     * from is not kept here: it is the soul's Hollow tier.
+     * {@link #NONE}, one from before the Gran Rey Cero as having no wait for it, and one from before the ranks
+     * as having no rank. The form the Arrancar rose from is not kept here: it is the soul's Hollow tier.
      *
      * @param perfected          whether the Hōgyoku made it, which a later natural road never takes away
      * @param failures           tries at tearing the mask that failed, each making the next likelier
@@ -294,10 +294,12 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
      *                           so every older copy crumbles, and 0 means it never had one
      * @param granReyCeroReadyAt no Gran Rey Cero before this game time: the wait after the last one fired, kept
      *                           across a relog as the release's is (see {@link GranReyCero})
+     * @param rank               its rank as the server's roster last said (see {@link ArrancarRank}); a cache, put
+     *                           right each second
      */
     public record Arrancar(boolean perfected, int failures, long lastTearAt, long releaseReadyAt, int forging,
-                           long granReyCeroReadyAt) {
-        public static final Arrancar NONE = new Arrancar(false, 0, NEVER, NEVER, 0, NEVER);
+                           long granReyCeroReadyAt, ArrancarRank rank) {
+        public static final Arrancar NONE = new Arrancar(false, 0, NEVER, NEVER, 0, NEVER, ArrancarRank.NONE);
 
         public static final Codec<Arrancar> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.BOOL.lenientOptionalFieldOf("perfected", false).forGetter(Arrancar::perfected),
@@ -305,13 +307,21 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
                 Codec.LONG.lenientOptionalFieldOf("last_tear_at", NEVER).forGetter(Arrancar::lastTearAt),
                 Codec.LONG.lenientOptionalFieldOf("release_ready_at", NEVER).forGetter(Arrancar::releaseReadyAt),
                 Codec.INT.lenientOptionalFieldOf("forging", 0).forGetter(Arrancar::forging),
-                Codec.LONG.lenientOptionalFieldOf("gran_rey_cero_ready_at", NEVER).forGetter(Arrancar::granReyCeroReadyAt)
+                Codec.LONG.lenientOptionalFieldOf("gran_rey_cero_ready_at", NEVER).forGetter(Arrancar::granReyCeroReadyAt),
+                ArrancarRank.CODEC.lenientOptionalFieldOf("rank", ArrancarRank.NONE).forGetter(Arrancar::rank)
         ).apply(instance, Arrancar::new));
 
-        /** Keeps the counts from going below zero. */
+        /** Keeps the counts from going below zero; a missing rank is none. */
         public Arrancar {
             failures = Math.max(0, failures);
             forging = Math.max(0, forging);
+            rank = rank == null ? ArrancarRank.NONE : rank;
+        }
+
+        /** The six-part record of 5f, with no rank. */
+        public Arrancar(boolean perfected, int failures, long lastTearAt, long releaseReadyAt, int forging,
+                        long granReyCeroReadyAt) {
+            this(perfected, failures, lastTearAt, releaseReadyAt, forging, granReyCeroReadyAt, ArrancarRank.NONE);
         }
 
         /** The five-part record of 5e, with no Gran Rey Cero wait. */
@@ -327,30 +337,35 @@ public record HollowProgress(float satiety, int souls, int pluses, Map<HollowKin
         /**
          * The soul has just become an Arrancar: perfected if this road or an earlier one was the Hōgyoku's, a
          * blade forged anew (so any older one crumbles), and no wait before its first release or its first Gran
-         * Rey Cero, as a new life starts with none. The failed tries and the last one are kept.
+         * Rey Cero, as a new life starts with none. The failed tries and the last one are kept, and so is the
+         * rank, which the server's roster then puts right (see {@link ArrancarRoster#keep}).
          */
         public Arrancar becoming(boolean perfected) {
-            return new Arrancar(this.perfected || perfected, failures, lastTearAt, NEVER, forging + 1, NEVER);
+            return new Arrancar(this.perfected || perfected, failures, lastTearAt, NEVER, forging + 1, NEVER, rank);
         }
 
         public Arrancar withFailures(int value) {
-            return new Arrancar(perfected, value, lastTearAt, releaseReadyAt, forging, granReyCeroReadyAt);
+            return new Arrancar(perfected, value, lastTearAt, releaseReadyAt, forging, granReyCeroReadyAt, rank);
         }
 
         public Arrancar withLastTearAt(long time) {
-            return new Arrancar(perfected, failures, time, releaseReadyAt, forging, granReyCeroReadyAt);
+            return new Arrancar(perfected, failures, time, releaseReadyAt, forging, granReyCeroReadyAt, rank);
         }
 
         public Arrancar withReleaseReadyAt(long time) {
-            return new Arrancar(perfected, failures, lastTearAt, time, forging, granReyCeroReadyAt);
+            return new Arrancar(perfected, failures, lastTearAt, time, forging, granReyCeroReadyAt, rank);
         }
 
         public Arrancar withForging(int value) {
-            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, value, granReyCeroReadyAt);
+            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, value, granReyCeroReadyAt, rank);
         }
 
         public Arrancar withGranReyCeroReadyAt(long time) {
-            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, forging, time);
+            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, forging, time, rank);
+        }
+
+        public Arrancar withRank(ArrancarRank value) {
+            return new Arrancar(perfected, failures, lastTearAt, releaseReadyAt, forging, granReyCeroReadyAt, value);
         }
     }
 }

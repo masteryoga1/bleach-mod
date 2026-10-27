@@ -22,6 +22,8 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarEvents;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
+import io.github.masteryoga1.bleach.soul.ArrancarRank;
+import io.github.masteryoga1.bleach.soul.ArrancarRoster;
 import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.BaitLogic;
 import io.github.masteryoga1.bleach.soul.BaitSite;
@@ -119,7 +121,10 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach hollow &lt;players&gt; satiety &lt;0..100&gt;   (soul hunger, started if it had not; Hollow players only)
  * /bleach hollow &lt;players&gt; souls &lt;0..100000&gt;   (the souls devoured, for any soul)
  * /bleach hollow &lt;players&gt; reset   (the Hollow record starts over; a Hollow's hunger starts again on its next tick)
- *                                    (an Arrancar's failed tears and release cooldown go too, but not its blade)
+ *                                    (an Arrancar's failed tears and release cooldown go too, but not its blade or its rank)
+ * /bleach rank list   (every Arrancar on the server's roster, with its rank and maximum reiryoku)
+ * /bleach rank &lt;players&gt; espada &lt;1..10&gt;   (one Arrancar, seated there whatever its strength until cleared)
+ * /bleach rank &lt;players&gt; clear   (the roster ranks them by their strength again, and forgets a lost seat)
  * /bleach bait &lt;players&gt; &lt;start|stop|wave|finale|status&gt;   (start skips every refusal but the world and Peaceful, and counts as a crush)
  * /bleach bait list
  * /bleach npc &lt;players&gt; &lt;elder|hunter&gt;   (a visit now, with no gates, chance or cooldown)
@@ -248,6 +253,15 @@ public final class BleachCommand {
                                                 .executes(BleachCommand::setSouls)))
                                 .then(Commands.literal("reset")
                                         .executes(BleachCommand::resetHollow))))
+                .then(Commands.literal("rank")
+                        .then(Commands.literal("list")
+                                .executes(context -> rankList(context.getSource())))
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.literal("espada")
+                                        .then(Commands.argument("seat", IntegerArgumentType.integer(1, ArrancarRank.SEATS))
+                                                .executes(BleachCommand::seatEspada)))
+                                .then(Commands.literal("clear")
+                                        .executes(BleachCommand::clearRank))))
                 .then(Commands.literal("bait")
                         .then(Commands.literal("list")
                                 .executes(context -> baitList(context.getSource())))
@@ -418,7 +432,7 @@ public final class BleachCommand {
 
     /**
      * The Arrancar for {@code /bleach info}: the form it rose from, whether it tore free or was perfected, its
-     * blade, and whether it is released, settling after a release (with the seconds left) or sealed.
+     * blade, whether it is released, settling after a release (with the seconds left) or sealed, and its rank.
      */
     private static Component arrancarLine(ServerPlayer player, SoulData data, long now) {
         HollowProgress.Arrancar record = data.hollow().arrancar();
@@ -434,7 +448,7 @@ public final class BleachCommand {
         return Component.translatable("commands.bleach.info.arrancar", ArrancarLogic.origin(data).displayName(),
                 Component.translatable(record.perfected()
                         ? "commands.bleach.info.arrancar.perfected" : "commands.bleach.info.arrancar.natural"),
-                ArrancarLogic.blade(player.getUUID()).displayName(), release);
+                ArrancarLogic.blade(player.getUUID()).displayName(), release, ArrancarRank.of(data).label());
     }
 
     /** A Hollow's failed tries at its own mask for {@code /bleach info}, and the seconds before it may try again. */
@@ -643,7 +657,8 @@ public final class BleachCommand {
     /**
      * Starts the Hollow record over: no hunger, no souls, no meals, sight on. A Hollow's hunger starts
      * again at the start value on its next tick. An Arrancar's failed tears and release cooldown go too,
-     * but its blade's forging is kept, so the blade it holds stays its own.
+     * but its blade's forging is kept, so the blade it holds stays its own, and its rank, so the roster
+     * does not number it again as if it were newly born.
      */
     private static int resetHollow(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
@@ -652,12 +667,100 @@ public final class BleachCommand {
             // Settle what is still owed first, so none of it comes off the fresh hunger.
             HollowBody.flushDebt(data);
             int forging = data.hollow().arrancar().forging();
-            data.setHollow(HollowProgress.NONE.withArrancar(HollowProgress.Arrancar.NONE.withForging(forging)));
+            ArrancarRank rank = data.hollow().arrancar().rank();
+            data.setHollow(HollowProgress.NONE.withArrancar(HollowProgress.Arrancar.NONE.withForging(forging)
+                    .withRank(rank)));
             BleachNetwork.syncSoul(player, data);
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.hollow.reset.success",
                 players.size()), true);
         return players.size();
+    }
+
+    // ---- /bleach rank ----
+
+    /**
+     * Lists every Arrancar on the server's roster, online or not: its name, rank and maximum reiryoku, and whether
+     * it is seated by command or away. The Espada come first by seat, then the Privaron Espada, the Números and
+     * the unnumbered. Only the one who asked sees it.
+     */
+    private static int rankList(CommandSourceStack source) {
+        MinecraftServer server = source.getServer();
+        long now = server.overworld().getGameTime();
+        List<ArrancarRoster.Entry> entries = ArrancarRoster.get(server).entries(now);
+        int needs = Math.round(ArrancarRank.espadaMinMaxReiryoku());
+        source.sendSuccess(() -> Component.translatable("commands.bleach.rank.list", entries.size(), needs), false);
+        for (ArrancarRoster.Entry entry : entries) {
+            Component suffix = entry.pinned() ? Component.translatable("commands.bleach.rank.list.pinned")
+                    : entry.away() ? Component.translatable("commands.bleach.rank.list.away") : Component.empty();
+            Component line = Component.translatable("commands.bleach.rank.list.entry", entry.name(),
+                    entry.rank().label(), entry.strength(), suffix);
+            source.sendSuccess(() -> line, false);
+        }
+        return entries.size();
+    }
+
+    /**
+     * Seats one Arrancar in this seat among the Espada whatever its strength, standing in for Aizen's own choice.
+     * It holds the seat until it is cleared, stops being an Arrancar or stays away too long, and whoever was seated
+     * there by command before is unpinned. The record is put right and sent at once, not a second later.
+     */
+    private static int seatEspada(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
+        if (players.size() > 1) {
+            source.sendFailure(Component.translatable("commands.bleach.rank.one_player"));
+            return 0;
+        }
+        ServerPlayer player = players.iterator().next();
+        SoulData data = SoulLogic.get(player);
+        if (!ArrancarLogic.isArrancar(data)) {
+            source.sendFailure(Component.translatable("commands.bleach.rank.not_arrancar"));
+            return 0;
+        }
+        int seat = IntegerArgumentType.getInteger(context, "seat");
+        MinecraftServer server = source.getServer();
+        long now = server.overworld().getGameTime();
+        ArrancarRoster roster = ArrancarRoster.get(server);
+        // On the roster first, so there is a place to pin.
+        ArrancarRoster.keep(player, data, roster, now);
+        roster.pin(player.getUUID(), seat);
+        ArrancarRank rank = ArrancarRoster.keep(player, data, roster, now);
+        BleachNetwork.syncSoul(player, data);
+        source.sendSuccess(() -> Component.translatable("commands.bleach.rank.espada.success", player.getDisplayName(),
+                rank.label()), true);
+        return 1;
+    }
+
+    /**
+     * Lets the roster rank each Arrancar among these players by its strength again: unpinned, and with any seat
+     * it lost forgotten, so a Privaron Espada is a Número again unless it is strong enough for a seat. Anyone who
+     * is not an Arrancar is left alone, and if no one is, the command fails.
+     */
+    private static int clearRank(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        MinecraftServer server = source.getServer();
+        long now = server.overworld().getGameTime();
+        ArrancarRoster roster = ArrancarRoster.get(server);
+        int cleared = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            if (!ArrancarLogic.isArrancar(data)) {
+                continue;
+            }
+            ArrancarRoster.keep(player, data, roster, now);
+            roster.clear(player.getUUID());
+            ArrancarRoster.keep(player, data, roster, now);
+            BleachNetwork.syncSoul(player, data);
+            cleared++;
+        }
+        if (cleared == 0) {
+            source.sendFailure(Component.translatable("commands.bleach.rank.not_arrancar"));
+            return 0;
+        }
+        int count = cleared;
+        source.sendSuccess(() -> Component.translatable("commands.bleach.rank.clear.success", count), true);
+        return count;
     }
 
     // ---- /bleach bait ----
