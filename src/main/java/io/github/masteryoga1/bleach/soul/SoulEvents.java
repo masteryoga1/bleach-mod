@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
@@ -237,11 +238,13 @@ public final class SoulEvents {
             return;
         }
         // One grant per swing at most, so sweeping several mobs or spam-clicking does not train faster.
-        // A Hollow is worth more than a mundane creature, and its mask more still.
+        // A Hollow is worth more than a mundane creature, and its mask more still. An Arrancar NPC is worth what
+        // an unmasked Hollow is: its mask is only a remnant, with nothing to strike.
         if (attacker.tickCount - data.lastCombatXpTick >= COMBAT_XP_COOLDOWN_TICKS) {
             data.lastCombatXpTick = attacker.tickCount;
             int xp = event.getEntity() instanceof Hollow hollow
-                    ? HollowLogic.hitXp(true, hollow.wasMaskStruckAt(attacker.level().getGameTime())) : 1;
+                    ? HollowLogic.hitXp(true, hollow.wasMaskStruckAt(attacker.level().getGameTime()))
+                    : event.getEntity() instanceof ArrancarNpc ? HollowLogic.hitXp(true, false) : 1;
             SoulLogic.addStatXp(attacker, data, stat, xp);
         }
     }

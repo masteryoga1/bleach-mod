@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.registry;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
@@ -34,9 +35,9 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Pluses, the
- * Garganta, zanpakutō techniques, the Cero and Negación's light, and the Quincy's arrows, blades and
- * Gintō spells.
+ * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Arrancar NPCs,
+ * Pluses, the Garganta, zanpakutō techniques, the Cero and Negación's light, and the Quincy's arrows,
+ * blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -159,6 +160,20 @@ public final class ModEntities {
                     .noSave()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("adjuchas").toString()));
+
+    // ---- Arrancar ----
+
+    /**
+     * An Arrancar NPC: a Número, or a Privaron Espada with its Fracción, come through a Garganta. Saved, as
+     * players' Arrancar are; a person's size, and not fire-proof.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<ArrancarNpc>> ARRANCAR =
+            ENTITY_TYPES.register("arrancar", () -> EntityType.Builder
+                    .<ArrancarNpc>of(ArrancarNpc::new, MobCategory.MONSTER)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("arrancar").toString()));
 
     // ---- Pluses and the Garganta ----
 
@@ -326,6 +341,7 @@ public final class ModEntities {
         event.put(FISHBONE_D.get(), FishboneD.createAttributes().build());
         event.put(GILLIAN.get(), Gillian.createAttributes().build());
         event.put(ADJUCHAS.get(), Adjuchas.createAttributes().build());
+        event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
         event.put(PLUS.get(), PlusSpirit.createAttributes().build());
     }
 }

@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:menos_grande",
+  "display": {
+    "icon": {
+      "id": "bleach:arrancar_blade"
+    },
+    "title": {
+      "translate": "advancements.bleach.arrancar_slain.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.arrancar_slain.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "arrancar_slain": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "arrancar_slain"
+      }
+    }
+  }
+}

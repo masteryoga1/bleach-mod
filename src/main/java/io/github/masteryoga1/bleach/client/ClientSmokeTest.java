@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.client;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
@@ -138,14 +139,16 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * among the Espada and made strong enough to pay by command, the Arrancar sneaks and holds the real Cero
  * key, which gathers a Gran Rey Cero in its blade's colour that fires by itself and is paid for. Then it
  * is mounted by command on a summoned Negación light, which must lift it, and sneaking must leave the
- * light, falling slowly. Last, it puts on the white Arrancar uniform by command, seen from in front,
- * before the run quits.
+ * light, falling slowly. Then it puts on the white Arrancar uniform by command, seen from in front.
+ * Last, seen from behind, a Privaron Espada and a Número are summoned to stand still before it, and both
+ * must reach the client dressed and armed, the bare-chested Privaron Espada with the 3 of its old seat
+ * tattooed on it, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
- * Hollow body, Menos, Cero, Arrancar, Negación light and HUD are drawn, and screenshots of the main
- * moments are saved for review. Any crash in the mod's client code fails the run, and so does anything
- * that did not reach the client as expected.
+ * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light and HUD are drawn, and screenshots
+ * of the main moments are saved for review. Any crash in the mod's client code fails the run, and so
+ * does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -165,6 +168,16 @@ public final class ClientSmokeTest {
     private static final double RIFT_RANGE = 40.0;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
+    /**
+     * A still, bare-chested Privaron Espada facing the player: seat 103, so the 3 of its old seat on its chest (this
+     * UUID's spot is CHEST_LEFT), its hole at the sternum, a Halcón blade and the second mask remnant.
+     */
+    private static final String PRIVARON_NPC = "{NoAI:1b,Rotation:[180f,0f],UUID:[I;0,1,0,0],Rank:{seat:103},"
+            + "ArmorItems:[{id:\"bleach:arrancar_zori\",count:1},{id:\"bleach:arrancar_hakama\",count:1},{},{}]}";
+    /** A still Número 34 facing the player, in the whole uniform. */
+    private static final String NUMERO_NPC = "{NoAI:1b,Rotation:[180f,0f],Rank:{numero:34},"
+            + "ArmorItems:[{id:\"bleach:arrancar_zori\",count:1},{id:\"bleach:arrancar_hakama\",count:1},"
+            + "{id:\"bleach:arrancar_jacket\",count:1},{}]}";
     /** How many ticks the bloodline question stays open before it is answered, so a screenshot shows it. */
     private static final int BLOODLINE_ANSWER_TICKS = 5;
     /** The first step, which turns the player into a Plus and so takes the bloodline question away. */
@@ -867,7 +880,16 @@ public final class ClientSmokeTest {
                 command(minecraft, "item replace entity @s armor.feet with bleach:arrancar_zori");
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
             }
+            // Arrancar NPCs by command, seen from behind: a bare-chested Privaron Espada and a Número in the whole
+            // uniform stand still facing the player, where the stone wall of the Pesquisa beat is cleared away.
             case 4150 -> {
+                command(minecraft, "fill ~-2 ~ ~1 ~2 ~3 ~6 air");
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                command(minecraft, "summon bleach:arrancar ~ ~ ~3 " + PRIVARON_NPC);
+                command(minecraft, "summon bleach:arrancar ~1.5 ~ ~4 " + NUMERO_NPC);
+            }
+            case 4185 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1081,6 +1103,22 @@ public final class ClientSmokeTest {
                 "the Arrancar uniform was never worn")) {
             shot(minecraft, "arrancar_uniform");
         }
+        if (expectWithin(minecraft, 4152, 4175,
+                () -> seenNpc(minecraft, npc -> npc.tattooNumber() == 3
+                        && ArrancarLogic.isArrancarBlade(npc.getMainHandItem())
+                        && npc.getItemBySlot(EquipmentSlot.LEGS).is(ModItems.ARRANCAR_HAKAMA.get())
+                        && npc.getItemBySlot(EquipmentSlot.CHEST).isEmpty())
+                        && seenNpc(minecraft, npc -> npc.tattooNumber() == 0
+                        && npc.getItemBySlot(EquipmentSlot.CHEST).is(ModItems.ARRANCAR_JACKET.get())),
+                "the Arrancar NPCs never stood dressed and armed with the Privaron's 3")) {
+            shot(minecraft, "arrancar_npc");
+        }
+    }
+
+    /** Whether an Arrancar NPC the player can see stands within 8 blocks as asked. */
+    private static boolean seenNpc(Minecraft minecraft, Predicate<ArrancarNpc> state) {
+        return nearest(minecraft, ArrancarNpc.class, 8.0,
+                npc -> npc.isAlive() && !ClientSouls.isHiddenFromViewer(npc) && state.test(npc)) != null;
     }
 
     /** Whether the player is drawn with this Hollow look bit. */

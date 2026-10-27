@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:arrancar_slain",
+  "display": {
+    "icon": {
+      "id": "minecraft:beacon"
+    },
+    "title": {
+      "translate": "advancements.bleach.arrancar_recalled.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.arrancar_recalled.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "arrancar_recalled": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "arrancar_recalled"
+      }
+    }
+  }
+}

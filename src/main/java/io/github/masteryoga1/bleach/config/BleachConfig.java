@@ -570,6 +570,60 @@ public final class BleachConfig {
     public static final ModConfigSpec.BooleanValue PRIVARON_ESPADA;
     public static final ModConfigSpec.BooleanValue NUMERO_TATTOO;
 
+    public static final ModConfigSpec.BooleanValue ARRANCAR_NPC_ARRIVALS;
+    public static final ModConfigSpec.BooleanValue ARRANCAR_NPC_NIGHT_ONLY;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_ARRIVAL_SHARE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_MIN_REIATSU;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_GROUP_MIN_REIATSU;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_GROUP_SHARE;
+    public static final ModConfigSpec.IntValue ARRANCAR_NPC_FRACCION_MIN;
+    public static final ModConfigSpec.IntValue ARRANCAR_NPC_FRACCION_MAX;
+    public static final ModConfigSpec.IntValue ARRANCAR_NPC_MAX_ALIVE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_SPACING;
+    public static final ModConfigSpec.IntValue ARRANCAR_NPC_LIFETIME_MINUTES;
+    public static final ModConfigSpec.IntValue ARRANCAR_NPC_IDLE_LEAVE_SECONDS;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_FOLLOW_RANGE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.IntValue ARRANCAR_NPC_FIRST_CERO_SECONDS;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_CERO_RANGE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_CERO_MIN_RANGE;
+    public static final ModConfigSpec.IntValue ARRANCAR_NPC_CERO_AIM_LOCK_TICKS;
+    public static final ModConfigSpec.BooleanValue ARRANCAR_NPC_CERO_BREAKS_BLOCKS;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_BALA_MIN_RANGE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_SONIDO_MIN_RANGE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_SONIDO_MAX_RANGE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_SONIDO_DODGE_CHANCE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_SONIDO_DODGE_BLOCKS;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_FOLLOW_DISTANCE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_CATCH_UP_DISTANCE;
+    public static final ModConfigSpec.BooleanValue ARRANCAR_NPC_LEADER_HOLDS_BACK;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_LEADER_JOINS_WITHIN;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_GUARD_RANGE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_BARE_CHESTED_SHARE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_UNIFORM_DROP_CHANCE;
+    public static final ModConfigSpec.BooleanValue ARRANCAR_NPC_RECALL;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_RECALL_HEALTH;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_RECALL_CHANCE;
+    public static final ModConfigSpec.DoubleValue ARRANCAR_NPC_RECALL_REACH;
+
+    /**
+     * The numbers of one kind of Arrancar NPC, each in its own section of {@code [arrancar.npc]}: its body, the
+     * band its maximum reiryoku is rolled in, the forms it may have risen from, its Cero, the pace of its Bala and
+     * Sonído, and the experience its slayer is given.
+     */
+    public record ArrancarNpcKind(ModConfigSpec.DoubleValue health, ModConfigSpec.DoubleValue armor,
+            ModConfigSpec.DoubleValue attackBonus, ModConfigSpec.DoubleValue speed,
+            ModConfigSpec.DoubleValue knockbackResistance, ModConfigSpec.DoubleValue minMaxReiryoku,
+            ModConfigSpec.DoubleValue maxMaxReiryoku, ModConfigSpec.DoubleValue gillianShare,
+            ModConfigSpec.DoubleValue vastoLordeShare, ModConfigSpec.DoubleValue ceroDamage,
+            ModConfigSpec.IntValue ceroChargeTicks, ModConfigSpec.IntValue ceroCooldownSeconds,
+            ModConfigSpec.IntValue balaCooldownTicks, ModConfigSpec.IntValue sonidoCooldownTicks,
+            ModConfigSpec.IntValue xp) {
+    }
+
+    public static final ArrancarNpcKind ARRANCAR_NPC_NUMERO;
+    public static final ArrancarNpcKind ARRANCAR_NPC_PRIVARON;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -2273,6 +2327,129 @@ public final class BleachConfig {
                         + " Privaron Espada keeps its old seat's).")
                 .define("numero_tattoo", false);
         builder.pop();
+
+        builder.push("npc");
+        ARRANCAR_NPC_ARRIVALS = builder
+                .comment("Whether Arrancar ever come through a Garganta that opens by chance, in place of Hollows.")
+                .define("arrivals", true);
+        ARRANCAR_NPC_NIGHT_ONLY = builder
+                .comment("Whether Arrancar come only at night.")
+                .define("night_only", true);
+        ARRANCAR_NPC_ARRIVAL_SHARE = builder
+                .comment("Share of the Garganta arrivals for a soul they would come for that bring Arrancar instead of"
+                        + " Hollows: 0.04 is one in 25.")
+                .defineInRange("arrival_share", 0.04, 0.0, 1.0);
+        ARRANCAR_NPC_MIN_REIATSU = builder
+                .comment("Maximum reiryoku a soul needs to draw Arrancar at all.")
+                .defineInRange("min_reiatsu", 600.0, 0.0, 10_000.0);
+        ARRANCAR_NPC_GROUP_MIN_REIATSU = builder
+                .comment("Maximum reiryoku a soul needs to draw a Privaron Espada and its Fracción.")
+                .defineInRange("group_min_reiatsu", 1000.0, 0.0, 10_000.0);
+        ARRANCAR_NPC_GROUP_SHARE = builder
+                .comment("Share of the Arrancar arrivals for such a soul that are a Privaron Espada and its Fracción, not"
+                        + " a lone Número.")
+                .defineInRange("group_share", 0.5, 0.0, 1.0);
+        ARRANCAR_NPC_FRACCION_MIN = builder
+                .comment("Fewest Números a Privaron Espada brings as its Fracción.")
+                .defineInRange("fraccion_min", 2, 1, 8);
+        ARRANCAR_NPC_FRACCION_MAX = builder
+                .comment("Most Números a Privaron Espada brings as its Fracción (fraccion_min if this is less).")
+                .defineInRange("fraccion_max", 4, 1, 8);
+        ARRANCAR_NPC_MAX_ALIVE = builder
+                .comment("Arrancar NPCs alive in loaded chunks across the server before no more come by chance. A"
+                        + " Fracción is cut to fit.")
+                .defineInRange("max_alive", 8, 1, 64);
+        ARRANCAR_NPC_SPACING = builder
+                .comment("Blocks from the soul within which another Arrancar keeps more from coming by chance.")
+                .defineInRange("spacing", 96.0, 0.0, 512.0);
+        ARRANCAR_NPC_LIFETIME_MINUTES = builder
+                .comment("Minutes Arrancar that came through a Garganta stay before they leave through one. 0: no set"
+                        + " time, though they still leave once idle.")
+                .defineInRange("lifetime_minutes", 8, 0, 1440);
+        ARRANCAR_NPC_IDLE_LEAVE_SECONDS = builder
+                .comment("Seconds such an Arrancar stays with no prey and no aware soul within 32 blocks before it leaves."
+                        + " 0: never.")
+                .defineInRange("idle_leave_seconds", 60, 0, 3600);
+        ARRANCAR_NPC_FOLLOW_RANGE = builder
+                .comment("Blocks an Arrancar notices and follows its prey from.")
+                .defineInRange("follow_range", 40.0, 8.0, 128.0);
+        ARRANCAR_NPC_DAMAGE_MULTIPLIER = builder
+                .comment("What the blade, Bala and Cero damage of every Arrancar NPC is multiplied by.")
+                .defineInRange("damage_multiplier", 1.0, 0.1, 10.0);
+        ARRANCAR_NPC_FIRST_CERO_SECONDS = builder
+                .comment("Seconds after it appears before an Arrancar's first Cero, and up to 2 more at random.")
+                .defineInRange("first_cero_seconds", 4, 0, 60);
+        ARRANCAR_NPC_CERO_RANGE = builder
+                .comment("Furthest an Arrancar fires a Cero, in blocks.")
+                .defineInRange("cero_range", 32.0, 4.0, 96.0);
+        ARRANCAR_NPC_CERO_MIN_RANGE = builder
+                .comment("Nearest, in blocks across the ground, an Arrancar fires a Cero; closer, it uses the blade.")
+                .defineInRange("cero_min_range", 6.0, 0.0, 32.0);
+        ARRANCAR_NPC_CERO_AIM_LOCK_TICKS = builder
+                .comment("Ticks before an Arrancar's Cero fires when its aim stops following the prey: 10 is half a"
+                        + " second to step aside.")
+                .defineInRange("cero_aim_lock_ticks", 10, 0, 100);
+        ARRANCAR_NPC_CERO_BREAKS_BLOCKS = builder
+                .comment("Whether an Arrancar's Cero blasts soft blocks where it strikes ([menos] cero_breaks_blocks and"
+                        + " mob griefing must allow it too).")
+                .define("cero_breaks_blocks", true);
+        ARRANCAR_NPC_BALA_MIN_RANGE = builder
+                .comment("Nearest an Arrancar fires a Bala, in blocks; the furthest is the Bala's own reach,"
+                        + " [arrancar.bala] range.")
+                .defineInRange("bala_min_range", 5.0, 0.0, 24.0);
+        ARRANCAR_NPC_SONIDO_MIN_RANGE = builder
+                .comment("Nearest prey an Arrancar closes on by Sonído, in blocks.")
+                .defineInRange("sonido_min_range", 6.0, 2.0, 32.0);
+        ARRANCAR_NPC_SONIDO_MAX_RANGE = builder
+                .comment("Furthest prey an Arrancar closes on by Sonído, in blocks.")
+                .defineInRange("sonido_max_range", 16.0, 2.0, 32.0);
+        ARRANCAR_NPC_SONIDO_DODGE_CHANCE = builder
+                .comment("Chance a blow from within 4 blocks makes an Arrancar Sonído aside, when its Sonído is ready.")
+                .defineInRange("sonido_dodge_chance", 0.25, 0.0, 1.0);
+        ARRANCAR_NPC_SONIDO_DODGE_BLOCKS = builder
+                .comment("Blocks such a dodge goes, at most as far as its Sonído reaches.")
+                .defineInRange("sonido_dodge_blocks", 6.0, 1.0, 16.0);
+        ARRANCAR_NPC_FOLLOW_DISTANCE = builder
+                .comment("Blocks from its leader a Fracción with no prey walks back to within.")
+                .defineInRange("follow_distance", 6.0, 2.0, 32.0);
+        ARRANCAR_NPC_CATCH_UP_DISTANCE = builder
+                .comment("Blocks from its leader beyond which a Fracción catches up by Sonído.")
+                .defineInRange("catch_up_distance", 12.0, 4.0, 64.0);
+        ARRANCAR_NPC_LEADER_HOLDS_BACK = builder
+                .comment("Whether a Privaron Espada lets its Fracción fight first, and joins in only when hurt, when its"
+                        + " prey comes close, or when none of its Fracción is near.")
+                .define("leader_holds_back", true);
+        ARRANCAR_NPC_LEADER_JOINS_WITHIN = builder
+                .comment("Blocks from a holding-back leader within which its prey makes it fight.")
+                .defineInRange("leader_joins_within", 4.0, 0.0, 32.0);
+        ARRANCAR_NPC_GUARD_RANGE = builder
+                .comment("Blocks within which one of its Fracción must be for a leader to hold back.")
+                .defineInRange("guard_range", 16.0, 4.0, 64.0);
+        ARRANCAR_NPC_BARE_CHESTED_SHARE = builder
+                .comment("Share of Arrancar that wear no jacket, showing the hole.")
+                .defineInRange("bare_chested_share", 0.25, 0.0, 1.0);
+        ARRANCAR_NPC_UNIFORM_DROP_CHANCE = builder
+                .comment("Chance an Arrancar that dies within 5 seconds of a player's blow drops one piece of the"
+                        + " uniform it wore.")
+                .defineInRange("uniform_drop_chance", 0.05, 0.0, 1.0);
+        ARRANCAR_NPC_RECALL = builder
+                .comment("Whether a beaten Privaron Espada may be lifted away by Negación, with its Fracción.")
+                .define("recall", true);
+        ARRANCAR_NPC_RECALL_HEALTH = builder
+                .comment("Share of its maximum health at or below which a Privaron Espada has its one chance of a"
+                        + " recall: 0.3 is 45 of 150 (22.5 hearts).")
+                .defineInRange("recall_health", 0.3, 0.01, 1.0);
+        ARRANCAR_NPC_RECALL_CHANCE = builder
+                .comment("Chance of that one roll.")
+                .defineInRange("recall_chance", 0.5, 0.0, 1.0);
+        ARRANCAR_NPC_RECALL_REACH = builder
+                .comment("Blocks from the leader within which its Fracción are lifted away with it.")
+                .defineInRange("recall_reach", 32.0, 4.0, 64.0);
+        ARRANCAR_NPC_NUMERO = npcKind(builder, "numero", "a Número", 60.0, 4.0, 0.0, 0.30, 0.3, 500.0, 900.0, 0.3, 0.0,
+                12.0, 30, 12, 40, 60, 40);
+        ARRANCAR_NPC_PRIVARON = npcKind(builder, "privaron", "a Privaron Espada", 150.0, 8.0, 4.0, 0.32, 0.5, 1100.0,
+                1400.0, 0.0, 0.5, 18.0, 24, 9, 30, 40, 80);
+        builder.pop();
         builder.pop();
 
         SPEC = builder.build();
@@ -2354,6 +2531,53 @@ public final class BleachConfig {
                         .defineInRange("bala_damage", bala, 0.0, 100.0));
         builder.pop();
         return origin;
+    }
+
+    /**
+     * One kind's section, {@code [arrancar.npc.<name>]}, with its defaults; {@code who} names it in comments ("a
+     * Número", "a Privaron Espada").
+     */
+    private static ArrancarNpcKind npcKind(ModConfigSpec.Builder builder, String name, String who, double health,
+                                           double armor, double attackBonus, double speed, double knockbackResistance,
+                                           double minReiryoku, double maxReiryoku, double gillianShare, double vastoShare,
+                                           double ceroDamage, int ceroChargeTicks, int ceroCooldownSeconds,
+                                           int balaCooldownTicks, int sonidoCooldownTicks, int xp) {
+        builder.push(name);
+        ArrancarNpcKind kind = new ArrancarNpcKind(
+                builder.comment("Maximum health of " + who + " (2 is a heart).")
+                        .defineInRange("health", health, 1.0, 1024.0),
+                builder.comment("Armour points of " + who + "; the uniform gives none.")
+                        .defineInRange("armor", armor, 0.0, 30.0),
+                builder.comment("Damage a blow of " + who + " deals on top of its blade's (2 is a heart).")
+                        .defineInRange("attack_bonus", attackBonus, 0.0, 100.0),
+                builder.comment("Movement speed of " + who + ", as the attribute (a zombie has 0.23).")
+                        .defineInRange("speed", speed, 0.05, 1.0),
+                builder.comment("Share of knockback " + who + " shrugs off (1 is all of it).")
+                        .defineInRange("knockback_resistance", knockbackResistance, 0.0, 1.0),
+                builder.comment("Lowest maximum reiryoku " + who + " is given.")
+                        .defineInRange("min_max_reiryoku", minReiryoku, 0.0, 10_000.0),
+                builder.comment("Highest maximum reiryoku " + who + " is given, always kept below [arrancar.ranks]"
+                                + " espada_min_max_reiryoku.")
+                        .defineInRange("max_max_reiryoku", maxReiryoku, 0.0, 10_000.0),
+                builder.comment("Share of " + who + " risen from a Gillian.")
+                        .defineInRange("gillian_share", gillianShare, 0.0, 1.0),
+                builder.comment("Share of " + who + " risen from a Vasto Lorde; the rest rose from an Adjuchas.")
+                        .defineInRange("vasto_lorde_share", vastoShare, 0.0, 1.0),
+                builder.comment("Damage of a fully gathered Cero of " + who + ", before [arrancar.npc] damage_multiplier"
+                                + " (2 is a heart).")
+                        .defineInRange("cero_damage", ceroDamage, 0.0, 200.0),
+                builder.comment("Ticks " + who + " takes to gather a Cero (20 is a second).")
+                        .defineInRange("cero_charge_ticks", ceroChargeTicks, 5, 200),
+                builder.comment("Seconds between one Cero of " + who + " and the next, and up to 2 more at random.")
+                        .defineInRange("cero_cooldown_seconds", ceroCooldownSeconds, 1, 600),
+                builder.comment("Ticks between one Bala of " + who + " and the next (20 is a second).")
+                        .defineInRange("bala_cooldown_ticks", balaCooldownTicks, 5, 1200),
+                builder.comment("Ticks between one Sonído step of " + who + " and the next (20 is a second).")
+                        .defineInRange("sonido_cooldown_ticks", sonidoCooldownTicks, 10, 1200),
+                builder.comment("Experience the player who slays " + who + " is given (a Gillian gives 60).")
+                        .defineInRange("xp", xp, 0, 10_000));
+        builder.pop();
+        return kind;
     }
 
     /** The configured value, or its default when no world is loaded (for example on the title screen). */

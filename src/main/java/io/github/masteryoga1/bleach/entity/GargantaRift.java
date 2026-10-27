@@ -25,6 +25,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.PushReaction;
@@ -43,6 +44,9 @@ import net.neoforged.neoforge.event.EventHooks;
  * site too, and the site is told how many came through. Such a tear may be quiet, sounding to no
  * pager. The bait's finale opens a great tear in the sky ({@link #sky}) that stays open for a while
  * ({@link #hold()}) before it closes.
+ * <p>
+ * An arrival tear may also carry mobs made ready elsewhere ({@link #carrying}), such as Arrancar. They drop
+ * after its Hollows, and like them never come if the tear is gone first.
  */
 public class GargantaRift extends Entity {
     private static final EntityDataAccessor<Long> DATA_OPEN_AT =
@@ -77,10 +81,15 @@ public class GargantaRift extends Entity {
     private static final int SKY_TOP_MARGIN = 8;
 
     private final List<HollowKind> pending = new ArrayList<>();
+    /**
+     * Mobs made ready elsewhere and dropped after the Hollows, each at its own spot; not in the world until then.
+     * Server only, never saved.
+     */
+    private final List<Mob> carried = new ArrayList<>();
     /** The soul whose reiatsu drew the Hollows, if any. */
     @Nullable
     private UUID drawer;
-    /** The Hollow a departure tear has come for, until it is taken. */
+    /** The creature (a Hollow or an Arrancar) a departure tear has come for, until it is taken. */
     @Nullable
     private UUID leaving;
     private boolean opened;
@@ -125,8 +134,8 @@ public class GargantaRift extends Entity {
         return rift;
     }
 
-    /** A small tear that opens now around a Hollow and takes it. It is not yet in the world: the caller adds it. */
-    public static GargantaRift departure(ServerLevel level, Hollow leaving) {
+    /** A small tear that opens now around a creature and takes it. It is not yet in the world: the caller adds it. */
+    public static GargantaRift departure(ServerLevel level, Entity leaving) {
         GargantaRift rift = new GargantaRift(ModEntities.GARGANTA.get(), level);
         rift.moveTo(leaving.getX(), leaving.getY(), leaving.getZ(), 0.0F, 0.0F);
         rift.entityData.set(DATA_OPEN_AT, level.getGameTime());
@@ -134,6 +143,15 @@ public class GargantaRift extends Entity {
         rift.entityData.set(DATA_SIZE, DEPARTURE_SIZE);
         rift.leaving = leaving.getUUID();
         return rift;
+    }
+
+    /**
+     * This tear also drops these mobs, set up by the caller but not yet added to the world, after any Hollows.
+     * Returns this.
+     */
+    public GargantaRift carrying(List<? extends Mob> mobs) {
+        carried.addAll(mobs);
+        return this;
     }
 
     @Override
@@ -267,7 +285,8 @@ public class GargantaRift extends Entity {
      * Drops the Hollows, each a little way from the middle if there is room there, turned toward the
      * soul that drew them. They hunt that soul if it is here and still their prey (a Hollow that drew
      * them is their rival), and Fishbone D takes it as its quarry. Hollows fall the few blocks to the
-     * ground unharmed. Those a Hollow Bait drew belong to its site, which is told how many came.
+     * ground unharmed. Those a Hollow Bait drew belong to its site, which is told how many came. Mobs it carries
+     * (Arrancar) drop after them, each set on the drawer if it may attack it.
      */
     private void drop(ServerLevel server) {
         ServerPlayer target = drawer != null ? server.getServer().getPlayerList().getPlayer(drawer) : null;
@@ -282,9 +301,7 @@ public class GargantaRift extends Entity {
                 continue;
             }
             Vec3 at = dropSpot(server, type, kind.scaleMax);
-            float yaw = target != null
-                    ? (float) (Mth.atan2(target.getZ() - at.z, target.getX() - at.x) * Mth.RAD_TO_DEG) - 90.0F
-                    : random.nextFloat() * 360.0F;
+            float yaw = yawToward(target, at);
             hollow.moveTo(at.x, at.y, at.z, yaw, 0.0F);
             hollow.setYHeadRot(yaw);
             hollow.setYBodyRot(yaw);
@@ -313,10 +330,36 @@ public class GargantaRift extends Entity {
             SpiritSenses.particles(server, ParticleTypes.LARGE_SMOKE, hollow.getX(), hollow.getY() + hollow.getBbHeight() * 0.5,
                     hollow.getZ(), 10, 0.4, 0.4, 0.4, 0.02);
         }
+        // Carried mobs are not the bait's (no bait tear carries any), so they do not count as landed.
+        for (Mob mob : carried) {
+            Vec3 at = dropSpot(server, mob.getType(), mob.getScale());
+            float yaw = yawToward(target, at);
+            mob.moveTo(at.x, at.y, at.z, yaw, 0.0F);
+            mob.setYHeadRot(yaw);
+            mob.setYBodyRot(yaw);
+            EventHooks.finalizeMobSpawn(mob, server, server.getCurrentDifficultyAt(BlockPos.containing(at)),
+                    MobSpawnType.EVENT, null);
+            if (!server.addFreshEntity(mob)) {
+                continue;
+            }
+            if (target != null && mob.canAttack(target)) {
+                mob.setTarget(target);
+            }
+            SpiritSenses.particles(server, ParticleTypes.LARGE_SMOKE, mob.getX(), mob.getY() + mob.getBbHeight() * 0.5,
+                    mob.getZ(), 10, 0.4, 0.4, 0.4, 0.02);
+        }
+        carried.clear();
         pending.clear();
         if (baitSite != null) {
             BaitEvents.onArrived(server, baitSite, landed);
         }
+    }
+
+    /** The yaw that faces the drawer from this spot, or a random one with no drawer here. */
+    private float yawToward(@Nullable ServerPlayer target, Vec3 at) {
+        return target != null
+                ? (float) (Mth.atan2(target.getZ() - at.z, target.getX() - at.x) * Mth.RAD_TO_DEG) - 90.0F
+                : random.nextFloat() * 360.0F;
     }
 
     /**

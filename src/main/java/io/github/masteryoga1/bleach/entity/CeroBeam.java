@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.ArrancarNpcLogic;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
@@ -577,10 +578,24 @@ public class CeroBeam extends Entity {
      * would hunt or fight: its target, whatever last hurt it, or its prey ({@link HollowLogic#isPreyFor}),
      * and never another Hollow, a Plus (spirit or player), a player in creative or spectator mode, or
      * anything it is allied to. So the mundane creatures about, the Academy's instructor and every Plus
-     * are spared: a Plus is to be eaten, not blasted. Anyone else's Cero keeps the rules of every soul's
-     * projectiles ({@link SpiritProjectiles#mayStrike}).
+     * are spared: a Plus is to be eaten, not blasted. An Arrancar NPC's (its Bala too, whose owner it is)
+     * strikes likewise only its target, whatever last hurt it, or its prey ({@link ArrancarNpcLogic#isPrey}),
+     * and never another Arrancar NPC, its leader, a Plus, a Shinigami or Quincy NPC, or a player in creative or
+     * spectator mode. Anyone else's Cero keeps the rules of every soul's projectiles
+     * ({@link SpiritProjectiles#mayStrike}).
      */
     public static boolean mayStrike(@Nullable Entity owner, LivingEntity target) {
+        if (owner instanceof ArrancarNpc npc) {
+            if (!target.isAlive() || target instanceof ArrancarNpc || target instanceof PlusSpirit
+                    || target instanceof ShinigamiNpc || target instanceof QuincyNpc
+                    || target.getUUID().equals(npc.leaderId())) {
+                return false;
+            }
+            if (target instanceof Player player && (player.isCreative() || player.isSpectator())) {
+                return false;
+            }
+            return target == npc.getTarget() || target == npc.getLastHurtByMob() || ArrancarNpcLogic.isPrey(target);
+        }
         if (!(owner instanceof Hollow hollow)) {
             return SpiritProjectiles.mayStrike(owner, target);
         }
