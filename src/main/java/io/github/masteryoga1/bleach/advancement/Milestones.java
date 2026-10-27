@@ -164,6 +164,10 @@ public final class Milestones {
     public static final String ARRANCAR_SLAIN = "arrancar_slain";
     /** Saw a beaten Privaron Espada and its Fracción lifted away by Negación. */
     public static final String ARRANCAR_RECALLED = "arrancar_recalled";
+    /** As an Espada, shut someone away in a Caja Negación. Granted when it happens (CajaNegacion), as is the one below. */
+    public static final String CAJA_NEGACION = "caja_negacion";
+    /** As an Espada, took a beaten Número as its Fracción (ArrancarNpcEvents). */
+    public static final String FRACCION = "fraccion";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;

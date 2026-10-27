@@ -624,6 +624,23 @@ public final class BleachConfig {
     public static final ArrancarNpcKind ARRANCAR_NPC_NUMERO;
     public static final ArrancarNpcKind ARRANCAR_NPC_PRIVARON;
 
+    public static final ModConfigSpec.BooleanValue CAJA_ENABLED;
+    public static final ModConfigSpec.IntValue CAJA_MAX_SECONDS;
+    public static final ModConfigSpec.IntValue CAJA_MIN_SECONDS;
+    public static final ModConfigSpec.IntValue CAJA_ESPADA_SECONDS;
+    public static final ModConfigSpec.DoubleValue CAJA_FULL_SHARE;
+    public static final ModConfigSpec.IntValue CAJA_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue CAJA_REISSUE_MINUTES;
+    public static final ModConfigSpec.BooleanValue CAJA_PVP;
+    public static final ModConfigSpec.BooleanValue CAJA_FROM_BEHIND;
+
+    public static final ModConfigSpec.IntValue FRACCION_MAX;
+    public static final ModConfigSpec.DoubleValue FRACCION_YIELD_HEALTH;
+    public static final ModConfigSpec.IntValue FRACCION_YIELD_SECONDS;
+    public static final ModConfigSpec.DoubleValue FRACCION_FOLLOW_LEASH;
+    public static final ModConfigSpec.IntValue FRACCION_POST_RADIUS;
+    public static final ModConfigSpec.IntValue FRACCION_HEAL_SECONDS;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -2449,6 +2466,66 @@ public final class BleachConfig {
                 12.0, 30, 12, 40, 60, 40);
         ARRANCAR_NPC_PRIVARON = npcKind(builder, "privaron", "a Privaron Espada", 150.0, 8.0, 4.0, 0.32, 0.5, 1100.0,
                 1400.0, 0.0, 0.5, 18.0, 24, 9, 30, 40, 80);
+        builder.pop();
+
+        builder.push("caja");
+        CAJA_ENABLED = builder
+                .comment("Whether the seated Espada carry a Caja Negación. Off: none is given, any carried crumbles, and"
+                        + " none can be used.")
+                .define("enabled", true);
+        CAJA_MAX_SECONDS = builder
+                .comment("Seconds a Caja Negación holds a soul of at most full_share of an Espada's strength"
+                        + " (espada_min_max_reiryoku).")
+                .defineInRange("max_seconds", 60, 5, 600);
+        CAJA_MIN_SECONDS = builder
+                .comment("Seconds it holds a soul at or past an Espada's strength. Between the two the time falls in a"
+                        + " straight line.")
+                .defineInRange("min_seconds", 10, 1, 600);
+        CAJA_ESPADA_SECONDS = builder
+                .comment("Seconds it holds a seated Espada, whatever its strength: it was never made for use between"
+                        + " Espada.")
+                .defineInRange("espada_seconds", 5, 1, 600);
+        CAJA_FULL_SHARE = builder
+                .comment("Share of espada_min_max_reiryoku up to which a soul is held the full max_seconds.")
+                .defineInRange("full_share", 0.5, 0.0, 1.0);
+        CAJA_COOLDOWN_SECONDS = builder
+                .comment("Seconds before an Espada's Caja Negación can be used again, kept across a relog. Creative"
+                        + " players need not wait.")
+                .defineInRange("cooldown_seconds", 300, 0, 3600);
+        CAJA_REISSUE_MINUTES = builder
+                .comment("Minutes a seated Espada goes without its Caja Negación before a new one is given. 0 never gives"
+                        + " another.")
+                .defineInRange("reissue_minutes", 10, 0, 1440);
+        CAJA_PVP = builder
+                .comment("Whether it can shut away a player at all (a Hollow or an Arrancar). The server's PvP rule and"
+                        + " teams still apply.")
+                .define("pvp", true);
+        CAJA_FROM_BEHIND = builder
+                .comment("Whether it must be used from behind or the side, outside the target's 120-degree view; never"
+                        + " needed on one's own Fracción.")
+                .define("from_behind", true);
+        builder.pop();
+
+        builder.push("fraccion");
+        FRACCION_MAX = builder
+                .comment("Most Números one Espada may hold as its Fracción. 0 turns the Fracción off.")
+                .defineInRange("max_fraccion", 3, 0, 6);
+        FRACCION_YIELD_HEALTH = builder
+                .comment("Share of its health at or below which a Número struck by a seated Espada kneels to it: 0.3 is"
+                        + " 18 of 60 (9 hearts).")
+                .defineInRange("yield_health", 0.3, 0.05, 1.0);
+        FRACCION_YIELD_SECONDS = builder
+                .comment("Seconds a kneeling Número waits to be taken with an empty hand before it stands again.")
+                .defineInRange("yield_seconds", 30, 5, 300);
+        FRACCION_FOLLOW_LEASH = builder
+                .comment("Blocks from its Espada beyond which a Fracción stops following and holds its post.")
+                .defineInRange("follow_leash", 64.0, 16.0, 256.0);
+        FRACCION_POST_RADIUS = builder
+                .comment("Blocks a Fracción strays from its post while its Espada is away, offline or in another world.")
+                .defineInRange("post_radius", 8, 2, 32);
+        FRACCION_HEAL_SECONDS = builder
+                .comment("Seconds between each half-heart a Fracción heals while it has no target. 0 turns healing off.")
+                .defineInRange("heal_seconds", 4, 0, 60);
         builder.pop();
         builder.pop();
 

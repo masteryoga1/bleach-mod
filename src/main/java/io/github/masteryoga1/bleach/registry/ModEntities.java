@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
@@ -36,8 +37,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Arrancar NPCs,
- * Pluses, the Garganta, zanpakutō techniques, the Cero and Negación's light, and the Quincy's arrows,
- * blades and Gintō spells.
+ * Pluses, the Garganta, zanpakutō techniques, the Cero, Negación's light and the Caja Negación, and the
+ * Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -227,6 +228,20 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .updateInterval(1)
                     .build(BleachMod.id("negacion").toString()));
+
+    /**
+     * The Caja Negación's cage, closed round a creature with a Hollow hole: it holds it out of the world for a
+     * while and sets it down unharmed. It is never saved; a held mob is saved on foot (see CajaNegacion).
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<CajaNegacion>> CAJA_NEGACION =
+            ENTITY_TYPES.register("caja_negacion", () -> EntityType.Builder
+                    .<CajaNegacion>of(CajaNegacion::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F)
+                    .noSave()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(20)
+                    .build(BleachMod.id("caja_negacion").toString()));
 
     // ---- Zanpakutō techniques ----
 

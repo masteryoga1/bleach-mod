@@ -19,6 +19,7 @@
     "bleach:adjuchas",
     "bleach:cero_beam",
     "bleach:negacion",
+    "bleach:caja_negacion",
     "bleach:arrancar"
   ]
 }

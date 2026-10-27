@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:espada",
+  "display": {
+    "icon": {
+      "id": "bleach:arrancar_jacket"
+    },
+    "title": {
+      "translate": "advancements.bleach.fraccion.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.fraccion.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "fraccion": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "fraccion"
+      }
+    }
+  }
+}

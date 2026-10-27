@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
@@ -140,15 +141,18 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * key, which gathers a Gran Rey Cero in its blade's colour that fires by itself and is paid for. Then it
  * is mounted by command on a summoned Negación light, which must lift it, and sneaking must leave the
  * light, falling slowly. Then it puts on the white Arrancar uniform by command, seen from in front.
- * Last, seen from behind, a Privaron Espada and a Número are summoned to stand still before it, and both
+ * Then, seen from behind, a Privaron Espada and a Número are summoned to stand still before it, and both
  * must reach the client dressed and armed, the bare-chested Privaron Espada with the 3 of its old seat
- * tattooed on it, before the run quits.
+ * tattooed on it. A Caja Negación is summoned and the Número mounted in it by command: the cage must
+ * close on it and then hide it from the player, and must let it out when the cage is killed. Last, in
+ * first person, the player is mounted in a Caja of its own, which must hold it; sneaking must not get it
+ * out, and when that cage is killed too it must let the player go, falling slowly, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
- * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light and HUD are drawn, and screenshots
- * of the main moments are saved for review. Any crash in the mod's client code fails the run, and so
- * does anything that did not reach the client as expected.
+ * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación and HUD are drawn,
+ * and screenshots of the main moments are saved for review. Any crash in the mod's client code fails
+ * the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -890,7 +894,27 @@ public final class ClientSmokeTest {
                 command(minecraft, "summon bleach:arrancar ~-2 ~ ~4 " + PRIVARON_NPC);
                 command(minecraft, "summon bleach:arrancar ~2 ~ ~4 " + NUMERO_NPC);
             }
-            case 4185 -> {
+            // A Caja Negación by command: summoned beside the player, it closes on the Número mounted in it and hides
+            // it, and lets it out when killed.
+            case 4185 -> command(minecraft, "summon bleach:caja_negacion ~2 ~ ~4");
+            case 4187 -> command(minecraft, "ride @e[type=bleach:arrancar,limit=1,nbt={Rank:{numero:34}}] mount "
+                    + "@e[type=bleach:caja_negacion,limit=1,sort=nearest]");
+            case 4222 -> command(minecraft, "kill @e[type=bleach:caja_negacion]");
+            // Then the player itself, in first person: sneaking does not get it out, and the kill lets it go.
+            case 4237 -> {
+                command(minecraft, "summon bleach:caja_negacion ~ ~ ~");
+                minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            }
+            case 4239 -> command(minecraft, "ride @s mount @e[type=bleach:caja_negacion,limit=1,sort=nearest]");
+            case 4268 -> minecraft.options.keyShift.setDown(true);
+            case 4272 -> minecraft.options.keyShift.setDown(false);
+            case 4280 -> {
+                if (!(player.getVehicle() instanceof CajaNegacion)) {
+                    fail(minecraft, "sneaking let the player out of the Caja Negación");
+                }
+            }
+            case 4281 -> command(minecraft, "kill @e[type=bleach:caja_negacion]");
+            case 4300 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1114,6 +1138,26 @@ public final class ClientSmokeTest {
                 "the Arrancar NPCs never stood dressed and armed with the Privaron's 3")) {
             shot(minecraft, "arrancar_npc");
         }
+        if (expectWithin(minecraft, 4188, 4200,
+                () -> nearest(minecraft, CajaNegacion.class, 8.0,
+                        caja -> caja.phase() == CajaNegacion.Phase.CLOSING && !caja.getPassengers().isEmpty()) != null,
+                "the Caja Negación never closed on the Número")) {
+            shot(minecraft, "caja_negacion");
+        }
+        expectWithin(minecraft, 4204, 4220,
+                () -> nearest(minecraft, ArrancarNpc.class, 8.0,
+                        npc -> npc.getVehicle() instanceof CajaNegacion caja && caja.phase() == CajaNegacion.Phase.HOLDING
+                                && ClientSouls.isHiddenFromViewer(npc)) != null,
+                "the Número was never hidden in the Caja Negación");
+        expectWithin(minecraft, 4224, 4235, () -> seenNpc(minecraft, npc -> npc.tattooNumber() == 0 && !npc.isPassenger()),
+                "the Número never came back out of the Caja Negación");
+        if (expectWithin(minecraft, 4240, 4265,
+                () -> player.getVehicle() instanceof CajaNegacion caja && caja.phase() == CajaNegacion.Phase.HOLDING,
+                "the player was never held in the Caja Negación")) {
+            shot(minecraft, "caja_inside");
+        }
+        expectWithin(minecraft, 4283, 4295, () -> !player.isPassenger() && player.hasEffect(MobEffects.SLOW_FALLING),
+                "the Caja Negación never let the player go, or let it go without Slow Falling");
     }
 
     /** Whether an Arrancar NPC the player can see stands within 8 blocks as asked. */

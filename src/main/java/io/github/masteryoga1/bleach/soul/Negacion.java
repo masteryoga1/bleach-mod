@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
@@ -20,6 +21,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -39,13 +41,13 @@ import net.neoforged.neoforge.event.level.BlockEvent;
  * share of its reiryoku and a short wait. A mob is lifted at once; a player is offered the light and must step
  * into it by using it, for the light never takes the unwilling.
  *
- * <p>The light itself, its rise and its carry-off are {@link NegacionLight}. Being held is riding one, and
- * {@link #held} is the one place that knows it, on both sides. The held cannot be hurt but by what passes every
- * protection (the void and {@code /kill}), and cannot hurt, use or build: their blows and shots are cancelled
- * here, as are a held player's attacks, item and block use, dealings with creatures and block breaking, and the
- * Hollow arts refuse them in their own checks. A player held at logging out is set down first, before it is
- * saved. The cooldown is a transient in the soul, so nothing is saved; everything but the milestone takes a
- * {@link Player}, so game tests can use mock players.
+ * <p>The light itself, its rise and its carry-off are {@link NegacionLight}. Being held is riding a
+ * {@link HoldingVehicle}, that light or an Espada's Caja Negación, and {@link #held} is the one place that knows
+ * it, on both sides. The held cannot be hurt but by what passes every protection (the void and {@code /kill}),
+ * and cannot hurt, use or build: their blows and shots are cancelled here, as are a held player's attacks, item
+ * and block use, dealings with creatures and block breaking, and the Hollow arts refuse them in their own checks.
+ * A player held at logging out is set down first, before it is saved. The cooldown is a transient in the soul, so
+ * nothing is saved; everything but the milestone takes a {@link Player}, so game tests can use mock players.
  */
 public final class Negacion {
     /** The tallest and widest creature the light can hold, in blocks. */
@@ -71,6 +73,17 @@ public final class Negacion {
         }
     }
 
+    /** A vehicle that holds its rider untouchable: Negación's light or the Caja Negación. */
+    public interface HoldingVehicle {
+        Level level();
+
+        /** Tells this held player, above the hotbar and at most once a second, that it can touch nothing. Server only. */
+        void tellHeld(Player player);
+
+        /** Lets this held player off where it was found, falling slowly, and ends the hold. Server only. */
+        void setDown(Player player);
+    }
+
     private Negacion() {
     }
 
@@ -92,9 +105,9 @@ public final class Negacion {
 
     // ---- The held state ----
 
-    /** The one place the held state is known: riding a light. Both sides. */
+    /** The one place the held state is known: riding a {@link HoldingVehicle}, a light or a Caja. Both sides. */
     public static boolean held(@Nullable Entity entity) {
-        return entity != null && entity.getVehicle() instanceof NegacionLight;
+        return entity != null && entity.getVehicle() instanceof HoldingVehicle;
     }
 
     /** The light that holds this creature, or null for one not held. */
@@ -103,11 +116,17 @@ public final class Negacion {
         return entity != null && entity.getVehicle() instanceof NegacionLight light ? light : null;
     }
 
+    /** Whatever holds this creature, a light or a Caja, or null for one not held. */
+    @Nullable
+    public static HoldingVehicle holderOf(@Nullable Entity entity) {
+        return entity != null && entity.getVehicle() instanceof HoldingVehicle holder ? holder : null;
+    }
+
     /**
      * The shape and state rules every Negación keeps, for mobs and players alike: a living creature not held
      * already, no taller than {@link #MAX_HEIGHT} and no wider than {@link #MAX_WIDTH}. A Hollow must be no
      * Gillian (it leaves by its own retreat) and not held in jaws, leaving, dissolving or held by a bait; a
-     * player must be no spectator and no giant.
+     * player must be no spectator and no giant; an Arrancar NPC must not be leaving through its Garganta.
      */
     public static boolean mayHold(LivingEntity target) {
         if (!target.isAlive() || held(target) || target.getBbHeight() > MAX_HEIGHT || target.getBbWidth() > MAX_WIDTH) {
@@ -119,6 +138,9 @@ public final class Negacion {
         }
         if (target instanceof Player player) {
             return !player.isSpectator() && !MenosBody.isGiant(player);
+        }
+        if (target instanceof ArrancarNpc npc) {
+            return !npc.isDeparting();
         }
         return true;
     }
@@ -220,10 +242,11 @@ public final class Negacion {
     /**
      * Why this creature may not be given a Negación by this caster, or null when it may, the first that applies
      * winning: none to give it to (none, dead or in another world); too big (taller or wider than the light, a
-     * Gillian or a giant player); busy (held, with an offer already waiting by it, or a Hollow the light may not
-     * hold now); and not an ally. A player is an ally when it sees spirits and is a Hollow or an Arrancar or on
-     * the caster's team; a Hollow mob always is; no other creature is. The PvP rule is not asked: the light never
-     * harms, and a player must step into it.
+     * Gillian or a giant player); busy (held, with an offer already waiting by it, or a creature the light may
+     * not hold now); and not an ally. A player is an ally when it sees spirits and is a Hollow or an Arrancar or
+     * on the caster's team; a Hollow mob always is, and an Arrancar NPC is an ally unless it is someone's
+     * Fracción; no other creature is. The PvP rule is not asked: the light never harms, and a player must step
+     * into it.
      */
     @Nullable
     public static Refusal targetRefusal(Player caster, @Nullable LivingEntity target) {
@@ -234,20 +257,23 @@ public final class Negacion {
                 || target instanceof Player giant && MenosBody.isGiant(giant)) {
             return Refusal.TOO_BIG;
         }
-        if (held(target) || offeredNear(target) || target instanceof Hollow hollow && !mayHold(hollow)) {
+        if (held(target) || offeredNear(target) || !(target instanceof Player) && !mayHold(target)) {
             return Refusal.BUSY;
         }
         if (target instanceof Player player) {
             boolean hollowSoul = SoulLogic.hasSoul(player) && HollowPlayerLogic.isHollowOrArrancar(SoulLogic.get(player));
             return SoulLogic.seesSpirits(player) && (hollowSoul || caster.isAlliedTo(player)) ? null : Refusal.NOT_ALLY;
         }
+        if (target instanceof ArrancarNpc npc) {
+            return npc.isPledged() ? Refusal.NOT_ALLY : null;
+        }
         return target instanceof Hollow ? null : Refusal.NOT_ALLY;
     }
 
     /**
      * The creature the caster looks at: the first along its look line, out to the reach and short of the first
-     * block in the way, a little to either side counting. Spectators, lights and the caster itself are passed
-     * by, and a part of a great creature stands for the whole.
+     * block in the way, a little to either side counting. Spectators, lights and Cajas and the caster itself are
+     * passed by, and a part of a great creature stands for the whole.
      */
     @Nullable
     public static LivingEntity aimed(Player caster) {
@@ -257,7 +283,7 @@ public final class Negacion {
                 .getLocation();
         EntityHitResult hit = ProjectileUtil.getEntityHitResult(caster.level(), caster, eye, end,
                 new AABB(eye, end).inflate(1.0), entity -> !entity.isSpectator() && entity.isPickable()
-                        && !(entity instanceof NegacionLight), AIM_MARGIN);
+                        && !(entity instanceof HoldingVehicle), AIM_MARGIN);
         Entity entity = hit == null ? null
                 : hit.getEntity() instanceof PartEntity<?> part ? part.getParent() : hit.getEntity();
         return entity instanceof LivingEntity living ? living : null;
@@ -357,38 +383,45 @@ public final class Negacion {
         }
     }
 
-    /** A held player logging out is set down where the light fell before it is saved, so it never loads mid-air. */
+    /**
+     * A held player logging out is set down where it was taken before it is saved, so it never loads mid-air or
+     * shut away.
+     */
     private static void onLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         Player player = event.getEntity();
-        NegacionLight light = lightOf(player);
-        if (light != null) {
-            light.setDown(player);
+        HoldingVehicle holder = holderOf(player);
+        if (holder != null) {
+            holder.setDown(player);
         }
     }
 
     /**
      * Vanilla takes a player to another world still riding (a teleport by command or pearl gets off first, but
-     * not every way does): it gets off its light in the world it left, where the light then ends, and it falls
-     * slowly where it arrived. Got off from afar, with no dismount spot, as the light is a world away.
+     * not every way does): it gets off its light or Caja in the world it left, where the hold then ends, and it
+     * falls slowly where it arrived. Got off from afar, with no dismount spot, as the hold is a world away; a
+     * Caja never moves a rider that is no longer in its world.
      */
     private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         Player player = event.getEntity();
-        NegacionLight light = lightOf(player);
-        if (light != null && light.level() != player.level()) {
+        HoldingVehicle holder = holderOf(player);
+        if (holder != null && holder.level() != player.level()) {
             player.removeVehicle();
         }
     }
 
     // ---- Helpers ----
 
-    /** Whether this player is held, so its doing is refused; on the server it is told so, now and then. */
-    private static boolean refused(@Nullable Player player) {
-        NegacionLight light = lightOf(player);
-        if (light == null) {
+    /**
+     * Whether this player is held, so its doing is refused; on the server it is told so, now and then. Also asked
+     * by {@link ArrancarEvents#onKey}, so the held call out nothing.
+     */
+    static boolean refused(@Nullable Player player) {
+        HoldingVehicle holder = holderOf(player);
+        if (holder == null) {
             return false;
         }
         if (!player.level().isClientSide()) {
-            light.tellHeld(player);
+            holder.tellHeld(player);
         }
         return true;
     }

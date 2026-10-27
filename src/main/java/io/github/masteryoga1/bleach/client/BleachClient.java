@@ -117,7 +117,8 @@ public final class BleachClient {
      * models or simple ones of the mod's, and a Plus looks like a villager.
      * Zanpakutō techniques and Gintō spells are drawn from plain shapes and the mod's placeholder
      * textures, the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
-     * in the mod's own textures, and a Cero as the vanilla beacon beam in its own colour.
+     * in the mod's own textures, and a Cero as the vanilla beacon beam in its own colour (Negación's light and the
+     * Caja Negación's cage too, in pale gold).
      * The type arguments are spelled out rather than left for the compiler to infer through the lambdas.
      */
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
@@ -166,6 +167,7 @@ public final class BleachClient {
                         HollowKind.ADJUCHAS, 90.0F));
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
+        event.registerEntityRenderer(ModEntities.CAJA_NEGACION.get(), CajaNegacionRenderer::new);
         event.registerEntityRenderer(ModEntities.PLUS.get(), PlusRenderer::new);
         event.registerEntityRenderer(ModEntities.GARGANTA.get(), GargantaRenderer::new);
         event.registerEntityRenderer(ModEntities.GETSUGA_TENSHO.get(), GetsugaTenshoRenderer::new);

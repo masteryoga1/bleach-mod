@@ -116,6 +116,9 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> NEGACION_DESCEND = fixed("entity.negacion.descend", 64.0F);
     /** The pillar of Negación carrying what it holds away. */
     public static final DeferredHolder<SoundEvent, SoundEvent> NEGACION_DEPART = fixed("entity.negacion.depart", 64.0F);
+    /** A Caja Negación closing round what it holds. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> CAJA_NEGACION_CLOSE =
+            fixed("entity.caja_negacion.close", 32.0F);
 
     private ModSounds() {
     }

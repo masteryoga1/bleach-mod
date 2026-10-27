@@ -84,9 +84,15 @@ public final class ArrancarEvents {
      * Release Zanpakutō, Seal and the Technique key, for a Hollow or an Arrancar (from ShikaiEvents). An Arrancar
      * calls out its Resurrección and seals it, told what came of it unless it worked, and fires its Bala on the
      * Technique key for as long as it holds it ({@link Bala}); a Hollow tears at its mask and lets go, and its
-     * Technique key calls down Negación, which only a Gillian can ({@link Negacion#press}).
+     * Technique key calls down Negación, which only a Gillian can ({@link Negacion#press}). A held soul, in Negación's
+     * light or a Caja Negación, can neither call out nor tear, nor fire or call down anything ({@link Negacion#refused});
+     * it may still seal and let go of its key.
      */
     public static void onKey(Player player, SoulData data, ZanpakutoKey key, long now) {
+        // Held (in Negación's light or a Caja Negación), it can call out nothing.
+        if ((key == ZanpakutoKey.RELEASE || key == ZanpakutoKey.TECHNIQUE_PRESS) && Negacion.refused(player)) {
+            return;
+        }
         if (ArrancarLogic.isArrancar(data)) {
             switch (key) {
                 case RELEASE -> {
@@ -348,8 +354,9 @@ public final class ArrancarEvents {
     /**
      * Every second, for every soul (from {@link HollowBody#tickBody}): a release left on a soul that is no longer
      * an Arrancar ends, and so do a Pesquisa focus and a held Bala key, the Arrancar's health, speed and damage
-     * are put right (taken off anyone else), the blades are kept right ({@link #reconcileBlades}), and its rank is
-     * kept right ({@link ArrancarRoster#keep}). Server side.
+     * are put right (taken off anyone else), the blades are kept right ({@link #reconcileBlades}), its rank is
+     * kept right ({@link ArrancarRoster#keep}), and so are an Espada's Caja Negación and the Fracción of a soul no
+     * longer an Arrancar ({@link EspadaLedger#keep}). Server side.
      */
     public static void reconcile(Player player, SoulData data, long now) {
         if (player.level().isClientSide()) {
@@ -366,6 +373,7 @@ public final class ArrancarEvents {
         reconcileBody(player, data);
         reconcileBlades(player, data, now);
         ArrancarRoster.keep(player, data, now);
+        EspadaLedger.keep(player, data, now);
     }
 
     /**

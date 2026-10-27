@@ -504,6 +504,10 @@ public class CeroBeam extends Entity {
             boolean shielded = target.isDamageSourceBlocked(source);
             if (target.hurt(source, spec.damage())) {
                 struck.add(target);
+                // As a blow or an arrow does, so a pledged Fracción joins what its Espada's Cero or Bala struck.
+                if (shooter != null) {
+                    shooter.setLastHurtMob(target);
+                }
                 if (push != null && spec.knockback() > 0.0F) {
                     target.knockback(spec.knockback(), -push.x, -push.z);
                     target.hurtMarked = true;
@@ -581,7 +585,8 @@ public class CeroBeam extends Entity {
      * are spared: a Plus is to be eaten, not blasted. An Arrancar NPC's (its Bala too, whose owner it is)
      * strikes likewise only its target, whatever last hurt it, or its prey ({@link ArrancarNpcLogic#isPrey}),
      * and never another Arrancar NPC, its leader, a Plus, a Shinigami or Quincy NPC, or a player in creative or
-     * spectator mode. Anyone else's Cero keeps the rules of every soul's projectiles
+     * spectator mode; a player's pledged Fracción has no prey of its own and spares what its Espada may not harm
+     * ({@link ArrancarNpc#mayHarmForEspada}). Anyone else's Cero keeps the rules of every soul's projectiles
      * ({@link SpiritProjectiles#mayStrike}).
      */
     public static boolean mayStrike(@Nullable Entity owner, LivingEntity target) {
@@ -594,7 +599,11 @@ public class CeroBeam extends Entity {
             if (target instanceof Player player && (player.isCreative() || player.isSpectator())) {
                 return false;
             }
-            return target == npc.getTarget() || target == npc.getLastHurtByMob() || ArrancarNpcLogic.isPrey(target);
+            if (npc.isPledged() && !npc.mayHarmForEspada(target)) {
+                return false;
+            }
+            return target == npc.getTarget() || target == npc.getLastHurtByMob()
+                    || !npc.isPledged() && ArrancarNpcLogic.isPrey(target);
         }
         if (!(owner instanceof Hollow hollow)) {
             return SpiritProjectiles.mayStrike(owner, target);

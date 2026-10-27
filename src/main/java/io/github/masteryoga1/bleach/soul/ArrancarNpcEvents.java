@@ -7,6 +7,8 @@ import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -25,10 +27,11 @@ import net.neoforged.neoforge.common.util.FakePlayer;
  * Número, or, for a stronger soul, a Privaron Espada with its Fracción ({@link #tryNaturalArrival}). The server
  * allows only so many at once, spaced well apart ({@link #mayArrive}), and a command may bring them past every
  * limit. A slain Arrancar counts as slain, never purified ({@link #onSlain}). A Privaron Espada beaten low may be
- * lifted away by Negación, taking its Fracción with it ({@link #maybeRecall}). The rules are in
- * {@link ArrancarNpcLogic}; the mob itself, and when it calls in here, is {@link ArrancarNpc}. Nothing here
- * listens to events. The kill counts for any {@link Player} killer, so game tests can use mock players; only the
- * milestones need a real one.
+ * lifted away by Negación, taking its Fracción with it ({@link #maybeRecall}). A Número with no living leader,
+ * beaten low by a seated Espada player, kneels to it, and may be taken as that player's own Fracción
+ * ({@link #maybeYield}, {@link #pledge}, {@link #commandFraccion}). The rules are in {@link ArrancarNpcLogic}; the
+ * mob itself, and when it calls in here, is {@link ArrancarNpc}. Nothing here listens to events. The kill and the
+ * pledge count for any {@link Player}, so game tests can use mock players; only the milestones need a real one.
  */
 public final class ArrancarNpcEvents {
     /** Aware souls this close see a Privaron Espada and its Fracción lifted away, for the milestone: as for a Garganta. */
@@ -36,6 +39,21 @@ public final class ArrancarNpcEvents {
 
     private static final EntityTypeTest<Entity, ArrancarNpc> ANY_ARRANCAR = EntityTypeTest.forClass(ArrancarNpc.class);
     private static final long TICKS_PER_MINUTE = 1200L;
+    private static final String FRACCION = "message.bleach.fraccion.";
+
+    /** What came of an Espada taking a kneeling Número as its Fracción ({@link #pledge}). */
+    public enum Pledge {
+        /** It is the Espada's Fracción now. */
+        PLEDGED,
+        /** The Espada already has {@code max_fraccion}. */
+        FULL,
+        /** The Espada has lost its seat since the Número knelt. */
+        NOT_ESPADA,
+        /** The server has turned the Fracción off ({@code max_fraccion} 0) since it knelt. Told nothing. */
+        OFF,
+        /** It no longer kneels to this player, or it is departing or held. Told nothing. */
+        NOT_KNEELING
+    }
 
     private ArrancarNpcEvents() {
     }
@@ -142,18 +160,20 @@ public final class ArrancarNpcEvents {
         return mobs;
     }
 
-    /** The Arrancar NPCs alive in every world of the server, in loaded chunks. */
+    /** The Arrancar NPCs alive in every world of the server, in loaded chunks, leaving out any pledged Fracción. */
     public static int aliveCount(MinecraftServer server) {
         int count = 0;
         for (ServerLevel level : server.getAllLevels()) {
-            count += level.getEntities(ANY_ARRANCAR, Entity::isAlive).size();
+            // A pledged Fracción is a player's own, and takes no arrival's room.
+            count += level.getEntities(ANY_ARRANCAR, npc -> npc.isAlive() && !npc.isPledged()).size();
         }
         return count;
     }
 
     /**
      * Whether Arrancar may come here by chance: the server has fewer alive than it allows, and none is within the
-     * spacing in this world. It looks through every entity, so it is asked only after the rare roll has passed.
+     * spacing in this world (a pledged Fracción does not count). It looks through every entity, so it is asked only
+     * after the rare roll has passed.
      */
     public static boolean mayArrive(ServerLevel level, Vec3 at) {
         if (aliveCount(level.getServer()) >= BleachConfig.get(BleachConfig.ARRANCAR_NPC_MAX_ALIVE)) {
@@ -161,7 +181,8 @@ public final class ArrancarNpcEvents {
         }
         double spacing = BleachConfig.get(BleachConfig.ARRANCAR_NPC_SPACING);
         double spacingSqr = spacing * spacing;
-        return level.getEntities(ANY_ARRANCAR, npc -> npc.isAlive() && npc.distanceToSqr(at) < spacingSqr).isEmpty();
+        return level.getEntities(ANY_ARRANCAR, npc -> npc.isAlive() && !npc.isPledged() && npc.distanceToSqr(at) < spacingSqr)
+                .isEmpty();
     }
 
     // ---- Death ----
@@ -171,10 +192,13 @@ public final class ArrancarNpcEvents {
      * counts, as for a Hollow: the killer's reiryoku grows as for a slain Hollow of its reiatsu, its slain count
      * goes up, and it earns the experience the rank is worth. An Arrancar is never purified and leaves no soul
      * behind, whoever kills it, and a Quincy's arrow counts the same. A fake player's kill, such as a machine's,
-     * counts for nothing.
+     * counts for nothing, and so does an Espada's kill of its own Fracción.
      */
     public static void onSlain(ArrancarNpc npc, DamageSource source) {
         if (!(source.getEntity() instanceof Player killer) || killer instanceof FakePlayer || !SoulLogic.hasSoul(killer)) {
+            return;
+        }
+        if (npc.isPledged() && killer.getUUID().equals(npc.leaderId())) {
             return;
         }
         SoulData data = SoulLogic.get(killer);
@@ -234,5 +258,101 @@ public final class ArrancarNpcEvents {
             Milestones.grant(witness, Milestones.ARRANCAR_RECALLED);
         }
         return true;
+    }
+
+    // ---- A player's Fracción ----
+
+    /**
+     * After a blow landed on it, from {@link ArrancarNpc#hurt}: a living Número free of every hold, not leaving, not
+     * pledged and not already kneeling, with no living leader in this world, struck down to {@code yield_health} of
+     * its health or less by a seated Espada player (no fake player), kneels to that Espada for {@code yield_seconds},
+     * and the Espada is told it may take it with an empty hand. Never a Privaron Espada, and never with the Fracción
+     * off.
+     */
+    public static void maybeYield(ArrancarNpc npc, DamageSource source) {
+        if (!(npc.level() instanceof ServerLevel level) || !npc.isAlive() || npc.isDeparting() || Negacion.held(npc)
+                || npc.isPledged() || npc.isYielding() || npc.kind() != ArrancarRank.Kind.NUMERO
+                || BleachConfig.get(BleachConfig.FRACCION_MAX) <= 0) {
+            return;
+        }
+        if (!(source.getEntity() instanceof Player espada) || espada instanceof FakePlayer
+                || !EspadaLedger.isSeatedEspada(espada)) {
+            return;
+        }
+        // Loyalty is personal: one whose leader lives is not taken from it.
+        if (npc.getHealth() > BleachConfig.get(BleachConfig.FRACCION_YIELD_HEALTH) * npc.getMaxHealth()
+                || npc.leader() != null) {
+            return;
+        }
+        npc.yieldTo(espada, level.getGameTime() + BleachConfig.get(BleachConfig.FRACCION_YIELD_SECONDS) * 20L);
+        espada.displayClientMessage(Component.translatable(FRACCION + "yields", npc.getDisplayName())
+                .withStyle(ChatFormatting.YELLOW), true);
+    }
+
+    /**
+     * The kneeling Número takes this Espada as its master, if it may: it must still kneel to this player, free and
+     * not leaving (else NOT_KNEELING, told nothing), the Fracción must be on, the player must still hold a seat, and
+     * its list in the {@link EspadaLedger} must have room for one more. Then it pledges ({@link ArrancarNpc#pledgeTo}),
+     * is listed, and the Espada is told in chat and granted its milestone. A refusal is told above the hotbar, and
+     * leaves the Número kneeling until its time runs out.
+     */
+    public static Pledge pledge(ArrancarNpc npc, Player espada, long now) {
+        if (!(npc.level() instanceof ServerLevel level) || !npc.isAlive() || npc.isPledged() || npc.isDeparting()
+                || Negacion.held(npc) || !espada.getUUID().equals(npc.yieldedTo())) {
+            return Pledge.NOT_KNEELING;
+        }
+        int most = BleachConfig.get(BleachConfig.FRACCION_MAX);
+        if (most <= 0) {
+            return Pledge.OFF;
+        }
+        if (!EspadaLedger.isSeatedEspada(espada)) {
+            espada.displayClientMessage(Component.translatable(FRACCION + "not_espada").withStyle(ChatFormatting.GRAY),
+                    true);
+            return Pledge.NOT_ESPADA;
+        }
+        EspadaLedger ledger = EspadaLedger.get(level.getServer());
+        int held = ledger.fraccion(espada.getUUID()).size();
+        if (held >= most) {
+            espada.displayClientMessage(Component.translatable(FRACCION + "full", held).withStyle(ChatFormatting.GRAY),
+                    true);
+            return Pledge.FULL;
+        }
+        npc.pledgeTo(espada);
+        ledger.addMember(espada.getUUID(), npc.getUUID(), npc.rank().numero());
+        espada.displayClientMessage(Component.translatable(FRACCION + "pledged", npc.getDisplayName(),
+                ledger.fraccion(espada.getUUID()).size(), most).withStyle(ChatFormatting.GOLD), false);
+        if (espada instanceof ServerPlayer player) {
+            Milestones.grant(player, Milestones.FRACCION);
+        }
+        return Pledge.PLEDGED;
+    }
+
+    /**
+     * Its own Espada used it with an empty hand: a plain use shows who it is and how many of the cap serve; with
+     * Sneak, the first use arms the dismiss and asks for a second, and a second within
+     * {@link ArrancarNpc#DISMISS_CONFIRM_TICKS} takes it off the list and sends it away through a Garganta
+     * ({@link ArrancarNpc#releasePledge}). Server side.
+     */
+    public static void commandFraccion(ArrancarNpc npc, Player espada, long now) {
+        if (!(npc.level() instanceof ServerLevel level)) {
+            return;
+        }
+        EspadaLedger ledger = EspadaLedger.get(level.getServer());
+        Component name = npc.getDisplayName();
+        if (espada.isShiftKeyDown()) {
+            if (!npc.armDismiss(now)) {
+                espada.displayClientMessage(Component.translatable(FRACCION + "confirm", name)
+                        .withStyle(ChatFormatting.YELLOW), true);
+                return;
+            }
+            ledger.removeMember(espada.getUUID(), npc.getUUID());
+            npc.releasePledge();
+            espada.displayClientMessage(Component.translatable(FRACCION + "dismissed", name)
+                    .withStyle(ChatFormatting.GRAY), true);
+            return;
+        }
+        espada.displayClientMessage(Component.translatable(FRACCION + "status", name,
+                ledger.fraccion(espada.getUUID()).size(), BleachConfig.get(BleachConfig.FRACCION_MAX))
+                .withStyle(ChatFormatting.GRAY), true);
     }
 }

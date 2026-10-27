@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.client;
 
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -46,13 +47,21 @@ public final class ClientSouls {
     }
 
     /**
-     * Whether the local player should not see this entity: it is a spirit and they are spiritually
-     * unaware. Players in creative or spectator mode see everything, and nothing is hidden before
-     * the server has sent the player's soul.
+     * Whether the local player should not see this entity: it is shut away in a Caja Negación, which hides it from
+     * everyone but itself and spectators, creative players included, or it is a spirit and they are spiritually
+     * unaware. Players in creative or spectator mode see every spirit, and none is hidden before the server has sent
+     * the player's soul.
      */
     public static boolean isHiddenFromViewer(Entity entity) {
         LocalPlayer viewer = Minecraft.getInstance().player;
-        if (viewer == null || entity == viewer || viewer.isCreative() || viewer.isSpectator()) {
+        if (viewer == null || entity == viewer) {
+            return false;
+        }
+        // Shut away in a Caja Negación, it is out of this world for all but spectators, creative players too.
+        if (CajaNegacion.hidden(entity)) {
+            return !viewer.isSpectator();
+        }
+        if (viewer.isCreative() || viewer.isSpectator()) {
             return false;
         }
         SoulData own = viewer.getData(SoulAttachments.SOUL);

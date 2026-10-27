@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.client;
 
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import net.minecraft.client.Minecraft;
@@ -49,7 +50,7 @@ public final class SpiritShimmer {
         long turn = now / INTERVAL;
         for (Entity entity : level.entitiesForRendering()) {
             if (Math.floorMod(entity.getId() + turn, CADENCE) != 0 || entity.distanceToSqr(player) > RANGE * RANGE
-                    || !ClientSouls.isHiddenFromViewer(entity)) {
+                    || !ClientSouls.isHiddenFromViewer(entity) || CajaNegacion.hidden(entity)) {
                 continue;
             }
             AABB box = entity.getBoundingBox();

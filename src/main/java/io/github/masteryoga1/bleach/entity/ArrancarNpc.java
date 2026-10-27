@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.soul.ArrancarNpcEvents;
 import io.github.masteryoga1.bleach.soul.ArrancarNpcLogic;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
 import io.github.masteryoga1.bleach.soul.Bala;
+import io.github.masteryoga1.bleach.soul.EspadaLedger;
 import io.github.masteryoga1.bleach.soul.FlashStep;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.HollowTier;
@@ -26,6 +27,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleOptions;
@@ -38,12 +40,14 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -55,6 +59,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Marker;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.OwnableEntity;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -82,6 +88,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.neoforged.neoforge.common.util.FakePlayer;
 
 /**
  * An Arrancar NPC: a Hollow that tore off its mask, come through a Garganta for a strong soul. A Número comes
@@ -97,9 +104,15 @@ import net.minecraft.world.phys.shapes.CollisionContext;
  * away by Negación ({@link ArrancarNpcEvents#maybeRecall}). It has a spirit's body, as a Hollow has: only those who
  * see spirits hear it or touch it.
  *
+ * <p>A Número with no living leader, beaten low by a seated Espada player, kneels to it a while ({@link #yieldTo});
+ * used with an empty hand it pledges itself as that player's Fracción ({@link #pledgeTo}) and stays until sent away
+ * or until its Espada stops being an Arrancar ({@link #keepPledge}, {@link EspadaLedger}). A pledged one hunts
+ * nothing of its own: it fights what strikes it, what strikes its Espada and what its Espada strikes, never what its
+ * Espada may not harm ({@link #mayHarmForEspada}), and holds its post while its Espada is away.
+ *
  * <p>Its rank is its own and never the roster's: no NPC holds an Espada seat ({@link ArrancarNpcLogic#unseated}).
  */
-public class ArrancarNpc extends Monster implements CeroBeam.Caster {
+public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEntity {
     /** {@link #leaveAt} for one that stays until killed (a spawn egg, a summons): no timed leave and no idle leave. */
     public static final long NEVER = -1L;
     /** {@link #leaveAt} for an arrival with no lifetime: no timed leave, but it still leaves once idle. */
@@ -108,6 +121,13 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     public static final int DEPART_TIMEOUT_TICKS = GargantaRift.DEPART_AGE + 40;
     /** The modifier that carries {@code [arrancar.npc] damage_multiplier} on to its melee blows. */
     public static final ResourceLocation DAMAGE_ID = BleachMod.id("arrancar_npc_damage");
+    /** Ticks after a first Sneak-use by its Espada in which a second one sends a pledged Fracción away. */
+    public static final int DISMISS_CONFIRM_TICKS = 100;
+    /**
+     * Sneak-uses closer together than this are one held press (the use key repeats every 4 ticks), so only a fresh
+     * press confirms a dismiss.
+     */
+    public static final int DISMISS_PRESS_GAP_TICKS = 10;
     /** Ticks it lies fallen before it breaks into smoke, as a Hollow does. */
     static final int DEATH_TICKS = 20;
     /** How often a leader not found is looked for again. Plumbing, not balance. */
@@ -138,6 +158,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     private static final float LOOK_TURN = 30.0F;
     /** How far ahead the head looks along a locked aim when there is no prey to measure by. */
     private static final double LOCKED_LOOK_DISTANCE = 8.0;
+    /** Told to anyone but its Espada who uses a pledged Fracción with an empty hand. */
+    private static final String NOT_YOURS = "message.bleach.fraccion.not_yours";
     /** The worn pieces a player's kill may drop one of; never the blade. */
     private static final EquipmentSlot[] UNIFORM_SLOTS = {EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
 
@@ -154,8 +176,20 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     private boolean recallRolled;
     /** Whether it has been dressed once, so a summons that names its clothes keeps them. */
     private boolean dressed;
+    /** Whether it is a player Espada's Fracción, pledged to its leader; see {@link #pledgeTo}. */
+    private boolean pledged;
+    /** The game time it pledged, read against {@link EspadaLedger#fraccionForgottenAt}; 0 when not pledged. */
+    private long pledgedAt;
 
     // Server side, not saved: a reloaded NPC starts these over.
+    /** The seated Espada it kneels to now, beaten; null when it does not kneel. A kneel is never saved. */
+    @Nullable
+    private UUID yieldedTo;
+    private long yieldUntil;
+    /** Until when its Espada's first Sneak-use stands, so a second one sends it away; -1 when none is armed. */
+    private long dismissArmedUntil = -1L;
+    /** When its Espada last Sneak-used it, to tell a held press from a second one; -1 when none. */
+    private long lastDismissUse = -1L;
     private boolean departing;
     private boolean statsApplied;
     private long departAt;
@@ -355,7 +389,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
 
     /**
      * The leader, if it is loaded and alive in this world: looked up by UUID at most once a second, and kept while
-     * it stays so. Any living creature may lead, a player too. Null on the client.
+     * it stays so. Any living creature may lead, a player too. A pledged Fracción counts its Espada as away beyond
+     * {@code [arrancar.fraccion] follow_leash}, though it keeps it in mind for when it comes back. Null on the client.
      */
     @Nullable
     public LivingEntity leader() {
@@ -371,6 +406,12 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
             leaderLookupAt = now + LEADER_LOOKUP_TICKS;
             if (server.getEntity(leaderId) instanceof LivingEntity found && found != this && found.isAlive()) {
                 cachedLeader = found;
+            }
+        }
+        if (pledged && cachedLeader != null) {
+            double leash = BleachConfig.get(BleachConfig.FRACCION_FOLLOW_LEASH);
+            if (distanceToSqr(cachedLeader) > leash * leash) {
+                return null;
             }
         }
         return cachedLeader;
@@ -405,6 +446,201 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     private static boolean hurtRecently(LivingEntity entity) {
         return entity.getLastHurtByMob() != null
                 && entity.tickCount - entity.getLastHurtByMobTimestamp() <= GUARD_MEMORY_TICKS;
+    }
+
+    /**
+     * Whether this creature struck another within the last {@link #GUARD_MEMORY_TICKS}, by its own clock. Vanilla
+     * forgets the creature struck only when that one dies, so the time is what keeps an old blow from counting.
+     */
+    private static boolean hitRecently(LivingEntity entity) {
+        return entity.getLastHurtMob() != null
+                && entity.tickCount - entity.getLastHurtMobTimestamp() <= GUARD_MEMORY_TICKS;
+    }
+
+    // ---- A player's Fracción ----
+
+    /** Whether it is a player Espada's Fracción. */
+    public boolean isPledged() {
+        return pledged;
+    }
+
+    /** The game time it pledged, read against {@link EspadaLedger#fraccionForgottenAt}; 0 when not pledged. */
+    public long pledgedAt() {
+        return pledgedAt;
+    }
+
+    /**
+     * Its Espada while pledged, as a tamed creature's owner, so the Espada's own Cero, Bala and aura spare it
+     * ({@link SpiritProjectiles#mayStrike} and the aura read this); null otherwise.
+     */
+    @Nullable
+    @Override
+    public UUID getOwnerUUID() {
+        return pledged ? leaderId : null;
+    }
+
+    /** Server side: kneeling to a seated Espada now. Clients read {@link #isCrouching}. */
+    public boolean isYielding() {
+        return yieldedTo != null;
+    }
+
+    /** The seated Espada it kneels to now, by UUID; null when it does not kneel. Server side. */
+    @Nullable
+    public UUID yieldedTo() {
+        return yieldedTo;
+    }
+
+    /**
+     * Kneels, beaten, to this seated Espada until the game time {@code until}: crouched, its fight dropped, its path
+     * stopped and any Cero it gathers let go. While it kneels it fights nothing, never Sonídos aside and never
+     * leaves; a blow, the time running out or a Caja Negación ends it. Server side.
+     */
+    public void yieldTo(Player espada, long until) {
+        yieldedTo = espada.getUUID();
+        yieldUntil = until;
+        setPose(Pose.CROUCHING);
+        setTarget(null);
+        getNavigation().stop();
+        if (charging != null && charging.isCharging()) {
+            charging.cancel();
+        }
+    }
+
+    /** No longer kneels, and stands. */
+    public void endYield() {
+        yieldedTo = null;
+        yieldUntil = 0L;
+        // Only the kneel crouches it, so nothing else is undone.
+        if (getPose() == Pose.CROUCHING) {
+            setPose(Pose.STANDING);
+        }
+    }
+
+    /**
+     * Becomes this player's Fracción for good, pledged at the level's game time: it follows the player from now on
+     * (any old leader forgotten), never leaves on its own, and drops any post, its kneel and its fight. Callers check
+     * the cap and list it in the {@link EspadaLedger} ({@link ArrancarNpcEvents#pledge}).
+     */
+    public void pledgeTo(Player espada) {
+        pledged = true;
+        pledgedAt = level().getGameTime();
+        setLeader(espada.getUUID());
+        // A mock player in a game test is never in the level, so only the cache can find it.
+        cachedLeader = espada;
+        setLeaveAt(NEVER);
+        idleSince = -1L;
+        dismissArmedUntil = -1L;
+        lastDismissUse = -1L;
+        clearRestriction();
+        endYield();
+        setTarget(null);
+    }
+
+    /**
+     * No longer anyone's Fracción: taken off its Espada's list in the {@link EspadaLedger} if it is on it, its leader
+     * and post forgotten, and it leaves through a Garganta of its own ({@link #depart}). Server side.
+     */
+    public void releasePledge() {
+        if (pledged && leaderId != null && level() instanceof ServerLevel server) {
+            EspadaLedger.get(server.getServer()).removeMember(leaderId, getUUID());
+        }
+        pledged = false;
+        pledgedAt = 0L;
+        dismissArmedUntil = -1L;
+        lastDismissUse = -1L;
+        setLeader(null);
+        clearRestriction();
+        endYield();
+        depart();
+    }
+
+    /**
+     * True if a dismiss was already armed and is still within {@link #DISMISS_CONFIRM_TICKS}; otherwise arms it. A use
+     * within {@link #DISMISS_PRESS_GAP_TICKS} of the last is the same press held down, so it neither confirms nor
+     * re-arms: holding Sneak and the use key never sends a Fracción away on its own.
+     */
+    public boolean armDismiss(long now) {
+        boolean held = lastDismissUse >= 0L && now >= lastDismissUse && now - lastDismissUse < DISMISS_PRESS_GAP_TICKS;
+        lastDismissUse = now;
+        if (held) {
+            return false;
+        }
+        if (dismissArmedUntil >= 0L && now <= dismissArmedUntil) {
+            dismissArmedUntil = -1L;
+            lastDismissUse = -1L;
+            return true;
+        }
+        dismissArmedUntil = now + DISMISS_CONFIRM_TICKS;
+        return false;
+    }
+
+    /**
+     * Whether a pledged Fracción may harm this creature for its Espada: never the Espada itself, a creature it owns
+     * (a tamed wolf, another of its Fracción), another Arrancar NPC, or a player in creative or spectator mode; and
+     * no player at all while the server forbids PvP, nor one its Espada, when online, may not harm (a team-mate).
+     * True when it is not pledged.
+     */
+    public boolean mayHarmForEspada(LivingEntity target) {
+        if (!pledged) {
+            return true;
+        }
+        if (target == this || target instanceof ArrancarNpc) {
+            return false;
+        }
+        if (leaderId != null && (leaderId.equals(target.getUUID())
+                || (target instanceof OwnableEntity owned && leaderId.equals(owned.getOwnerUUID())))) {
+            return false;
+        }
+        if (!(target instanceof Player player)) {
+            return true;
+        }
+        if (player.isCreative() || player.isSpectator()) {
+            return false;
+        }
+        MinecraftServer server = level().getServer();
+        if (server != null && !server.isPvpAllowed()) {
+            return false;
+        }
+        // The one near is the cached leader (a mock in a game test); one away is looked for among those online.
+        Player espada = leader() instanceof Player near ? near
+                : server != null && leaderId != null ? server.getPlayerList().getPlayer(leaderId) : null;
+        return espada == null || espada.canHarmPlayer(player);
+    }
+
+    /**
+     * Once a second while pledged, whether or not its Espada is about (see {@link EspadaLedger}): with no Espada
+     * recorded it is released; missing from its Espada's list, it is released if the list was forgotten since it
+     * pledged (its Espada stopped being an Arrancar) or is full, and else lists itself again. Then it holds its post,
+     * within {@code post_radius} of where it stands, while its Espada is away, offline or in another world, and is
+     * free again once its Espada is back; and with no target it heals half a heart every {@code heal_seconds}.
+     */
+    private void keepPledge(ServerLevel server) {
+        if (leaderId == null) {
+            releasePledge();
+            return;
+        }
+        EspadaLedger ledger = EspadaLedger.get(server.getServer());
+        if (!ledger.isMember(leaderId, getUUID())) {
+            if (ledger.fraccionForgottenAt(leaderId) >= pledgedAt
+                    || ledger.fraccion(leaderId).size() >= BleachConfig.get(BleachConfig.FRACCION_MAX)) {
+                releasePledge();
+                return;
+            }
+            // A lost or older ledger file, or this NPC restored from a backup: it is still pledged, so it says so.
+            ledger.addMember(leaderId, getUUID(), rank.numero());
+        }
+        if (leader() == null) {
+            if (!hasRestriction()) {
+                restrictTo(blockPosition(), BleachConfig.get(BleachConfig.FRACCION_POST_RADIUS));
+            }
+        } else if (hasRestriction()) {
+            clearRestriction();
+        }
+        int healSeconds = BleachConfig.get(BleachConfig.FRACCION_HEAL_SECONDS);
+        if (healSeconds > 0 && getTarget() == null && (tickCount / 20) % healSeconds == 0
+                && getHealth() < getMaxHealth()) {
+            heal(1.0F);
+        }
     }
 
     // ---- Leaving ----
@@ -562,7 +798,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     /**
      * Each tick it may: a Bala at prey between {@code bala_min_range} and the Bala's reach, or a Sonído step closing
      * on prey between {@code sonido_min_range} and {@code sonido_max_range}, landing a little short. Neither while a
-     * Cero gathers or a leader holds back, and only at prey in sight. Once a second, the leaving checks.
+     * Cero gathers or a leader holds back, and only at prey in sight. Once a second, the leaving checks. A kneel
+     * holds it still until it runs out, and a pledged Fracción keeps its pledge once a second ({@link #keepPledge}).
      */
     @Override
     protected void customServerAiStep() {
@@ -571,13 +808,31 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
             return;
         }
         long now = server.getGameTime();
+        // A kneel is not made immobile: an immobile mob never gets here, so the kneel could not run out.
+        if (yieldedTo != null) {
+            if (now >= yieldUntil) {
+                endYield();
+            } else {
+                getNavigation().stop();
+                if (getTarget() != null) {
+                    setTarget(null);
+                }
+            }
+        }
+        if (pledged && tickCount % 20 == 0) {
+            keepPledge(server);
+            if (departing) {
+                return;
+            }
+        }
         // Looks the leader up again if it was not found, so the goals see it as soon as it is loaded.
         leader();
         LivingEntity target = getTarget();
         if (target != null && target.isAlive() && charging == null) {
             useArts(target, now);
         }
-        if (tickCount % 20 == 0) {
+        // Never while it kneels: one whose time ran out goes at the first check after the kneel ends.
+        if (tickCount % 20 == 0 && yieldedTo == null) {
             checkLeaving(server, now);
         }
     }
@@ -672,8 +927,9 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
         goalSelector.addGoal(7, new RandomLookAroundGoal(this));
         targetSelector.addGoal(1, new HurtByTargetGoal(this, ArrancarNpc.class));
         targetSelector.addGoal(2, new GuardLeaderGoal(this));
+        // A pledged Fracción hunts nothing of its own: it fights only for itself and its Espada.
         targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false,
-                ArrancarNpcLogic::isPrey) {
+                target -> !isPledged() && ArrancarNpcLogic.isPrey(target)) {
             // Vanilla fixes the reach for players when the goal is made, before the config's follow_range is applied.
             @Override
             protected void findTarget() {
@@ -726,8 +982,9 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     }
 
     /**
-     * Hurt while leaving it cannot be. A blow that lands may make it Sonído aside, and may bring a beaten leader its
-     * recall.
+     * Hurt while leaving it cannot be. A blow that lands ends a kneel, or may make a beaten Número kneel to the seated
+     * Espada that struck it ({@link ArrancarNpcEvents#maybeYield}); one that does not kneel may Sonído aside, and a
+     * beaten leader may have its recall.
      */
     @Override
     public boolean hurt(DamageSource source, float amount) {
@@ -738,7 +995,14 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
             return false;
         }
         if (level() instanceof ServerLevel && isAlive()) {
-            dodge(source);
+            if (yieldedTo != null) {
+                endYield();
+            } else {
+                ArrancarNpcEvents.maybeYield(this, source);
+            }
+            if (yieldedTo == null) {
+                dodge(source);
+            }
             if (isLeader()) {
                 ArrancarNpcEvents.maybeRecall(this);
             }
@@ -777,8 +1041,12 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
         boolean wasDead = dead;
         super.die(source);
         // A cancelled death leaves it alive, and a second call does nothing: only a real first death counts.
-        if (!wasDead && dead && level() instanceof ServerLevel) {
+        if (!wasDead && dead && level() instanceof ServerLevel server) {
             ArrancarNpcEvents.onSlain(this, source);
+            // Off its Espada's list at once, not only when the body goes a second later (remove).
+            if (pledged && leaderId != null) {
+                EspadaLedger.get(server.getServer()).removeMember(leaderId, getUUID());
+            }
         }
     }
 
@@ -857,7 +1125,9 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
      * It goes after its prey ({@link ArrancarNpcLogic#isPrey}), strikes back at whoever just hurt it, and guards its
      * leader: what struck the leader just now, what the leader fights, and what it took on for the leader (kept with
      * no leader left). Never another Arrancar NPC, its leader, or a player in creative or spectator mode. Every goal
-     * asks this, so a target that stops being one is dropped.
+     * asks this, so a target that stops being one is dropped. Kneeling, it fights nothing. A pledged Fracción has no
+     * prey of its own, also turns on what its Espada struck just now, and never on what its Espada may not harm
+     * ({@link #mayHarmForEspada}).
      */
     @Override
     public boolean canAttack(LivingEntity target) {
@@ -866,15 +1136,20 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
                 || (target instanceof Player player && (player.isCreative() || player.isSpectator()))) {
             return false;
         }
-        if (ArrancarNpcLogic.isPrey(target) || target == getLastHurtByMob() || target == guarding) {
+        if (yieldedTo != null || (pledged && !mayHarmForEspada(target))) {
+            return false;
+        }
+        if ((!pledged && ArrancarNpcLogic.isPrey(target)) || target == getLastHurtByMob() || target == guarding) {
             return true;
         }
         LivingEntity leader = leader();
         if (leader == null) {
             return false;
         }
+        // What its Espada struck counts only for a pledged one, so an NPC leader's Fracción keep their old rules.
         return (target == leader.getLastHurtByMob() && hurtRecently(leader))
-                || (leader instanceof Mob mob && target == mob.getTarget());
+                || (leader instanceof Mob mob && target == mob.getTarget())
+                || (pledged && target == leader.getLastHurtMob() && hitRecently(leader));
     }
 
     /** A spirit's body: walls and crowds cannot crush it. */
@@ -883,7 +1158,7 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
         return super.isInvulnerableTo(source) || source.is(DamageTypes.IN_WALL) || source.is(DamageTypes.CRAMMING);
     }
 
-    /** Frozen while a tear takes it and while Negación's light holds it, so none of its goals run. */
+    /** Frozen while a tear takes it and while it is held (Negación's light, a Caja Negación), so none of its goals run. */
     @Override
     protected boolean isImmobile() {
         return super.isImmobile() || departing || Negacion.held(this);
@@ -895,10 +1170,64 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
         return false;
     }
 
-    /** Kept out of the natural monster cap, and never despawned by distance. Peaceful still removes it. */
+    /** Kept out of the natural monster cap, and never despawned by distance. Peaceful still removes it, if unpledged. */
     @Override
     public boolean requiresCustomPersistence() {
         return true;
+    }
+
+    /** Peaceful removes every Arrancar but a pledged Fracción, which stays (fighting nothing, as every mob there). */
+    @Override
+    protected boolean shouldDespawnInPeaceful() {
+        return !pledged && super.shouldDespawnInPeaceful();
+    }
+
+    /**
+     * A pledged Fracción killed or discarded is taken off its Espada's list. Unloading with its chunk and going to
+     * another world never come through here, so they keep its place.
+     */
+    @Override
+    public void remove(Entity.RemovalReason reason) {
+        if (pledged && reason.shouldDestroy() && leaderId != null && level() instanceof ServerLevel server) {
+            EspadaLedger.get(server.getServer()).removeMember(leaderId, getUUID());
+        }
+        super.remove(reason);
+    }
+
+    /**
+     * An empty main hand, on one free and not leaving: its own Espada is shown its status, or sends it away with two
+     * Sneak-uses ({@link ArrancarNpcEvents#commandFraccion}); anyone else is told it serves another; and the Espada
+     * it kneels to takes it as its Fracción ({@link ArrancarNpcEvents#pledge}). Anything else passes, so an item's
+     * own use on it (the Caja Negación's) gets its turn.
+     */
+    @Override
+    protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+        if (hand != InteractionHand.MAIN_HAND || !player.getMainHandItem().isEmpty() || Negacion.held(this)
+                || departing) {
+            return InteractionResult.PASS;
+        }
+        if (level().isClientSide()) {
+            // The client cannot know who it serves; a kneel it can see. The server is asked either way.
+            return isCrouching() ? InteractionResult.SUCCESS : InteractionResult.PASS;
+        }
+        if (player instanceof FakePlayer) {
+            return InteractionResult.PASS;
+        }
+        long now = level().getGameTime();
+        if (pledged) {
+            if (player.getUUID().equals(leaderId)) {
+                ArrancarNpcEvents.commandFraccion(this, player, now);
+            } else {
+                player.displayClientMessage(Component.translatable(NOT_YOURS, getDisplayName())
+                        .withStyle(ChatFormatting.GRAY), true);
+            }
+            return InteractionResult.SUCCESS;
+        }
+        if (player.getUUID().equals(yieldedTo)) {
+            ArrancarNpcEvents.pledge(this, player, now);
+            return InteractionResult.SUCCESS;
+        }
+        return InteractionResult.PASS;
     }
 
     @Override
@@ -997,6 +1326,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
         if (leaderId != null) {
             tag.putUUID("Leader", leaderId);
         }
+        tag.putBoolean("Pledged", pledged);
+        tag.putLong("PledgedAt", pledgedAt);
         tag.putLong("LeaveAt", leaveAt);
         tag.putBoolean("RecallRolled", recallRolled);
         tag.putBoolean("Dressed", dressed);
@@ -1004,8 +1335,9 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
 
     /**
      * Every key is read leniently: a missing or bad rank reads as none (and is repaired on the first tick), an Espada
-     * seat as that seat's Privaron number, a missing time as {@link #NEVER}. The config's body is applied again on
-     * the first tick.
+     * seat as that seat's Privaron number, a missing time as {@link #NEVER}, a missing pledge as none (so an NPC from
+     * before the Fracción loads as it was). The config's body is applied again on the first tick. A kneel and an armed
+     * dismiss are never saved.
      */
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
@@ -1015,10 +1347,15 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
                 : ArrancarRank.NONE;
         rank = ArrancarNpcLogic.unseated(parsed);
         leaderId = tag.hasUUID("Leader") ? tag.getUUID("Leader") : null;
+        pledged = tag.getBoolean("Pledged");
+        pledgedAt = pledged && tag.contains("PledgedAt", Tag.TAG_ANY_NUMERIC) ? tag.getLong("PledgedAt") : 0L;
         // Any number will do, so a hand-written /summon of LeaveAt:-1 (an int) still means NEVER.
         leaveAt = tag.contains("LeaveAt", Tag.TAG_ANY_NUMERIC) ? tag.getLong("LeaveAt") : NEVER;
         recallRolled = tag.getBoolean("RecallRolled");
         dressed = tag.getBoolean("Dressed");
+        endYield();
+        dismissArmedUntil = -1L;
+        lastDismissUse = -1L;
         cachedLeader = null;
         leaderLookupAt = 0L;
         statsApplied = false;
@@ -1273,8 +1610,9 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     }
 
     /**
-     * A Fracción turns on what threatens its leader: what struck the leader in the last five seconds, else what the
-     * leader fights. Looked at every 10 ticks. What it takes on is kept in {@code guarding} while this runs, so it
+     * A Fracción turns on what threatens its leader: what struck the leader in the last five seconds, else (for a
+     * pledged one) what its Espada struck in the last five seconds, else what the leader fights. Looked at every 10
+     * ticks. What it takes on is kept in {@code guarding} while this runs, so it
      * fights on if the leader falls, until the target dies, leaves its notice or stops being a lawful target.
      */
     static final class GuardLeaderGoal extends TargetGoal {
@@ -1302,8 +1640,11 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
                 return false;
             }
             // What struck the leader comes first; failing that (none, or one this Fracción may not take on), what it
-            // fights.
+            // fights. A player has no target to read, so a pledged Fracción takes what its Espada struck just now.
             candidate = guardable(hurtRecently(leader) ? leader.getLastHurtByMob() : null);
+            if (candidate == null && npc.isPledged()) {
+                candidate = guardable(hitRecently(leader) ? leader.getLastHurtMob() : null);
+            }
             if (candidate == null) {
                 candidate = guardable(leader instanceof Mob mob ? mob.getTarget() : null);
             }

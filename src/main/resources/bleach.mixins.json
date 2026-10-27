@@ -9,6 +9,7 @@
     "EntitySectionStorageMixin",
     "FoodDataMixin",
     "LivingEntityMixin",
+    "PlayerMixin",
     "TargetingConditionsMixin",
     "ThrownPotionMixin",
     "WardenMixin"

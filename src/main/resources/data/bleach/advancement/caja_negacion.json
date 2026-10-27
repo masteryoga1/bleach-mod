@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:espada",
+  "display": {
+    "icon": {
+      "id": "bleach:caja_negacion"
+    },
+    "title": {
+      "translate": "advancements.bleach.caja_negacion.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.caja_negacion.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "caja_negacion": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "caja_negacion"
+      }
+    }
+  }
+}
