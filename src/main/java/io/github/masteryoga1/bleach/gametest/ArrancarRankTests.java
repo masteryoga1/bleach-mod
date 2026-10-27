@@ -227,13 +227,21 @@ public final class ArrancarRankTests {
         note(roster, 4, 100.0F, now);
         helper.assertTrue(rank(roster, 4, now).numero() == 14, "soul 4 was given " + rank(roster, 4, now).numero()
                 + ", not 14: a number is not given again until the count comes round");
-        // A number the soul's record asks for is kept while it is free, and does not move the count on.
+        // A number the soul's record asks for is kept while it is free.
         roster.note(id(5), "soul5", 12, 100.0F, now);
         helper.assertTrue(rank(roster, 5, now).numero() == 12,
                 "soul 5 asked for the free 12 and got " + rank(roster, 5, now));
         roster.note(id(6), "soul6", 11, 100.0F, now);
         helper.assertTrue(rank(roster, 6, now).numero() == 15,
                 "soul 6 asked for the held 11 and got " + rank(roster, 6, now));
+        // Nor does it move the count on: on a roster of its own, the soul after one that asked for 40 is born 12.
+        ArrancarRoster hinted = new ArrancarRoster();
+        note(hinted, 1, 100.0F, now);
+        hinted.note(id(2), "soul2", 40, 100.0F, now);
+        note(hinted, 3, 100.0F, now);
+        helper.assertTrue(rank(hinted, 2, now).numero() == 40 && rank(hinted, 3, now).numero() == 12,
+                "after asking for 40, soul 2 is Número " + rank(hinted, 2, now).numero() + " and the next soul "
+                        + rank(hinted, 3, now).numero() + ", not 40 and 12");
 
         Set<Integer> held = new HashSet<>();
         for (int n : new int[] {1, 3, 4, 5, 6}) {
@@ -452,6 +460,8 @@ public final class ArrancarRankTests {
         helper.assertFalse(roster.pin(weak, 11), "W was pinned to an eleventh seat");
         helper.assertTrue(roster.clear(weak), "W could not be cleared");
         assertRank(helper, roster.rank(weak, now), ArrancarRank.Kind.NUMERO, 14, "W cleared");
+        // W leaves, so its 14 lies free behind the count (15): only a saved count numbers the next soul 16.
+        helper.assertTrue(roster.remove(weak), "W was not on the roster to take off");
 
         // Saved and read back, it lists the same and numbers the next soul the same.
         CompoundTag saved = roster.save(new CompoundTag(), registries);
