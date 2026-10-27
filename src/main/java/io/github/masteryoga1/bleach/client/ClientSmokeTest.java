@@ -19,6 +19,7 @@ import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
@@ -32,6 +33,7 @@ import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
+import io.github.masteryoga1.bleach.soul.ArrancarRank;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
@@ -126,15 +128,18 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * each drawn as its form.
  *
  * <p>Then the bare-handed Vasto Lorde becomes an Arrancar by command, seen from in front: a person's
- * size again, with the fragment of its mask, its hole and its own blade in hand. The soul screen is
+ * size again, with the fragment of its mask, its hole and its own blade in hand. Seated as the Cuatro
+ * Espada by command, its rank and its tattooed number must reach the client. The soul screen is
  * opened on it, and the real Release key calls out its Resurrección, which must draw the released
  * Vasto Lorde and raise its health; the Seal key seals it again, and the wait before the next release
- * must reach the client. Then the sealed Arrancar's Sonído, through the real flash step request, must
- * carry it further than a first Shunpo, and holding the real Devour key still sends out Pesquisa, which
- * must outline a Plus standing behind a stone wall. Made strong enough by command, the Arrancar sneaks and
- * holds the real Cero key, which gathers a Gran Rey Cero in its blade's colour that fires by itself and is
- * paid for. Last, it is mounted by command on a summoned Negación light, which must lift it, and sneaking
- * must leave the light, falling slowly, before the run quits.
+ * must reach the client. Then, seen from behind, where its tattoo may be, the sealed Arrancar's Sonído,
+ * through the real flash step request, must carry it further than a first Shunpo, and holding the real
+ * Devour key still sends out Pesquisa, which must outline a Plus standing behind a stone wall. Seated
+ * among the Espada and made strong enough to pay by command, the Arrancar sneaks and holds the real Cero
+ * key, which gathers a Gran Rey Cero in its blade's colour that fires by itself and is paid for. Then it
+ * is mounted by command on a summoned Negación light, which must lift it, and sneaking must leave the
+ * light, falling slowly. Last, it puts on the white Arrancar uniform by command, seen from in front,
+ * before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -800,10 +805,12 @@ public final class ClientSmokeTest {
             case 3725 -> HollowKeys.CERO.setDown(false);
             case 3745 -> command(minecraft, "bleach tier @s hollow 3");
             case 3775 -> command(minecraft, "bleach tier @s hollow 4");
-            // The Vasto Lorde tears free by command, and is seen from in front: fragment, hole and blade.
+            // The Vasto Lorde tears free by command, and is seen from in front: fragment, hole and blade. It is
+            // seated as the Cuatro Espada by command, in the same tick, so its number is tattooed.
             case 3800 -> {
                 command(minecraft, "item replace entity @s weapon.mainhand with minecraft:air");
                 command(minecraft, "bleach soul @s arrancar");
+                command(minecraft, "bleach rank @s espada 4");
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
             }
             case 3832 -> minecraft.setScreen(new SoulStatsScreen());
@@ -818,6 +825,9 @@ public final class ClientSmokeTest {
                 command(minecraft, "tp @s ~ ~ ~ 0 0");
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
             }
+            // Seen from behind before the dash. A tattoo on the chest, hip or back is in this shot or in the arrancar
+            // shot from in front; one on the left arm is edge-on to both, so for it these beats only prove it draws.
+            case 3901 -> shot(minecraft, "arrancar_back");
             case 3902 -> {
                 dashFrom = player.position();
                 BleachNetwork.requestFlashStep(1.0F, 0.0F);
@@ -830,8 +840,8 @@ public final class ClientSmokeTest {
             case 3925 -> HollowKeys.DEVOUR.setDown(true);
             case 3950 -> HollowKeys.DEVOUR.setDown(false);
             case 3975 -> command(minecraft, "kill @e[type=bleach:plus]");
-            // The Gran Rey Cero through the real keys: strong enough by command, sneaking, the Cero key held until it
-            // fires itself.
+            // The Gran Rey Cero through the real keys: seated by command at 3800, strong enough to pay by command,
+            // sneaking, the Cero key held until it fires itself.
             case 3990 -> {
                 command(minecraft, "bleach reiryoku @s 2000 2000");
                 command(minecraft, "tp @s ~ ~ ~ 0 0");
@@ -850,7 +860,14 @@ public final class ClientSmokeTest {
             }
             case 4095 -> minecraft.options.keyShift.setDown(true);
             case 4099 -> minecraft.options.keyShift.setDown(false);
-            case 4130 -> {
+            // The white uniform by command, seen from in front: jacket and sash, hakama, zōri over black tabi.
+            case 4120 -> {
+                command(minecraft, "item replace entity @s armor.chest with bleach:arrancar_jacket");
+                command(minecraft, "item replace entity @s armor.legs with bleach:arrancar_hakama");
+                command(minecraft, "item replace entity @s armor.feet with bleach:arrancar_zori");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+            }
+            case 4150 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1015,8 +1032,10 @@ public final class ClientSmokeTest {
                 () -> soul.state() == SoulState.ARRANCAR && soul.tier(PowerPath.HOLLOW) == 4
                         && ArrancarLogic.isOwnBlade(player.getMainHandItem(), player)
                         && !hasLook(player, HollowPlayerLogic.LOOK_RESURRECCION)
-                        && Math.abs(player.getScale() - 1.0F) < 0.01F,
-                "the Vasto Lorde never became an Arrancar with its own blade in hand")) {
+                        && Math.abs(player.getScale() - 1.0F) < 0.01F
+                        && soul.hollow().arrancar().rank().seat() == 4
+                        && ArrancarRank.lookNumber(ClientSouls.appearance(player).hollowLook()) == 4,
+                "the Vasto Lorde never became an Arrancar with its own blade in hand, seated as the Cuatro Espada")) {
             shot(minecraft, "arrancar");
         }
         if (expectWithin(minecraft, 3842, 3870,
@@ -1058,6 +1077,10 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 4097, 4115,
                 () -> !player.isPassenger() && player.hasEffect(MobEffects.SLOW_FALLING),
                 "sneaking never left the Negación light, or left it without Slow Falling");
+        if (expectWithin(minecraft, 4122, 4140, () -> ArrancarUniformItem.isFullSet(player),
+                "the Arrancar uniform was never worn")) {
+            shot(minecraft, "arrancar_uniform");
+        }
     }
 
     /** Whether the player is drawn with this Hollow look bit. */

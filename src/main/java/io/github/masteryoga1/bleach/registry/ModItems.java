@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.EmptyGintoItem;
 import io.github.masteryoga1.bleach.item.GintoItem;
@@ -84,6 +85,17 @@ public final class ModItems {
             () -> new QuincyGarbItem(ModArmorMaterials.WANDENREICH, ArmorItem.Type.LEGGINGS));
     public static final DeferredItem<QuincyGarbItem> WANDENREICH_BOOTS = ITEMS.register("wandenreich_boots",
             () -> new QuincyGarbItem(ModArmorMaterials.WANDENREICH, ArmorItem.Type.BOOTS));
+
+    /**
+     * The white Arrancar uniform: a jacket with a black sash, a hakama, and zōri over black tabi. Only for
+     * the look. See {@link ArrancarUniformItem}.
+     */
+    public static final DeferredItem<ArrancarUniformItem> ARRANCAR_JACKET = ITEMS.register("arrancar_jacket",
+            () -> new ArrancarUniformItem(ArmorItem.Type.CHESTPLATE));
+    public static final DeferredItem<ArrancarUniformItem> ARRANCAR_HAKAMA = ITEMS.register("arrancar_hakama",
+            () -> new ArrancarUniformItem(ArmorItem.Type.LEGGINGS));
+    public static final DeferredItem<ArrancarUniformItem> ARRANCAR_ZORI = ITEMS.register("arrancar_zori",
+            () -> new ArrancarUniformItem(ArmorItem.Type.BOOTS));
 
     /**
      * The Sanrei Glove, handed down to a Quincy of the third tier: worn, it fights every draw until a

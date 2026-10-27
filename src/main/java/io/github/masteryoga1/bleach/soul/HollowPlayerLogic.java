@@ -52,6 +52,10 @@ public final class HollowPlayerLogic {
     public static final int LOOK_DEVOURING_PLUS = 128;
     /** An Arrancar in Resurrección: its Hollow skin and full mask (with {@link #LOOK_VASTO_LORDE}, a Vasto Lorde's bone). */
     public static final int LOOK_RESURRECCION = 256;
+    /** Bits 9 to 15: the number tattooed on an Arrancar, 0 for none (see {@link ArrancarRank#lookBits}). */
+    public static final int LOOK_NUMBER_SHIFT = 9;
+    /** The seven bits that hold it, from {@link #LOOK_NUMBER_SHIFT} up: 0 to 127, of which 0 to 99 are used. */
+    public static final int LOOK_NUMBER_MASK = 0x7F << LOOK_NUMBER_SHIFT;
     /** How many mask shapes there are: 0 skull, 1 fanged, 2 horned, 3 beaked. */
     public static final int MASK_VARIANTS = 4;
     /** The food level a starving Hollow is held at: exactly the client's own limit for sprinting. */
@@ -277,11 +281,11 @@ public final class HollowPlayerLogic {
 
     /**
      * The look bits the soul's saved data gives, so its owner's client can work them out too: red eyes
-     * while hungry, and the Menos form.
+     * while hungry, the Menos form, and an Arrancar's tattooed number.
      */
     public static int hollowLook(SoulData data) {
         int look = isHollow(data) && data.hollow().hungerStarted() && band(data) != Band.FED ? LOOK_RAVENOUS : 0;
-        return look | HollowTier.of(data).lookBit();
+        return look | HollowTier.of(data).lookBit() | ArrancarRank.lookBits(data);
     }
 
     /**

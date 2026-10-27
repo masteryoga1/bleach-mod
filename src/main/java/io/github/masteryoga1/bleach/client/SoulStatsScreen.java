@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
+import io.github.masteryoga1.bleach.soul.ArrancarRank;
 import io.github.masteryoga1.bleach.soul.BaitRecord;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.GranReyCero;
@@ -54,7 +55,7 @@ import net.minecraft.world.level.Level;
  * the souls a Hollow has devoured and what they were, Quincy blood (its reishi and Blut, the Hollow
  * poison in it, souls destroyed and how rich the reishi is here, how far its arts have come, and the
  * Quincy Elder's lessons), stats with training progress, awakened powers (an Arrancar's with the form it
- * rose from) and what comes next.
+ * rose from and its rank) and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -234,7 +235,7 @@ public final class SoulStatsScreen extends Screen {
             if (tier > 0 || arrancar) {
                 anyPower = true;
                 // A Hollow's tier is its form: Hollow, Gillian, Adjuchas or Vasto Lorde; an Arrancar's, the form it
-                // rose from.
+                // rose from, with its rank as the server's roster last said on a row of its own, so neither runs wide.
                 Component row;
                 if (path == PowerPath.HOLLOW && HollowPlayerLogic.isHollow(data)) {
                     row = Component.translatable("screen.bleach.soul.tier.hollow", path.displayName(),
@@ -247,6 +248,11 @@ public final class SoulStatsScreen extends Screen {
                 }
                 text(graphics, row, left + 6, y, WHITE);
                 y += line;
+                if (arrancar) {
+                    text(graphics, Component.translatable("screen.bleach.soul.rank", ArrancarRank.of(data).label()),
+                            left + 12, y, WHITE);
+                    y += line;
+                }
             }
         }
         if (!anyPower) {
@@ -531,8 +537,8 @@ public final class SoulStatsScreen extends Screen {
 
     /**
      * An Arrancar's Gran Rey Cero: how to fire it and what it costs (its blood in hearts, its reiryoku and the
-     * wait after it), or, until it is strong enough, the maximum reiryoku it needs and has. Both read only the
-     * synced soul and the server's settings, which this client has.
+     * wait after it), or, until it holds a seat among the Espada, what a seat needs and the maximum reiryoku it
+     * has. Both read only the synced soul and the server's settings, which this client has.
      */
     private static Component granReyCero(SoulData data) {
         if (GranReyCero.eligible(data)) {
@@ -541,7 +547,7 @@ public final class SoulStatsScreen extends Screen {
                     BleachConfig.get(BleachConfig.GRAN_REY_CERO_COOLDOWN_SECONDS));
         }
         return Component.translatable("screen.bleach.soul.next.arrancar.gran_rey_cero.locked",
-                Math.round(GranReyCero.requiredMaxReiryoku()), Math.round(data.maxReiryoku()));
+                Math.round(ArrancarRank.espadaMinMaxReiryoku()), Math.round(data.maxReiryoku()));
     }
 
     @Override

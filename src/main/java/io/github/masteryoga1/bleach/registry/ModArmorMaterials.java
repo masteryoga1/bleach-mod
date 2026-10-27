@@ -34,6 +34,12 @@ public final class ModArmorMaterials {
      */
     public static final DeferredHolder<ArmorMaterial, ArmorMaterial> WANDENREICH = cloth("wandenreich");
 
+    /**
+     * The white Arrancar uniform, cloth like the rest. Textures are
+     * {@code textures/models/armor/arrancar_uniform_layer_1.png} (jacket and zōri) and {@code _2} (hakama).
+     */
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ARRANCAR_UNIFORM = cloth("arrancar_uniform");
+
     private ModArmorMaterials() {
     }
 

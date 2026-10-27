@@ -272,7 +272,8 @@ public final class ArrancarEvents {
      * stops, and its Hollow body and hunger go, food back. Its Hollow tier becomes the form it rose from, the
      * record counts a new forging of its blade, and the first time it gains a share of maximum reiryoku by that
      * form; its reiryoku and health fill. The blade goes into an empty main hand, or else the inventory, and
-     * any older copy crumbles within a second.
+     * any older copy crumbles within a second. A real player is then numbered on the server's roster at once
+     * ({@link ArrancarRoster#keep}), and told its Número, or its seat if it is already strong enough for one.
      */
     public static void become(Player player, SoulData data, HollowTier origin, boolean perfected) {
         long now = player.level().getGameTime();
@@ -312,6 +313,7 @@ public final class ArrancarEvents {
             ArrancarLogic.Blade kind = ArrancarLogic.blade(player.getUUID());
             serverPlayer.sendSystemMessage(Component.translatable(BECAME, kind.displayName())
                     .withStyle(ChatFormatting.WHITE));
+            ArrancarRoster.keep(serverPlayer, data, now);
             SpiritSenses.play(player, ModSounds.MASK_CRACK.get(), SoundSource.PLAYERS, 1.5F, 0.5F, false);
             SpiritSenses.play(player, ModSounds.ZANPAKUTO_RELEASE.get(), SoundSource.PLAYERS, 1.0F, 0.8F, false);
             if (player.level() instanceof ServerLevel level) {
@@ -345,7 +347,8 @@ public final class ArrancarEvents {
     /**
      * Every second, for every soul (from {@link HollowBody#tickBody}): a release left on a soul that is no longer
      * an Arrancar ends, and so do a Pesquisa focus and a held Bala key, the Arrancar's health, speed and damage
-     * are put right (taken off anyone else), and the blades are kept right ({@link #reconcileBlades}). Server side.
+     * are put right (taken off anyone else), the blades are kept right ({@link #reconcileBlades}), and its rank is
+     * kept right ({@link ArrancarRoster#keep}). Server side.
      */
     public static void reconcile(Player player, SoulData data, long now) {
         if (player.level().isClientSide()) {
@@ -361,6 +364,7 @@ public final class ArrancarEvents {
         }
         reconcileBody(player, data);
         reconcileBlades(player, data, now);
+        ArrancarRoster.keep(player, data, now);
     }
 
     /**

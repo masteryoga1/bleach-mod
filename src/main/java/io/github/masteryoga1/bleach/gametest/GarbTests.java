@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.menu.TailoringMenu;
 import io.github.masteryoga1.bleach.menu.TailoringPages;
@@ -10,6 +11,8 @@ import io.github.masteryoga1.bleach.recipe.TailoringRecipe;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModRecipes;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -32,18 +35,21 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for the Shihakushō, the Quincy garb and the Wandenreich uniform, the Tailoring Table and its
- * pages, and the sheathed blade.
+ * Tests for the Shihakushō, the Quincy garb, the Wandenreich uniform and the white Arrancar uniform, the
+ * Tailoring Table and its pages, and the sheathed blade.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class GarbTests {
     private static final double EPSILON = 1.0E-6;
     private static final long NOW = 100_000L;
+    /** Where a player stands in the {@code empty} template. */
+    private static final Vec3 ROOM = new Vec3(1.5, 1.0, 1.5);
 
     private GarbTests() {
     }
@@ -77,7 +83,8 @@ public final class GarbTests {
         helper.assertTrue(results.equals(Set.of(ModItems.SHIHAKUSHO_KOSODE.get(), ModItems.SHIHAKUSHO_HAKAMA.get(),
                 ModItems.WARAJI.get(), ModItems.QUINCY_TUNIC.get(), ModItems.QUINCY_TROUSERS.get(),
                 ModItems.QUINCY_SHOES.get(), ModItems.SANREI_GLOVE.get(), ModItems.WANDENREICH_CAP.get(),
-                ModItems.WANDENREICH_COAT.get(), ModItems.WANDENREICH_TROUSERS.get(), ModItems.WANDENREICH_BOOTS.get())),
+                ModItems.WANDENREICH_COAT.get(), ModItems.WANDENREICH_TROUSERS.get(), ModItems.WANDENREICH_BOOTS.get(),
+                ModItems.ARRANCAR_JACKET.get(), ModItems.ARRANCAR_HAKAMA.get(), ModItems.ARRANCAR_ZORI.get())),
                 "tailoring makes " + results);
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("tailoring_table")).isPresent(),
                 "the Tailoring Table cannot be crafted");
@@ -205,6 +212,51 @@ public final class GarbTests {
             helper.assertTrue(BuiltInRegistries.ITEM.getKey(made.getItem()).equals(BleachMod.id(name)),
                     "bleach:tailoring/" + name + " makes " + made);
         }
+        helper.succeed();
+    }
+
+    /**
+     * The white Arrancar uniform is cloth: no armour and no bonus, sewn at the table, a set of its own apart from
+     * the Shihakushō and the Quincy garb, and refused only by a Hollow's hide, as all armour is.
+     */
+    @GameTest(template = "empty")
+    public static void arrancarUniformIsCloth(GameTestHelper helper) {
+        for (String name : List.of("arrancar_jacket", "arrancar_hakama", "arrancar_zori")) {
+            Item piece = BuiltInRegistries.ITEM.get(BleachMod.id(name));
+            helper.assertTrue(piece instanceof ArrancarUniformItem,
+                    "bleach:" + name + " is not a piece of the Arrancar uniform");
+            ItemStack stack = new ItemStack(piece);
+            helper.assertTrue(stack.is(BleachTags.ARRANCAR_UNIFORM), stack + " is not in #bleach:arrancar_uniform");
+            helper.assertFalse(stack.is(BleachTags.QUINCY_GARB), stack + " counts as the Quincy garb");
+            helper.assertFalse(stack.is(BleachTags.SHINIGAMI_GARB), stack + " counts as the Shihakushō");
+            if (piece instanceof ArrancarUniformItem uniform) {
+                helper.assertTrue(uniform.getDefense() == 0, stack + " gives " + uniform.getDefense() + " armour");
+                helper.assertTrue(uniform.getDefaultAttributeModifiers(stack).equals(ItemAttributeModifiers.EMPTY),
+                        stack + " has attributes of its own");
+            }
+            helper.assertTrue(stack.getMaxStackSize() == 1, stack + " stacks to " + stack.getMaxStackSize());
+            ItemStack made = recipe(helper, name).getResultItem(helper.getLevel().registryAccess());
+            helper.assertTrue(made.is(piece), "bleach:tailoring/" + name + " makes " + made);
+        }
+        helper.assertTrue(BuiltInRegistries.ARMOR_MATERIAL.containsKey(BleachMod.id("arrancar_uniform")),
+                "the Arrancar uniform's armour material is not registered");
+
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setItemSlot(EquipmentSlot.CHEST, new ItemStack(ModItems.ARRANCAR_JACKET.get()));
+        player.setItemSlot(EquipmentSlot.LEGS, new ItemStack(ModItems.ARRANCAR_HAKAMA.get()));
+        player.setItemSlot(EquipmentSlot.FEET, new ItemStack(ModItems.ARRANCAR_ZORI.get()));
+        helper.assertTrue(ArrancarUniformItem.isFullSet(player), "the whole Arrancar uniform is not a full set");
+        player.setItemSlot(EquipmentSlot.FEET, new ItemStack(ModItems.WARAJI.get()));
+        helper.assertFalse(ArrancarUniformItem.isFullSet(player), "the uniform with waraji passed for a full set");
+
+        // Anyone may wear it but a Hollow, whose hide refuses all armour; an Arrancar is not a Hollow for that.
+        ItemStack jacket = new ItemStack(ModItems.ARRANCAR_JACKET.get());
+        Player hollow = HollowPlayerTests.soulPlayer(helper, GameType.SURVIVAL, SoulState.HOLLOW, 400.0F, ROOM);
+        helper.assertTrue(HollowPlayerLogic.refusesArmour(hollow, jacket, EquipmentSlot.CHEST)
+                == !BleachConfig.get(BleachConfig.HOLLOW_WEARS_ARMOR), "a Hollow's hide does not follow the server's rule");
+        Player arrancar = ArrancarTests.arrancar(helper, HollowTier.ADJUCHAS, 400.0F, ROOM);
+        helper.assertFalse(HollowPlayerLogic.refusesArmour(arrancar, jacket, EquipmentSlot.CHEST),
+                "an Arrancar's body refuses the Arrancar jacket");
         helper.succeed();
     }
 
