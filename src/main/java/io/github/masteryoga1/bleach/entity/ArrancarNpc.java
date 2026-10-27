@@ -124,6 +124,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     static final double SONIDO_MIN_STEP = 2.0;
     /** A closing step lands this far short of the prey, within the blade's reach. */
     static final double SONIDO_STOP_SHORT = 2.0;
+    /** How long a closing or catching-up Sonído that found no footing (water, a gap) waits before it looks again. */
+    static final int SONIDO_RETRY_TICKS = 10;
     /** Only a blow from this close starts a dodge roll. */
     static final double DODGE_REACH = 4.0;
     /** The drop from a tear (at most 6 blocks) does it no harm, but a cliff does. */
@@ -161,6 +163,7 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
     private long ceroReadyAt;
     private long balaReadyAt;
     private long sonidoReadyAt;
+    private long sonidoRetryAt;
     private long leaderLookupAt;
     @Nullable
     private LivingEntity cachedLeader;
@@ -475,7 +478,9 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
             return;
         }
         int idleSeconds = BleachConfig.get(BleachConfig.ARRANCAR_NPC_IDLE_LEAVE_SECONDS);
-        if (idleSeconds <= 0 || getTarget() != null || leader() != null
+        LivingEntity target = getTarget();
+        // A target that died or left is no reason to stay.
+        if (idleSeconds <= 0 || (target != null && target.isAlive()) || leader() != null
                 || !SpiritSenses.awareNear(server, position(), HollowLogic.AWARE_NEAR_RANGE).isEmpty()) {
             idleSince = -1L;
             return;
@@ -587,13 +592,14 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
                 return;
             }
         }
-        if (now >= sonidoReadyAt) {
+        if (now >= sonidoReadyAt && now >= sonidoRetryAt) {
             double min = BleachConfig.get(BleachConfig.ARRANCAR_NPC_SONIDO_MIN_RANGE);
             double max = BleachConfig.get(BleachConfig.ARRANCAR_NPC_SONIDO_MAX_RANGE);
             Vec3 toward = target.position().subtract(position());
             double across = Math.sqrt(toward.x * toward.x + toward.z * toward.z);
-            if (across >= min && across <= max && mayFight() && hasLineOfSight(target)) {
-                sonido(toward, Math.max(SONIDO_MIN_STEP, across - SONIDO_STOP_SHORT), SONIDO_MIN_STEP);
+            if (across >= min && across <= max && mayFight() && hasLineOfSight(target)
+                    && !sonido(toward, Math.max(SONIDO_MIN_STEP, across - SONIDO_STOP_SHORT), SONIDO_MIN_STEP)) {
+                sonidoRetryAt = now + SONIDO_RETRY_TICKS;
             }
         }
     }
@@ -1244,11 +1250,14 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster {
                 return;
             }
             double distance = npc.distanceTo(leader);
-            if (distance > BleachConfig.get(BleachConfig.ARRANCAR_NPC_CATCH_UP_DISTANCE)) {
+            long now = npc.level().getGameTime();
+            if (distance > BleachConfig.get(BleachConfig.ARRANCAR_NPC_CATCH_UP_DISTANCE) && now >= npc.sonidoRetryAt) {
                 double landShort = BleachConfig.get(BleachConfig.ARRANCAR_NPC_FOLLOW_DISTANCE);
                 if (npc.sonido(leader.position().subtract(npc.position()), distance - landShort, SONIDO_MIN_STEP)) {
                     // The old path starts where it no longer stands.
                     repathIn = 0;
+                } else {
+                    npc.sonidoRetryAt = now + SONIDO_RETRY_TICKS;
                 }
             }
             if (--repathIn <= 0) {

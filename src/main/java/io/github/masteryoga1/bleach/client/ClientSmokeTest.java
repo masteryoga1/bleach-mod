@@ -881,13 +881,14 @@ public final class ClientSmokeTest {
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
             }
             // Arrancar NPCs by command, seen from behind: a bare-chested Privaron Espada and a Número in the whole
-            // uniform stand still facing the player, where the stone wall of the Pesquisa beat is cleared away.
+            // uniform stand still facing the player, either side of its body so it hides neither, where the stone
+            // wall of the Pesquisa beat is cleared away.
             case 4150 -> {
                 command(minecraft, "fill ~-2 ~ ~1 ~2 ~3 ~6 air");
                 command(minecraft, "tp @s ~ ~ ~ 0 0");
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-                command(minecraft, "summon bleach:arrancar ~ ~ ~3 " + PRIVARON_NPC);
-                command(minecraft, "summon bleach:arrancar ~1.5 ~ ~4 " + NUMERO_NPC);
+                command(minecraft, "summon bleach:arrancar ~-2 ~ ~4 " + PRIVARON_NPC);
+                command(minecraft, "summon bleach:arrancar ~2 ~ ~4 " + NUMERO_NPC);
             }
             case 4185 -> {
                 finished = true;
