@@ -551,7 +551,7 @@
   "message.bleach.cero.fizzled": "The Cero fizzles out before it has gathered.",
   "message.bleach.cero.held": "Held in the light, you cannot gather a Cero.",
   "message.bleach.gran_rey_cero.held": "Held in the light, you cannot gather a Gran Rey Cero.",
-  "message.bleach.gran_rey_cero.locked": "Only the Espada gather a Gran Rey Cero, and you are %1$s. A seat needs %2$s maximum reiryoku and a place among the ten strongest.",
+  "message.bleach.gran_rey_cero.locked": "Only the Espada gather a Gran Rey Cero. You are %1$s; a seat needs %2$s maximum reiryoku.",
   "message.bleach.gran_rey_cero.cooldown": "Your blood has not gathered for another Gran Rey Cero: %s seconds.",
   "message.bleach.gran_rey_cero.no_blade": "Hold your own blade to draw the blood for a Gran Rey Cero.",
   "message.bleach.gran_rey_cero.too_weak": "Too little reiryoku left for a Gran Rey Cero.",

@@ -251,11 +251,14 @@ public final class ArrancarRankTests {
                 && keyed(unnumbered.label(), "rank.bleach.unnumbered"),
                 "with every Número held, soul 200 is " + unnumbered + ", labelled " + unnumbered.label());
 
+        // Soul 1 is seen again a minute on, so souls 4 and 5 are the longest away, last seen in the same tick.
+        note(roster, 1, 100.0F, now + ArrancarRoster.SEEN_REFRESH_TICKS);
+
         // Set for these calls, in this one tick, and put back before any other test runs.
         int hours = BleachConfig.get(BleachConfig.RANK_ABSENT_HOURS);
         BleachConfig.RANK_ABSENT_HOURS.set(1);
         try {
-            long later = now + ArrancarRoster.TICKS_PER_HOUR + 1L;
+            long later = now + ArrancarRoster.SEEN_REFRESH_TICKS + ArrancarRoster.TICKS_PER_HOUR + 1L;
             note(roster, 3, 100.0F, later);
             note(roster, 6, 100.0F, later);
             for (int n = 100; n <= 183; n++) {
@@ -269,11 +272,13 @@ public final class ArrancarRankTests {
             ArrancarRoster.Entry seen = entry(entries, id(3));
             helper.assertTrue(seen != null && !seen.away(), "soul 3, seen just now, is listed as " + seen);
 
-            // Every Número held: the longest away gives its number up, and between equal sights the lowest goes.
+            // Every Número held: the longest away gives its number up first, and between equal sights the lowest
+            // goes. Soul 5 holds 12 though soul 4 (14) came first, so going by the order they came in would differ,
+            // and so would going by the number alone, which would take soul 1's 11 first.
             note(roster, 200, 100.0F, later);
             note(roster, 201, 100.0F, later);
             note(roster, 202, 100.0F, later);
-            int[][] given = {{200, 11}, {201, 12}, {202, 14}, {1, 0}, {4, 0}, {5, 0}, {3, 13}};
+            int[][] given = {{200, 12}, {201, 14}, {202, 11}, {1, 0}, {4, 0}, {5, 0}, {3, 13}};
             for (int[] pair : given) {
                 int numero = rank(roster, pair[0], later).numero();
                 helper.assertTrue(numero == pair[1], "soul " + pair[0] + " is Número " + numero + ", not " + pair[1]);
@@ -321,6 +326,14 @@ public final class ArrancarRankTests {
         note(roster, 2, 2_600.0F, now);
         assertRank(helper, rank(roster, 2, now), ArrancarRank.Kind.ESPADA, 1, "soul 2 at 2600");
         assertRank(helper, rank(roster, 3, now), ArrancarRank.Kind.PRIVARON, 100, "soul 3, the next Diez");
+
+        // A tie again, on a roster of its own where the order they came in and their ids both favour the younger:
+        // the first asks for Número 15, the second is given 11, and only the elder Número seats the second first.
+        ArrancarRoster tied = new ArrancarRoster();
+        tied.note(id(1), "first", 15, 2_000.0F, now);
+        tied.note(id(2), "second", 0, 2_000.0F, now);
+        assertRank(helper, tied.rank(id(2), now), ArrancarRank.Kind.ESPADA, 1, "Número 11 tied at 2000");
+        assertRank(helper, tied.rank(id(1), now), ArrancarRank.Kind.ESPADA, 2, "Número 15 tied at 2000");
 
         double needs = BleachConfig.get(BleachConfig.ESPADA_MIN_MAX_REIRYOKU);
         BleachConfig.ESPADA_MIN_MAX_REIRYOKU.set(3_000.0);
@@ -386,6 +399,22 @@ public final class ArrancarRankTests {
         int reborn = rank(roster, 1, muchLater).numero();
         helper.assertTrue(reborn == 13,
                 "A born again is Número " + reborn + ", not 13, the next after 12: its old 11 is not given again");
+
+        // A pin ends with a long absence too, so a weak soul pinned by command is not seated again on its return.
+        note(roster, 3, 100.0F, muchLater);
+        note(roster, 5, 100.0F, muchLater);
+        helper.assertTrue(roster.pin(id(3), 3) && roster.pin(id(5), 4), "the weak souls could not be pinned");
+        assertRank(helper, rank(roster, 3, muchLater), ArrancarRank.Kind.ESPADA, 3, "C pinned as the Tercera");
+        assertRank(helper, rank(roster, 5, muchLater), ArrancarRank.Kind.ESPADA, 4, "E pinned as the Cuatro");
+        long weekOn = muchLater + 168L * ArrancarRoster.TICKS_PER_HOUR + 1L;
+        // E comes back before anything deals the seats again, so its own return must end its pin.
+        note(roster, 5, 100.0F, weekOn);
+        assertRank(helper, rank(roster, 5, weekOn), ArrancarRank.Kind.PRIVARON, 104, "E back after a week away");
+        assertRank(helper, rank(roster, 3, weekOn), ArrancarRank.Kind.PRIVARON, 103, "C still away after a week");
+        for (int n : new int[] {3, 5}) {
+            ArrancarRoster.Entry unpinned = entry(roster.entries(weekOn), id(n));
+            helper.assertTrue(unpinned != null && !unpinned.pinned(), "soul " + n + ", away a week, is " + unpinned);
+        }
         helper.succeed();
     }
 

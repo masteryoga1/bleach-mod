@@ -177,6 +177,11 @@ public final class ArrancarRoster extends SavedData {
             return;
         }
         boolean changed = false;
+        // A pin ends with a long absence, before the sight below would make the soul present again.
+        if (place.pin != 0 && absent(place, now)) {
+            place.pin = 0;
+            changed = true;
+        }
         if (!Objects.equals(place.name, shown)) {
             place.name = shown;
             changed = true;
@@ -212,17 +217,24 @@ public final class ArrancarRoster extends SavedData {
     }
 
     /**
-     * Deals the ten seats again: each present, pinned soul takes its pinned seat, then the present, unpinned souls
-     * strong enough for a seat fill the free ones, the strongest the lowest. A soul that loses its seat remembers it
-     * (the mark of a Privaron Espada), and one that gains a seat forgets any it lost. Marks dirty only on a change.
+     * Deals the ten seats again: a soul away too long loses its pin, each pinned soul takes its pinned seat, then
+     * the present, unpinned souls strong enough for a seat fill the free ones, the strongest the lowest. A soul that
+     * loses its seat remembers it (the mark of a Privaron Espada), and one that gains a seat forgets any it lost.
+     * Marks dirty only on a change.
      */
     public void reseat(long now) {
         boolean[] taken = new boolean[ArrancarRank.SEATS + 1];
+        boolean changed = false;
         for (Place place : places.values()) {
             place.dealt = 0;
+            // Staying away ends a pin, as it ends a seat: the soul must be pinned again on its return.
+            if (place.pin > 0 && absent(place, now)) {
+                place.pin = 0;
+                changed = true;
+            }
         }
         for (Place place : places.values()) {
-            if (place.pin > 0 && !absent(place, now) && !taken[place.pin]) {
+            if (place.pin > 0 && !taken[place.pin]) {
                 place.dealt = place.pin;
                 taken[place.pin] = true;
             }
@@ -246,7 +258,6 @@ public final class ArrancarRoster extends SavedData {
             place.dealt = next;
             taken[next] = true;
         }
-        boolean changed = false;
         for (Place place : places.values()) {
             if (place.dealt == place.seat) {
                 continue;

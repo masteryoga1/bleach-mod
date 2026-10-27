@@ -825,7 +825,8 @@ public final class ClientSmokeTest {
                 command(minecraft, "tp @s ~ ~ ~ 0 0");
                 minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
             }
-            // Seen from behind before the dash: the tattoo is in this shot or in the arrancar shot from in front.
+            // Seen from behind before the dash. A tattoo on the chest, hip or back is in this shot or in the arrancar
+            // shot from in front; one on the left arm is edge-on to both, so for it these beats only prove it draws.
             case 3901 -> shot(minecraft, "arrancar_back");
             case 3902 -> {
                 dashFrom = player.position();
