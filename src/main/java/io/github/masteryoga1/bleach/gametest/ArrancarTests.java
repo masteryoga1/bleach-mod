@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
@@ -396,6 +397,23 @@ public final class ArrancarTests {
         helper.assertFalse(ArrancarEvents.tearing(data), "a step of a block and a quarter did not break the tear");
         HollowPlayerTests.assertClose(helper, data.reiryoku(), 400.0, "the reiryoku after a tear broken by a step");
         helper.assertTrue(data.hollow().arrancar().failures() == 0, "a tear broken by a step counted as a failure");
+
+        // Shut in a Caja Negación, a soul loses its grip on the mask, for free: in there it can do nothing.
+        ArrancarEvents.pressTear(player, data, now + 102L);
+        ArrancarEvents.pressTear(player, data, now + 102L);
+        helper.assertTrue(ArrancarEvents.tearing(data), "two presses did not begin the tear a third time");
+        CajaNegacion caja = CajaNegacion.close(helper.getLevel(), player, null, 200);
+        try {
+            helper.assertTrue(caja != null, "no Caja Negación closed on the tearing Adjuchas");
+            helper.assertFalse(ArrancarEvents.tickTear(player, data, now + 103L),
+                    "a tear in a Caja Negación made an Arrancar");
+            helper.assertFalse(ArrancarEvents.tearing(data), "a Caja Negación did not break the tear");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 400.0, "the reiryoku after a tear broken by a Caja");
+        } finally {
+            if (caja != null) {
+                caja.discard();
+            }
+        }
         helper.succeed();
     }
 

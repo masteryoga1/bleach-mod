@@ -502,9 +502,13 @@ public final class ArrancarEvents {
         return BleachConfig.get(BleachConfig.TEAR_CHANNEL_SECONDS) * 20L;
     }
 
-    /** Whether something has broken the grip of a soul tearing at its mask (see {@link #tickTear}). */
+    /**
+     * Whether something has broken the grip of a soul tearing at its mask (see {@link #tickTear}). A held soul (shut in
+     * a Caja Negación, or riding Negación's light) can do nothing, so its tear goes too.
+     */
     private static boolean breaks(Player player, SoulData data) {
-        return !player.isAlive() || player.isSpectator() || data.devourTargetId >= 0 || HollowCero.charging(data)
+        return !player.isAlive() || player.isSpectator() || Negacion.held(player) || data.devourTargetId >= 0
+                || HollowCero.charging(data)
                 || !ArrancarLogic.canTear(HollowTier.of(data)) || data.hollowHurtAt > data.tearStartedAt
                 || data.tearFrom == null || player.position().distanceToSqr(data.tearFrom) > STILL_DISTANCE_SQR;
     }

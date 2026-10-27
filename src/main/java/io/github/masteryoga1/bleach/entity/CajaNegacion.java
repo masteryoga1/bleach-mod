@@ -114,6 +114,8 @@ public class CajaNegacion extends Entity implements Negacion.HoldingVehicle {
     private static final int SWEEP_TICKS = 20;
     /** A held player is told it can touch nothing at most this often. */
     private static final int TELL_TICKS = 20;
+    /** Ticks after the hold begins at which a held player is told again, once the client's own mount line has shown. */
+    private static final int RETELL_TICKS = 2;
     /** A built-in mob is lifted to the first clear spot up to this many steps of half a block above where it was taken. */
     private static final int CLEAR_STEPS = 6;
     private static final double CLEAR_STEP = 0.5;
@@ -433,6 +435,11 @@ public class CajaNegacion extends Entity implements Negacion.HoldingVehicle {
         }
         if (phase() == Phase.CLOSING && phaseTicks() >= CLOSE_TICKS) {
             setPhase(Phase.HOLDING);
+        }
+        if (phase() == Phase.CLOSING && phaseTicks() == RETELL_TICKS && rider instanceof Player player) {
+            // The client shows vanilla's "Press Shift to dismount" when it learns of the mount, which is untrue here.
+            lastToldAt = tickCount - TELL_TICKS;
+            tellHeld(player);
         }
         keepSafe(rider);
         if (tickCount - lastSweepAt >= SWEEP_TICKS) {

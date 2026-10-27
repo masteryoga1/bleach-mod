@@ -48,6 +48,8 @@ public final class CajaNegacionRenderer extends EntityRenderer<CajaNegacion> {
     private static final int FACE_RGB = 0x0B0B14;
     private static final float FACE_ALPHA = 0.85F;
     private static final float INSIDE_FACE_ALPHA = 0.92F;
+    /** The floor face sits this far above the ground, so it never flickers against the block below. */
+    private static final float FLOOR_LIFT = 0.01F;
     /** Beams rebounding inside as it closes, each striking the next face on its path every so many ticks. */
     private static final int BEAMS = 6;
     private static final int BOUNCE_TICKS = 3;
@@ -248,9 +250,11 @@ public final class CajaNegacionRenderer extends EntityRenderer<CajaNegacion> {
         float y1 = centreY + half;
         float z0 = -half;
         float z1 = half;
+        // The floor stands a hair above the ground the rider stands on, so the two never fight for the same pixels.
+        float floor = y0 + FLOOR_LIFT;
         // Down, up, north, south, west and east, each corner listed round the face.
         float[][] faces = {
-                {x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1},
+                {x0, floor, z0, x1, floor, z0, x1, floor, z1, x0, floor, z1},
                 {x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0},
                 {x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0},
                 {x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1},

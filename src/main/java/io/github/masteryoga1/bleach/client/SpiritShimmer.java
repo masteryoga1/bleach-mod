@@ -50,7 +50,8 @@ public final class SpiritShimmer {
         long turn = now / INTERVAL;
         for (Entity entity : level.entitiesForRendering()) {
             if (Math.floorMod(entity.getId() + turn, CADENCE) != 0 || entity.distanceToSqr(player) > RANGE * RANGE
-                    || !ClientSouls.isHiddenFromViewer(entity) || CajaNegacion.hidden(entity)) {
+                    || !ClientSouls.isHiddenFromViewer(entity) || entity instanceof CajaNegacion
+                    || CajaNegacion.hidden(entity)) {
                 continue;
             }
             AABB box = entity.getBoundingBox();
