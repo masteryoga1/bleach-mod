@@ -84,6 +84,7 @@ public final class Negacion {
         bus.addListener(Negacion::onRightClickItem);
         bus.addListener(Negacion::onRightClickBlock);
         bus.addListener(Negacion::onEntityInteract);
+        bus.addListener(Negacion::onEntityInteractAt);
         bus.addListener(Negacion::onBreakBlock);
         bus.addListener(Negacion::onLoggedOut);
         bus.addListener(Negacion::onChangedDimension);
@@ -335,6 +336,14 @@ public final class Negacion {
 
     /** Nor deals with a creature. */
     private static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        if (refused(event.getEntity())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+        }
+    }
+
+    /** Nor with a spot on one, the way an armour stand's gear is taken: a separate event that comes first. */
+    private static void onEntityInteractAt(PlayerInteractEvent.EntityInteractSpecific event) {
         if (refused(event.getEntity())) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);

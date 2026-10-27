@@ -11,6 +11,7 @@ import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -148,6 +149,9 @@ public class CeroBeam extends Entity {
     private Vec3 lockedAim;
     @Nullable
     private Shot lastShot;
+    /** Told in the tick it fires, after its caster: a player's own code settles the price there. Server only. */
+    @Nullable
+    private Consumer<CeroBeam> onFired;
     /** {@link #tickCount} when it fired; on a client, when it learned that it had. */
     private int firedAt = -1;
 
@@ -312,6 +316,17 @@ public class CeroBeam extends Entity {
         if (owner instanceof Caster caster) {
             caster.onCeroFired(shot);
         }
+        if (onFired != null) {
+            onFired.accept(this);
+        }
+    }
+
+    /**
+     * What to do as it fires, by itself or sooner, in that same tick: a player is no {@link Caster}, so a Gran Rey
+     * Cero is paid for here, with no tick between for a logout or a change of world to slip into. Server only.
+     */
+    public void whenFired(Consumer<CeroBeam> action) {
+        onFired = action;
     }
 
     /**

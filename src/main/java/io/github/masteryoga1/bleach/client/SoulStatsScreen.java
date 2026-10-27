@@ -102,17 +102,18 @@ public final class SoulStatsScreen extends Screen {
         }
         SoulData data = player.getData(SoulAttachments.SOUL);
         List<FormattedCharSequence> next = font.split(nextStep(player, data), PANEL_WIDTH);
-        // Everything stays above the Done button: when the next step would reach it, the rows close up;
-        // when even the closed-up rows would, they close up to a line of text each and start higher; when
-        // those still would (the most a soul shows, such as a Hollow that was a Quincy), the two section
+        // Everything stays above the Done button: when the rows and the next step would reach it, the rows
+        // close up; when they still would, the rows close up to a line of text each and start higher; when
+        // they still would (the most a soul shows, such as a Hollow that was a Quincy), the two section
         // headings go; and what still does not fit of the next step is left out.
         int bottom = height - DONE_TOP - 4;
+        int below = next.size() * font.lineHeight;
         int y;
-        if (drawRows(null, player, data, TOP, LINE, GAP, true) + next.size() * font.lineHeight <= bottom) {
+        if (drawRows(null, player, data, TOP, LINE, GAP, true) + below <= bottom) {
             y = drawRows(graphics, player, data, TOP, LINE, GAP, true);
-        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0, true) <= bottom) {
+        } else if (drawRows(null, player, data, TOP, COMPACT_LINE, 0, true) + below <= bottom) {
             y = drawRows(graphics, player, data, TOP, COMPACT_LINE, 0, true);
-        } else if (drawRows(null, player, data, TIGHT_TOP, TIGHT_LINE, 0, true) <= bottom) {
+        } else if (drawRows(null, player, data, TIGHT_TOP, TIGHT_LINE, 0, true) + below <= bottom) {
             y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0, true);
         } else {
             y = drawRows(graphics, player, data, TIGHT_TOP, TIGHT_LINE, 0, false);

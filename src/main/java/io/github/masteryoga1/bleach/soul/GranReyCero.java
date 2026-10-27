@@ -248,6 +248,7 @@ public final class GranReyCero {
         }
         data.granReyCeroBeamId = beam.getId();
         data.granReyCeroStartedAt = now;
+        beam.whenFired(GranReyCero::fired);
         // Health, not a blow: no armour, totem, Hierro or hurt flash, and the refusal above keeps it from killing.
         if (!player.hasInfiniteMaterials()) {
             player.setHealth(player.getHealth() - blood());
@@ -271,7 +272,7 @@ public final class GranReyCero {
         }
         CeroBeam beam = beam(player, data);
         if (beam == null || beam.isFired()) {
-            // Gone, it is forgotten; fired by itself, it is paid for.
+            // Gone, it is forgotten; fired, it is settled.
             tick(player, data, now);
             return;
         }
@@ -286,12 +287,23 @@ public final class GranReyCero {
             player.displayClientMessage(Component.translatable(FIZZLED).withStyle(ChatFormatting.GRAY), true);
             return;
         }
+        // Paid as it fires (see fired); one whose caster could no longer fire it fizzled instead, for nothing.
         beam.fireNow();
-        // Paid only if it really fired: one whose caster could no longer fire it fizzled instead.
-        if (beam.isFired()) {
-            paid(player, data, beam, now);
-        }
         clear(data);
+    }
+
+    /**
+     * Settles one that has just fired, by itself or let go, in the tick it fires: the reiryoku is paid and the wait
+     * begins before a logout, a death or a change of world can come between the shot and its price.
+     */
+    private static void fired(CeroBeam beam) {
+        if (beam.owner() instanceof Player player) {
+            SoulData data = SoulLogic.get(player);
+            if (data.granReyCeroBeamId == beam.getId()) {
+                paid(player, data, beam, beam.level().getGameTime());
+                clear(data);
+            }
+        }
     }
 
     /**
@@ -312,8 +324,8 @@ public final class GranReyCero {
     }
 
     /**
-     * Each body tick of an Arrancar, from {@link ArrancarEvents#tick}: one that fired by itself is paid for and
-     * its wait starts; one that has gone without firing is forgotten; and one still gathering fizzles if the soul
+     * Each body tick of an Arrancar, from {@link ArrancarEvents#tick}: one that fired is paid for if its own fire
+     * did not settle it already; one that has gone without firing is forgotten; and one still gathering fizzles if the soul
      * is no longer an Arrancar, watches as a spectator or is held in a Negación light, or else turns its ring and
      * drips its blood while the game runs.
      */

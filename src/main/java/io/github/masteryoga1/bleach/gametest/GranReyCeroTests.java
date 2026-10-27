@@ -347,7 +347,8 @@ public final class GranReyCeroTests {
             helper.assertTrue(data.maxReiryoku() > STRONG, "killing the Spider Hollow did not grow the maximum");
             HollowPlayerTests.assertClose(helper, data.reiryoku(), STRONG - GranReyCero.cost(data),
                     "the reiryoku after a Gran Rey Cero");
-            helper.assertTrue(readyAt(data) == now + 21L + 1_200L,
+            // Settled as it fires, by the game's own clock: this whole test runs within one tick.
+            helper.assertTrue(readyAt(data) == HollowPlayerTests.now(helper) + 1_200L,
                     "the next is ready at " + readyAt(data) + ", not a minute after it fired");
             CeroBeam.Shot shot = full.lastShot();
             helper.assertTrue(shot != null && shot.struck().contains(spider),

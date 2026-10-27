@@ -319,7 +319,8 @@ public final class NegacionTests {
         Player caster = gillian(helper, 400.0F, new Vec3(4.5, 2.0, 4.5));
         SoulData data = SoulLogic.get(caster);
         Player target = ArrancarTests.arrancar(helper, HollowTier.ADJUCHAS, 400.0F, new Vec3(7.5, 2.0, 4.5));
-        Player stranger = aware(helper, new Vec3(4.5, 2.0, 10.5));
+        // Beside the Arrancar, within reach of its light, so only the offer can turn the stranger away.
+        Player stranger = aware(helper, new Vec3(8.5, 2.0, 5.5));
         Player giant = aware(helper, new Vec3(10.5, 2.0, 10.5));
         Player teammate = aware(helper, new Vec3(12.5, 2.0, 4.5));
         int offerSeconds = BleachConfig.get(BleachConfig.NEGACION_OFFER_SECONDS);
@@ -354,6 +355,8 @@ public final class NegacionTests {
             assertRefusal(helper, Negacion.castOn(caster, data, giant, now), Negacion.Refusal.TOO_BIG,
                     "on a team-mate five times a player's size");
 
+            helper.assertTrue(stranger.distanceToSqr(light) <= NegacionLight.BOARD_REACH * NegacionLight.BOARD_REACH,
+                    "the stranger stands out of the light's reach");
             helper.assertTrue(light.interact(stranger, InteractionHand.MAIN_HAND) == InteractionResult.PASS,
                     "someone else boarded the Arrancar's offer");
             InteractionResult boarded = light.interact(target, InteractionHand.MAIN_HAND);
