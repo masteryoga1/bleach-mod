@@ -123,6 +123,11 @@ ARRANCAR_BLACK = rgb(30, 30, 34)
 TATTOO_GLYPH = rgb(255, 255, 255)
 # An Arrancar NPC's pale skin.
 ARRANCAR_SKIN = rgb(226, 214, 200)
+# The Caja Negación: a slate cube, lit from above and its left, seamed in Negación's pale gold.
+CAJA_FACE = rgb(0x3A, 0x3D, 0x48)
+CAJA_SIDE = rgb(0x2A, 0x2C, 0x35)
+CAJA_TOP = rgb(0x4A, 0x4E, 0x5A)
+CAJA_SEAM = rgb(0xFF, 0xF2, 0xB0)  # Negación's pale gold
 # The later arts: Letzt Stil's pale gold, Ginrei Kojaku's silver-blue, Vollständig's halo and its
 # translucent wings, the cloud of a Gintō spell, and the Sanrei Glove's blue cuff.
 LETZT = rgb(255, 214, 160)
@@ -977,6 +982,18 @@ def arrancar_uniform_layer_2():
     return c
 
 
+def caja_negacion_icon():
+    """The Caja Negación: a small slate cube in three-quarter view, its edges seamed in Negación's pale gold."""
+    c = Canvas(16, 16)
+    c.rect(3, 6, 10, 14, CAJA_FACE)     # the front face
+    c.rect(10, 4, 13, 12, CAJA_SIDE)    # the right side
+    c.rect(5, 3, 12, 6, CAJA_TOP)       # the top, short of the side's corner below the seam
+    for x0, y0, x1, y1 in [(3, 6, 10, 6), (3, 13, 10, 13), (3, 6, 3, 13), (10, 6, 10, 13),
+                           (5, 3, 13, 3), (13, 3, 13, 11), (3, 6, 5, 3), (10, 6, 13, 3), (10, 13, 13, 11)]:
+        line(c, x0, y0, x1, y1, CAJA_SEAM)
+    return c
+
+
 def mask_fragment_icon():
     """A jagged shard of bone with a crack across it. The shade falls on its lower right: the
     right-most pixel of each row, and the bottom-most of each column."""
@@ -1527,6 +1544,7 @@ TEXTURES = {
     "item/arrancar_zori.png": arrancar_zori_icon,
     "models/armor/arrancar_uniform_layer_1.png": arrancar_uniform_layer_1,
     "models/armor/arrancar_uniform_layer_2.png": arrancar_uniform_layer_2,
+    "item/caja_negacion.png": caja_negacion_icon,
     "item/mask_fragment.png": mask_fragment_icon,
     "item/hollow_bait.png": hollow_bait_icon,
     "entity/heilig_pfeil.png": heilig_pfeil,

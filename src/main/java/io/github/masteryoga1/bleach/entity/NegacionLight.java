@@ -39,7 +39,7 @@ import net.neoforged.neoforge.fluids.FluidType;
 
 /**
  * Negación: the pillar of light a Gillian calls down on a comrade (Ch. 178). The comrade rides it, which is
- * the one held state the mod knows ({@link Negacion#held}): nothing can hurt it but the void and commands,
+ * one of the held states the mod knows ({@link Negacion#held}): nothing can hurt it but the void and commands,
  * and it can hurt, use or build nothing (see {@link Negacion}). The light falls for half a second, then
  * rises slowly with its comrade into a quiet Garganta tear that opens above it, and carries it off: a mob is
  * gone from the world, with no drops, experience or kill, and a player is set down at its respawn point, or
@@ -55,7 +55,7 @@ import net.neoforged.neoforge.fluids.FluidType;
  * NegacionLightRenderer) and places its rider on it as the server does. It is never saved: the type is
  * {@code noSave}, so a player saved while riding it loads on foot.
  */
-public class NegacionLight extends Entity {
+public class NegacionLight extends Entity implements Negacion.HoldingVehicle {
     /** What the light is doing, synced by ordinal: append only. */
     public enum Phase { OFFERED, HOLDING, ENDING }
 
@@ -455,6 +455,7 @@ public class NegacionLight extends Entity {
      * Logging out and the like: lets this player off where the light first fell, falling slowly, and the light
      * fades. Does nothing for a player it does not hold. Server only.
      */
+    @Override
     public void setDown(Player player) {
         if (level().isClientSide() || player.getVehicle() != this) {
             return;
@@ -468,6 +469,7 @@ public class NegacionLight extends Entity {
     }
 
     /** Tells this held player, above the hotbar, that it can touch nothing: at most once a second. Server only. */
+    @Override
     public void tellHeld(Player player) {
         if (level().isClientSide() || tickCount - lastToldAt < TELL_TICKS) {
             return;

@@ -1,6 +1,8 @@
 package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.EmptyGintoItem;
@@ -16,10 +18,15 @@ import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tiers;
 import net.minecraft.world.item.TooltipFlag;
@@ -153,6 +160,32 @@ public final class ModItems {
                 public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip,
                                             TooltipFlag flag) {
                     tooltip.add(Component.translatable("tooltip.bleach.arrancar_blade").withStyle(ChatFormatting.GRAY));
+                }
+            });
+
+    /**
+     * The Espada's cube: used on a creature with a Hollow hole, from behind, it shuts it away
+     * ({@link CajaNegacion#use}). Every seated Espada is given one, and it crumbles in anyone else's hands (see
+     * {@link io.github.masteryoga1.bleach.soul.EspadaLedger}), so it needs no class of its own.
+     */
+    public static final DeferredItem<Item> CAJA_NEGACION = ITEMS.register("caja_negacion",
+            () -> new Item(new Item.Properties().stacksTo(1).fireResistant().rarity(Rarity.UNCOMMON)) {
+                @Override
+                public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity target,
+                                                              InteractionHand hand) {
+                    // An empty main hand already gave a pledged Fracción the click (its status or dismiss); the
+                    // client cannot tell it is pledged, so it sends the off hand's turn too, which must not close on it.
+                    if (hand == InteractionHand.OFF_HAND && player.getMainHandItem().isEmpty()
+                            && target instanceof ArrancarNpc npc && npc.isPledged()) {
+                        return InteractionResult.PASS;
+                    }
+                    return CajaNegacion.useCube(player, target);
+                }
+
+                @Override
+                public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip,
+                                            TooltipFlag flag) {
+                    tooltip.add(Component.translatable("tooltip.bleach.caja_negacion").withStyle(ChatFormatting.GRAY));
                 }
             });
 

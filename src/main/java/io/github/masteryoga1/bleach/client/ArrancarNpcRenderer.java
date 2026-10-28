@@ -22,6 +22,7 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Draws an Arrancar NPC as a player with wide arms, in the mod's own pale, black-haired placeholder skin, wearing
@@ -51,7 +52,8 @@ public class ArrancarNpcRenderer extends HumanoidMobRenderer<ArrancarNpc, Player
     /**
      * Unlike a player's, a mob's model is never told how its arms are posed, so they are set here: the blade held
      * out in the main hand, the other arm empty. The poses follow the main arm, as the held item and the swing do,
-     * since a few NPCs are left-handed.
+     * since a few NPCs are left-handed. Nor is it told when to crouch: a Número kneeling to an Espada stoops as a
+     * sneaking player does, from the pose the server syncs (see {@link #getRenderOffset}).
      */
     @Override
     public void render(ArrancarNpc npc, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffer,
@@ -66,7 +68,16 @@ public class ArrancarNpcRenderer extends HumanoidMobRenderer<ArrancarNpc, Player
             model.rightArmPose = HumanoidModel.ArmPose.EMPTY;
             model.leftArmPose = main;
         }
+        model.crouching = npc.isCrouching();
         super.render(npc, entityYaw, partialTick, poseStack, buffer, packedLight);
+    }
+
+    /** A kneeling Número is drawn lower by as much as a sneaking player is, so its feet stay on the ground as it stoops. */
+    @Override
+    public Vec3 getRenderOffset(ArrancarNpc npc, float partialTick) {
+        return npc.isCrouching()
+                ? new Vec3(0.0, npc.getScale() * -2.0F / 16.0, 0.0)
+                : super.getRenderOffset(npc, partialTick);
     }
 
     /**
