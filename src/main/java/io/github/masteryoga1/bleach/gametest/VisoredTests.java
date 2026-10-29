@@ -84,6 +84,19 @@ public final class VisoredTests {
         return player;
     }
 
+    /** A mock Shinigami in this game mode, set up as {@link #host} sets one up, with 900 reiryoku. */
+    private static Player hostIn(GameTestHelper helper, GameType mode) {
+        Player player = helper.makeMockPlayer(mode);
+        SoulData data = ZanpakutoTests.soul(SoulState.SHINIGAMI, 900.0F);
+        player.setData(SoulAttachments.SOUL, data);
+        player.tickCount = 1000;
+        player.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
+        ZanpakutoEvents.learnName(player, data, ZanpakutoSpirits.ZANGETSU.location(),
+                ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU), player.getMainHandItem());
+        stand(helper, player);
+        return player;
+    }
+
     /** Puts the player in the middle of the field, on the ground and facing south. */
     private static void stand(GameTestHelper helper, Player player) {
         Vec3 at = helper.absoluteVec(HOST_SPOT);
@@ -417,6 +430,10 @@ public final class VisoredTests {
         Player neighbour = host(helper, 900.0F);
         SoulData neighbourData = SoulLogic.get(neighbour);
         ready(neighbourData, now);
+        Player creative = hostIn(helper, GameType.CREATIVE);
+        SoulData creativeData = SoulLogic.get(creative);
+        ready(creativeData, now);
+        creative.setShiftKeyDown(true);
         try {
             if (HollowPlayerTests.peaceful(helper)) {
                 VisoredEvents.DuelStart start = VisoredEvents.beginDuel(host, data, now, false);
@@ -467,6 +484,12 @@ public final class VisoredTests {
             helper.assertFalse(VisoredEvents.isDuelling(early), "a Hollow that was not ready came out");
             helper.assertTrue(earlyData.jinzen() != null && earlyData.jinzen().opened(),
                     "Jinzen did not open for a soul whose Hollow was not ready");
+            // Creative mode would break the fight off at once, so the inner world opens instead.
+            JinzenLogic.begin(creative, creativeData, now);
+            JinzenLogic.tick(creative, creativeData, creative.getMainHandItem(), JinzenLogic.SETTLE_TICKS, now);
+            helper.assertFalse(VisoredEvents.isDuelling(creative), "a creative host's Hollow came out");
+            helper.assertTrue(creativeData.jinzen() != null && creativeData.jinzen().opened()
+                    && VisoredLogic.duelReady(creativeData, now), "a creative host's Jinzen did not open as it always did");
             VisoredEvents.DuelStart crowded = VisoredEvents.beginDuel(neighbour, neighbourData, now, false);
             helper.assertTrue(crowded == VisoredEvents.DuelStart.CROWDED && !VisoredEvents.isDuelling(neighbour),
                     "a fight in the same spot gave " + crowded);
@@ -480,7 +503,7 @@ public final class VisoredTests {
             helper.assertTrue(hollow.isRemoved() && !VisoredEvents.isDuelling(host),
                     "breaking the fight off left the Hollow");
         } finally {
-            end(now, host, early, neighbour);
+            end(now, host, early, neighbour, creative);
         }
         helper.succeed();
     }
@@ -519,6 +542,9 @@ public final class VisoredTests {
             float health = host.getHealth();
             helper.assertFalse(host.hurt(sources.mobAttack(zombie), 4.0F), "a zombie's blow reached the host mid-fight");
             HollowPlayerTests.assertClose(helper, host.getHealth(), health, "the host's health after the zombie's blow");
+            helper.assertFalse(zombie.hurt(sources.playerAttack(host), 4.0F), "the host's blow reached a zombie mid-fight");
+            helper.assertFalse(other.hurt(sources.playerAttack(host), 4.0F),
+                    "the host's blow reached another Shinigami mid-fight");
 
             hollow.setHealth(1.0F);
             hollow.invulnerableTime = 0;
@@ -528,6 +554,8 @@ public final class VisoredTests {
                     "cutting the Hollow down did not make a Visored: " + record);
             helper.assertFalse(VisoredEvents.isDuelling(host), "the fight went on after the Hollow was cut down");
             helper.assertTrue(hollow.isRemoved(), "the beaten Hollow is still there");
+            helper.assertTrue(zombie.hurt(sources.playerAttack(host), 1.0F),
+                    "the host's blow on a zombie was stopped after the fight");
         } finally {
             end(now, host);
             discard(zombie);
@@ -541,8 +569,11 @@ public final class VisoredTests {
         helper.assertFalse(VisoredLogic.isLosingBlow(20.0F, 0.0F, 17.9F), "17.9 of 20 is a losing blow");
         helper.assertTrue(VisoredLogic.isLosingBlow(10.0F, 4.0F, 12.0F), "12 against 10 and 4 absorption is no losing blow");
         helper.assertFalse(VisoredLogic.isLosingBlow(10.0F, 4.0F, 11.0F), "11 against 10 and 4 absorption is a losing blow");
-        HollowPlayerTests.assertClose(helper, VisoredLogic.clampedBlow(10.0F, 4.0F, 2.0F), 12.0, "the blow cut for 10 and 4");
-        HollowPlayerTests.assertClose(helper, VisoredLogic.clampedBlow(1.5F, 0.0F, 2.0F), 0.0, "the blow cut for 1.5");
+        HollowPlayerTests.assertClose(helper, VisoredLogic.clampedBlow(20.0F, 10.0F, 4.0F, 2.0F), 12.0,
+                "the blow cut for 10 and 4");
+        HollowPlayerTests.assertClose(helper, VisoredLogic.clampedBlow(5.0F, 1.5F, 0.0F, 2.0F), 0.0, "the blow cut for 1.5");
+        HollowPlayerTests.assertClose(helper, VisoredLogic.clampedBlow(1.0F, 1.5F, 5.0F, 2.0F), 1.0,
+                "a small blow on 1.5 and 5 absorption was raised");
         HollowPlayerTests.assertClose(helper, VisoredLogic.hollowHealth(900.0F), 90.0, "the Hollow's health at 900");
         HollowPlayerTests.assertClose(helper, VisoredLogic.hollowBlow(900.0F), 5.0, "the Hollow's blow at 900");
         HollowPlayerTests.assertClose(helper, VisoredLogic.hollowHealth(0.0F), 30.0, "the Hollow's health at 0");
@@ -593,13 +624,8 @@ public final class VisoredTests {
         SoulData walkerData = SoulLogic.get(walker);
         ready(walkerData, now);
         if (!refusedOnPeaceful(helper, walker, now)) {
-            Player spectator = helper.makeMockPlayer(GameType.SPECTATOR);
-            SoulData spectatorData = ZanpakutoTests.soul(SoulState.SHINIGAMI, 900.0F);
-            spectator.setData(SoulAttachments.SOUL, spectatorData);
-            spectator.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
-            ZanpakutoEvents.learnName(spectator, spectatorData, ZanpakutoSpirits.ZANGETSU.location(),
-                    ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU), spectator.getMainHandItem());
-            stand(helper, spectator);
+            Player spectator = hostIn(helper, GameType.SPECTATOR);
+            SoulData spectatorData = SoulLogic.get(spectator);
             Player dying = host(helper, 900.0F);
             ready(SoulLogic.get(dying), now);
             Player stopped = host(helper, 900.0F);

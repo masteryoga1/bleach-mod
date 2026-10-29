@@ -27,9 +27,11 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.FlyingMob;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.animal.FlyingAnimal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -49,11 +51,11 @@ import org.joml.Vector3f;
  * <p>Near-fatal blows from Menos-class Hollows ({@link VisoredLogic#isWoundingSource}) are counted as wounds, and
  * enough of them root the Hollow ({@link #takeRoot}), which then speaks to its host every 5 minutes. Once it is
  * ready, sitting in Jinzen brings it out ({@link #beginDuel}, from {@link JinzenLogic}) as an {@link InnerHollow}
- * in a ring around where the host sat: the host is kept in, everyone else is kept out and cannot touch the host,
- * and the fight has a time limit. Beating it makes the soul a Visored ({@link #subdue}). Losing never kills: the
- * Hollow's last blow stops at {@code loss_health}. Death, logging out, another world, Peaceful, the power lost or
- * lent, spectator or creative mode, a server stop or getting far out of the ring break it off with no loss
- * counted. Every end goes through {@link #endDuel}.
+ * in a ring around where the host sat: the host is kept in and everyone else out, the two can touch nothing
+ * living but each other, and the fight has a time limit. Beating it makes the soul a Visored ({@link #subdue}).
+ * Losing never kills: the Hollow's last blow stops at {@code loss_health}. Death, logging out, another world,
+ * Peaceful, the power lost or lent, spectator or creative mode, a server stop or getting far out of the ring break
+ * it off with no loss counted. Every end goes through {@link #endDuel}.
  *
  * <p>The fights are held only in memory, in a table on the server thread, and the Hollow is never saved, so a
  * save holds nothing of a fight but its host's record, which at the start already says when the next try may
@@ -81,6 +83,10 @@ public final class VisoredEvents {
     /** How far from the centre a creature's grudge against either fighter is dropped, in blocks. */
     private static final double AGGRO_RANGE = 32.0;
     private static final double PUSH_LIFT = 0.1;
+    /** How far out a push is followed to see where it ends, in blocks; it carries a body about this far. */
+    private static final int PUSH_CHECK_BLOCKS = 3;
+    /** How far below a pushed body's feet the ground may be, in blocks: a drop too short to hurt. */
+    private static final double PUSH_DROP_BLOCKS = 2.0;
     private static final int RING_POINTS = 36;
     private static final double RING_LIFT = 0.2;
     private static final int BURST = 30;
@@ -282,9 +288,9 @@ public final class VisoredEvents {
     /**
      * Brings the Hollow out to fight its host where the host stands. The first check that fails gives the result: a
      * fight already under way, the path turned off (even when forced), no Shinigami power or lent away, the Hollow
-     * already beaten, not ready yet (skipped when forced), Peaceful, and another fight too close by. A forced fight
-     * roots an unrooted soul silently first. On the client, nothing happens and the result is {@link
-     * DuelStart#NOT_READY}.
+     * already beaten, not ready yet or in creative or spectator mode (both skipped when forced), Peaceful, and another
+     * fight too close by. A forced fight roots an unrooted soul silently first. On the client, nothing happens and
+     * the result is {@link DuelStart#NOT_READY}.
      */
     public static DuelStart beginDuel(Player host, SoulData data, long now, boolean force) {
         if (!(host.level() instanceof ServerLevel level)) {
@@ -303,6 +309,10 @@ public final class VisoredEvents {
             return DuelStart.SUBDUED;
         }
         if (!force && !VisoredLogic.duelReady(data, now)) {
+            return DuelStart.NOT_READY;
+        }
+        // Either would break the fight off on its first tick, so Jinzen's inner world opens instead.
+        if (!force && (host.isCreative() || host.isSpectator())) {
             return DuelStart.NOT_READY;
         }
         if (level.getDifficulty() == Difficulty.PEACEFUL) {
@@ -466,10 +476,10 @@ public final class VisoredEvents {
     }
 
     /**
-     * One tick of the host's fight, in this order: the reasons it breaks off, the time limit, the ring keeping the
-     * host and its Hollow in, then every 5 ticks keeping everyone else out, every 10 the ring's light, every second
-     * other creatures' grudges against the two dropped, the time left on the bar and the Hollow's mending, and every
-     * tick the bar's progress.
+     * One tick of the host's fight, in this order: the reasons it breaks off, the time limit, the host got off
+     * anything it rides, the ring keeping the host and its Hollow in, then every 5 ticks keeping everyone else out,
+     * every 10 the ring's light, every second other creatures' grudges against the two dropped, the time left on the
+     * bar and the Hollow's mending, and every tick the bar's progress.
      */
     private static void upkeep(Player host, SoulData data, Duel duel, long now) {
         if (!(host.level() instanceof ServerLevel level)) {
@@ -485,12 +495,16 @@ public final class VisoredEvents {
             return;
         }
         InnerHollow hollow = duel.hollow;
+        // A rider's own motion is thrown away each tick, so a mount would carry the host past the ring's push.
+        if (host.isPassenger()) {
+            host.stopRiding();
+        }
         if (horizontalDistance(host.position(), duel.centre) > radius) {
-            push(host, duel.centre, true);
+            push(host, outward(host, duel.centre).reverse());
             bar(host, "duel.arena");
         }
         if (horizontalDistance(hollow.position(), duel.centre) > radius) {
-            push(hollow, duel.centre, true);
+            push(hollow, outward(hollow, duel.centre).reverse());
         }
         long elapsed = now - duel.startedAt;
         if (Math.floorMod(elapsed, KEEP_OUT_INTERVAL_TICKS) == 0) {
@@ -530,8 +544,10 @@ public final class VisoredEvents {
     }
 
     /**
-     * Pushes every creature and player but the two fighters (and what the host rides) back out of the ring, and
-     * tells a pushed player why. Spectators and creative players pass.
+     * Pushes every creature and player but the two fighters back out of the ring, and tells a pushed player why,
+     * unless the push would leave it somewhere unsafe ({@link #safeOutward}). Spectators, creative players and
+     * players the host may not harm (PvP off, or a team without friendly fire) pass. Whoever is left inside can
+     * touch neither fighter.
      */
     private static void keepOut(ServerLevel level, Player host, Duel duel, int radius) {
         double reach = radius + 2.0;
@@ -540,18 +556,47 @@ public final class VisoredEvents {
                 centre.x + reach, centre.y + KEEP_OUT_HEIGHT, centre.z + reach);
         double inside = radius + 1.0;
         for (Mob mob : level.getEntitiesOfClass(Mob.class, box, creature -> creature != duel.hollow
-                && creature.isAlive() && creature.getRootVehicle() != host.getRootVehicle())) {
-            if (horizontalDistance(mob.position(), centre) <= inside) {
-                push(mob, centre, false);
+                && creature.isAlive())) {
+            Vec3 out = outward(mob, centre);
+            if (horizontalDistance(mob.position(), centre) <= inside && safeOutward(level, mob, out)) {
+                push(mob, out);
             }
         }
         for (Player other : level.getEntitiesOfClass(Player.class, box, player -> player != host && player.isAlive()
-                && !player.isSpectator() && !player.isCreative())) {
-            if (horizontalDistance(other.position(), centre) <= inside) {
-                push(other, centre, false);
+                && !player.isSpectator() && !player.isCreative() && host.canHarmPlayer(player))) {
+            Vec3 out = outward(other, centre);
+            if (horizontalDistance(other.position(), centre) <= inside && safeOutward(level, other, out)) {
+                push(other, out);
                 bar(other, "duel.barrier");
             }
         }
+    }
+
+    /**
+     * Whether a push this way leaves this body somewhere safe. Whatever flies always is. Anything else is followed a
+     * block at a time for {@link #PUSH_CHECK_BLOCKS} blocks, until a wall that would stop it: each step needs ground
+     * within {@link #PUSH_DROP_BLOCKS} below, with no lava, fire or the like where it would land. So no one is pushed
+     * off a ledge, into the void or into lava.
+     */
+    private static boolean safeOutward(ServerLevel level, Entity entity, Vec3 direction) {
+        if (entity.isNoGravity() || entity instanceof FlyingMob || entity instanceof FlyingAnimal) {
+            return true;
+        }
+        AABB box = entity.getBoundingBox();
+        Vec3 drop = new Vec3(0.0, -PUSH_DROP_BLOCKS - 1.0, 0.0);
+        for (int step = 1; step <= PUSH_CHECK_BLOCKS; step++) {
+            AABB ahead = box.move(direction.x * step, 0.0, direction.z * step);
+            if (!level.noCollision(entity, ahead)) {
+                return true;
+            }
+            Vec3 fall = Entity.collideBoundingBox(entity, drop, ahead, level, List.of());
+            AABB landed = ahead.move(fall);
+            if (-fall.y > PUSH_DROP_BLOCKS || SafeLanding.touchesLava(level, landed)
+                    || SafeLanding.isHarmful(level, entity, landed)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Creatures nearby that have taken either fighter as their target drop it, the brain's memory too. */
@@ -570,16 +615,17 @@ public final class VisoredEvents {
         }
     }
 
-    /**
-     * Sets the entity moving at {@link VisoredLogic#PUSH_STRENGTH} straight towards the centre, or straight away from
-     * it, along the ground, and a little up, and has it sent to the clients.
-     */
-    private static void push(Entity entity, Vec3 centre, boolean inward) {
+    /** The way straight out from the centre along the ground, as a unit vector; east for a body right on it. */
+    private static Vec3 outward(Entity entity, Vec3 centre) {
         Vec3 away = new Vec3(entity.getX() - centre.x, 0.0, entity.getZ() - centre.z);
-        Vec3 direction = away.lengthSqr() < 1.0E-6 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
-        if (inward) {
-            direction = direction.reverse();
-        }
+        return away.lengthSqr() < 1.0E-6 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
+    }
+
+    /**
+     * Sets the entity moving this way along the ground at {@link VisoredLogic#PUSH_STRENGTH}, and a little up, and has
+     * it sent to the clients.
+     */
+    private static void push(Entity entity, Vec3 direction) {
         entity.setDeltaMovement(direction.x * VisoredLogic.PUSH_STRENGTH, PUSH_LIFT,
                 direction.z * VisoredLogic.PUSH_STRENGTH);
         entity.hurtMarked = true;
@@ -649,24 +695,29 @@ public final class VisoredEvents {
     }
 
     /**
-     * Nothing living but its own Hollow can touch a host while it fights: the blow of any other creature or player is
-     * stopped before anything else weighs it. Blocks, lava and falls still hurt. A mundane creature's blow would
-     * otherwise land, as spirit sight never shields a player (see {@link SpiritEvents#blindToSpirit}).
+     * While a host fights, nothing living but its own Hollow can touch it, and it can touch nothing living but its
+     * Hollow: the blow of any other creature or player on the host, and any blow of the host's (its arrows, waves
+     * and blasts too) on anything else, is stopped before anything else weighs it. Blocks, lava and falls still hurt
+     * the host. A mundane creature's blow would otherwise land, as spirit sight never shields a player (see
+     * {@link SpiritEvents#blindToSpirit}).
      */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
-        if (!(event.getEntity() instanceof Player host) || host.level().isClientSide()) {
+        LivingEntity victim = event.getEntity();
+        if (victim.level().isClientSide() || !(event.getSource().getEntity() instanceof LivingEntity attacker)
+                || attacker == victim) {
             return;
         }
-        Duel duel = DUELS.get(host.getUUID());
-        if (duel != null && event.getSource().getEntity() instanceof LivingEntity attacker && attacker != host
-                && attacker != duel.hollow) {
+        Duel guarded = victim instanceof Player host ? DUELS.get(host.getUUID()) : null;
+        Duel striking = attacker instanceof Player striker ? DUELS.get(striker.getUUID()) : null;
+        if (guarded != null && attacker != guarded.hollow || striking != null && victim != striking.hollow) {
             event.setCanceled(true);
         }
     }
 
     /**
      * The Hollow's losing blow, once armour and every other listener have had their say and before absorption: cut
-     * so it leaves its host at exactly {@code loss_health}, and the fight is lost. A loss never kills.
+     * so it leaves its host at {@code loss_health} (or where it was, if already lower), and the fight is lost. A loss
+     * never kills.
      */
     private static void onDamagePre(LivingDamageEvent.Pre event) {
         if (!(event.getEntity() instanceof Player host) || host.level().isClientSide()) {
@@ -680,7 +731,7 @@ public final class VisoredEvents {
         float health = host.getHealth();
         float absorption = host.getAbsorptionAmount();
         if (VisoredLogic.isLosingBlow(health, absorption, event.getNewDamage())) {
-            event.setNewDamage(VisoredLogic.clampedBlow(health, absorption,
+            event.setNewDamage(VisoredLogic.clampedBlow(event.getNewDamage(), health, absorption,
                     (float) BleachConfig.get(BleachConfig.INNER_HOLLOW_LOSS_HEALTH)));
             endDuel(host, SoulLogic.get(host), DuelEnd.LOSS, host.level().getGameTime());
         }

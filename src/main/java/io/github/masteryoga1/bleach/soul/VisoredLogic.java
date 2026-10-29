@@ -177,11 +177,11 @@ public final class VisoredLogic {
     }
 
     /**
-     * The damage a losing blow is cut to, so that it leaves exactly {@code lossHealth} once the absorption is
-     * spent; health already at or below it is never lowered.
+     * The damage a losing blow of {@code damage} is cut to, so that it leaves exactly {@code lossHealth} once the
+     * absorption is spent; health already at or below it is never lowered. Never more than the blow itself.
      */
-    public static float clampedBlow(float health, float absorption, float lossHealth) {
-        return Math.max(0.0F, absorption + health - lossHealth);
+    public static float clampedBlow(float damage, float health, float absorption, float lossHealth) {
+        return Math.min(damage, Math.max(0.0F, absorption + health - lossHealth));
     }
 
     /** Blocks from the centre of a fight to its ring. */

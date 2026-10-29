@@ -248,6 +248,12 @@ public class InnerHollow extends Monster {
         return false;
     }
 
+    /** Nor does a portal: a Hollow carried to another world would end its host's fight. */
+    @Override
+    public boolean canUsePortal(boolean allowPassengers) {
+        return false;
+    }
+
     // ---- A spirit's senses ----
 
     @Override
