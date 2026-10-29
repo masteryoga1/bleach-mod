@@ -42,7 +42,7 @@ public final class ShinigamiLogic {
     /**
      * Whether this soul holds a Shinigami's power: a Shinigami, or anyone with a Shinigami tier. A
      * Hollow's Shinigami power is lost under the mask, and an Arrancar's stays lost when the mask comes
-     * away, as its power is a Hollow's; a Visored (a Shinigami with a Hollow tier) keeps it.
+     * away, as its power is a Hollow's; a Visored (a Shinigami with a Hollow inside, see VisoredLogic) keeps it.
      */
     public static boolean hasShinigamiPower(SoulData data) {
         return data.state() != SoulState.HOLLOW && data.state() != SoulState.ARRANCAR
@@ -69,11 +69,17 @@ public final class ShinigamiLogic {
      * A Shinigami, Substitute or student whose Asauchi bond is full hears {@code .bonded} (sit in
      * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it). A
      * Quincy who has passed on and whom the Academy will not take hears {@code quincy.rukongai}. A
-     * Hollow hears {@code hollow} until it has devoured a soul, and {@code hollow.fed} after.
+     * Hollow hears {@code hollow} until it has devoured a soul, and {@code hollow.fed} after. A soul with
+     * Shinigami power and a Hollow rooted in it hears about that Hollow instead, until it is beaten (see
+     * {@link VisoredLogic#nextStepKey}).
      */
     public static String nextStepKey(SoulData data, long now) {
         if (isPowerLent(data, now)) {
             return "lent";
+        }
+        String visored = VisoredLogic.nextStepKey(data, now);
+        if (visored != null) {
+            return visored;
         }
         return switch (data.state()) {
             case HUMAN -> isSubstitute(data) ? "substitute" + bondStep(data.zanpakuto()) : QuincyLogic.nextStepKey(data, now);

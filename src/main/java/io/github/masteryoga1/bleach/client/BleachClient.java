@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
@@ -9,6 +10,7 @@ import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
+import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
@@ -21,12 +23,17 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModMenus;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.SpiderModel;
 import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -59,6 +66,9 @@ public final class BleachClient {
 
     public static final KeyMapping FLASH_STEP_KEY = new KeyMapping("key.bleach.flash_step",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, KEY_CATEGORY);
+
+    /** The inner Hollow's placeholder skin, drawn by the art script: its host's white double, unmasked. */
+    private static final ResourceLocation INNER_HOLLOW_TEXTURE = BleachMod.id("textures/entity/inner_hollow.png");
 
     /** Whether the release key was down last tick, so holding it (and key repeat) toggles only once. */
     private static boolean releaseKeyWasDown;
@@ -113,7 +123,8 @@ public final class BleachClient {
     /**
      * The NPCs wear four of the game's default player skins until the mod has its own, no two alike:
      * the Academy's instructor, the wounded Shinigami, the Quincy Elder and the Quincy Hunter. An Arrancar
-     * wears the mod's own placeholder skin under its uniform. Hollows use the vanilla spider and wolf
+     * wears the mod's own placeholder skin under its uniform, and a Visored's inner Hollow another of the mod's,
+     * holding the copy of its host's blade out as an Arrancar holds its own. Hollows use the vanilla spider and wolf
      * models or simple ones of the mod's, and a Plus looks like a villager.
      * Zanpakutō techniques and Gintō spells are drawn from plain shapes and the mod's placeholder
      * textures, the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
@@ -135,6 +146,26 @@ public final class BleachClient {
         event.registerEntityRenderer(ModEntities.QUINCY_HUNTER.get(),
                 context -> new QuincyNpcRenderer<QuincyHunter>(context, hunter));
         event.registerEntityRenderer(ModEntities.ARRANCAR.get(), ArrancarNpcRenderer::new);
+        event.registerEntityRenderer(ModEntities.INNER_HOLLOW.get(),
+                context -> new HumanoidMobRenderer<InnerHollow, PlayerModel<InnerHollow>>(context,
+                        new PlayerModel<>(context.bakeLayer(ModelLayers.PLAYER), false), 0.5F) {
+                    // A mob's model is never told how its arms are posed: the blade is held out in the main hand.
+                    @Override
+                    public void render(InnerHollow entity, float entityYaw, float partialTick, PoseStack poseStack,
+                                       MultiBufferSource buffer, int packedLight) {
+                        HumanoidModel.ArmPose main = entity.getMainHandItem().isEmpty()
+                                ? HumanoidModel.ArmPose.EMPTY : HumanoidModel.ArmPose.ITEM;
+                        boolean right = entity.getMainArm() == HumanoidArm.RIGHT;
+                        getModel().rightArmPose = right ? main : HumanoidModel.ArmPose.EMPTY;
+                        getModel().leftArmPose = right ? HumanoidModel.ArmPose.EMPTY : main;
+                        super.render(entity, entityYaw, partialTick, poseStack, buffer, packedLight);
+                    }
+
+                    @Override
+                    public ResourceLocation getTextureLocation(InnerHollow entity) {
+                        return INNER_HOLLOW_TEXTURE;
+                    }
+                });
         // Spiders end on their backs when they die; the rest fall on their sides, all but the Gillian.
         event.registerEntityRenderer(ModEntities.SPIDER_HOLLOW.get(),
                 context -> new HollowRenderer<SpiderHollow, SpiderModel<SpiderHollow>>(context,

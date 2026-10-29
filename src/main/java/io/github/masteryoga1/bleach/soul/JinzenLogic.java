@@ -37,7 +37,9 @@ import org.joml.Vector3f;
  * Jinzen: sitting with the blade across one's lap until the world inside it opens. The soul settles
  * for three seconds, then a screen shows what the spirit has for it, from silence through a stirring
  * to the meeting, where the spirit sets its test and, if the soul passes, tells it its name. The
- * server builds every page as finished text; the client only shows it and sends answers back.
+ * server builds every page as finished text; the client only shows it and sends answers back. A soul whose
+ * inner Hollow is ready to be faced meets that instead once it has settled: the Hollow steps out to fight it
+ * (see {@link VisoredEvents#beginDuel}) and the sitting ends, unless the fight cannot start, when the world opens.
  */
 public final class JinzenLogic {
     public static final int SETTLE_TICKS = 60;
@@ -135,6 +137,14 @@ public final class JinzenLogic {
                 motes(player, data);
             }
             if (elapsed >= SETTLE_TICKS) {
+                if (VisoredLogic.duelReady(data, now)) {
+                    VisoredEvents.DuelStart start = VisoredEvents.beginDuel(player, data, now, false);
+                    if (start == VisoredEvents.DuelStart.STARTED) {
+                        stop(player, data);
+                        return;
+                    }
+                    VisoredEvents.tell(player, start);
+                }
                 JinzenPage page = open(player, data, now);
                 if (player instanceof ServerPlayer serverPlayer && data.jinzen != null) {
                     BleachNetwork.openJinzen(serverPlayer, data.jinzen.id, page);

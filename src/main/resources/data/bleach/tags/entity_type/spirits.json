@@ -20,6 +20,7 @@
     "bleach:cero_beam",
     "bleach:negacion",
     "bleach:caja_negacion",
-    "bleach:arrancar"
+    "bleach:arrancar",
+    "bleach:inner_hollow"
   ]
 }

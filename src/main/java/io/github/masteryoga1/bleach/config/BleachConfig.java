@@ -641,6 +641,25 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue FRACCION_POST_RADIUS;
     public static final ModConfigSpec.IntValue FRACCION_HEAL_SECONDS;
 
+    public static final ModConfigSpec.BooleanValue VISORED_ENABLED;
+    public static final ModConfigSpec.IntValue VISORED_MIN_MAX_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue VISORED_WOUND_HEALTH_SHARE;
+    public static final ModConfigSpec.IntValue VISORED_WOUND_SPACING_SECONDS;
+    public static final ModConfigSpec.IntValue VISORED_WOUNDS_TO_ROOT;
+    public static final ModConfigSpec.IntValue VISORED_SUBSTITUTE_WOUNDS_TO_ROOT;
+    public static final ModConfigSpec.IntValue VISORED_STIR_MINUTES;
+
+    public static final ModConfigSpec.IntValue INNER_HOLLOW_ARENA_RADIUS;
+    public static final ModConfigSpec.IntValue INNER_HOLLOW_TIME_LIMIT_SECONDS;
+    public static final ModConfigSpec.IntValue INNER_HOLLOW_RETRY_MINUTES;
+    public static final ModConfigSpec.DoubleValue INNER_HOLLOW_HEALTH_BASE;
+    public static final ModConfigSpec.DoubleValue INNER_HOLLOW_HEALTH_PER_ROOT_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue INNER_HOLLOW_BLOW_BASE;
+    public static final ModConfigSpec.DoubleValue INNER_HOLLOW_BLOW_PER_ROOT_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue INNER_HOLLOW_RANGED_SHARE;
+    public static final ModConfigSpec.DoubleValue INNER_HOLLOW_MEND_PER_SECOND;
+    public static final ModConfigSpec.DoubleValue INNER_HOLLOW_LOSS_HEALTH;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -2526,6 +2545,74 @@ public final class BleachConfig {
         FRACCION_HEAL_SECONDS = builder
                 .comment("Seconds between each half-heart a Fracción heals while it has no target. 0 turns healing off.")
                 .defineInRange("heal_seconds", 4, 0, 60);
+        builder.pop();
+        builder.pop();
+
+        builder.push("visored");
+        VISORED_ENABLED = builder
+                .comment("Whether souls can take a Hollow in and face it at all. Off: no wound counts, the Hollow stays"
+                        + " silent, the soul screen says nothing of it and no fight starts (one under way breaks off),"
+                        + " but every soul keeps its Hollow for when it is turned on again.")
+                .define("enabled", true);
+        builder.push("hollowfication");
+        VISORED_MIN_MAX_REIRYOKU = builder
+                .comment("Maximum reiryoku a Shinigami or Substitute with a named zanpakutō needs to take a Hollow into"
+                        + " its wounds.")
+                .defineInRange("min_max_reiryoku", 500, 0, 100_000);
+        VISORED_WOUND_HEALTH_SHARE = builder
+                .comment("Share of its health at or below which a blow from a Menos-class Hollow must leave a soul to"
+                        + " count as a wound: 0.25 is 5 of 20 (2.5 hearts).")
+                .defineInRange("wound_health_share", 0.25, 0.05, 1.0);
+        VISORED_WOUND_SPACING_SECONDS = builder
+                .comment("Seconds from one counted wound to the next: a wound sooner than that does not count.")
+                .defineInRange("wound_spacing_seconds", 300, 0, 86_400);
+        VISORED_WOUNDS_TO_ROOT = builder
+                .comment("Wounds that root the Hollow in a Shinigami's soul.")
+                .defineInRange("wounds_to_root", 3, 1, 20);
+        VISORED_SUBSTITUTE_WOUNDS_TO_ROOT = builder
+                .comment("Wounds that root the Hollow in a Substitute's soul, for whom a blow from any Hollow counts.")
+                .defineInRange("substitute_wounds_to_root", 2, 1, 20);
+        VISORED_STIR_MINUTES = builder
+                .comment("Minutes after rooting before the Hollow can be faced in Jinzen (20 is one Minecraft day).")
+                .defineInRange("stir_minutes", 20, 0, 1_440);
+        builder.pop();
+
+        builder.push("duel");
+        INNER_HOLLOW_ARENA_RADIUS = builder
+                .comment("Blocks from the centre of a fight with the inner Hollow to its ring, which keeps everyone else"
+                        + " out.")
+                .defineInRange("arena_radius", 10, 6, 32);
+        INNER_HOLLOW_TIME_LIMIT_SECONDS = builder
+                .comment("Seconds before a fight with the inner Hollow is lost.")
+                .defineInRange("time_limit_seconds", 180, 30, 1_800);
+        INNER_HOLLOW_RETRY_MINUTES = builder
+                .comment("Minutes after a lost or broken-off fight before the inner Hollow can be faced again.")
+                .defineInRange("retry_minutes", 20, 0, 1_440);
+        INNER_HOLLOW_HEALTH_BASE = builder
+                .comment("The inner Hollow's health before it is scaled to its host (2 is a heart).")
+                .defineInRange("health_base", 30.0, 1.0, 1024.0);
+        INNER_HOLLOW_HEALTH_PER_ROOT_REIRYOKU = builder
+                .comment("Health the inner Hollow gains per square root of its host's maximum reiryoku: 60 more at 900,"
+                        + " and never more than 1,024 in all.")
+                .defineInRange("health_per_root_reiryoku", 2.0, 0.0, 50.0);
+        INNER_HOLLOW_BLOW_BASE = builder
+                .comment("The inner Hollow's blow before it is scaled to its host and to the difficulty.")
+                .defineInRange("blow_base", 2.0, 0.0, 100.0);
+        INNER_HOLLOW_BLOW_PER_ROOT_REIRYOKU = builder
+                .comment("Blow the inner Hollow gains per square root of its host's maximum reiryoku: 3 more at 900, and"
+                        + " never more than 20 in all.")
+                .defineInRange("blow_per_root_reiryoku", 0.1, 0.0, 10.0);
+        INNER_HOLLOW_RANGED_SHARE = builder
+                .comment("Share of a blow its host does not strike by hand (an arrow, a Getsuga Tenshō) that hurts the"
+                        + " inner Hollow.")
+                .defineInRange("ranged_share", 0.5, 0.0, 1.0);
+        INNER_HOLLOW_MEND_PER_SECOND = builder
+                .comment("Health the inner Hollow mends each second once 5 seconds pass without a blow from its host.")
+                .defineInRange("mend_per_second", 1.0, 0.0, 100.0);
+        INNER_HOLLOW_LOSS_HEALTH = builder
+                .comment("The host's health at which the inner Hollow's last blow stops and the fight is lost, so a loss"
+                        + " never kills: 2 is one heart.")
+                .defineInRange("loss_health", 2.0, 1.0, 20.0);
         builder.pop();
         builder.pop();
 

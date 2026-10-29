@@ -26,8 +26,9 @@ public final class BleachNetwork {
      * 13: the Pesquisa marks payload.
      * 14: the Gran Rey Cero key and the Arrancar record's Gran Rey Cero wait.
      * 15: the Arrancar record's rank, and the Arrancar's number in the Hollow look.
+     * 16: the Visored record in ShinigamiProgress.
      */
-    private static final String VERSION = "15";
+    private static final String VERSION = "16";
 
     private BleachNetwork() {
     }

@@ -141,6 +141,10 @@ WING_EDGE = (150, 196, 255, 235)
 CLOUD = (200, 232, 255, 110)
 CLOUD_EDGE = (110, 170, 230, 220)
 GLOVE_CUFF = QUINCY_BLUE
+# A Visored's inner Hollow: its host's white double, with a Hollow's black eyes and yellow irises.
+INNER_SKIN = rgb(232, 234, 238)
+INNER_ROBE = rgb(208, 210, 216)
+HOLLOW_IRIS = rgb(236, 200, 40)
 
 
 class Canvas:
@@ -1425,6 +1429,47 @@ def arrancar_npc():
     return c
 
 
+def inner_hollow():
+    """A Visored's inner Hollow, its host's white double, in the player skin layout with wide arms: white skin, and
+    white hair over the top, back and sides of the head and down the face to its third row, over two black eyes with
+    a yellow iris each, on the side nearest the nose. A white kosode with a black collar V on the chest and a black
+    sash at the waist, its sleeves ending above white hands, and a white hakama down to straw soles. Every overlay
+    layer (hat, jacket, sleeves, trousers) stays clear. It wears no mask: in canon its inner Hollow meets its host
+    unmasked."""
+    c = Canvas(64, 64)
+    box(c, 0, 0, 8, 8, 8, INNER_SKIN)       # the head
+    c.rect(8, 0, 16, 8, WHITE)              # the top of the head
+    c.rect(0, 8, 8, 16, WHITE)              # its right side
+    c.rect(16, 8, 32, 16, WHITE)            # its left side and back
+    c.rect(8, 8, 16, 11, WHITE)             # the hair down the face, to its third row
+    c.rect(9, 12, 11, 13, VOID)             # the eyes, two pixels wide, either side of the middle
+    c.rect(13, 12, 15, 13, VOID)
+    c.put(10, 12, HOLLOW_IRIS)
+    c.put(13, 12, HOLLOW_IRIS)
+    # Body: the kosode, its collars meeting in a black V with bare skin between, and a black sash all round.
+    box(c, 16, 16, 8, 12, 4, INNER_ROBE)
+    for x, y in [(21, 20), (22, 21), (23, 22), (23, 23), (26, 20), (25, 21), (24, 22), (24, 23)]:
+        c.put(x, y, BLACK)
+    c.rect(22, 20, 26, 21, INNER_SKIN)
+    c.rect(23, 21, 25, 22, INNER_SKIN)
+    c.rect(16, 28, 40, 30, BLACK)
+    # Arms: sleeves to just above the wrist, so the hands show, and the palms beneath.
+    box(c, 40, 16, 4, 12, 4, INNER_ROBE)
+    c.rect(40, 30, 56, 32, INNER_SKIN)
+    c.rect(48, 16, 52, 20, INNER_SKIN)
+    box(c, 32, 48, 4, 12, 4, INNER_ROBE)
+    c.rect(32, 62, 48, 64, INNER_SKIN)
+    c.rect(40, 48, 44, 52, INNER_SKIN)
+    # Legs: the hakama down to straw soles, under the feet and round their last row.
+    box(c, 0, 16, 4, 12, 4, INNER_ROBE)
+    c.rect(0, 31, 16, 32, STRAW)
+    c.rect(8, 16, 12, 20, STRAW)
+    box(c, 16, 48, 4, 12, 4, INNER_ROBE)
+    c.rect(16, 63, 32, 64, STRAW)
+    c.rect(24, 48, 28, 52, STRAW)
+    return c
+
+
 def hollow_player_mask():
     """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
     between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
@@ -1573,6 +1618,7 @@ TEXTURES = {
     "entity/arrancar_hole.png": arrancar_hole,
     "entity/arrancar_digits.png": arrancar_digits,
     "entity/arrancar.png": arrancar_npc,
+    "entity/inner_hollow.png": inner_hollow,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,

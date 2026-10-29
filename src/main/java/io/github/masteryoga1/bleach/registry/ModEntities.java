@@ -16,6 +16,7 @@ import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
+import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
@@ -36,9 +37,9 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Arrancar NPCs,
- * Pluses, the Garganta, zanpakutō techniques, the Cero, Negación's light and the Caja Negación, and the
- * Quincy's arrows, blades and Gintō spells.
+ * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Arrancar NPCs, a
+ * Shinigami's inner Hollow, Pluses, the Garganta, zanpakutō techniques, the Cero, Negación's light and the
+ * Caja Negación, and the Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -175,6 +176,21 @@ public final class ModEntities {
                     .eyeHeight(1.62F)
                     .clientTrackingRange(10)
                     .build(BleachMod.id("arrancar").toString()));
+
+    // ---- Visored ----
+
+    /**
+     * A Shinigami's inner Hollow, out of its host for their fight (see InnerHollow). It lives only while the fight
+     * does, is never saved, and never spawns by itself.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<InnerHollow>> INNER_HOLLOW =
+            ENTITY_TYPES.register("inner_hollow", () -> EntityType.Builder
+                    .<InnerHollow>of(InnerHollow::new, MobCategory.MONSTER)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .noSave()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("inner_hollow").toString()));
 
     // ---- Pluses and the Garganta ----
 
@@ -357,6 +373,7 @@ public final class ModEntities {
         event.put(GILLIAN.get(), Gillian.createAttributes().build());
         event.put(ADJUCHAS.get(), Adjuchas.createAttributes().build());
         event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
+        event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());
         event.put(PLUS.get(), PlusSpirit.createAttributes().build());
     }
 }
