@@ -13,6 +13,7 @@ import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
+import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.NpcAction;
@@ -144,15 +145,17 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * Then, seen from behind, a Privaron Espada and a Número are summoned to stand still before it, and both
  * must reach the client dressed and armed, the bare-chested Privaron Espada with the 3 of its old seat
  * tattooed on it. A Caja Negación is summoned and the Número mounted in it by command: the cage must
- * close on it and then hide it from the player, and must let it out when the cage is killed. Last, in
+ * close on it and then hide it from the player, and must let it out when the cage is killed. Then, in
  * first person, the player is mounted in a Caja of its own, which must hold it; sneaking must not get it
- * out, and when that cage is killed too it must let the player go, falling slowly, before the run quits.
+ * out, and when that cage is killed too it must let the player go, falling slowly. Then, a Shinigami
+ * again by command, it faces its inner Hollow by command, which must come out beside it, and beats it by
+ * command, after which the Hollow must be gone and the win must reach the client, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
- * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación and HUD are drawn,
- * and screenshots of the main moments are saved for review. Any crash in the mod's client code fails
- * the run, and so does anything that did not reach the client as expected.
+ * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow and HUD
+ * are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code
+ * fails the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -350,6 +353,7 @@ public final class ClientSmokeTest {
         checkMenos(minecraft);
         checkMenosPlayer(minecraft, player, soul);
         checkArrancar(minecraft, player, soul);
+        checkVisored(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -914,7 +918,20 @@ public final class ClientSmokeTest {
                 }
             }
             case 4281 -> command(minecraft, "kill @e[type=bleach:caja_negacion]");
+            // A Shinigami again by command, facing south and seen from behind, its blade in hand: the forced fight
+            // roots its Hollow, readies it and brings it out ahead of the player, and the command's win beats it.
             case 4300 -> {
+                command(minecraft, "kill @e[type=bleach:arrancar]");
+                command(minecraft, "bleach soul @s shinigami");
+                command(minecraft, "bleach reiryoku @s 800 800");
+                command(minecraft, "effect clear @s");
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:asauchi");
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            }
+            case 4305 -> command(minecraft, "bleach visored @s duel");
+            case 4315 -> command(minecraft, "bleach visored @s subdue");
+            case 4350 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1158,6 +1175,22 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, 4283, 4295, () -> !player.isPassenger() && player.hasEffect(MobEffects.SLOW_FALLING),
                 "the Caja Negación never let the player go, or let it go without Slow Falling");
+    }
+
+    /** The checks of the inner Hollow, each window from the step it follows. */
+    private static void checkVisored(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (expectWithin(minecraft, 4306, 4330,
+                () -> nearest(minecraft, InnerHollow.class, 12.0, hollow -> hollow.isAlive()
+                        && !ClientSouls.isHiddenFromViewer(hollow) && !hollow.getMainHandItem().isEmpty()) != null
+                        && soul.shinigami().visored().rooted(),
+                "the inner Hollow never came out beside the player with its copied blade, or its root never reached"
+                        + " the client")) {
+            shot(minecraft, "inner_hollow");
+        }
+        expectWithin(minecraft, 4316, 4340,
+                () -> soul.shinigami().visored().subdued()
+                        && nearest(minecraft, InnerHollow.class, 12.0, hollow -> true) == null,
+                "the beaten inner Hollow never went, or the win never reached the client");
     }
 
     /** Whether an Arrancar NPC the player can see stands within 8 blocks as asked. */

@@ -15,6 +15,7 @@ import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyTeaching;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.Stat;
@@ -168,6 +169,10 @@ public final class Milestones {
     public static final String CAJA_NEGACION = "caja_negacion";
     /** As an Espada, took a beaten Número as its Fracción (ArrancarNpcEvents). */
     public static final String FRACCION = "fraccion";
+    /** A Hollow took root in the soul's wounds (VisoredLogic). */
+    public static final String HOLLOWFIED = "hollowfied";
+    /** Beat its inner Hollow and became a Visored. */
+    public static final String VISORED = "visored";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -243,6 +248,14 @@ public final class Milestones {
         }
         if (ArrancarLogic.isArrancar(data) && ArrancarUniformItem.isFullSet(player)) {
             trigger.trigger(player, ARRANCAR_UNIFORM);
+        }
+        // Read from the record, so a Hollow rooted or beaten by command counts too.
+        ShinigamiProgress.Visored visored = data.shinigami().visored();
+        if (visored.rooted()) {
+            trigger.trigger(player, HOLLOWFIED);
+        }
+        if (visored.subdued()) {
+            trigger.trigger(player, VISORED);
         }
         // Read from the record, so a soul taught or met by command counts too.
         QuincyTeaching teaching = data.quincy().teaching();

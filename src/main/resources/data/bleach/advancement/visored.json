@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:hollowfied",
+  "display": {
+    "icon": {
+      "id": "bleach:mask_fragment"
+    },
+    "title": {
+      "translate": "advancements.bleach.visored.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.visored.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "visored": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "visored"
+      }
+    }
+  }
+}

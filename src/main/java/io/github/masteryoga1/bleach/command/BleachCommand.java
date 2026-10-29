@@ -55,12 +55,15 @@ import io.github.masteryoga1.bleach.soul.ResurreccionEvents;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.VisoredEvents;
+import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
@@ -138,6 +141,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach zanpakuto &lt;players&gt; name    (as if the spirit's test was passed)
  * /bleach zanpakuto &lt;players&gt; seal    (a constant release can be released for the first time again)
  * /bleach zanpakuto &lt;players&gt; reset
+ * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|reset&gt;   (duel starts a fight here, rooting as needed)
  * /bleach quincy &lt;players&gt; bloodline &lt;none|gemischt|echt&gt;   (as if chosen, with no word and no Cross)
  * /bleach quincy &lt;players&gt; training &lt;0..100000&gt;   (raises the tier to match, never lowers it)
  * /bleach quincy &lt;players&gt; reishi &lt;amount&gt;   (up to the soul's maximum)
@@ -177,6 +181,7 @@ public final class BleachCommand {
     private static final SuggestionProvider<CommandSourceStack> BLUT_MODES = suggest(BlutMode.values());
     private static final SuggestionProvider<CommandSourceStack> GLOVE_SETTINGS = suggest(GloveSetting.values());
     private static final SuggestionProvider<CommandSourceStack> LETZT_ACTIONS = suggest(LetztAction.values());
+    private static final SuggestionProvider<CommandSourceStack> VISORED_ACTIONS = suggest(VisoredAction.values());
     private static final SuggestionProvider<CommandSourceStack> TOGGLES = suggest(Toggle.values());
     private static final SuggestionProvider<CommandSourceStack> GINTO_SPELLS = suggest(GintoSpell.values());
     private static final SuggestionProvider<CommandSourceStack> BAIT_ACTIONS = suggest(BaitAction.values());
@@ -307,6 +312,11 @@ public final class BleachCommand {
                                         .executes(BleachCommand::sealZanpakuto))
                                 .then(Commands.literal("reset")
                                         .executes(BleachCommand::resetZanpakuto))))
+                .then(Commands.literal("visored")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.argument("action", StringArgumentType.word())
+                                        .suggests(VISORED_ACTIONS)
+                                        .executes(BleachCommand::visored))))
                 .then(Commands.literal("quincy")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .then(Commands.literal("bloodline")
@@ -1123,6 +1133,7 @@ public final class BleachCommand {
             HollowCero.cancel(player, SoulLogic.get(player));
             GranReyCero.cancel(player, SoulLogic.get(player));
             HollowBody.leaveBodyIfWorn(player, SoulLogic.get(player));
+            VisoredEvents.endAll(player, SoulLogic.get(player), player.level().getGameTime());
             SoulData fresh = new SoulData();
             QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);
             player.setData(SoulAttachments.SOUL, fresh);
@@ -1314,6 +1325,85 @@ public final class BleachCommand {
         context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.reset",
                 players.size()), true);
         return players.size();
+    }
+
+    // ---- /bleach visored ----
+
+    /**
+     * Drives the road to a Visored one step at a time: {@code root} plants the Hollow now, with its signs;
+     * {@code ready} also lets it be faced now; {@code duel} starts the fight where the player stands, rooting and
+     * readying as needed, though never on Peaceful or with the path turned off; {@code subdue} makes the soul a
+     * Visored, winning a fight under way; and {@code reset} ends any fight and takes the Hollow away.
+     */
+    private static int visored(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String name = StringArgumentType.getString(context, "action");
+        VisoredAction action = byName(VisoredAction.values(), name);
+        if (action == null) {
+            context.getSource().sendFailure(Component.translatable("argument.enum.invalid", name));
+            return 0;
+        }
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            Component refusal = visoredFor(player, data, action, player.level().getGameTime());
+            if (refusal != null) {
+                refuseArts(context.getSource(), player, refusal);
+                continue;
+            }
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.visored.success",
+                    action.getSerializedName(), count), true);
+        }
+        return count;
+    }
+
+    /** Does one {@code visored} action for one player, or says why it cannot. */
+    @Nullable
+    private static Component visoredFor(ServerPlayer player, SoulData data, VisoredAction action, long now) {
+        if (action != VisoredAction.DUEL && action != VisoredAction.RESET && !ShinigamiLogic.hasShinigamiPower(data)) {
+            return Component.translatable("message.bleach.visored.no_power");
+        }
+        switch (action) {
+            case ROOT, READY -> {
+                if (!VisoredLogic.isRooted(data)) {
+                    VisoredEvents.takeRoot(player, data, now);
+                }
+                ShinigamiProgress.Visored record = VisoredLogic.record(data);
+                if (action == VisoredAction.READY && !record.subdued()) {
+                    VisoredLogic.setRecord(data, record.withDuelReadyAt(now));
+                }
+            }
+            case DUEL -> {
+                // The line the player would have seen on its action bar; a forced start is never NOT_READY.
+                VisoredEvents.DuelStart start = VisoredEvents.beginDuel(player, data, now, true);
+                if (start != VisoredEvents.DuelStart.STARTED) {
+                    String key = start.messageKey();
+                    return key != null
+                            ? Component.translatable(key)
+                            : Component.literal(start.name().toLowerCase(Locale.ROOT));
+                }
+            }
+            case SUBDUE -> {
+                if (VisoredEvents.isDuelling(player)) {
+                    VisoredEvents.endDuel(player, data, VisoredEvents.DuelEnd.WIN, now);
+                } else if (!VisoredLogic.record(data).subdued()) {
+                    // The record only: a Hollow beaten by command never spoke, so it takes root without its signs.
+                    if (!VisoredLogic.isRooted(data)) {
+                        VisoredLogic.setRecord(data, VisoredLogic.record(data).withRootedAt(now));
+                    }
+                    VisoredEvents.subdue(player, data, now);
+                }
+            }
+            case RESET -> {
+                VisoredEvents.endAll(player, data, now);
+                VisoredLogic.setRecord(data, ShinigamiProgress.Visored.NONE);
+            }
+        }
+        return null;
     }
 
     // ---- /bleach quincy ----
@@ -1731,6 +1821,16 @@ public final class BleachCommand {
     /** What {@code /bleach quincy <players> letzt} does. */
     private enum LetztAction implements StringRepresentable {
         START, SEAL, READY, RESTORE, RESET;
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** What {@code /bleach visored <players>} does. */
+    private enum VisoredAction implements StringRepresentable {
+        ROOT, READY, DUEL, SUBDUE, RESET;
 
         @Override
         public String getSerializedName() {

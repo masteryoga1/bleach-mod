@@ -78,6 +78,7 @@ public final class SoulEvents {
         PlusEvents.register(bus);
         ZanpakutoEvents.register(bus);
         ShikaiEvents.register(bus);
+        VisoredEvents.register(bus);
         QuincyEvents.register(bus);
         QuincyArtsEvents.register(bus);
         QuincyNpcEvents.register(bus);
@@ -139,6 +140,7 @@ public final class SoulEvents {
         }
 
         QuincyEvents.tick(player, data, meditating);
+        VisoredEvents.tick(player, data, player.level().getGameTime());
 
         if (player.tickCount % MILESTONE_CHECK_TICKS == 0) {
             Milestones.check(player, data);
@@ -315,7 +317,8 @@ public final class SoulEvents {
 
     /**
      * Reapplies the transient stat modifiers, settles the Quincy bloodline (see
-     * {@link QuincyEvents#onRefresh}) and sends the client a full copy.
+     * {@link QuincyEvents#onRefresh}), brings the Visored record's clocks into this world's time (see
+     * {@link VisoredEvents#onRefresh}) and sends the client a full copy.
      */
     public static void refresh(ServerPlayer player) {
         SoulData data = SoulLogic.get(player);
@@ -324,6 +327,7 @@ public final class SoulEvents {
         }
         SoulLogic.applyStatModifiers(player, data);
         QuincyEvents.onRefresh(player, data);
+        VisoredEvents.onRefresh(player, data);
         BleachNetwork.syncSoul(player, data);
     }
 

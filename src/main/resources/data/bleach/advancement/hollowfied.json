@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:zanpakuto_name",
+  "display": {
+    "icon": {
+      "id": "minecraft:white_dye"
+    },
+    "title": {
+      "translate": "advancements.bleach.hollowfied.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.hollowfied.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "hollowfied": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "hollowfied"
+      }
+    }
+  }
+}
