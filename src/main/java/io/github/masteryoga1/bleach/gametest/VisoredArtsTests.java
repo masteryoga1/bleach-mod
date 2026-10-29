@@ -171,12 +171,22 @@ public final class VisoredArtsTests {
         helper.assertFalse(HollowCero.charging(data), "the refused Cero of " + what + " is gathering");
     }
 
-    /** Asks for the player's Cero now, which must begin gathering. */
-    private static void assertGathers(GameTestHelper helper, Player player, long now, String what) {
+    /** Asks for the player's Cero now, which must begin gathering, and gives back its one gathering beam. */
+    private static CeroBeam assertGathers(GameTestHelper helper, Player player, long now, String what) {
         SoulData data = SoulLogic.get(player);
         HollowCero.Refusal refusal = HollowCero.start(player, data, now);
         helper.assertTrue(refusal == null && HollowCero.charging(data),
                 "the Cero of " + what + " gave " + refusal + ", gathering " + HollowCero.charging(data));
+        List<CeroBeam> gathering = ownBeams(helper, player).stream().filter(CeroBeam::isCharging).toList();
+        helper.assertTrue(gathering.size() == 1, "the Cero of " + what + " gathers " + gathering.size() + " beams");
+        return gathering.get(0);
+    }
+
+    /** The Cero fizzled: the soul holds none, and its beam is gone without firing. */
+    private static void assertFizzled(GameTestHelper helper, SoulData data, CeroBeam beam, String what) {
+        helper.assertTrue(!HollowCero.charging(data) && beam.isRemoved() && !beam.isFired(),
+                "the Cero did not fizzle " + what + ": gathering " + HollowCero.charging(data)
+                        + ", beam removed " + beam.isRemoved() + ", fired " + beam.isFired());
     }
 
     /** To every rule but the Cero's the soul is still the Shinigami it is: no Hollow, and no Hollow source to a Quincy. */
@@ -363,14 +373,18 @@ public final class VisoredArtsTests {
         SoulData keptData = SoulLogic.get(kept);
         Player[] all = {keyed, cracked, crumbled, lender, disabled, kept};
         try {
-            for (Player player : all) {
-                assertGathers(helper, player, now, "a masked Visored ten minutes worn");
-            }
+            String trained = "a masked Visored ten minutes worn";
+            CeroBeam keyedBeam = assertGathers(helper, keyed, now, trained);
+            CeroBeam crackedBeam = assertGathers(helper, cracked, now, trained);
+            CeroBeam crumbledBeam = assertGathers(helper, crumbled, now, trained);
+            CeroBeam lenderBeam = assertGathers(helper, lender, now, trained);
+            CeroBeam disabledBeam = assertGathers(helper, disabled, now, trained);
+            CeroBeam keptBeam = assertGathers(helper, kept, now, trained);
 
             // Taken off with the key: it fizzles, and no cooldown began, so with the mask back on it gathers at once.
             VisoredEvents.onMaskKey(keyed, keyedData, now);
             helper.assertFalse(VisoredLogic.isMasked(keyedData), "the Hollow Mask key did not take the mask off");
-            helper.assertFalse(HollowCero.charging(keyedData), "a Cero went on gathering after the mask was taken off");
+            assertFizzled(helper, keyedData, keyedBeam, "when the mask was taken off");
             assertMaskOn(helper, keyed, now, "a Visored that took its mask off");
             assertGathers(helper, keyed, now, "a Visored whose Cero fizzled with its mask");
 
@@ -379,27 +393,28 @@ public final class VisoredArtsTests {
             helper.assertTrue(VisoredLogic.isMasked(crackedData) && VisoredLogic.maskCracked(crackedData),
                     "a blow of 3 of 20 did not crack the mask, or took it off");
             HollowCero.tick(cracked, crackedData, now + 1L);
-            helper.assertFalse(HollowCero.charging(crackedData), "a fresh crack kept the masked Cero");
+            assertFizzled(helper, crackedData, crackedBeam, "at a fresh crack");
 
             // Crumbled at its time.
             long endsAt = VisoredLogic.record(crumbledData).maskEndsAt();
             VisoredEvents.tick(crumbled, crumbledData, endsAt);
             helper.assertFalse(VisoredLogic.isMasked(crumbledData), "the mask did not crumble at its time");
-            helper.assertFalse(HollowCero.charging(crumbledData), "a Cero went on gathering after the mask crumbled");
+            assertFizzled(helper, crumbledData, crumbledBeam, "when the mask crumbled");
 
             // The power lent away: the next upkeep takes the mask off.
             lenderData.setShinigami(lenderData.shinigami().withPowerLentUntil(now + 1_000L));
             VisoredEvents.tick(lender, lenderData, now + 1L);
             helper.assertFalse(VisoredLogic.isMasked(lenderData), "lending the power did not take the mask off");
-            helper.assertFalse(HollowCero.charging(lenderData), "a Cero went on gathering after the power was lent");
+            assertFizzled(helper, lenderData, lenderBeam, "when the power was lent");
 
             // The path off, the mask still on for the tick: the body's tick lets it fizzle, as any soul's that is no Menos.
             withConfig(BleachConfig.VISORED_ENABLED, false, () -> HollowBody.tickBody(disabled, disabledData, now + 1L));
-            helper.assertFalse(HollowCero.charging(disabledData), "the body's tick kept a Cero with the path off");
+            assertFizzled(helper, disabledData, disabledBeam, "at the body's tick with the path off");
 
             // The path on, the body's tick keeps a masked Visored's Cero gathering.
             HollowBody.tickBody(kept, keptData, now + 1L);
-            helper.assertTrue(HollowCero.charging(keptData), "the body's tick let a masked Visored's Cero fizzle");
+            helper.assertTrue(HollowCero.charging(keptData) && keptBeam.isCharging(),
+                    "the body's tick let a masked Visored's Cero fizzle");
 
             for (Player player : all) {
                 HollowPlayerTests.assertClose(helper, SoulLogic.get(player).reiryoku(), 800.0,
