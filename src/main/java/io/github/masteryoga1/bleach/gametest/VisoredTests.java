@@ -4,24 +4,34 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
+import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.VisoredEvents;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
+import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -29,13 +39,16 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSources;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
@@ -51,12 +64,13 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Visored: the Hollow's record on a save, which souls take it into their wounds and from what, its
- * voice and the soul screen while it waits, and the fight with it, which only the host can win and which never
- * kills. Mock players are never in the world and never tick, so every fight is driven by calling
- * {@link VisoredEvents#tick} with the time it needs. Every Hollow that steps out is made still, and every fight a
- * test begins is ended within that test's first tick, so the server's table of fights is empty whenever another
- * test runs. The test server runs on Normal; on Peaceful, where no Hollow comes out, the parts that need a fight
- * or hurt a mock are skipped.
+ * voice and the soul screen while it waits, the fight with it, which only the host can win and which never
+ * kills, and the beaten Hollow's mask: who may call it, what it gives and costs, how long it lasts and grows, the
+ * waits after it and every way it comes off. Mock players are never in the world and never tick, so every fight
+ * and every mask is driven by calling {@link VisoredEvents#tick} with the time it needs. Every Hollow that steps
+ * out is made still, and every fight a test begins and every mask it puts on is ended within that test's first
+ * tick, so the server's table of fights is empty whenever another test runs. The test server runs on Normal; on
+ * Peaceful, where no Hollow comes out, the parts that need a fight or hurt a mock are skipped.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -95,6 +109,25 @@ public final class VisoredTests {
                 ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU), player.getMainHandItem());
         stand(helper, player);
         return player;
+    }
+
+    /** A Visored: a mock Shinigami as {@link #host} makes one, whose Hollow took root a day ago and was beaten a tick ago. */
+    private static Player visored(GameTestHelper helper, float maxReiryoku) {
+        Player player = host(helper, maxReiryoku);
+        beaten(SoulLogic.get(player), HollowPlayerTests.now(helper));
+        return player;
+    }
+
+    /** A Visored in this game mode, set up as {@link #hostIn} sets one up, with 900 reiryoku. */
+    private static Player visoredIn(GameTestHelper helper, GameType mode) {
+        Player player = hostIn(helper, mode);
+        beaten(SoulLogic.get(player), HollowPlayerTests.now(helper));
+        return player;
+    }
+
+    /** A Hollow rooted in this soul a day ago and beaten a tick ago, its mask never yet worn. */
+    private static void beaten(SoulData data, long now) {
+        VisoredLogic.setRecord(data, VisoredLogic.record(data).withRootedAt(now - DAY).withSubduedAt(now - 1L));
     }
 
     /** Puts the player in the middle of the field, on the ground and facing south. */
@@ -150,7 +183,7 @@ public final class VisoredTests {
         return true;
     }
 
-    /** Ends every fight of these hosts, so none is left in the table for another test. */
+    /** Ends every fight of these hosts and takes off any mask they wear, so none is left in the table for another test. */
     private static void end(long now, Player... hosts) {
         for (Player host : hosts) {
             VisoredEvents.endAll(host, SoulLogic.get(host), now);
@@ -173,6 +206,29 @@ public final class VisoredTests {
         helper.assertTrue(record.duelReadyAt() == at + VisoredLogic.retryTicks(),
                 what + " may try again at " + record.duelReadyAt() + ", not " + (at + VisoredLogic.retryTicks()));
         helper.assertTrue(hollow.isRemoved(), "the Hollow of " + what + " is still there");
+    }
+
+    /**
+     * Calls the player's mask at {@code now} and asserts what came of it. Only a mask put on, or one already on,
+     * leaves the player masked.
+     */
+    private static void assertStart(GameTestHelper helper, Player player, long now, boolean force,
+                                    VisoredEvents.MaskStart expected, String what) {
+        SoulData data = SoulLogic.get(player);
+        VisoredEvents.MaskStart start = VisoredEvents.putOnMask(player, data, now, force);
+        helper.assertTrue(start == expected, "calling the mask for " + what + " gave " + start + ", not " + expected);
+        boolean on = expected == VisoredEvents.MaskStart.PUT_ON || expected == VisoredEvents.MaskStart.ALREADY;
+        helper.assertTrue(VisoredLogic.isMasked(data) == on,
+                what + (on ? " is not masked" : " is masked") + " after calling the mask gave " + start);
+    }
+
+    /** The player's mask is off, and neither of its boosts is left on the player. */
+    private static void assertUnmasked(GameTestHelper helper, Player player, String what) {
+        helper.assertFalse(VisoredLogic.isMasked(SoulLogic.get(player)), what + " is still masked");
+        helper.assertTrue(HollowPlayerTests.modifier(player, Attributes.MOVEMENT_SPEED, VisoredLogic.MASK_SPEED_ID) == null,
+                what + " kept the mask's speed");
+        helper.assertTrue(HollowPlayerTests.modifier(player, Attributes.ATTACK_DAMAGE, VisoredLogic.MASK_DAMAGE_ID) == null,
+                what + " kept the mask's melee damage");
     }
 
     /** The first tick at or after {@code from} on which the Hollow of the soul with this id speaks. */
@@ -355,7 +411,7 @@ public final class VisoredTests {
         helper.assertFalse(VisoredLogic.duelReady(data, readyAt - 1L), "the Hollow was ready a tick early");
         helper.assertTrue(VisoredLogic.duelReady(data, readyAt), "the Hollow was not ready after 20 minutes");
 
-        // The soul screen: the Hollow's lines while it waits, and the usual ones otherwise.
+        // The soul screen: the Hollow's lines while it waits, the mask's once it is beaten, and the usual ones otherwise.
         helper.assertTrue("hollowfied".equals(ShinigamiLogic.nextStepKey(data, now)),
                 "the stirring Hollow's next step is " + ShinigamiLogic.nextStepKey(data, now));
         helper.assertTrue("hollowfied.ready".equals(ShinigamiLogic.nextStepKey(data, readyAt)),
@@ -373,6 +429,9 @@ public final class VisoredTests {
                 "shinigami.named".equals(ShinigamiLogic.nextStepKey(data, now)),
                 "with the path off the next step is " + ShinigamiLogic.nextStepKey(data, now)));
         VisoredLogic.setRecord(data, rooted.withSubduedAt(now));
+        helper.assertTrue("visored".equals(ShinigamiLogic.nextStepKey(data, now)),
+                "a Visored who has never worn its mask hears " + ShinigamiLogic.nextStepKey(data, now));
+        VisoredLogic.setRecord(data, rooted.withSubduedAt(now).withMaskChangedAt(now));
         helper.assertTrue("shinigami.named".equals(ShinigamiLogic.nextStepKey(data, now)),
                 "a Visored's next step is " + ShinigamiLogic.nextStepKey(data, now));
         VisoredLogic.setRecord(data, rooted);
@@ -670,5 +729,456 @@ public final class VisoredTests {
         InnerHollow bare = helper.spawn(ModEntities.INNER_HOLLOW.get(), 2, 2, 2);
         helper.runAfterDelay(2, () -> helper.assertTrue(bare.isRemoved(), "a Hollow in no fight outlived 2 ticks"));
         helper.succeedWhen(() -> helper.assertTrue(bare.isRemoved(), "a Hollow in no fight is still there"));
+    }
+
+    // ---- The mask ----
+
+    @GameTest(template = "empty")
+    public static void maskRecordLoadsAndRepairs(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        ShinigamiProgress.Visored full =
+                new ShinigamiProgress.Visored(3, 1_000L, 2_000L, 2, 3_000L, 4_000L, 5_000L, 6_000L, 7_000L, 8_000L);
+        Tag saved = ShinigamiProgress.Visored.CODEC.encodeStart(NbtOps.INSTANCE, full).getOrThrow();
+        ShinigamiProgress.Visored loaded = ShinigamiProgress.Visored.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
+        helper.assertTrue(loaded.equals(full), "the record with its mask came back as " + loaded);
+        ShinigamiProgress progress = ShinigamiProgress.NONE.withVisored(full);
+        Tag savedProgress = ShinigamiProgress.CODEC.encodeStart(NbtOps.INSTANCE, progress).getOrThrow();
+        ShinigamiProgress loadedProgress = ShinigamiProgress.CODEC.parse(NbtOps.INSTANCE, savedProgress).getOrThrow();
+        helper.assertTrue(loadedProgress.equals(progress), "the Shinigami record came back as " + loadedProgress);
+
+        // A 5j record: a beaten Hollow and no mask yet, which saves none and reads back with none.
+        ShinigamiProgress.Visored old = new ShinigamiProgress.Visored(3, 1_000L, 2_000L, 0, 3_000L, 4_000L);
+        helper.assertTrue(old.equals(new ShinigamiProgress.Visored(3, 1_000L, 2_000L, 0, 3_000L, 4_000L, NEVER, NEVER,
+                NEVER, 0L)), "the 5j constructor gave " + old);
+        CompoundTag oldTag = (CompoundTag) ShinigamiProgress.Visored.CODEC.encodeStart(NbtOps.INSTANCE, old).getOrThrow();
+        for (String key : new String[] {"mask_changed_at", "mask_ends_at", "mask_ready_at", "mask_trained_ticks"}) {
+            helper.assertFalse(oldTag.contains(key), "a record that never wore its mask saved " + key);
+        }
+        ShinigamiProgress.Visored fromOld = ShinigamiProgress.Visored.CODEC.parse(NbtOps.INSTANCE, oldTag).getOrThrow();
+        helper.assertTrue(fromOld.equals(old) && !fromOld.masked() && fromOld.maskChangedAt() == NEVER
+                && fromOld.maskEndsAt() == NEVER && fromOld.maskReadyAt() == NEVER && fromOld.maskTrainedTicks() == 0L,
+                "a 5j save read as " + fromOld);
+
+        // Damaged tags, one key at a time: each reads on its own, and none wipes the rest.
+        CompoundTag noStart = new CompoundTag();
+        noStart.putLong("mask_ends_at", now + 100L);
+        ShinigamiProgress.Visored startless = ShinigamiProgress.Visored.CODEC.parse(NbtOps.INSTANCE, noStart).getOrThrow();
+        helper.assertTrue(startless.masked() && startless.maskChangedAt() == NEVER,
+                "a mask on with no start read as " + startless);
+        helper.assertTrue(VisoredLogic.maskWorn(startless, now) == 0L,
+                "a mask with no start was worn " + VisoredLogic.maskWorn(startless, now) + " ticks");
+        helper.assertTrue(VisoredLogic.normalise(startless, now).maskChangedAt() == now,
+                "a mask on with no start was repaired to " + VisoredLogic.normalise(startless, now));
+        CompoundTag negative = new CompoundTag();
+        negative.putLong("mask_trained_ticks", -5L);
+        long below = ShinigamiProgress.Visored.CODEC.parse(NbtOps.INSTANCE, negative).getOrThrow().maskTrainedTicks();
+        helper.assertTrue(below == 0L, "a training below zero read as " + below);
+        CompoundTag huge = new CompoundTag();
+        huge.putLong("mask_trained_ticks", 1_000_000_000_000L);
+        long above = ShinigamiProgress.Visored.CODEC.parse(NbtOps.INSTANCE, huge).getOrThrow().maskTrainedTicks();
+        helper.assertTrue(above == ShinigamiProgress.Visored.MAX_TRAINED_TICKS, "a training of 10^12 read as " + above);
+        CompoundTag word = new CompoundTag();
+        word.put("mask_ends_at", StringTag.valueOf("soon"));
+        word.putInt("wounds", 2);
+        ShinigamiProgress.Visored fromWord = ShinigamiProgress.Visored.CODEC.parse(NbtOps.INSTANCE, word).getOrThrow();
+        helper.assertTrue(fromWord.maskEndsAt() == NEVER && fromWord.wounds() == 2,
+                "a word where the mask's end belongs read as " + fromWord);
+
+        // Clocks out of reach of the game time are brought back to the longest the config gives, at most 180 s.
+        ShinigamiProgress.Visored stale = ShinigamiProgress.Visored.NONE.withMaskChangedAt(now + 500L)
+                .withMaskEndsAt(now + 1_000_000_000L).withMaskReadyAt(now + 1_000_000_000L);
+        ShinigamiProgress.Visored normal = VisoredLogic.normalise(stale, now);
+        helper.assertTrue(normal.maskChangedAt() == now && normal.maskEndsAt() == now + 3_600L
+                && normal.maskReadyAt() == now + 3_600L, "a stale mask was brought back to " + normal);
+        ShinigamiProgress.Visored trained = ShinigamiProgress.Visored.NONE.withMaskTrainedTicks(40L);
+        helper.assertTrue(VisoredLogic.normalise(trained, now).equals(trained),
+                "bringing a record back changed what never happened: " + VisoredLogic.normalise(trained, now));
+        ShinigamiProgress.Visored days = ShinigamiProgress.Visored.NONE.withMaskChangedAt(0L).withMaskEndsAt(2_000_100L);
+        helper.assertTrue(VisoredLogic.maskWorn(days, 2_000_000L) == 3_600L,
+                "a mask on since tick 0 was worn " + VisoredLogic.maskWorn(days, 2_000_000L) + " ticks");
+
+        // A save that still holds a mask on (a crash) has it taken off at the next login: worn until then, waiting from then.
+        Player host = visored(helper, 500.0F);
+        SoulData data = SoulLogic.get(host);
+        VisoredLogic.setRecord(data, VisoredLogic.record(data).withMaskChangedAt(now - 40L).withMaskEndsAt(now + 180L));
+        try {
+            VisoredEvents.onRefresh(host, data);
+            ShinigamiProgress.Visored refreshed = VisoredLogic.record(data);
+            helper.assertTrue(!refreshed.masked() && refreshed.maskTrainedTicks() == 40L
+                    && refreshed.maskReadyAt() == now + 60L, "a saved mask on came back as " + refreshed);
+        } finally {
+            end(now, host);
+        }
+
+        // The key rides with the zanpakutō keys, by ordinal. A key the other side does not know reads as Release,
+        // which is why the network's version moves with it.
+        helper.assertTrue(ZanpakutoKey.MASK.ordinal() == 5, "the Hollow Mask key is ordinal " + ZanpakutoKey.MASK.ordinal());
+        ByteBuf buffer = Unpooled.buffer();
+        try {
+            ZanpakutoKey.STREAM_CODEC.encode(buffer, ZanpakutoKey.MASK);
+            ZanpakutoKey received = ZanpakutoKey.STREAM_CODEC.decode(buffer);
+            helper.assertTrue(received == ZanpakutoKey.MASK && buffer.readableBytes() == 0,
+                    "the Hollow Mask key came through the network as " + received);
+            ByteBufCodecs.VAR_INT.encode(buffer, 7);
+            ZanpakutoKey unknown = ZanpakutoKey.STREAM_CODEC.decode(buffer);
+            helper.assertTrue(unknown == ZanpakutoKey.RELEASE, "an unknown key read as " + unknown);
+        } finally {
+            buffer.release();
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void onlyABeatenHollowGivesAMask(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player plain = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZANGETSU);
+        Player rooted = host(helper, 500.0F);
+        ready(SoulLogic.get(rooted), now);
+        Player host = visored(helper, 500.0F);
+        SoulData data = SoulLogic.get(host);
+        Player creative = visoredIn(helper, GameType.CREATIVE);
+        SoulData creativeData = SoulLogic.get(creative);
+        // A living Human who kept the Shinigami tier the name gave it.
+        Player substitute = visored(helper, 500.0F);
+        SoulData substituteData = SoulLogic.get(substitute);
+        substituteData.setState(SoulState.HUMAN);
+        Player fresh = visored(helper, 500.0F);
+        SoulData freshData = SoulLogic.get(fresh);
+        CajaNegacion caja = null;
+        try {
+            helper.assertTrue(VisoredLogic.isVisored(data) && ShinigamiLogic.isSubstitute(substituteData)
+                    && VisoredLogic.isVisored(substituteData), "the Visored were not made as they should be");
+
+            // Each refusal in its turn, one cause at a time.
+            assertStart(helper, plain, now, false, VisoredEvents.MaskStart.NO_HOLLOW, "a Shinigami with no Hollow");
+            assertStart(helper, rooted, now, false, VisoredEvents.MaskStart.NOT_SUBDUED,
+                    "a Shinigami whose Hollow is not beaten");
+            withConfig(BleachConfig.VISORED_ENABLED, false, () -> assertStart(helper, host, now, false,
+                    VisoredEvents.MaskStart.DISABLED, "a Visored with the path off"));
+            long lentUntil = data.shinigami().powerLentUntil();
+            data.setShinigami(data.shinigami().withPowerLentUntil(now + 1_000L));
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.NO_POWER, "a Visored whose power is lent");
+            data.setShinigami(data.shinigami().withPowerLentUntil(lentUntil));
+            caja = helper.spawn(ModEntities.CAJA_NEGACION.get(), HOST_SPOT);
+            helper.assertTrue(host.startRiding(caja, true), "the Visored could not be shut in the Caja Negación");
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.HELD, "a Visored shut in a Caja Negación");
+            host.stopRiding();
+            ShinigamiProgress.Visored before = VisoredLogic.record(data);
+            VisoredLogic.setRecord(data, before.withMaskReadyAt(now + 100L));
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.WAITING, "a Visored whose mask still waits");
+            float reiryoku = data.reiryoku();
+            assertStart(helper, host, now, true, VisoredEvents.MaskStart.PUT_ON, "a waiting Visored, by command");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), reiryoku, "the reiryoku after a mask by command");
+            VisoredEvents.endMask(host, data, VisoredEvents.MaskEnd.REMOVED, now);
+            VisoredLogic.setRecord(data, VisoredLogic.record(data).withMaskReadyAt(before.maskReadyAt()));
+
+            // At 500 the mask costs 50, and must leave half a point.
+            HollowPlayerTests.assertClose(helper, VisoredLogic.maskCost(data), 50.0, "the mask's cost at 500");
+            data.setReiryoku(50.4F);
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.TOO_WEAK, "a Visored with 50.4 reiryoku");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 50.4, "the reiryoku after a mask too costly");
+            data.setReiryoku(50.5F);
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.PUT_ON, "a Visored with 50.5 reiryoku");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 0.5, "the reiryoku after the mask's cost");
+            ShinigamiProgress.Visored on = VisoredLogic.record(data);
+            helper.assertTrue(on.maskEndsAt() == now + 220L && on.maskChangedAt() == now, "the first mask is " + on);
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.ALREADY, "a Visored already masked");
+
+            // Creative pays nothing and waits for nothing; a Substitute calls it as a Shinigami does.
+            creativeData.setReiryoku(0.0F);
+            VisoredLogic.setRecord(creativeData, VisoredLogic.record(creativeData).withMaskReadyAt(now + 5_000L));
+            assertStart(helper, creative, now, false, VisoredEvents.MaskStart.PUT_ON, "a creative Visored with nothing");
+            HollowPlayerTests.assertClose(helper, creativeData.reiryoku(), 0.0, "a creative Visored's reiryoku");
+            assertStart(helper, substitute, now, false, VisoredEvents.MaskStart.PUT_ON, "a Visored Substitute");
+
+            // The soul screen tells a new Visored how to call the mask, until it first has.
+            helper.assertTrue("visored".equals(ShinigamiLogic.nextStepKey(freshData, now)),
+                    "a new Visored's next step is " + ShinigamiLogic.nextStepKey(freshData, now));
+            long freshLent = freshData.shinigami().powerLentUntil();
+            freshData.setShinigami(freshData.shinigami().withPowerLentUntil(now + 1_000L));
+            helper.assertTrue("lent".equals(ShinigamiLogic.nextStepKey(freshData, now)),
+                    "a lending Visored's next step is " + ShinigamiLogic.nextStepKey(freshData, now));
+            freshData.setShinigami(freshData.shinigami().withPowerLentUntil(freshLent));
+            withConfig(BleachConfig.VISORED_ENABLED, false, () -> helper.assertTrue(
+                    "shinigami.named".equals(ShinigamiLogic.nextStepKey(freshData, now)),
+                    "with the path off a new Visored's next step is " + ShinigamiLogic.nextStepKey(freshData, now)));
+            assertStart(helper, fresh, now, false, VisoredEvents.MaskStart.PUT_ON, "a new Visored");
+            VisoredEvents.onMaskKey(fresh, freshData, now);
+            helper.assertFalse(VisoredLogic.isMasked(freshData), "the Hollow Mask key did not take the mask off");
+            helper.assertTrue("shinigami.named".equals(ShinigamiLogic.nextStepKey(freshData, now)),
+                    "a Visored who has worn its mask hears " + ShinigamiLogic.nextStepKey(freshData, now));
+        } finally {
+            if (host.isPassenger()) {
+                host.stopRiding();
+            }
+            discard(caja);
+            end(now, plain, rooted, host, creative, substitute, fresh);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void aMaskGivesAHollowsEdge(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player host = visored(helper, 1_000.0F);
+        SoulData data = SoulLogic.get(host);
+        Player creative = visoredIn(helper, GameType.CREATIVE);
+        SoulData creativeData = SoulLogic.get(creative);
+        try {
+            assertUnmasked(helper, host, "a Visored before its mask");
+            HollowPlayerTests.assertClose(helper, SoulLogic.reiatsu(host), 1_000.0, "the reiatsu before the mask");
+
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.PUT_ON, "a Visored of 1,000");
+            HollowPlayerTests.assertModifier(helper, host, Attributes.MOVEMENT_SPEED, VisoredLogic.MASK_SPEED_ID, 0.25,
+                    AttributeModifier.Operation.ADD_MULTIPLIED_BASE, "the mask's speed");
+            HollowPlayerTests.assertModifier(helper, host, Attributes.ATTACK_DAMAGE, VisoredLogic.MASK_DAMAGE_ID, 0.5,
+                    AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, "the mask's melee damage");
+            HollowPlayerTests.assertClose(helper, SoulLogic.reiatsu(host), 1_500.0, "the masked reiatsu");
+            helper.assertFalse(SoulEvents.mayRegenerate(host, data), "a masked Visored's reiryoku refills");
+            helper.assertTrue((HollowPlayerLogic.hollowLook(data) & HollowPlayerLogic.LOOK_MASK) != 0,
+                    "the mask is not in the look");
+            // To the living and the dead it looks a Hollow; to every other rule it is the Shinigami it is.
+            helper.assertTrue(HollowPlayerLogic.seenAsHollow(data) && HollowPlayerLogic.shunnedByVillagers(host),
+                    "villagers and Pluses do not take a masked Visored for a Hollow");
+            helper.assertFalse(HollowPlayerLogic.isHollow(data) || HollowPlayerLogic.isHollowOrArrancar(data)
+                    || HollowPlayerLogic.isHollowPlayer(host) || QuincyLogic.isHollowSource(host),
+                    "a masked Visored counts as a Hollow");
+            helper.assertTrue(data.state() == SoulState.SHINIGAMI && ShinigamiLogic.hasShinigamiPower(data),
+                    "a masked Visored is a " + data.state());
+            assertStart(helper, creative, now, false, VisoredEvents.MaskStart.PUT_ON, "a creative Visored");
+            helper.assertTrue(HollowPlayerLogic.seenAsHollow(creativeData), "a creative masked Visored looks no Hollow");
+            helper.assertFalse(HollowPlayerLogic.shunnedByVillagers(creative), "villagers shun a creative masked Visored");
+
+            // Whatever takes a boost off, the next tick puts it back.
+            AttributeInstance speed = host.getAttribute(Attributes.MOVEMENT_SPEED);
+            helper.assertTrue(speed != null && speed.removeModifier(VisoredLogic.MASK_SPEED_ID),
+                    "the mask's speed could not be taken off by hand");
+            VisoredEvents.tick(host, data, now + 1L);
+            HollowPlayerTests.assertModifier(helper, host, Attributes.MOVEMENT_SPEED, VisoredLogic.MASK_SPEED_ID, 0.25,
+                    AttributeModifier.Operation.ADD_MULTIPLIED_BASE, "the mask's speed a tick after it was taken off");
+
+            VisoredEvents.onMaskKey(host, data, now + 2L);
+            assertUnmasked(helper, host, "a Visored that took its mask off");
+            HollowPlayerTests.assertClose(helper, SoulLogic.reiatsu(host), 1_000.0, "the reiatsu after the mask");
+            helper.assertTrue(SoulEvents.mayRegenerate(host, data), "a Visored's reiryoku does not refill after the mask");
+            helper.assertTrue((HollowPlayerLogic.hollowLook(data) & HollowPlayerLogic.LOOK_MASK) == 0,
+                    "the mask is still in the look");
+            helper.assertFalse(HollowPlayerLogic.shunnedByVillagers(host), "villagers shun a Visored without its mask");
+        } finally {
+            end(now + 2L, host, creative);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void aMaskGrowsCrumblesAndRunsDry(GameTestHelper helper) {
+        // 11 s at first, 3 s more for every minute worn, and never past 3 minutes.
+        long[][] durations = {{0L, 220L}, {1_200L, 280L}, {67_600L, 3_600L}, {10_000_000L, 3_600L}};
+        for (long[] duration : durations) {
+            helper.assertTrue(VisoredLogic.maskDurationTicks(duration[0]) == duration[1], "after " + duration[0]
+                    + " ticks worn a mask lasts " + VisoredLogic.maskDurationTicks(duration[0]) + ", not " + duration[1]);
+        }
+
+        long now = HollowPlayerTests.now(helper);
+        Player host = visored(helper, 500.0F);
+        SoulData data = SoulLogic.get(host);
+        Player dry = visored(helper, 500.0F);
+        SoulData dryData = SoulLogic.get(dry);
+        try {
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.PUT_ON, "a Visored at full reiryoku");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 450.0, "the reiryoku after the mask's cost");
+            // 0.4% of 500 a second, less with Reiatsu Control, whatever the mock's level is.
+            double drain = 500.0 * 0.004 * ZanpakutoLogic.drainFraction(data) / 20.0;
+            HollowPlayerTests.assertClose(helper, VisoredLogic.maskDrainPerTick(data), drain, "the mask's drain a tick");
+            VisoredEvents.tick(host, data, now + 1L);
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 450.0 - drain, "the reiryoku after a tick masked");
+            VisoredEvents.tick(host, data, now + 219L);
+            helper.assertTrue(VisoredLogic.isMasked(data), "the first mask crumbled a tick early");
+
+            VisoredEvents.tick(host, data, now + 220L);
+            ShinigamiProgress.Visored crumbled = VisoredLogic.record(data);
+            assertUnmasked(helper, host, "a first mask 11 seconds on");
+            helper.assertTrue(crumbled.maskReadyAt() == now + 1_420L && crumbled.maskTrainedTicks() == 220L
+                    && crumbled.maskChangedAt() == now + 220L, "the crumbled mask left " + crumbled);
+            MobEffectInstance slowed = host.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
+            helper.assertTrue(slowed != null && slowed.getAmplifier() == 1 && host.hasEffect(MobEffects.WEAKNESS),
+                    "the crumbled mask left its wearer " + slowed);
+            assertStart(helper, host, now + 221L, false, VisoredEvents.MaskStart.WAITING, "a Visored just after a crumble");
+            assertStart(helper, host, now + 1_420L, false, VisoredEvents.MaskStart.PUT_ON, "a Visored a minute on");
+            long endsAt = VisoredLogic.record(data).maskEndsAt();
+            helper.assertTrue(endsAt == now + 1_420L + 231L, "the second mask ends " + (endsAt - now - 1_420L) + " ticks on");
+            VisoredEvents.endMask(host, data, VisoredEvents.MaskEnd.TAKEN_OFF, now + 1_420L);
+
+            // A drain that would leave less than half a point runs the mask dry, at any Reiatsu Control.
+            assertStart(helper, dry, now, false, VisoredEvents.MaskStart.PUT_ON, "a second Visored");
+            dryData.setReiryoku(ZanpakutoLogic.RESERVE + VisoredLogic.maskDrainPerTick(dryData) / 2.0F);
+            VisoredEvents.tick(dry, dryData, now + 1L);
+            ShinigamiProgress.Visored ranDry = VisoredLogic.record(dryData);
+            assertUnmasked(helper, dry, "a mask that ran dry");
+            HollowPlayerTests.assertClose(helper, dryData.reiryoku(), 0.0, "the reiryoku after the mask ran dry");
+            helper.assertTrue(ranDry.maskReadyAt() == now + 1_201L, "the dry mask's wait ends at " + ranDry.maskReadyAt());
+            helper.assertTrue(dry.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "the dry mask did not wind its wearer");
+        } finally {
+            end(now + 1_420L, host, dry);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void takingItOffSavesTheWait(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player host = visored(helper, 500.0F);
+        SoulData data = SoulLogic.get(host);
+        Player creative = visoredIn(helper, GameType.CREATIVE);
+        SoulData creativeData = SoulLogic.get(creative);
+        try {
+            // Taken off, the next mask waits as long as this one was worn, and at least 3 seconds.
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.PUT_ON, "a Visored");
+            VisoredEvents.onMaskKey(host, data, now + 40L);
+            ShinigamiProgress.Visored first = VisoredLogic.record(data);
+            assertUnmasked(helper, host, "a mask taken off after 2 seconds");
+            helper.assertTrue(first.maskReadyAt() == now + 100L && first.maskTrainedTicks() == 40L,
+                    "a mask taken off after 2 seconds left " + first);
+            helper.assertFalse(host.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "taking the mask off winded its wearer");
+            assertStart(helper, host, now + 100L, false, VisoredEvents.MaskStart.PUT_ON, "a Visored whose wait is over");
+            long endsAt = VisoredLogic.record(data).maskEndsAt();
+            helper.assertTrue(endsAt == now + 100L + 222L, "the second mask ends " + (endsAt - now - 100L) + " ticks on");
+            VisoredEvents.onMaskKey(host, data, now + 300L);
+            ShinigamiProgress.Visored second = VisoredLogic.record(data);
+            helper.assertTrue(!second.masked() && second.maskReadyAt() == now + 500L && second.maskTrainedTicks() == 240L,
+                    "a mask taken off after 10 seconds left " + second);
+
+            // Creative pays nothing, drains nothing, waits for nothing, trains nothing and is never winded.
+            creativeData.setReiryoku(0.0F);
+            assertStart(helper, creative, now, false, VisoredEvents.MaskStart.PUT_ON, "a creative Visored with nothing");
+            VisoredEvents.tick(creative, creativeData, now + 1L);
+            helper.assertTrue(VisoredLogic.isMasked(creativeData), "a creative mask came off at its first tick");
+            HollowPlayerTests.assertClose(helper, creativeData.reiryoku(), 0.0, "a creative Visored's reiryoku masked");
+            VisoredEvents.onMaskKey(creative, creativeData, now + 2L);
+            ShinigamiProgress.Visored taken = VisoredLogic.record(creativeData);
+            helper.assertTrue(!taken.masked() && taken.maskReadyAt() == now + 2L && taken.maskTrainedTicks() == 0L,
+                    "a creative mask taken off left " + taken);
+            assertStart(helper, creative, now + 2L, false, VisoredEvents.MaskStart.PUT_ON, "a creative Visored again");
+            VisoredEvents.tick(creative, creativeData, VisoredLogic.record(creativeData).maskEndsAt());
+            assertUnmasked(helper, creative, "a creative mask at the end of its time");
+            helper.assertFalse(creative.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "a creative mask's crumble winded it");
+        } finally {
+            end(now + 300L, host, creative);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void blowsCrackAndShatterIt(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player host = visored(helper, 500.0F);
+        SoulData data = SoulLogic.get(host);
+        Player struck = visored(helper, 500.0F);
+        SoulData struckData = SoulLogic.get(struck);
+        Player attacker = host(helper, 5_000.0F);
+        try {
+            HollowPlayerTests.assertClose(helper, host.getMaxHealth(), 20.0, "a mock's maximum health");
+            assertStart(helper, host, now, false, VisoredEvents.MaskStart.PUT_ON, "a Visored");
+            VisoredEvents.noteMaskBlow(host, data, 2.0F, now);
+            helper.assertTrue(VisoredLogic.isMasked(data) && !VisoredLogic.maskCracked(data),
+                    "a blow of 2 of 20 cracked the mask or took it off");
+            VisoredEvents.noteMaskBlow(host, data, 2.0F, now);
+            helper.assertTrue(VisoredLogic.isMasked(data) && VisoredLogic.maskCracked(data),
+                    "blows of 4 of 20 did not crack the mask, or took it off");
+            helper.assertTrue((HollowPlayerLogic.hollowLook(data, now) & HollowPlayerLogic.LOOK_MASK_CRACKED) != 0,
+                    "the cracked mask is not drawn cracked");
+            // 6.5 of 20 is a share of 0.325, clear of float rounding at 0.30.
+            VisoredEvents.noteMaskBlow(host, data, 2.5F, now);
+            ShinigamiProgress.Visored shattered = VisoredLogic.record(data);
+            assertUnmasked(helper, host, "a mask after blows of 6.5 of 20");
+            helper.assertTrue(shattered.maskReadyAt() == now + 1_200L, "the shattered mask's wait ends at "
+                    + shattered.maskReadyAt());
+            helper.assertTrue(host.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "the shattered mask did not wind its wearer");
+            helper.assertFalse(VisoredLogic.maskCracked(data), "the mask is still cracked once it is off");
+
+            // A real blow, through the listener: a player's does not scale with the difficulty, and at 5,000 against
+            // the masked 750 the reiatsu difference does not cut it.
+            assertStart(helper, struck, now, false, VisoredEvents.MaskStart.PUT_ON, "a second Visored");
+            helper.assertTrue(struck.hurt(struck.damageSources().playerAttack(attacker), 4.0F),
+                    "the blow on the masked Visored did not land");
+            helper.assertTrue(struck.getHealth() < 20.0F,
+                    "the masked Visored's health after the blow is " + struck.getHealth());
+            helper.assertTrue(VisoredLogic.isMasked(struckData) && VisoredLogic.maskCracked(struckData),
+                    "a blow of 4 of 20 did not crack the mask, or took it off");
+        } finally {
+            end(now, host, struck, attacker);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void everyExitTakesTheMaskOff(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player dying = visored(helper, 500.0F);
+        Player leaving = visored(helper, 500.0F);
+        Player stopped = visored(helper, 500.0F);
+        Player alsoStopped = visored(helper, 500.0F);
+        Player disabled = visored(helper, 500.0F);
+        Player lender = visored(helper, 500.0F);
+        Player spectator = visoredIn(helper, GameType.SPECTATOR);
+        Player sleeper = visored(helper, 500.0F);
+        Player fallen = visored(helper, 500.0F);
+        Player[] all = {dying, leaving, stopped, alsoStopped, disabled, lender, spectator, sleeper, fallen};
+        try {
+            for (Player player : all) {
+                // The spectator's mask is put on by command; the refresh path is in maskRecordLoadsAndRepairs.
+                boolean forced = player == spectator;
+                assertStart(helper, player, now, forced, VisoredEvents.MaskStart.PUT_ON,
+                        forced ? "a spectator" : "a Visored");
+            }
+
+            // Death, before the soul is copied: nothing to drop in the box, and no wind.
+            dying.getInventory().clearContent();
+            dying.die(dying.damageSources().generic());
+            assertUnmasked(helper, dying, "a Visored that died");
+            ShinigamiProgress.Visored died = VisoredLogic.record(SoulLogic.get(dying));
+            helper.assertTrue(died.maskReadyAt() == now + 60L, "the dead Visored's wait ends at " + died.maskReadyAt());
+            helper.assertFalse(dying.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "dying winded the Visored");
+
+            // Logging out, before the save.
+            VisoredEvents.endAll(leaving, SoulLogic.get(leaving), now + 30L);
+            assertUnmasked(helper, leaving, "a Visored that logged out");
+            ShinigamiProgress.Visored left = VisoredLogic.record(SoulLogic.get(leaving));
+            helper.assertTrue(left.maskReadyAt() == now + 90L && left.maskTrainedTicks() == 30L,
+                    "logging out after 30 ticks left " + left);
+
+            // The server stopping, before it saves its players.
+            VisoredEvents.endMasks(List.of(stopped, alsoStopped));
+            assertUnmasked(helper, stopped, "a Visored at the server's stop");
+            assertUnmasked(helper, alsoStopped, "a second Visored at the server's stop");
+
+            // Every soul that may no longer wear it, at its next tick.
+            withConfig(BleachConfig.VISORED_ENABLED, false,
+                    () -> VisoredEvents.tick(disabled, SoulLogic.get(disabled), now + 1L));
+            assertUnmasked(helper, disabled, "a Visored with the path turned off");
+            SoulData lent = SoulLogic.get(lender);
+            lent.setShinigami(lent.shinigami().withPowerLentUntil(now + 1_000L));
+            VisoredEvents.tick(lender, lent, now + 1L);
+            assertUnmasked(helper, lender, "a Visored that lent its power");
+            VisoredEvents.tick(spectator, SoulLogic.get(spectator), now + 1L);
+            assertUnmasked(helper, spectator, "a spectator");
+            sleeper.startSleeping(helper.absolutePos(new BlockPos(2, 2, 2)));
+            helper.assertTrue(sleeper.isSleeping(), "the Visored could not lie down");
+            VisoredEvents.tick(sleeper, SoulLogic.get(sleeper), now + 1L);
+            sleeper.stopSleeping();
+            assertUnmasked(helper, sleeper, "a Visored asleep");
+            SoulData hollow = SoulLogic.get(fallen);
+            hollow.setState(SoulState.HOLLOW);
+            VisoredEvents.tick(fallen, hollow, now + 1L);
+            assertUnmasked(helper, fallen, "a Visored become a Hollow");
+            helper.assertTrue((HollowPlayerLogic.hollowLook(hollow) & HollowPlayerLogic.LOOK_MASK) == 0,
+                    "a Hollow has the Visored's mask in its look");
+        } finally {
+            if (sleeper.isSleeping()) {
+                sleeper.stopSleeping();
+            }
+            end(now + 30L, all);
+        }
+        helper.succeed();
     }
 }

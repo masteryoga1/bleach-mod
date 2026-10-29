@@ -18,10 +18,12 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -30,6 +32,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.FlyingMob;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.animal.FlyingAnimal;
 import net.minecraft.world.entity.player.Player;
@@ -46,7 +50,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.joml.Vector3f;
 
 /**
- * The Visored on the server: the Hollow taking root in a Shinigami's wounds, its voice, and the fight with it.
+ * The Visored on the server: the Hollow taking root in a Shinigami's wounds, its voice, the fight with it, and its mask.
  *
  * <p>Near-fatal blows from Menos-class Hollows ({@link VisoredLogic#isWoundingSource}) are counted as wounds, and
  * enough of them root the Hollow ({@link #takeRoot}), which then speaks to its host every 5 minutes. Once it is
@@ -61,6 +65,14 @@ import org.joml.Vector3f;
  * save holds nothing of a fight but its host's record, which at the start already says when the next try may
  * come. Everything takes a {@link Player}, so game tests can use mock players; the boss bar is for a real
  * {@link ServerPlayer} only.
+ *
+ * <p>A Visored calls its beaten Hollow's mask with the Hollow Mask key ({@link #onMaskKey}, {@link #putOnMask}): it
+ * costs a share of maximum reiryoku and then drains it, stops regeneration, and gives speed, melee damage and
+ * weightier reiatsu, for {@code base_seconds} at first and longer the more masks have been worn. The key again takes
+ * it off; it also crumbles when its time is up, runs dry with the reiryoku, shatters under blows, and is taken off
+ * on death, logging out, a server stop and whenever its soul may no longer wear it. Every end goes through
+ * {@link #endMask}, which starts the wait for the next. The mask is on while the saved record says so, so the
+ * owner's client sees it, and a save that still holds one (a crash) has it taken off at the next login.
  */
 public final class VisoredEvents {
     private static final String PREFIX = "message.bleach.visored.";
@@ -95,6 +107,15 @@ public final class VisoredEvents {
     private static final double BURST_SPREAD_UP = 1.0;
     private static final DustParticleOptions WHITE_DUST = new DustParticleOptions(new Vector3f(1.0F, 1.0F, 1.0F), 1.2F);
     private static final DustParticleOptions RING_DUST = new DustParticleOptions(new Vector3f(0.92F, 0.92F, 0.96F), 1.0F);
+    /** Black reiatsu drawn across the face as the mask forms; its endings shed {@link #WHITE_DUST}. */
+    private static final DustParticleOptions BLACK_DUST = new DustParticleOptions(new Vector3f(0.08F, 0.04F, 0.08F), 1.0F);
+    private static final int MASK_ON_DUST = 16;
+    private static final int MASK_OFF_DUST = 8;
+    private static final int MASK_CRUMBLE_DUST = 16;
+    private static final int MASK_SHATTER_DUST = 24;
+    private static final double MASK_DUST_SPREAD = 0.25;
+    /** How far in front of the eyes, along the look, the black reiatsu gathers, in blocks. */
+    private static final double MASK_FACE_AHEAD = 0.3;
 
     /** Every fight under way, by its host's UUID. Server thread only. */
     private static final Map<UUID, Duel> DUELS = new HashMap<>();
@@ -203,8 +224,8 @@ public final class VisoredEvents {
     }
 
     /**
-     * Each tick of a living player, server side: the fight's upkeep for its host, then, outside a fight, the
-     * Hollow's voice.
+     * Each tick of a living player, server side: the fight's upkeep for its host, then, outside a fight, the mask's
+     * upkeep while it is on and the Hollow's voice. A masked soul is beaten, so it never has a fight.
      */
     public static void tick(Player player, SoulData data, long now) {
         if (player.level().isClientSide()) {
@@ -215,6 +236,9 @@ public final class VisoredEvents {
             upkeep(player, data, duel, now);
             // A fight that ended this tick has had its last words.
             return;
+        }
+        if (VisoredLogic.isMasked(data)) {
+            maskUpkeep(player, data, now);
         }
         String voice = VisoredLogic.voiceKey(data, player.getUUID(), now);
         if (voice != null) {
@@ -267,20 +291,29 @@ public final class VisoredEvents {
         speak(player, "rooted");
     }
 
-    /** Brings the record's clocks into this world's time, on login, respawn and reset (see {@link SoulEvents#refresh}). */
+    /**
+     * Brings the record's clocks into this world's time, on login, respawn and reset (see {@link SoulEvents#refresh}),
+     * and takes off, silently, a mask the save still holds (a crash, an autosave, or leaving the End): it counts as
+     * worn up to now, and its wait starts now. A mask never resumes.
+     */
     public static void onRefresh(Player player, SoulData data) {
+        long now = player.level().getGameTime();
         ShinigamiProgress.Visored record = VisoredLogic.record(data);
-        ShinigamiProgress.Visored normal = VisoredLogic.normalise(record, player.level().getGameTime());
+        ShinigamiProgress.Visored normal = VisoredLogic.normalise(record, now);
         if (!normal.equals(record)) {
             VisoredLogic.setRecord(data, normal);
         }
+        if (normal.masked()) {
+            endMask(player, data, MaskEnd.REMOVED, now);
+        }
     }
 
-    /** Ends a fight (BROKEN_OFF): for resets and commands. 5k adds the mask's end. */
+    /** Ends a fight (BROKEN_OFF) and takes the mask off (REMOVED): for logging out, resets and commands. */
     public static void endAll(Player player, SoulData data, long now) {
         if (isDuelling(player)) {
             endDuel(player, data, DuelEnd.BROKEN_OFF, now);
         }
+        endMask(player, data, MaskEnd.REMOVED, now);
     }
 
     // ---- The fight ----
@@ -419,12 +452,13 @@ public final class VisoredEvents {
     }
 
     /**
-     * The Hollow is beaten and the soul a Visored: said in chat, and the Hollow's last words, "for now". The
-     * milestone follows from the record.
+     * The Hollow is beaten and the soul a Visored: said in chat, with the key that calls its mask, and the Hollow's
+     * last words, "for now". The milestone follows from the record. The mask is ready at once, as a record that has
+     * never had one waits for nothing.
      */
     public static void subdue(Player player, SoulData data, long now) {
         VisoredLogic.setRecord(data, VisoredLogic.record(data).withSubduedAt(now));
-        chat(player, "won", GOLDEN);
+        chat(player, "won", GOLDEN, Component.keybind("key.bleach.visored_mask"));
         speak(player, "won");
     }
 
@@ -676,11 +710,245 @@ public final class VisoredEvents {
         return Math.sqrt(dx * dx + dz * dz);
     }
 
+    // ---- The mask ----
+
+    /** What came of calling the mask. Every one but PUT_ON, NO_HOLLOW and HELD is told here. */
+    public enum MaskStart {
+        PUT_ON(null), NO_HOLLOW(null), NOT_SUBDUED("mask.not_subdued"), DISABLED("disabled"),
+        NO_POWER("no_power"), ALREADY("mask.already"), HELD(null), WAITING("mask.waiting"),
+        TOO_WEAK("mask.too_weak");
+
+        @Nullable
+        private final String line;
+
+        MaskStart(@Nullable String line) {
+            this.line = line;
+        }
+
+        /** The action-bar key (PREFIX + line), or null. */
+        @Nullable
+        public String messageKey() {
+            return line == null ? null : PREFIX + line;
+        }
+    }
+
+    /** How a mask came off. */
+    public enum MaskEnd {
+        TAKEN_OFF, CRUMBLED, DRY, SHATTERED, REMOVED;
+
+        /** CRUMBLED, DRY and SHATTERED: the long wait, and winded. */
+        public boolean crumbles() {
+            return this == CRUMBLED || this == DRY || this == SHATTERED;
+        }
+    }
+
+    /**
+     * The M key, server side: off if on, otherwise on, telling a refusal. Taking it off is always allowed, held, lent
+     * or not.
+     */
+    public static void onMaskKey(Player player, SoulData data, long now) {
+        if (VisoredLogic.isMasked(data)) {
+            endMask(player, data, MaskEnd.TAKEN_OFF, now);
+            return;
+        }
+        MaskStart start = putOnMask(player, data, now, false);
+        if (start != MaskStart.PUT_ON) {
+            tell(player, data, start, now);
+        }
+    }
+
+    /**
+     * Calls the mask. Forced (the command) skips HELD, WAITING and TOO_WEAK and pays nothing.
+     *
+     * <p>The first check that fails gives the result: no Hollow at all (a soul that presses an unused key), one not
+     * yet beaten (which covers a soul in its fight), the path off, no Shinigami power or lent away, the mask already
+     * on, held by Negación or a Caja, the wait after the last mask, and a cost that would leave less than
+     * {@link ZanpakutoLogic#RESERVE}; creative skips the wait and the cost. Then it pays, writes the record, puts the
+     * boosts on, and the hand is drawn across the face in black reiatsu, with the sculk's charge, pitched low.
+     */
+    public static MaskStart putOnMask(Player player, SoulData data, long now, boolean force) {
+        ShinigamiProgress.Visored record = VisoredLogic.record(data);
+        if (!record.rooted() && !record.subdued()) {
+            return MaskStart.NO_HOLLOW;
+        }
+        if (!record.subdued()) {
+            return MaskStart.NOT_SUBDUED;
+        }
+        if (!VisoredLogic.enabled()) {
+            return MaskStart.DISABLED;
+        }
+        if (!ShinigamiLogic.hasShinigamiPower(data) || ShinigamiLogic.isPowerLent(data, now)) {
+            return MaskStart.NO_POWER;
+        }
+        if (record.masked()) {
+            return MaskStart.ALREADY;
+        }
+        // Tells the held player its own line.
+        if (!force && Negacion.refused(player)) {
+            return MaskStart.HELD;
+        }
+        boolean free = force || player.isCreative();
+        if (!free && now < record.maskReadyAt()) {
+            return MaskStart.WAITING;
+        }
+        float cost = VisoredLogic.maskCost(data);
+        if (!free && data.reiryoku() - cost < ZanpakutoLogic.RESERVE) {
+            return MaskStart.TOO_WEAK;
+        }
+        if (!free) {
+            SoulLogic.trySpend(player, data, cost);
+        }
+        VisoredLogic.setRecord(data, record.withMaskChangedAt(now)
+                .withMaskEndsAt(now + VisoredLogic.maskDurationTicks(record.maskTrainedTicks())));
+        data.maskDamageShare = 0.0F;
+        applyMaskBody(player);
+        // The hand drawn across the face; the swinging player sees it too.
+        player.swing(InteractionHand.MAIN_HAND, true);
+        if (player.level() instanceof ServerLevel level) {
+            Vec3 face = player.getEyePosition().add(player.getLookAngle().scale(MASK_FACE_AHEAD));
+            SpiritSenses.particles(level, BLACK_DUST, face.x, face.y, face.z, MASK_ON_DUST, MASK_DUST_SPREAD,
+                    MASK_DUST_SPREAD, MASK_DUST_SPREAD, 0.0);
+        }
+        SpiritSenses.play(player, SoundEvents.SCULK_BLOCK_CHARGE, SoundSource.PLAYERS, 1.0F, 0.7F, false);
+        return MaskStart.PUT_ON;
+    }
+
+    /** Tells a refusal on the action bar, in grey; WAITING with the whole seconds left. */
+    public static void tell(Player player, SoulData data, MaskStart start, long now) {
+        String key = start.messageKey();
+        if (key == null) {
+            return;
+        }
+        Object[] args = start == MaskStart.WAITING
+                ? new Object[] {VisoredLogic.secondsUntil(VisoredLogic.record(data).maskReadyAt(), now)}
+                : new Object[0];
+        player.displayClientMessage(Component.translatable(key, args).withStyle(ChatFormatting.GRAY), true);
+    }
+
+    /**
+     * The single exit: every way a mask comes off goes through here. Nothing when the mask is off.
+     *
+     * <p>The record is written once ({@link VisoredLogic#maskEnded}): the wait for the next mask starts, as long as
+     * this one was worn and at least {@code min_wait_seconds}, or {@code crumble_wait_seconds} when it crumbled, ran
+     * dry or shattered, and the time worn trains the next. Then the crack share is cleared and the boosts come off,
+     * a crumbled, dry or shattered mask leaves its wearer winded, and the ending is heard, seen and told. Creative
+     * waits for nothing, trains nothing and is never winded. REMOVED, every way that is not the mask's own doing, is
+     * silent.
+     */
+    public static void endMask(Player player, SoulData data, MaskEnd end, long now) {
+        ShinigamiProgress.Visored record = VisoredLogic.record(data);
+        if (!record.masked()) {
+            return;
+        }
+        boolean creative = player.isCreative();
+        VisoredLogic.setRecord(data, VisoredLogic.maskEnded(record, now, end.crumbles(), creative));
+        data.maskDamageShare = 0.0F;
+        removeMaskBody(player);
+        if (end.crumbles() && !creative) {
+            SoulLogic.exhaust(player);
+        }
+        switch (end) {
+            case TAKEN_OFF -> maskFalls(player, 0.6F, 1.3F, MASK_OFF_DUST, null);
+            case CRUMBLED -> maskFalls(player, 1.0F, 0.9F, MASK_CRUMBLE_DUST, "mask.crumbled");
+            case DRY -> maskFalls(player, 1.0F, 0.9F, MASK_CRUMBLE_DUST, "mask.dry");
+            case SHATTERED -> maskFalls(player, 1.0F, 0.7F, MASK_SHATTER_DUST, "mask.shattered");
+            case REMOVED -> {
+            }
+        }
+    }
+
+    /**
+     * A creature's blow landed on a masked wearer. The health it took, after armour and absorption, counts as a share
+     * of maximum health; half of {@code shatter_health_share} in one wearing cracks the mask, heard once, and all of
+     * it shatters it. A new wearing starts whole.
+     */
+    public static void noteMaskBlow(Player player, SoulData data, float damage, long now) {
+        if (!VisoredLogic.isMasked(data) || !(damage > 0.0F)) {
+            return;
+        }
+        boolean wasCracked = VisoredLogic.maskCracked(data);
+        data.maskDamageShare += damage / Math.max(1.0F, player.getMaxHealth());
+        if (data.maskDamageShare >= BleachConfig.get(BleachConfig.VISORED_MASK_SHATTER_HEALTH_SHARE)) {
+            endMask(player, data, MaskEnd.SHATTERED, now);
+        } else if (!wasCracked && VisoredLogic.maskCracked(data)) {
+            SpiritSenses.play(player, ModSounds.MASK_CRACK.get(), SoundSource.PLAYERS, 0.8F, 1.2F, false);
+        }
+    }
+
+    /** Ends each player's mask REMOVED at its own level's game time: the server-stop path. */
+    public static void endMasks(Iterable<? extends Player> players) {
+        for (Player player : players) {
+            endMask(player, SoulLogic.get(player), MaskEnd.REMOVED, player.level().getGameTime());
+        }
+    }
+
+    /**
+     * One tick of the mask on, in this order: it is taken off at once when its soul may no longer wear it (no
+     * longer a Visored, lent, the path off, a spectator, asleep or dead); it crumbles when its time is up; it drains
+     * its share of reiryoku, outside creative and while the world's time runs (a frozen server still ticks its
+     * players), and runs dry when that would leave less than half a point; and the boosts are set again, which puts
+     * back anything that took them off.
+     */
+    private static void maskUpkeep(Player player, SoulData data, long now) {
+        if (!VisoredLogic.isVisored(data) || ShinigamiLogic.isPowerLent(data, now) || !VisoredLogic.enabled()
+                || player.isSpectator() || player.isSleeping() || !player.isAlive()) {
+            endMask(player, data, MaskEnd.REMOVED, now);
+            return;
+        }
+        if (now >= VisoredLogic.record(data).maskEndsAt()) {
+            endMask(player, data, MaskEnd.CRUMBLED, now);
+            return;
+        }
+        if (!player.isCreative() && player.level().tickRateManager().runsNormally()) {
+            float drain = VisoredLogic.maskDrainPerTick(data);
+            if (drain > 0.0F && !SoulLogic.drain(player, data, drain)) {
+                endMask(player, data, MaskEnd.DRY, now);
+                return;
+            }
+        }
+        applyMaskBody(player);
+    }
+
+    /**
+     * The mask's speed and melee damage, as transient modifiers through {@link HollowBody#setModifier}, which writes
+     * only when they change: never saved, so no save holds them.
+     */
+    private static void applyMaskBody(Player player) {
+        HollowBody.setModifier(player, Attributes.MOVEMENT_SPEED, VisoredLogic.MASK_SPEED_ID,
+                BleachConfig.get(BleachConfig.VISORED_MASK_SPEED_BONUS), AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+        HollowBody.setModifier(player, Attributes.ATTACK_DAMAGE, VisoredLogic.MASK_DAMAGE_ID,
+                BleachConfig.get(BleachConfig.VISORED_MASK_DAMAGE_MULTIPLIER) - 1.0,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+    }
+
+    /** Takes both of the mask's modifiers off. */
+    private static void removeMaskBody(Player player) {
+        HollowBody.setModifier(player, Attributes.MOVEMENT_SPEED, VisoredLogic.MASK_SPEED_ID, 0.0,
+                AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+        HollowBody.setModifier(player, Attributes.ATTACK_DAMAGE, VisoredLogic.MASK_DAMAGE_ID, 0.0,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+    }
+
+    /**
+     * A mask coming away: bone breaking at this volume and pitch, white dust at the eyes for those who see spirits,
+     * and the line, if any, on the action bar.
+     */
+    private static void maskFalls(Player player, float volume, float pitch, int dust, @Nullable String line) {
+        SpiritSenses.play(player, ModSounds.MASK_CRACK.get(), SoundSource.PLAYERS, volume, pitch, false);
+        if (player.level() instanceof ServerLevel level) {
+            SpiritSenses.particles(level, WHITE_DUST, player.getX(), player.getEyeY(), player.getZ(), dust,
+                    MASK_DUST_SPREAD, MASK_DUST_SPREAD, MASK_DUST_SPREAD, 0.0);
+        }
+        if (line != null) {
+            bar(player, line);
+        }
+    }
+
     // ---- Listeners ----
 
     /**
-     * A blow that landed on a player may be a wound: only one with damage from a creature, read once the health
-     * after it is known.
+     * A blow that landed on a player may crack its mask, and may be a wound: only one with damage from a creature,
+     * read once the health after it is known, so only the health it took counts.
      */
     private static void onDamageTaken(LivingDamageEvent.Post event) {
         if (!(event.getEntity() instanceof Player player) || player.level().isClientSide() || !SoulLogic.hasSoul(player)
@@ -688,9 +956,11 @@ public final class VisoredEvents {
             return;
         }
         SoulData data = SoulLogic.get(player);
+        long now = player.level().getGameTime();
+        noteMaskBlow(player, data, event.getNewDamage(), now);
         if (VisoredLogic.isWoundingSource(attacker, data)
                 && VisoredLogic.isWound(player.getHealth(), player.getMaxHealth())) {
-            noteWound(player, data, player.level().getGameTime());
+            noteWound(player, data, now);
         }
     }
 
@@ -738,8 +1008,9 @@ public final class VisoredEvents {
     }
 
     /**
-     * A host that dies breaks its fight off. A Hollow killed by its host is beaten; one that died any other way
-     * ({@code /kill}) breaks the fight off.
+     * A host that dies breaks its fight off, and a Visored that dies takes its mask off, before the soul is copied to
+     * the respawned player. A Hollow killed by its host is beaten; one that died any other way ({@code /kill}) breaks
+     * the fight off.
      */
     private static void onDeath(LivingDeathEvent event) {
         LivingEntity victim = event.getEntity();
@@ -757,23 +1028,30 @@ public final class VisoredEvents {
             } else {
                 endDuel(duel.host, SoulLogic.get(duel.host), DuelEnd.BROKEN_OFF, now);
             }
-        } else if (victim instanceof Player player && isDuelling(player)) {
-            endDuel(player, SoulLogic.get(player), DuelEnd.BROKEN_OFF, now);
+        } else if (victim instanceof Player player) {
+            if (isDuelling(player)) {
+                endDuel(player, SoulLogic.get(player), DuelEnd.BROKEN_OFF, now);
+            }
+            endMask(player, SoulLogic.get(player), MaskEnd.REMOVED, now);
         }
     }
 
-    /** A fight does not outlast the session. This runs before the player is saved, so the wait for the next one is. */
+    /**
+     * A fight and a mask do not outlast the session. This runs before the player is saved, so the waits for the next
+     * are.
+     */
     private static void onLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         Player player = event.getEntity();
         endAll(player, SoulLogic.get(player), player.level().getGameTime());
     }
 
     /**
-     * A stop saves every player before any of them logs out, so every fight is broken off here first, or the saves
-     * would hold the fight's end as the next try instead of the wait.
+     * A stop saves every player before any of them logs out, so every fight is broken off and every mask taken off
+     * here first, or the saves would hold the fight's end as the next try instead of the wait, and a mask still on.
      */
     private static void onServerStopping(ServerStoppingEvent event) {
         breakOffAll();
+        endMasks(event.getServer().getPlayerList().getPlayers());
     }
 
     // ---- Lines ----

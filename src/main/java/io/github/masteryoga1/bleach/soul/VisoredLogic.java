@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.soul;
 
+import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.Hollow;
@@ -7,18 +8,20 @@ import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.Menos;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
 /**
  * The rules of the Visored: a Shinigami with a Hollow inside. Who can take a Hollow into its wounds and what
  * wounds it, when the rooted Hollow speaks and can be faced, what the soul screen says meanwhile, how strong the
- * inner Hollow is and where its losing blow stops. A Visored is a soul with Shinigami power whose Hollow is
+ * inner Hollow is and where its losing blow stops, and what the beaten Hollow's mask costs, how long it lasts and
+ * grows, what it gives and how long the next one waits. A Visored is a soul with Shinigami power whose Hollow is
  * beaten ({@link #isVisored}); there is no Visored state and no Hollow tier, so to every other rule it is a
- * Shinigami. Like {@link ArrancarLogic}, these read only their arguments and the config, send nothing and are
- * safe on both sides, so game tests and the client can call them directly; the one write is
- * {@link #setRecord}. What they do to a player, and the fight itself, are in {@link VisoredEvents}, and the
- * Hollow that steps out is {@link InnerHollow}. {@code now} is the level's game time.
+ * Shinigami, masked or not. Like {@link ArrancarLogic}, these read only their arguments and the config, send
+ * nothing and are safe on both sides, so game tests and the client can call them directly; the one write is
+ * {@link #setRecord}. What they do to a player, the fight itself and the mask's upkeep are in
+ * {@link VisoredEvents}, and the Hollow that steps out is {@link InnerHollow}. {@code now} is the level's game time.
  */
 public final class VisoredLogic {
     /** Blocks from its host at which the inner Hollow steps out. */
@@ -45,6 +48,10 @@ public final class VisoredLogic {
     public static final int LOSS_EFFECT_TICKS = 600;
     /** Ticks past the time limit an inner Hollow may live before it ends its own fight, whatever happened to it. */
     public static final int LIFE_MARGIN_TICKS = 600;
+    /** The mask's movement speed, a share of base speed (transient). */
+    public static final ResourceLocation MASK_SPEED_ID = BleachMod.id("visored_mask_speed");
+    /** The mask's melee damage, a multiplier of everything else (transient). */
+    public static final ResourceLocation MASK_DAMAGE_ID = BleachMod.id("visored_mask_damage");
 
     private static final long TICKS_PER_MINUTE = 1200L;
 
@@ -237,9 +244,10 @@ public final class VisoredLogic {
     /**
      * The soul screen's next step while a Hollow is rooted and not yet beaten, as the last part of a
      * {@code screen.bleach.soul.next.*} key: {@code hollowfied} while it stirs, {@code hollowfied.waiting} while
-     * it rests after beating its host, and {@code hollowfied.ready} once it can be faced. Null, so the soul hears
-     * its usual line, with the path off, with no Hollow or a beaten one, and for a soul without Shinigami power:
-     * a Hollow or an Arrancar with a rooted record hears its own line, not one about Jinzen.
+     * it rests after beating its host, and {@code hollowfied.ready} once it can be faced; once it is beaten,
+     * {@code visored} (the Hollow Mask key) until the first mask is worn. Null, so the soul hears its usual line,
+     * with the path off, with no Hollow, once the mask has been worn, and for a soul without Shinigami power: a
+     * Hollow or an Arrancar with a rooted record hears its own line, not one about Jinzen.
      */
     @Nullable
     public static String nextStepKey(SoulData data, long now) {
@@ -247,8 +255,11 @@ public final class VisoredLogic {
             return null;
         }
         ShinigamiProgress.Visored record = record(data);
-        if (!record.rooted() || record.subdued()) {
+        if (!record.rooted()) {
             return null;
+        }
+        if (record.subdued()) {
+            return record.maskChangedAt() == ShinigamiProgress.NEVER ? "visored" : null;
         }
         if (now >= record.duelReadyAt()) {
             return "hollowfied.ready";
@@ -258,8 +269,11 @@ public final class VisoredLogic {
 
     /**
      * Puts the record's clocks back in reach of the game time, for a world whose time was changed or a save
-     * copied between worlds: no wound, rooting or win lies in the future, and no wait is longer than the longest
-     * the config gives (the stirring or the rest after a fight). A time that never happened stays so.
+     * copied between worlds: no wound, rooting, win or change of the mask lies in the future, no wait is longer
+     * than the longest the config gives (the stirring or the rest after a fight, and the longest wait after a
+     * mask), and no mask on lasts longer than {@code max_seconds} from now. A time that never happened stays so,
+     * except that a mask on with no start (a missing or damaged {@code mask_changed_at}) starts now, so it is never
+     * counted as worn since {@link ShinigamiProgress#NEVER}.
      */
     public static ShinigamiProgress.Visored normalise(ShinigamiProgress.Visored record, long now) {
         ShinigamiProgress.Visored out = record;
@@ -276,7 +290,156 @@ public final class VisoredLogic {
         if (out.duelReadyAt() > latestReady) {
             out = out.withDuelReadyAt(latestReady);
         }
+        if (out.maskChangedAt() > now) {
+            out = out.withMaskChangedAt(now);
+        }
+        long latestEnd = now + maskMaxTicks();
+        if (out.maskEndsAt() > latestEnd) {
+            out = out.withMaskEndsAt(latestEnd);
+        }
+        long longestWait = Math.max(Math.max(BleachConfig.get(BleachConfig.VISORED_MASK_CRUMBLE_WAIT_SECONDS),
+                BleachConfig.get(BleachConfig.VISORED_MASK_MIN_WAIT_SECONDS)),
+                BleachConfig.get(BleachConfig.VISORED_MASK_MAX_SECONDS)) * 20L;
+        if (out.maskReadyAt() > now + longestWait) {
+            out = out.withMaskReadyAt(now + longestWait);
+        }
+        if (out.masked() && out.maskChangedAt() == ShinigamiProgress.NEVER) {
+            out = out.withMaskChangedAt(now);
+        }
         return out;
+    }
+
+    // ---- The mask ----
+
+    /**
+     * Whether the Hollow's mask is on: read from the saved record alone, with no config, so it is safe on the client
+     * (its HUD and look) and from {@link SoulLogic#reiatsu} anywhere. The upkeep in {@link VisoredEvents} takes off a
+     * mask its soul may no longer wear.
+     */
+    public static boolean isMasked(SoulData data) {
+        return record(data).masked();
+    }
+
+    /**
+     * Whether the mask on has cracked: blows in this wearing have taken half the health share that shatters it.
+     * The share is server-side only, so on a client's copy this is false; the look carries the crack.
+     */
+    public static boolean maskCracked(SoulData data) {
+        return isMasked(data)
+                && data.maskDamageShare >= BleachConfig.get(BleachConfig.VISORED_MASK_SHATTER_HEALTH_SHARE) / 2.0;
+    }
+
+    /**
+     * How long a mask put on now lasts, in ticks, for this many ticks of masks worn before: {@code base_seconds}
+     * and {@code seconds_per_minute_worn} more for every minute worn, at most {@code max_seconds}. That is 11 s at
+     * first and 3 minutes after 56 min 20 s at the defaults. Never less than a tick.
+     */
+    public static long maskDurationTicks(long trainedTicks) {
+        double grown = BleachConfig.get(BleachConfig.VISORED_MASK_BASE_SECONDS) * 20.0
+                + Math.floor(Math.max(0L, trainedTicks)
+                        * BleachConfig.get(BleachConfig.VISORED_MASK_SECONDS_PER_MINUTE_WORN) / 60.0);
+        return Math.max(1L, (long) Math.min((double) maskMaxTicks(), grown));
+    }
+
+    /** Reiryoku the mask costs to call: {@code cost_share} of the maximum, and never less than {@code min_cost}. */
+    public static float maskCost(SoulData data) {
+        return (float) Math.max(BleachConfig.get(BleachConfig.VISORED_MASK_MIN_COST),
+                BleachConfig.get(BleachConfig.VISORED_MASK_COST_SHARE) * Math.max(0.0F, data.maxReiryoku()));
+    }
+
+    /**
+     * Reiryoku the mask drains each tick it is on: {@code drain_share_per_second} of the maximum a second, shrunk
+     * by Reiatsu Control as Shikai's drain is ({@link ZanpakutoLogic#drainFraction}).
+     */
+    public static float maskDrainPerTick(SoulData data) {
+        return (float) (Math.max(0.0F, data.maxReiryoku())
+                * BleachConfig.get(BleachConfig.VISORED_MASK_DRAIN_SHARE_PER_SECOND)
+                * ZanpakutoLogic.drainFraction(data) / 20.0);
+    }
+
+    /**
+     * What the mask weighs the soul's reiatsu by, in {@link SoulLogic#reiatsu}: {@code reiatsu_multiplier} while it
+     * is on, so a masked Visored reads as an Espada does, and 1 otherwise. Reads the config only while masked.
+     */
+    public static float reiatsuFactor(SoulData data) {
+        return isMasked(data) ? (float) BleachConfig.get(BleachConfig.VISORED_MASK_REIATSU_MULTIPLIER) : 1.0F;
+    }
+
+    /**
+     * Ticks this wearing has lasted by {@code now}, never past its end: 0 when the start is unknown, and never more
+     * than {@code max_seconds}, so a damaged stamp cannot count days.
+     */
+    public static long maskWorn(ShinigamiProgress.Visored record, long now) {
+        if (record.maskChangedAt() == ShinigamiProgress.NEVER) {
+            return 0L;
+        }
+        long worn = Math.min(now, record.maskEndsAt()) - record.maskChangedAt();
+        return Math.max(0L, Math.min(maskMaxTicks(), worn));
+    }
+
+    /**
+     * Ticks before the next mask after one worn this long: as long as it was worn, and at least
+     * {@code crumble_wait_seconds} when it crumbled, ran dry or shattered, or {@code min_wait_seconds} otherwise. A
+     * crumble never waits less than taking it off would have.
+     */
+    public static long maskWaitTicks(boolean crumbled, long worn) {
+        long least = (crumbled
+                ? BleachConfig.get(BleachConfig.VISORED_MASK_CRUMBLE_WAIT_SECONDS)
+                : BleachConfig.get(BleachConfig.VISORED_MASK_MIN_WAIT_SECONDS)) * 20L;
+        return Math.max(least, worn);
+    }
+
+    /**
+     * The record once the mask on comes off now: the change stamped (the wait's start), no end, the wait after it
+     * and the time worn added to the training. In creative there is no wait and nothing is trained.
+     */
+    public static ShinigamiProgress.Visored maskEnded(ShinigamiProgress.Visored record, long now, boolean crumbled,
+                                                      boolean creative) {
+        long worn = maskWorn(record, now);
+        long wait = creative ? 0L : maskWaitTicks(crumbled, worn);
+        long trained = creative ? record.maskTrainedTicks() : record.maskTrainedTicks() + worn;
+        return record.withMaskChangedAt(now).withMaskEndsAt(ShinigamiProgress.NEVER).withMaskReadyAt(now + wait)
+                .withMaskTrainedTicks(trained);
+    }
+
+    /** How much of the mask on is left, 0 to 1: 0 when off or its span is not positive. */
+    public static float maskLeft(ShinigamiProgress.Visored record, long now) {
+        if (!record.masked()) {
+            return 0.0F;
+        }
+        long span = record.maskEndsAt() - record.maskChangedAt();
+        if (span <= 0L) {
+            return 0.0F;
+        }
+        return clampShare((double) (record.maskEndsAt() - now) / span);
+    }
+
+    /**
+     * How far the wait has run, 0 to 1: 1 when ready, 0 when the wait's start is unknown (NEVER) or its span is not
+     * positive.
+     */
+    public static float maskRecovered(ShinigamiProgress.Visored record, long now) {
+        if (now >= record.maskReadyAt()) {
+            return 1.0F;
+        }
+        if (record.maskChangedAt() == ShinigamiProgress.NEVER) {
+            return 0.0F;
+        }
+        long span = record.maskReadyAt() - record.maskChangedAt();
+        if (span <= 0L) {
+            return 0.0F;
+        }
+        return clampShare((double) (now - record.maskChangedAt()) / span);
+    }
+
+    /** The longest a mask lasts, in ticks. */
+    private static long maskMaxTicks() {
+        return BleachConfig.get(BleachConfig.VISORED_MASK_MAX_SECONDS) * 20L;
+    }
+
+    /** The share held between 0 and 1. */
+    private static float clampShare(double share) {
+        return (float) Math.max(0.0, Math.min(1.0, share));
     }
 
     /** Whole seconds from {@code now} until {@code at}, rounded up, and never below 0: for the fight's bar. */

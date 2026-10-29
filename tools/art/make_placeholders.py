@@ -101,8 +101,8 @@ QUINCY_BLUE = rgb(40, 84, 170)
 VEIN = rgb(90, 170, 255)
 VEIN_DIM = rgb(60, 120, 220)
 # The Wandenreich uniform, white with black bands and silver buttons; a fragment of a Hollow's mask,
-# and the red glow in a ravenous Hollow player's eyes; and the Hollow Bait, a pale wafer with a dark
-# red heart.
+# and the red glow in a ravenous Hollow player's eyes; a Visored's whiter mask and its red stripes; and
+# the Hollow Bait, a pale wafer with a dark red heart.
 WANDENREICH_WHITE = rgb(240, 240, 236)
 WANDENREICH_BLACK = rgb(34, 34, 40)
 WANDENREICH_SILVER = rgb(176, 184, 196)
@@ -111,6 +111,9 @@ MASK_BONE = rgb(234, 230, 218)
 MASK_SHADE = rgb(188, 182, 168)
 MASK_LINE = rgb(92, 88, 82)
 EYE_RED = rgb(230, 40, 40)
+VISORED_BONE = rgb(244, 242, 236)
+VISORED_SHADE = rgb(206, 202, 192)
+MASK_RED = rgb(176, 30, 36)
 BAIT_WHITE = rgb(226, 220, 206)
 BAIT_EDGE = rgb(150, 140, 124)
 BAIT_RED = rgb(150, 30, 36)
@@ -1502,6 +1505,19 @@ def hollow_player_mask_eyes():
     return c
 
 
+def visored_mask():
+    """A Visored's mask (HollowMaskModel's skull: the plate and the shut jaw): whiter bone than a Hollow's, with two
+    red stripes down over the wearer's left eye, which is the texture's right (the plate's front is x 1-9, y 1-7;
+    its eye holes are x 2-3 and x 7-8 at y 3-4; the jaw's front, x 1-7, sits under the plate's x 2-8)."""
+    c = recoloured(hollow_player_mask, {BONE: VISORED_BONE, BONE_SHADE: VISORED_SHADE}, "visored_mask_base")()
+    for y in (1, 2, 5, 6, 7):            # through the eye hole, above and below it
+        c.put(7, y, MASK_RED)
+    for y in range(1, 8):                # beside it, at the plate's edge
+        c.put(9, y, MASK_RED)
+    c.put(6, 10, MASK_RED)               # on, under the first stripe (the jaw's x 6, y 9 is a gap)
+    return c
+
+
 def mask_edge_reach(x, y):
     """Where a pixel of the edge lies against the oval a Hollow sees through: above 1 is outside it."""
     return ((x + 0.5 - 32) / 29) ** 2 + ((y + 0.5 - 16) / 13) ** 2
@@ -1622,6 +1638,7 @@ TEXTURES = {
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,
+    "entity/visored_mask.png": visored_mask,
     "misc/hollow_mask_edge.png": hollow_mask_edge,
     "misc/hollow_mask_edge_cracked.png": hollow_mask_edge_cracked,
 }

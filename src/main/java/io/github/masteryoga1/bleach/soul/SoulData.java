@@ -188,6 +188,8 @@ public final class SoulData {
     long hollowRegenPausedUntil = NEVER;
     /** This Hollow's mask is drawn cracked until this game time. */
     long hollowCrackedUntil = NEVER;
+    /** Share of maximum health a Visored's mask has taken in blows this wearing; the look carries the crack. */
+    float maskDamageShare;
     /** Soul hunger spent and not yet taken off the saved value, so it is not re-sent every tick. */
     float hollowSatietyDebt;
     /** Ticks this Hollow has spent starving since its last starving hurt. */

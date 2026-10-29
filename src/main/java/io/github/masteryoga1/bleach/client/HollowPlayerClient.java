@@ -6,6 +6,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
+import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,7 +35,8 @@ import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
  * HUD's hunger gauge is in {@link ReiryokuHud}), and the air bubbles take its place as vanilla stacks
  * them. In first person, the edge of the bone mask frames the view, cracked after a blow and tinged red
  * while the Hollow is ravenous (the client config can turn it off), and the bare arms show the dark
- * forearms and claws of {@link HollowBodyLayer}.
+ * forearms and claws of {@link HollowBodyLayer}. A Visored sees the same edge while its Hollow mask is on,
+ * cracked as a Hollow's is but never tinged, and keeps its food row and its own arms.
  */
 public final class HollowPlayerClient {
     public static final ResourceLocation MASK_EDGE_LAYER_ID = BleachMod.id("hollow_mask_edge");
@@ -69,21 +72,26 @@ public final class HollowPlayerClient {
     }
 
     /**
-     * A GUI layer above the camera overlays: the inside edge of the mask around a Hollow's view in first
-     * person, drawn as vanilla draws the carved pumpkin's blur. Not under a carved pumpkin, which has its
-     * own, nor through a spyglass, whose own view fills the screen.
+     * A GUI layer above the camera overlays: the inside edge of the mask around the view of a Hollow, or of a
+     * Visored with its mask on, in first person, drawn as vanilla draws the carved pumpkin's blur. Not under a
+     * carved pumpkin, which has its own, nor through a spyglass, whose own view fills the screen.
      */
     static void renderMaskEdge(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         if (!BleachClientConfig.maskOverlay() || player == null || minecraft.options.hideGui || player.isSpectator()
                 || !minecraft.options.getCameraType().isFirstPerson() || player.isScoping()
-                || player.getItemBySlot(EquipmentSlot.HEAD).is(Items.CARVED_PUMPKIN)
-                || !HollowPlayerLogic.isHollowPlayer(player)) {
+                || player.getItemBySlot(EquipmentSlot.HEAD).is(Items.CARVED_PUMPKIN)) {
             return;
         }
-        float satiety = player.getData(SoulAttachments.SOUL).hollow().satiety();
-        float tint = HollowPlayerLogic.band(satiety) != HollowPlayerLogic.Band.FED ? HUNGRY_TINT : 1.0F;
+        boolean hollow = HollowPlayerLogic.isHollowPlayer(player);
+        SoulData data = player.getData(SoulAttachments.SOUL);
+        if (!hollow && !VisoredLogic.isMasked(data)) {
+            return;
+        }
+        // Hunger tinges only a Hollow's edge: a Visored that was once a Hollow may keep an old satiety.
+        float tint = hollow && HollowPlayerLogic.band(data.hollow().satiety()) != HollowPlayerLogic.Band.FED
+                ? HUNGRY_TINT : 1.0F;
         boolean cracked = (ClientSouls.appearance(player).hollowLook() & HollowPlayerLogic.LOOK_MASK_CRACKED) != 0;
         ResourceLocation texture = cracked ? MASK_EDGE_CRACKED : MASK_EDGE;
         int width = graphics.guiWidth();

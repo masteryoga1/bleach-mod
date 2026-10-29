@@ -110,6 +110,7 @@ public final class BleachClient {
         event.register(ZanpakutoKeys.RELEASE);
         event.register(ZanpakutoKeys.SEAL);
         event.register(ZanpakutoKeys.TECHNIQUE);
+        event.register(ZanpakutoKeys.MASK);
         event.register(QuincyClient.BLUT_KEY);
         event.register(QuincyClient.FORM_KEY);
         event.register(HollowKeys.DEVOUR);

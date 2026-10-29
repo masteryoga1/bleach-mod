@@ -20,7 +20,7 @@ import net.minecraft.core.BlockPos;
  * @param konsoDay        the game day the Konsō rewards below were counted on
  * @param konsoRewards    how many Konsō grew this soul's reiryoku on that day
  * @param academyPos      the nearest Academy this soul was told about, if any
- * @param visored         the Hollow that took root in this soul's wounds and the fights with it (see
+ * @param visored         the Hollow that took root in this soul's wounds, the fights with it and its mask (see
  *                        {@link VisoredLogic}); it belongs to the soul's Shinigami power, so it is kept here
  */
 public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long powerLentUntil, float lentReiryoku,
@@ -111,21 +111,34 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
     }
 
     /**
-     * The Hollow inside a Shinigami: how it took root and the fights with it. Saved with the rest and read
-     * leniently key by key, so a save from before the Visored reads as {@link #NONE} and one bad value falls
-     * back to its own default. The rules are in {@link VisoredLogic}, and the fight in {@link VisoredEvents}.
+     * The Hollow inside a Shinigami: how it took root, the fights with it and, once it is beaten, its mask. Saved
+     * with the rest and read leniently key by key, so a save from before the Visored (or the mask) reads as
+     * {@link #NONE} (or with no mask yet) and one bad value falls back to its own default. The rules are in
+     * {@link VisoredLogic}, and the fight and the mask in {@link VisoredEvents}. The mask is on while
+     * {@code maskEndsAt} is set ({@link #masked}), so the owner's client knows it from this record alone.
      *
-     * @param wounds      wounds from Hollows counted towards rooting it, at most one per spacing
-     * @param lastWoundAt when the last of those wounds was counted
-     * @param rootedAt    when the Hollow took root in the soul ({@link ShinigamiProgress#NEVER} while it has not)
-     * @param losses      fights the Hollow has won against its host
-     * @param duelReadyAt no fight with the Hollow before this game time: the stirring after rooting, the rest
-     *                    after a loss or a broken-off fight, or the end of a fight under way
-     * @param subduedAt   when its host beat it and became a Visored ({@link ShinigamiProgress#NEVER} while it has not)
+     * @param wounds           wounds from Hollows counted towards rooting it, at most one per spacing
+     * @param lastWoundAt      when the last of those wounds was counted
+     * @param rootedAt         when the Hollow took root in the soul ({@link ShinigamiProgress#NEVER} while it has not)
+     * @param losses           fights the Hollow has won against its host
+     * @param duelReadyAt      no fight with the Hollow before this game time: the stirring after rooting, the rest
+     *                         after a loss or a broken-off fight, or the end of a fight under way
+     * @param subduedAt        when its host beat it and became a Visored ({@link ShinigamiProgress#NEVER} while it has
+     *                         not)
+     * @param maskChangedAt    when the mask last went on or came off ({@link ShinigamiProgress#NEVER} before the
+     *                         first): the start of a wearing, or of the wait after it
+     * @param maskEndsAt       when the mask on crumbles, or {@link ShinigamiProgress#NEVER} while it is off
+     * @param maskReadyAt      no mask before this game time: the wait after the last one
+     * @param maskTrainedTicks ticks masks have been worn in all, outside creative, which lengthens the next; at most
+     *                         {@link #MAX_TRAINED_TICKS}
      */
     public record Visored(int wounds, long lastWoundAt, long rootedAt, int losses, long duelReadyAt,
-                          long subduedAt) {
-        public static final Visored NONE = new Visored(0, NEVER, NEVER, 0, NEVER, NEVER);
+                          long subduedAt, long maskChangedAt, long maskEndsAt, long maskReadyAt,
+                          long maskTrainedTicks) {
+        /** The most mask time that counts toward growth: 24 hours. */
+        public static final long MAX_TRAINED_TICKS = 1_728_000L;
+
+        public static final Visored NONE = new Visored(0, NEVER, NEVER, 0, NEVER, NEVER, NEVER, NEVER, NEVER, 0L);
 
         public static final Codec<Visored> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.lenientOptionalFieldOf("wounds", 0).forGetter(Visored::wounds),
@@ -133,13 +146,23 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
                 Codec.LONG.lenientOptionalFieldOf("rooted_at", NEVER).forGetter(Visored::rootedAt),
                 Codec.INT.lenientOptionalFieldOf("losses", 0).forGetter(Visored::losses),
                 Codec.LONG.lenientOptionalFieldOf("duel_ready_at", NEVER).forGetter(Visored::duelReadyAt),
-                Codec.LONG.lenientOptionalFieldOf("subdued_at", NEVER).forGetter(Visored::subduedAt)
+                Codec.LONG.lenientOptionalFieldOf("subdued_at", NEVER).forGetter(Visored::subduedAt),
+                Codec.LONG.lenientOptionalFieldOf("mask_changed_at", NEVER).forGetter(Visored::maskChangedAt),
+                Codec.LONG.lenientOptionalFieldOf("mask_ends_at", NEVER).forGetter(Visored::maskEndsAt),
+                Codec.LONG.lenientOptionalFieldOf("mask_ready_at", NEVER).forGetter(Visored::maskReadyAt),
+                Codec.LONG.lenientOptionalFieldOf("mask_trained_ticks", 0L).forGetter(Visored::maskTrainedTicks)
         ).apply(instance, Visored::new));
 
-        /** Keeps the counts from going below zero. */
+        /** Keeps the counts from going below zero, and the mask's training within 0 and its cap. */
         public Visored {
             wounds = Math.max(0, wounds);
             losses = Math.max(0, losses);
+            maskTrainedTicks = Math.max(0L, Math.min(MAX_TRAINED_TICKS, maskTrainedTicks));
+        }
+
+        /** The 5j shape: no mask yet. */
+        public Visored(int wounds, long lastWoundAt, long rootedAt, int losses, long duelReadyAt, long subduedAt) {
+            this(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt, NEVER, NEVER, NEVER, 0L);
         }
 
         /** Whether a Hollow has taken root in the soul. */
@@ -152,28 +175,59 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
             return subduedAt != NEVER;
         }
 
+        /** Whether the Hollow's mask is on. */
+        public boolean masked() {
+            return maskEndsAt != NEVER;
+        }
+
         public Visored withWounds(int value) {
-            return new Visored(value, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt);
+            return new Visored(value, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt, maskChangedAt, maskEndsAt,
+                    maskReadyAt, maskTrainedTicks);
         }
 
         public Visored withLastWoundAt(long value) {
-            return new Visored(wounds, value, rootedAt, losses, duelReadyAt, subduedAt);
+            return new Visored(wounds, value, rootedAt, losses, duelReadyAt, subduedAt, maskChangedAt, maskEndsAt,
+                    maskReadyAt, maskTrainedTicks);
         }
 
         public Visored withRootedAt(long value) {
-            return new Visored(wounds, lastWoundAt, value, losses, duelReadyAt, subduedAt);
+            return new Visored(wounds, lastWoundAt, value, losses, duelReadyAt, subduedAt, maskChangedAt, maskEndsAt,
+                    maskReadyAt, maskTrainedTicks);
         }
 
         public Visored withLosses(int value) {
-            return new Visored(wounds, lastWoundAt, rootedAt, value, duelReadyAt, subduedAt);
+            return new Visored(wounds, lastWoundAt, rootedAt, value, duelReadyAt, subduedAt, maskChangedAt, maskEndsAt,
+                    maskReadyAt, maskTrainedTicks);
         }
 
         public Visored withDuelReadyAt(long value) {
-            return new Visored(wounds, lastWoundAt, rootedAt, losses, value, subduedAt);
+            return new Visored(wounds, lastWoundAt, rootedAt, losses, value, subduedAt, maskChangedAt, maskEndsAt,
+                    maskReadyAt, maskTrainedTicks);
         }
 
         public Visored withSubduedAt(long value) {
-            return new Visored(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, value);
+            return new Visored(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, value, maskChangedAt, maskEndsAt,
+                    maskReadyAt, maskTrainedTicks);
+        }
+
+        public Visored withMaskChangedAt(long value) {
+            return new Visored(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt, value, maskEndsAt,
+                    maskReadyAt, maskTrainedTicks);
+        }
+
+        public Visored withMaskEndsAt(long value) {
+            return new Visored(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt, maskChangedAt, value,
+                    maskReadyAt, maskTrainedTicks);
+        }
+
+        public Visored withMaskReadyAt(long value) {
+            return new Visored(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt, maskChangedAt, maskEndsAt,
+                    value, maskTrainedTicks);
+        }
+
+        public Visored withMaskTrainedTicks(long value) {
+            return new Visored(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt, maskChangedAt, maskEndsAt,
+                    maskReadyAt, value);
         }
     }
 }

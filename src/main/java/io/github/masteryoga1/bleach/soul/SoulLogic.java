@@ -216,15 +216,15 @@ public final class SoulLogic {
 
     /**
      * A creature's spiritual pressure: maximum reiryoku for a soul (players and spirit mobs alike),
-     * weighed by a Quincy's form (see {@link QuincyArtsLogic#reiatsuFactor}), and max health as a
-     * stand-in for creatures without one.
+     * weighed by a Quincy's form (see {@link QuincyArtsLogic#reiatsuFactor}) and a Visored's mask (see
+     * {@link VisoredLogic#reiatsuFactor}), and max health as a stand-in for creatures without one.
      */
     public static float reiatsu(LivingEntity entity) {
         if (!hasSoul(entity)) {
             return entity.getMaxHealth();
         }
         SoulData data = get(entity);
-        return (float) (data.maxReiryoku() * QuincyArtsLogic.reiatsuFactor(data));
+        return (float) (data.maxReiryoku() * QuincyArtsLogic.reiatsuFactor(data) * VisoredLogic.reiatsuFactor(data));
     }
 
     /**
