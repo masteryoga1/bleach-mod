@@ -948,7 +948,8 @@ public final class VisoredEvents {
 
     /**
      * A blow that landed on a player may crack its mask, and may be a wound: only one with damage from a creature,
-     * read once the health after it is known, so only the health it took counts.
+     * read once the health after it is known, so only the health it took counts. A wearer's own blows never crack
+     * its mask, and a killing blow leaves the mask to death's ending.
      */
     private static void onDamageTaken(LivingDamageEvent.Post event) {
         if (!(event.getEntity() instanceof Player player) || player.level().isClientSide() || !SoulLogic.hasSoul(player)
@@ -957,7 +958,9 @@ public final class VisoredEvents {
         }
         SoulData data = SoulLogic.get(player);
         long now = player.level().getGameTime();
-        noteMaskBlow(player, data, event.getNewDamage(), now);
+        if (attacker != player && !player.isDeadOrDying()) {
+            noteMaskBlow(player, data, event.getNewDamage(), now);
+        }
         if (VisoredLogic.isWoundingSource(attacker, data)
                 && VisoredLogic.isWound(player.getHealth(), player.getMaxHealth())) {
             noteWound(player, data, now);

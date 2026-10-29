@@ -1076,6 +1076,9 @@ public final class VisoredTests {
         Player struck = visored(helper, 500.0F);
         SoulData struckData = SoulLogic.get(struck);
         Player attacker = host(helper, 5_000.0F);
+        Player own = visored(helper, 500.0F);
+        SoulData ownData = SoulLogic.get(own);
+        Player doomed = visored(helper, 500.0F);
         try {
             HollowPlayerTests.assertClose(helper, host.getMaxHealth(), 20.0, "a mock's maximum health");
             assertStart(helper, host, now, false, VisoredEvents.MaskStart.PUT_ON, "a Visored");
@@ -1105,8 +1108,25 @@ public final class VisoredTests {
                     "the masked Visored's health after the blow is " + struck.getHealth());
             helper.assertTrue(VisoredLogic.isMasked(struckData) && VisoredLogic.maskCracked(struckData),
                     "a blow of 4 of 20 did not crack the mask, or took it off");
+
+            // The wearer's own blow never cracks its mask.
+            assertStart(helper, own, now, false, VisoredEvents.MaskStart.PUT_ON, "a third Visored");
+            helper.assertTrue(own.hurt(own.damageSources().playerAttack(own), 4.0F),
+                    "the masked Visored's own blow did not land");
+            helper.assertTrue(VisoredLogic.isMasked(ownData) && !VisoredLogic.maskCracked(ownData),
+                    "the wearer's own blow of 4 of 20 cracked its mask, or took it off");
+
+            // A killing blow leaves the mask to death's ending: off with the short wait, not shattered.
+            assertStart(helper, doomed, now, false, VisoredEvents.MaskStart.PUT_ON, "a fourth Visored");
+            doomed.setHealth(3.0F);
+            doomed.hurt(doomed.damageSources().playerAttack(attacker), 8.0F);
+            helper.assertTrue(doomed.isDeadOrDying(), "the killing blow left the masked Visored at " + doomed.getHealth());
+            assertUnmasked(helper, doomed, "a Visored killed while masked");
+            long doomedReady = VisoredLogic.record(SoulLogic.get(doomed)).maskReadyAt();
+            helper.assertTrue(doomedReady == now + 60L, "the wait after a killing blow ends at " + doomedReady
+                    + ", not death's " + (now + 60L));
         } finally {
-            end(now, host, struck, attacker);
+            end(now, host, struck, attacker, own, doomed);
         }
         helper.succeed();
     }

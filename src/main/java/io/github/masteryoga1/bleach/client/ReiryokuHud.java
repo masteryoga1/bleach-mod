@@ -148,7 +148,8 @@ public final class ReiryokuHud {
         }
         ItemStack held = player.getMainHandItem();
         ZanpakutoBlade blade = ZanpakutoItem.blade(held);
-        if (blade.released() && ZanpakutoLogic.isOwnBlade(held, player)) {
+        boolean shikaiRings = blade.released() && ZanpakutoLogic.isOwnBlade(held, player);
+        if (shikaiRings) {
             int colour = 0xFF000000 | blade.colour();
             for (int ring = 2; ring < 2 + SHIKAI_OUTLINE; ring++) {
                 graphics.renderOutline(x - ring, y - ring, WIDTH + 2 * ring, HEIGHT + 2 * ring, colour);
@@ -168,7 +169,9 @@ public final class ReiryokuHud {
         boolean hungerShown = data.state() == SoulState.HOLLOW && data.hollow().hungerStarted();
         // A Visored is never a Plus or a Hollow, so the slot is free for its mask.
         boolean maskShown = !chainShown && !hungerShown && VisoredLogic.isVisored(data) && VisoredLogic.enabled();
-        int sx = x + WIDTH + 2;
+        // A Visored often holds its blade released, so its mask gauge steps out past the Shikai rings.
+        int shift = maskShown && shikaiRings ? SHIKAI_OUTLINE : 0;
+        int sx = x + WIDTH + 2 + shift;
         if (chainShown) {
             drawGauge(graphics, sx, y, data.chainFraction(),
                     SoulLogic.isEncroaching(data) ? CHAIN_FILL_ENCROACHING : CHAIN_FILL);
@@ -182,7 +185,7 @@ public final class ReiryokuHud {
         }
 
         // The reishi gauge goes beyond the chain, hunger or mask one, should a soul ever have both.
-        int rx = chainShown || hungerShown || maskShown ? x + 2 * WIDTH + 8 : x + WIDTH + 6;
+        int rx = chainShown || hungerShown || maskShown ? x + 2 * WIDTH + 8 + shift : x + WIDTH + 6;
         if (QuincyLogic.canUsePowers(data)) {
             renderReishi(graphics, player, data, rx, y);
         } else if (QuincyArtsLogic.isSealed(data)) {
