@@ -26,11 +26,13 @@ import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
 import io.github.masteryoga1.bleach.soul.QuincyTeaching;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import java.util.ArrayList;
@@ -49,13 +51,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * The soul screen: state, reiryoku, a Plus's Chain of Fate or a Hollow's soul hunger, the zanpakutō
- * (or until it has a name, the Asauchi bond; for an Arrancar, its own blade and whether it is released),
- * Hollows purified and slain and Pluses sent on, Hollow Bait crushed and contests with the Quincy Hunter,
- * the souls a Hollow has devoured and what they were, Quincy blood (its reishi and Blut, the Hollow
- * poison in it, souls destroyed and how rich the reishi is here, how far its arts have come, and the
- * Quincy Elder's lessons), stats with training progress, awakened powers (an Arrancar's with the form it
- * rose from and its rank) and what comes next.
+ * The soul screen: state, reiryoku, a Plus's Chain of Fate or a Hollow's soul hunger, the zanpakutō (or
+ * until it has a name, the Asauchi bond; for an Arrancar, its own blade and whether it is released), a
+ * Visored's Hollow mask and how near it is to the masked Cero, Hollows purified and slain and Pluses sent
+ * on, Hollow Bait crushed and contests with the Quincy Hunter, the souls a Hollow has devoured and what
+ * they were, Quincy blood (its reishi and Blut, the Hollow poison in it, souls destroyed and how rich the
+ * reishi is here, how far its arts have come, and the Quincy Elder's lessons), stats with training
+ * progress, awakened powers (an Arrancar's with the form it rose from and its rank) and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -132,7 +134,8 @@ public final class SoulStatsScreen extends Screen {
     /**
      * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
      * more between sections, and the stats and powers headings only with {@code headers}; with no
-     * {@code graphics}, only measures them.
+     * {@code graphics}, only measures them. A Visored, while the server has the path on, says so on its state
+     * row and gets two rows of its own after the zanpakutō's (see {@link #visoredRows}).
      *
      * @return where the next step starts
      */
@@ -145,7 +148,12 @@ public final class SoulStatsScreen extends Screen {
             graphics.drawCenteredString(font, title, width / 2, y, WHITE);
         }
         y += line + gap;
-        String stateKey = ShinigamiLogic.isSubstitute(data) ? "screen.bleach.soul.state.substitute"
+        boolean visored = VisoredLogic.enabled() && VisoredLogic.isVisored(data);
+        boolean substitute = ShinigamiLogic.isSubstitute(data);
+        // A Visored is named first, so a Substitute who has beaten its Hollow is both on one row.
+        String stateKey = visored && substitute ? "screen.bleach.soul.state.visored_substitute"
+                : visored ? "screen.bleach.soul.state.visored"
+                : substitute ? "screen.bleach.soul.state.substitute"
                 : data.state() == SoulState.HUMAN && QuincyLogic.isAwakened(data) ? "screen.bleach.soul.state.quincy"
                 : ShinigamiLogic.isStudent(data) ? "screen.bleach.soul.state.student" : "screen.bleach.soul.state";
         text(graphics, Component.translatable(stateKey, data.state().displayName()), left, y, WHITE);
@@ -181,6 +189,9 @@ public final class SoulStatsScreen extends Screen {
         if (zanpakuto != null) {
             text(graphics, zanpakuto, left, y, GREY);
             y += line;
+        }
+        if (visored) {
+            y = visoredRows(graphics, player, data, left, y, line);
         }
         HuntRecord hunt = data.hunt();
         if (hunt.purified() + hunt.slain() + hunt.sentOn() > 0) {
@@ -260,6 +271,40 @@ public final class SoulStatsScreen extends Screen {
             y += line;
         }
         return y + gap;
+    }
+
+    /**
+     * A Visored's two rows: its mask (on, with the time left; forming again, with the wait; or ready) and the masked
+     * Cero (the time its masks have been worn of the time it needs, or the key, once it has it).
+     *
+     * @return where the next row starts
+     */
+    private int visoredRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int left, int y, int line) {
+        long now = player.level().getGameTime();
+        ShinigamiProgress.Visored record = VisoredLogic.record(data);
+        Component mask;
+        int colour = GREY;
+        if (record.masked()) {
+            mask = Component.translatable("screen.bleach.soul.visored.masked", duration(record.maskEndsAt() - now));
+            colour = WHITE;
+        } else if (now < record.maskReadyAt()) {
+            mask = Component.translatable("screen.bleach.soul.visored.waiting", duration(record.maskReadyAt() - now));
+        } else {
+            mask = Component.translatable("screen.bleach.soul.visored.ready");
+        }
+        text(graphics, mask, left, y, colour);
+        y += line;
+        Component cero = VisoredLogic.ceroUnlocked(data)
+                ? Component.translatable("screen.bleach.soul.visored.cero", HollowKeys.CERO.getTranslatedKeyMessage())
+                : Component.translatable("screen.bleach.soul.visored.cero_training",
+                        duration(record.maskTrainedTicks()), duration(VisoredLogic.ceroUnlockTicks()));
+        text(graphics, cero, left, y, GREY);
+        return y + line;
+    }
+
+    /** Ticks as {@code mm:ss}, or {@code hh:mm:ss} from an hour; never below 0. */
+    private static String duration(long ticks) {
+        return StringUtil.formatTickDuration((int) Math.max(0L, Math.min(Integer.MAX_VALUE, ticks)), TICKS_PER_SECOND);
     }
 
     /** Draws a row, unless only measuring. */

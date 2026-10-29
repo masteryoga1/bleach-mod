@@ -64,9 +64,10 @@ public final class DevourEvents {
      * The Devour and Cero keys, from {@link io.github.masteryoga1.bleach.network.HollowKeyPayload} on the
      * server thread. A press of the Devour key starts a hold (a Hollow) or the gnawing (a Plus); letting go
      * ends either; sneaking with it turns the Hollow sight on or off. The target id is only the client's
-     * hint. The Cero key starts, fires or lets fizzle a Menos's or an Arrancar's Cero ({@link HollowCero}), and
-     * pressed by a sneaking Arrancar, its Gran Rey Cero ({@link GranReyCero}); an Arrancar no longer devours: its
-     * Devour press and release start and end a Pesquisa focus ({@link Pesquisa}), and its sight key does nothing.
+     * hint. The Cero key starts, fires or lets fizzle a Menos's, an Arrancar's or a masked Visored's Cero
+     * ({@link HollowCero}), and pressed by a sneaking Arrancar, its Gran Rey Cero ({@link GranReyCero}); an
+     * Arrancar no longer devours: its Devour press and release start and end a Pesquisa focus ({@link Pesquisa}),
+     * and its sight key does nothing.
      */
     public static void onKey(ServerPlayer player, HollowKey key, int targetId) {
         if (!SoulLogic.hasSoul(player)) {
@@ -111,7 +112,9 @@ public final class DevourEvents {
                 }
             }
             case CERO -> {
-                if (player.isAlive() && !player.isSpectator() && HollowPlayerLogic.isHollowOrArrancar(data)) {
+                // A Visored is heard masked or not, so it is told why it gathers none (HollowCero#start).
+                if (player.isAlive() && !player.isSpectator() && (HollowPlayerLogic.isHollowOrArrancar(data)
+                        || VisoredLogic.isVisored(data) && VisoredLogic.enabled())) {
                     startCero(player, data, now);
                 }
             }
@@ -143,7 +146,7 @@ public final class DevourEvents {
         }
     }
 
-    /** Starts a Cero for a Hollow or an Arrancar, telling a refusal on the action bar. */
+    /** Starts a Cero for a Hollow, an Arrancar or a Visored, telling a refusal on the action bar. */
     private static void startCero(ServerPlayer player, SoulData data, long now) {
         HollowCero.Refusal refusal = HollowCero.start(player, data, now);
         if (refusal != null) {

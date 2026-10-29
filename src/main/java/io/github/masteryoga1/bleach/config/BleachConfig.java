@@ -673,6 +673,12 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue VISORED_MASK_REIATSU_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue VISORED_MASK_SHATTER_HEALTH_SHARE;
 
+    public static final ModConfigSpec.IntValue VISORED_CERO_AFTER_MINUTES_WORN;
+    public static final ModConfigSpec.DoubleValue VISORED_CERO_DAMAGE_SHARE;
+    public static final ModConfigSpec.DoubleValue VISORED_CERO_COST_SHARE;
+    public static final ModConfigSpec.DoubleValue VISORED_CERO_RADIUS;
+    public static final ModConfigSpec.DoubleValue VISORED_BLACK_GETSUGA_MULTIPLIER;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -2668,6 +2674,26 @@ public final class BleachConfig {
         VISORED_MASK_SHATTER_HEALTH_SHARE = builder
                 .comment("Share of maximum health lost to blows in one wearing that shatters it; half of it cracks it.")
                 .defineInRange("shatter_health_share", 0.30, 0.05, 10.0);
+        builder.pop();
+
+        builder.push("arts");
+        VISORED_CERO_AFTER_MINUTES_WORN = builder
+                .comment("Minutes of masks worn, in all, before a masked Visored can fire a Cero. 0 gives it with the first"
+                        + " mask.")
+                .defineInRange("cero_after_minutes_worn", 10, 0, 1_440);
+        VISORED_CERO_DAMAGE_SHARE = builder
+                .comment("The masked Cero's damage, as a share of a Gillian player's Cero at the same maximum reiryoku.")
+                .defineInRange("cero_damage_share", 0.8, 0.0, 5.0);
+        VISORED_CERO_COST_SHARE = builder
+                .comment("Share of maximum reiryoku it costs when it fires, never less than [hollow_evolution]"
+                        + " cero_min_cost.")
+                .defineInRange("cero_cost_share", 0.15, 0.0, 1.0);
+        VISORED_CERO_RADIUS = builder
+                .comment("Its half-width in blocks. Its blast, the blocks it breaks and its push grow with it.")
+                .defineInRange("cero_radius", 2.0, 0.1, 8.0);
+        VISORED_BLACK_GETSUGA_MULTIPLIER = builder
+                .comment("Damage multiplier of a Getsuga Tenshō loosed with the mask on: the black one.")
+                .defineInRange("black_getsuga_multiplier", 1.5, 1.0, 5.0);
         builder.pop();
         builder.pop();
 

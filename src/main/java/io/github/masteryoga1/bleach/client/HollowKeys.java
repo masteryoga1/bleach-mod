@@ -11,6 +11,7 @@ import io.github.masteryoga1.bleach.soul.MenosBody;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -31,13 +32,14 @@ import org.lwjgl.glfw.GLFW;
  * holds it to gnaw at its own Chain of Fate; pressed while sneaking, it turns a Hollow's sight on or off
  * instead. The press goes to the server with the creature under the crosshair, and letting go (or a
  * screen opening, or dying) goes after it, so a hold lasts as long as the key does. Cero (Y): a Hollow
- * or an Arrancar holds it to gather a Cero at its mouth and lets go to fire it, and an Arrancar that sneaks as
- * it presses the key gathers a Gran Rey Cero instead; a screen opening, dying or no longer being a Hollow or an
- * Arrancar while it is held lets the beam fizzle instead. The server decides everything and says why when it
- * refuses (a plain Hollow is told only a Menos can gather one); this only sends the presses, and keeps a guess
- * at the hold and the gathering Cero for the HUD. Nothing is sent for the Devour key but a Hollow's, a Plus's
- * or an Arrancar's (an Arrancar no longer devours: held still, its Devour key sends out Pesquisa), and nothing
- * for the Cero key but a Hollow's or an Arrancar's.
+ * or an Arrancar holds it to gather a Cero at its mouth and lets go to fire it, and a Visored holds it with its
+ * mask on to gather one at its face; an Arrancar that sneaks as it presses the key gathers a Gran Rey Cero
+ * instead. A screen opening, dying or no longer being a Hollow, an Arrancar or a Visored while it is held lets the
+ * beam fizzle instead. The server decides everything and says why when it refuses (a plain Hollow is told only a
+ * Menos can gather one); this only sends the presses, and keeps a guess at the hold and the gathering Cero for the
+ * HUD. Nothing is sent for the Devour key but a Hollow's, a Plus's or an Arrancar's (an Arrancar no longer devours:
+ * held still, its Devour key sends out Pesquisa), and nothing for the Cero key but a Hollow's, an Arrancar's or a
+ * Visored's (the server tells a Visored without its mask, or without the training, why).
  *
  * <p>It also keeps the souls an Arrancar's last Pesquisa felt, which this client outlines through walls for a
  * few seconds (see {@link #marked}), and tells {@link MenosBody} how tall the giants this client sees stand,
@@ -151,14 +153,15 @@ public final class HollowKeys {
 
     /**
      * The Cero key: down sends the start, and up the release, which fires it; a screen opening, dying or no
-     * longer being a Hollow or an Arrancar cancels it. A tap is let go before anything has gathered, so it
-     * fizzles. An Arrancar sneaking as the key goes down starts a Gran Rey Cero instead, which is let go and
-     * cancelled the same way. While the key is held, this looks for the player's own gathering beam, a Cero
-     * or a Gran Rey Cero, so the HUD and the model can show it.
+     * longer being a Hollow, an Arrancar or a Visored cancels it. A tap is let go before anything has gathered, so
+     * it fizzles. A Visored's press is sent masked or not, so the server can tell it what it lacks; the mask
+     * coming off mid-gather is the server's to settle. An Arrancar sneaking as the key goes down starts a Gran Rey
+     * Cero instead, which is let go and cancelled the same way. While the key is held, this looks for the player's
+     * own gathering beam, a Cero or a Gran Rey Cero, so the HUD and the model can show it.
      */
     private static void tickCero(Minecraft minecraft, LocalPlayer player, SoulData data, boolean down, boolean rising) {
-        boolean hollow = data.isInitialized() && (data.state() == SoulState.HOLLOW || data.state() == SoulState.ARRANCAR)
-                && !player.isSpectator();
+        boolean hollow = data.isInitialized() && (data.state() == SoulState.HOLLOW || data.state() == SoulState.ARRANCAR
+                || VisoredLogic.isVisored(data) && VisoredLogic.enabled()) && !player.isSpectator();
         // A screen opening releases every key, so check for one before taking the key's release as a shot.
         if (ceroHolding && (minecraft.screen != null || !player.isAlive() || !hollow)) {
             BleachNetwork.requestHollowKey(HollowKey.CERO_CANCEL, -1);

@@ -69,6 +69,8 @@ public final class ShikaiEvents {
     private static final int TITLE_FADE_IN = 10;
     private static final int TITLE_STAY = 50;
     private static final int TITLE_FADE_OUT = 20;
+    /** The black Getsuga Tenshō is heard a little lower than the pale one. */
+    private static final float BLACK_FIRE_PITCH = 0.85F;
 
     /** What came of asking to release or seal. Every one but {@link #RELEASED} is told to the player. */
     public enum Result {
@@ -325,7 +327,8 @@ public final class ShikaiEvents {
         if (ZanpakutoLogic.affordableCharge(data, 0.0F) < 0.0F) {
             return GatherResult.TOO_WEAK;
         }
-        if (data.isGathering()) {
+        // One art at a time: a Cero gathering at the mask holds the soul's reiatsu as a Getsuga Tenshō would.
+        if (data.isGathering() || HollowCero.charging(data)) {
             return GatherResult.ALREADY_GATHERING;
         }
         data.gatherStartedAt = now;
@@ -335,7 +338,9 @@ public final class ShikaiEvents {
 
     /**
      * Swings the gathered reiatsu out as a Getsuga Tenshō, as strong as the gathering and the soul's
-     * reiryoku allow. Null, firing nothing, if nothing was gathering or the blade can no longer do it.
+     * reiryoku allow. Behind a Visored's mask it is the black crescent, half again as strong, decided as the
+     * blade swings ({@link VisoredLogic#blackGetsuga}). Null, firing nothing, if nothing was gathering or the
+     * blade can no longer do it.
      */
     @Nullable
     public static GetsugaTensho fire(Player player) {
@@ -361,11 +366,14 @@ public final class ShikaiEvents {
         player.swing(InteractionHand.MAIN_HAND, true);
         Vec3 look = player.getLookAngle();
         Vec3 root = player.getEyePosition().subtract(0.0, 0.4, 0.0);
+        // Read as the blade swings, so a mask that came off mid-gather gives a pale one; getsugaDamage reads it too.
+        boolean black = VisoredLogic.blackGetsuga(data);
         GetsugaTensho crescent = GetsugaTensho.launch(player.level(), player, root, look, charge,
                 ZanpakutoLogic.getsugaDamage(data, charge),
                 GetsugaTensho.lifeTicksFor(BleachConfig.get(BleachConfig.GETSUGA_RANGE)),
-                stack.copy(), ZanpakutoItem.blade(stack).colour());
-        SpiritSenses.play(player, ModSounds.GETSUGA_FIRE.get(), SoundSource.PLAYERS, 1.0F, 1.0F, false);
+                stack.copy(), (ZanpakutoItem.blade(stack).colour() & 0xFFFFFF) | (black ? GetsugaTensho.BLACK : 0));
+        SpiritSenses.play(player, ModSounds.GETSUGA_FIRE.get(), SoundSource.PLAYERS, 1.0F,
+                black ? BLACK_FIRE_PITCH : 1.0F, false);
         data.lastGetsugaAt = now;
         noteGetsugaFired(player, data, charge);
         return crescent;

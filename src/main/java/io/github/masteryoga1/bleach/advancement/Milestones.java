@@ -173,6 +173,8 @@ public final class Milestones {
     public static final String HOLLOWFIED = "hollowfied";
     /** Beat its inner Hollow and became a Visored. */
     public static final String VISORED = "visored";
+    /** Put its beaten Hollow's mask on for the first time: Hollowfication as the Visored mean it (Ch. 253). */
+    public static final String MASKED = "masked";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;
@@ -256,6 +258,10 @@ public final class Milestones {
         }
         if (visored.subdued()) {
             trigger.trigger(player, VISORED);
+        }
+        // Stamped by the first mask put on and by every ending, so a mask worn before this check, or by command, counts.
+        if (visored.subdued() && visored.maskChangedAt() != ShinigamiProgress.NEVER) {
+            trigger.trigger(player, MASKED);
         }
         // Read from the record, so a soul taught or met by command counts too.
         QuincyTeaching teaching = data.quincy().teaching();

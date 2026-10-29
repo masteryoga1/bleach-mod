@@ -26,6 +26,13 @@ import net.minecraft.world.entity.player.Player;
  * ({@link CeroBeam#mayStrike}). It cannot begin while the soul is held in a Negación light, nor while an
  * Arrancar's {@link GranReyCero} gathers, as only one beam gathers at a time.
  *
+ * <p>A Visored gathers one too, with its mask on, once its masks have been worn long enough
+ * ({@link VisoredLogic#maskedCero}). It gathers, reaches and waits as a Gillian player's does, but it is crimson,
+ * wider, weaker and dearer ({@link #spec}, {@link #damage}, {@link #cost}). It reads as a Gillian to this alone; to
+ * every other rule it stays a Shinigami. It cannot begin while a Getsuga Tenshō gathers or the soul sits in Jinzen,
+ * and it fizzles, for free, when the mask comes off, crumbles, shatters or cracks fresh, or when Jinzen begins. A
+ * Visored without the mask or the training is told which it lacks.
+ *
  * <p>The beam and the times live in the soul as transients, so nothing about a Cero is saved.
  */
 public final class HollowCero {
@@ -40,7 +47,11 @@ public final class HollowCero {
         /** Paying for it would leave less than the reserve. */
         TOO_WEAK,
         /** Held in a Negación light, which lets the soul touch nothing (see {@link Negacion#held}). */
-        HELD;
+        HELD,
+        /** A Visored whose masks have not yet been worn long enough in all ({@link VisoredLogic#ceroUnlocked}). */
+        UNTRAINED,
+        /** A Visored whose masks have been worn long enough, with no mask on. */
+        UNMASKED;
 
         /** {@code message.bleach.cero.<name>}. */
         public String messageKey() {
@@ -52,14 +63,16 @@ public final class HollowCero {
     public static final double BLAST_PER_RADIUS = 1.8, BLOCKS_PER_RADIUS = 10.0, KNOCKBACK_PER_RADIUS = 0.8;
     /** The message of a Cero let go too soon. */
     public static final String FIZZLED = "message.bleach.cero.fizzled";
+    /** A masked Visored's Cero: crimson, as Shinji's and Hiyori's are (Ch. 236, 366), a shade from a Menos's red. */
+    public static final int VISORED_CRIMSON = 0xDC143C;
 
     private HollowCero() {
     }
 
     /**
      * Starts gathering a Cero at the mouth, the first check that fails winning. A second press while one
-     * gathers does nothing, and so does one while a Gran Rey Cero gathers; nothing is told when the world
-     * will not have the Cero (a dead player, or no server level).
+     * gathers does nothing, and so does one while a Gran Rey Cero or a Getsuga Tenshō gathers or the soul sits
+     * in Jinzen; nothing is told when the world will not have the Cero (a dead player, or no server level).
      *
      * @return the refusal, or null when it began (or was already gathering)
      */
@@ -79,9 +92,13 @@ public final class HollowCero {
         if (GranReyCero.charging(data)) {
             return null;
         }
+        // One art at a time: a Getsuga Tenshō gathering in the blade, or a soul sitting in Jinzen, calls out no Cero.
+        if (data.isGathering() || data.jinzen() != null) {
+            return null;
+        }
         HollowTier tier = ArrancarLogic.ceroForm(data);
         if (!tier.isMenos()) {
-            return Refusal.NOT_MENOS;
+            return visoredRefusal(data);
         }
         if (data.devourTargetId >= 0) {
             return Refusal.DEVOURING;
@@ -140,8 +157,8 @@ public final class HollowCero {
     }
 
     /**
-     * Lets a gathering Cero fizzle, for free: a screen opened, a devour hold began, or the soul stopped
-     * being a Hollow or an Arrancar. One that already fired is paid for instead.
+     * Lets a gathering Cero fizzle, for free: a screen opened, a devour hold began, the soul stopped being a
+     * Hollow or an Arrancar, or its mask came off. One that already fired is paid for instead.
      */
     public static void cancel(Player player, SoulData data) {
         if (!charging(data)) {
@@ -157,10 +174,11 @@ public final class HollowCero {
     }
 
     /**
-     * Each body tick of a Hollow or an Arrancar: a Cero that fired by itself is paid for and the cooldown
+     * Each body tick of a soul with a Cero gathering: a Cero that fired by itself is paid for and the cooldown
      * starts; one that has gone without firing is forgotten; and one still gathering fizzles if the mask
      * cracked fresh since it began, a devour hold is on, the soul is no longer a Menos (an Arrancar always
-     * counts as the form it rose from), the player watches as a spectator, or it is held in a Negación light.
+     * counts as the form it rose from, and a Visored as a Gillian only while {@link VisoredLogic#maskedCero}
+     * holds), it sits in Jinzen, the player watches as a spectator, or it is held in a Negación light.
      */
     public static void tick(Player player, SoulData data, long now) {
         if (!charging(data)) {
@@ -177,7 +195,7 @@ public final class HollowCero {
             return;
         }
         // Stamped only by a fresh crack, and strictly after the start, so a crack in the start's own tick came first.
-        if (!ArrancarLogic.ceroForm(data).isMenos() || data.devourTargetId >= 0
+        if (!ArrancarLogic.ceroForm(data).isMenos() || data.devourTargetId >= 0 || data.jinzen() != null
                 || data.hollowFreshCrackAt > data.ceroStartedAt || player.isSpectator() || Negacion.held(player)) {
             beam.cancel();
             clear(data);
@@ -191,23 +209,32 @@ public final class HollowCero {
 
     /**
      * The Cero this form gathers at full strength: the form's damage, width and gather time, and a blast,
-     * blocks and knockback that grow with the width, in a Menos's red. It never locks its aim early.
+     * blocks and knockback that grow with the width, in a Menos's red. A Visored's is {@code [visored.arts]}
+     * {@code cero_radius} wide and {@link #VISORED_CRIMSON}. It never locks its aim early.
      */
     public static CeroBeam.Spec spec(SoulData data, HollowTier tier) {
-        float radius = (float) BleachConfig.get(form(tier).ceroRadius());
+        // Keyed by the Visored, not the mask, so a Cero that fires or is paid for as the mask ends keeps its numbers.
+        boolean visored = VisoredLogic.isVisored(data);
+        float radius = (float) (visored ? BleachConfig.get(BleachConfig.VISORED_CERO_RADIUS)
+                : BleachConfig.get(form(tier).ceroRadius()));
         return new CeroBeam.Spec(damage(data, tier), BleachConfig.get(BleachConfig.CERO_RANGE), radius,
                 (float) (radius * BLAST_PER_RADIUS), (float) BleachConfig.get(BleachConfig.CERO_BLAST_SHARE),
-                (int) Math.round(radius * BLOCKS_PER_RADIUS), (float) (radius * KNOCKBACK_PER_RADIUS), CeroBeam.MENOS_RED,
-                chargeTicks(tier), 0, BleachConfig.get(BleachConfig.CERO_BREAKS_BLOCKS));
+                (int) Math.round(radius * BLOCKS_PER_RADIUS), (float) (radius * KNOCKBACK_PER_RADIUS),
+                visored ? VISORED_CRIMSON : CeroBeam.MENOS_RED, chargeTicks(tier), 0,
+                BleachConfig.get(BleachConfig.CERO_BREAKS_BLOCKS));
     }
 
     /**
      * A fully gathered Cero's damage: the form's own, and more for each square root of maximum reiryoku,
      * up to {@link BleachConfig#CERO_MAX_DAMAGE}; then, for an Arrancar in Resurrección, the release's
      * multiplier, so a released Cero is the one that can pass the cap. The Hollow mobs' damage multiplier
-     * is a mob setting and does not reach it.
+     * is a mob setting and does not reach it. A Visored's is {@code [visored.arts] cero_damage_share} of a
+     * Gillian player's at the same maximum reiryoku, whatever the tier asked for.
      */
     public static float damage(SoulData data, HollowTier tier) {
+        if (VisoredLogic.isVisored(data)) {
+            return (float) (baseDamage(data, HollowTier.GILLIAN) * BleachConfig.get(BleachConfig.VISORED_CERO_DAMAGE_SHARE));
+        }
         return (float) (baseDamage(data, tier) * ArrancarLogic.ceroMultiplier(data));
     }
 
@@ -222,10 +249,14 @@ public final class HollowCero {
         return Math.min(BleachConfig.get(BleachConfig.CERO_MAX_DAMAGE), damage);
     }
 
-    /** The reiryoku a Cero costs when it fires: a share of the maximum, but never less than the least cost. */
+    /**
+     * The reiryoku a Cero costs when it fires: a share of the maximum ({@code [visored.arts] cero_cost_share} for a
+     * Visored's), but never less than the least cost.
+     */
     public static float cost(SoulData data) {
-        return (float) Math.max(BleachConfig.get(BleachConfig.CERO_MIN_COST),
-                BleachConfig.get(BleachConfig.CERO_COST_FRACTION) * data.maxReiryoku());
+        double share = VisoredLogic.isVisored(data) ? BleachConfig.get(BleachConfig.VISORED_CERO_COST_SHARE)
+                : BleachConfig.get(BleachConfig.CERO_COST_FRACTION);
+        return (float) Math.max(BleachConfig.get(BleachConfig.CERO_MIN_COST), share * data.maxReiryoku());
     }
 
     /** The ticks this form's Cero takes to gather fully. */
@@ -237,6 +268,17 @@ public final class HollowCero {
     @Nullable
     private static CeroBeam beam(Player player, SoulData data) {
         return player.level().getEntity(data.ceroBeamId) instanceof CeroBeam beam && beam.owner() == player ? beam : null;
+    }
+
+    /**
+     * Why a soul whose form gathers no Cero cannot: a Visored is told what it lacks, any other soul that only a
+     * Menos can.
+     */
+    private static Refusal visoredRefusal(SoulData data) {
+        if (!VisoredLogic.isVisored(data) || !VisoredLogic.enabled()) {
+            return Refusal.NOT_MENOS;
+        }
+        return VisoredLogic.ceroUnlocked(data) ? Refusal.UNMASKED : Refusal.UNTRAINED;
     }
 
     /** A plain Hollow gathers no Cero; should one ever be asked for, it is a Gillian's. */

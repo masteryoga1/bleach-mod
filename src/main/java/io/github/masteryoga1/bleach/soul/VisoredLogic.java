@@ -16,12 +16,14 @@ import net.minecraft.world.entity.player.Player;
  * The rules of the Visored: a Shinigami with a Hollow inside. Who can take a Hollow into its wounds and what
  * wounds it, when the rooted Hollow speaks and can be faced, what the soul screen says meanwhile, how strong the
  * inner Hollow is and where its losing blow stops, and what the beaten Hollow's mask costs, how long it lasts and
- * grows, what it gives and how long the next one waits. A Visored is a soul with Shinigami power whose Hollow is
- * beaten ({@link #isVisored}); there is no Visored state and no Hollow tier, so to every other rule it is a
- * Shinigami, masked or not. Like {@link ArrancarLogic}, these read only their arguments and the config, send
- * nothing and are safe on both sides, so game tests and the client can call them directly; the one write is
- * {@link #setRecord}. What they do to a player, the fight itself and the mask's upkeep are in
- * {@link VisoredEvents}, and the Hollow that steps out is {@link InnerHollow}. {@code now} is the level's game time.
+ * grows, what it gives and how long the next one waits. With the mask on come its two arts: the masked Cero, once
+ * masks have been worn long enough ({@link #maskedCero}), and the black Getsuga Tenshō ({@link #blackGetsuga}). A
+ * Visored is a soul with Shinigami power whose Hollow is beaten ({@link #isVisored}); there is no Visored state and
+ * no Hollow tier, so to every other rule it is a Shinigami, masked or not. Like {@link ArrancarLogic}, these read
+ * only their arguments and the config, send nothing and are safe on both sides, so game tests and the client can
+ * call them directly; the one write is {@link #setRecord}. What they do to a player, the fight itself and the mask's
+ * upkeep are in {@link VisoredEvents}, and the Hollow that steps out is {@link InnerHollow}. {@code now} is the
+ * level's game time.
  */
 public final class VisoredLogic {
     /** Blocks from its host at which the inner Hollow steps out. */
@@ -440,6 +442,39 @@ public final class VisoredLogic {
     /** The share held between 0 and 1. */
     private static float clampShare(double share) {
         return (float) Math.max(0.0, Math.min(1.0, share));
+    }
+
+    // ---- The masked arts ----
+
+    /** Ticks of masks worn, in all, before the mask's Cero answers: {@code cero_after_minutes_worn} minutes. */
+    public static long ceroUnlockTicks() {
+        return BleachConfig.get(BleachConfig.VISORED_CERO_AFTER_MINUTES_WORN) * TICKS_PER_MINUTE;
+    }
+
+    /**
+     * Whether the soul's masks have been worn long enough for the masked Cero, read from the saved record alone: the
+     * wearing on now counts once it ends, as it does for the mask's own growth.
+     */
+    public static boolean ceroUnlocked(SoulData data) {
+        return record(data).maskTrainedTicks() >= ceroUnlockTicks();
+    }
+
+    /**
+     * Whether this soul gathers the masked Cero now: its mask on, a Visored, the path on and its masks worn long
+     * enough. Client-safe (the record and the server's synced config); reads the config only while masked.
+     */
+    public static boolean maskedCero(SoulData data) {
+        return isMasked(data) && isVisored(data) && enabled() && ceroUnlocked(data);
+    }
+
+    /** Whether a Getsuga Tenshō loosed now is the black one: its mask on, a Visored and the path on. */
+    public static boolean blackGetsuga(SoulData data) {
+        return isMasked(data) && isVisored(data) && enabled();
+    }
+
+    /** What the mask multiplies a Getsuga Tenshō's damage by: {@code black_getsuga_multiplier} for the black one, else 1. */
+    public static float getsugaFactor(SoulData data) {
+        return blackGetsuga(data) ? (float) BleachConfig.get(BleachConfig.VISORED_BLACK_GETSUGA_MULTIPLIER) : 1.0F;
     }
 
     /** Whole seconds from {@code now} until {@code at}, rounded up, and never below 0: for the fight's bar. */

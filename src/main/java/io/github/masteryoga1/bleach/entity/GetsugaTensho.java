@@ -53,6 +53,8 @@ public class GetsugaTensho extends Projectile {
     public static final float SPEED = 1.6F;
     /** How far in front of where the swing starts the crescent appears, in blocks. */
     public static final double SWING_REACH = 1.0;
+    /** The colour bit that makes a crescent the black one with a red edge, above the 24 bits of the blade's colour. */
+    public static final int BLACK = 1 << 24;
 
     private static final EntityDataAccessor<Float> DATA_CHARGE =
             SynchedEntityData.defineId(GetsugaTensho.class, EntityDataSerializers.FLOAT);
@@ -95,7 +97,8 @@ public class GetsugaTensho extends Projectile {
      * wielder, just below the eyes), and adds it to the level: it appears {@link #SWING_REACH} on, and
      * never touches anything wholly behind {@code root}. The charge, from 0 to 1, sets how wide it is
      * and how many creatures it cuts through; the damage and life (in ticks) are the caller's, so a
-     * test can pin them. {@code blade} is the zanpakutō it came from, copied, and {@code colour} tints it.
+     * test can pin them. {@code blade} is the zanpakutō it came from, copied, and {@code colour} tints it; with
+     * {@link #BLACK} it is the black crescent with a red edge.
      */
     public static GetsugaTensho launch(Level level, @Nullable LivingEntity owner, Vec3 root, Vec3 direction,
                                        float charge, float damage, int lifeTicks, ItemStack blade, int colour) {
@@ -198,9 +201,14 @@ public class GetsugaTensho extends Projectile {
         return entityData.get(DATA_CHARGE);
     }
 
-    /** The blade's colour, which tints the crescent. */
+    /** The blade's colour, which tints the crescent: its low 24 bits; the {@link #BLACK} bit above them. */
     public int colour() {
         return entityData.get(DATA_COLOUR);
+    }
+
+    /** Whether this is the black crescent with a red edge: a masked Visored's. */
+    public boolean isBlack() {
+        return (colour() & BLACK) != 0;
     }
 
     /** How many ticks the crescent flies for. */

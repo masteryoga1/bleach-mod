@@ -167,9 +167,10 @@ public final class HollowBody {
      * tick if the mask came away; then, alive, under survival's rules and while the game runs, the armour is
      * shed, the hunger drains (or refills on Peaceful), the bands are told, the body regenerates or starves,
      * and a hungry Hollow smells for souls. An Arrancar has its own tick instead (see
-     * {@link ArrancarEvents#tick}). Any other soul gets its body back, any Cero it was gathering fizzles and
-     * any tear is let go of; a Gran Rey Cero fizzles on any soul but an Arrancar. Every soul's place among the
-     * Vasto Lorde, and its Arrancar body and blades, are kept right every second.
+     * {@link ArrancarEvents#tick}). Any other soul gets its body back, any Cero it was gathering fizzles (but a
+     * masked Visored's, which goes on) and any tear is let go of; a Gran Rey Cero fizzles on any soul but an
+     * Arrancar. Every soul's place among the Vasto Lorde, and its Arrancar body and blades, are kept right every
+     * second.
      */
     public static void tickBody(Player player, SoulData data, long now) {
         if (player.tickCount % VASTO_NOTE_INTERVAL_TICKS == 0) {
@@ -189,7 +190,8 @@ public final class HollowBody {
             // A command, a purification or any other road out of the Hollow state lets go of the mask.
             ArrancarEvents.clearTear(data);
             if (HollowCero.charging(data)) {
-                HollowCero.cancel(player, data);
+                // Settled as a Hollow's is: a masked Visored's keeps gathering, any other soul's fizzles (HollowCero#tick).
+                HollowCero.tick(player, data, now);
             }
             leaveBodyIfWorn(player, data);
             return;

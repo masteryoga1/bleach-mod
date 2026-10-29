@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:visored",
+  "display": {
+    "icon": {
+      "id": "minecraft:bone_block"
+    },
+    "title": {
+      "translate": "advancements.bleach.masked.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.masked.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "masked": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "masked"
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
@@ -840,8 +841,9 @@ public final class QuincyEvents {
     }
 
     /**
-     * Fires only for hits that got past shields and invulnerability frames: a Hollow's blow poisons a
-     * Quincy. Being devoured does not: the blow that swallows a soul would only pour poison into the dying.
+     * Fires only for hits that got past shields and invulnerability frames: a Hollow's blow, or a Visored's Cero,
+     * poisons a Quincy ({@link #poisons}). Being devoured does not: the blow that swallows a soul would only pour
+     * poison into the dying.
      */
     private static void onDamageTaken(LivingDamageEvent.Post event) {
         if (event.getNewDamage() <= 0.0F || !(event.getEntity() instanceof Player player) || player.level().isClientSide()
@@ -849,12 +851,23 @@ public final class QuincyEvents {
             return;
         }
         Entity cause = event.getSource().getEntity();
-        if (cause == player || !QuincyLogic.isHollowSource(cause) || DevourLogic.isDevoured(event.getSource())) {
+        if (cause == player || !poisons(event.getSource()) || DevourLogic.isDevoured(event.getSource())) {
             return;
         }
         SoulData data = SoulLogic.get(player);
         boolean onHit = cause instanceof Hollow hollow && hollow.kind().onHit != null;
         addPoison(player, data, QuincyLogic.poisonFrom(data, event.getNewDamage(), onHit, player.level().getDifficulty()));
+    }
+
+    /**
+     * Whether this hit carries Hollow reiatsu into a Quincy: a blow, bite or beam from a Hollow source
+     * ({@link QuincyLogic#isHollowSource}), or a Cero whose shooter is a Visored, which only a masked one can fire. A
+     * masked Visored's melee and aura are a Shinigami's, and do not poison.
+     */
+    private static boolean poisons(DamageSource source) {
+        Entity cause = source.getEntity();
+        return QuincyLogic.isHollowSource(cause) || source.is(CeroBeam.DAMAGE) && cause instanceof Player shooter
+                && SoulLogic.hasSoul(shooter) && VisoredLogic.isVisored(SoulLogic.get(shooter));
     }
 
     // ---- Telling the player ----

@@ -37,11 +37,12 @@ import net.minecraft.world.item.ItemStack;
  * offhand slot or the hotbar attack indicator is on that side. It gets a white outline while
  * reiatsu is released, and a wider one in the blade's colour while the player holds their own
  * released zanpakutō, with a small bar above it that fills while a technique gathers. A Hollow from
- * Gillian up gets the same bar in a Menos's red while it gathers a Cero, white once full. A Plus gets a
- * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in, and is
- * outlined red while the Plus gnaws at it with the Devour key. A Hollow gets a soul hunger gauge in
- * the chain's place: bone while fed, amber while ravenous, and empty with a flashing red outline
- * while starving, with a bar above it that fills while the Devour key is held on prey. A Visored gets a
+ * Gillian up, and a masked Visored, gets the same bar in a Menos's red while it gathers a Cero,
+ * white once full, in the technique's place. A Plus gets a second gauge beside it for the Chain of
+ * Fate, which turns red once Encroachment sets in, and is outlined red while the Plus gnaws at it
+ * with the Devour key. A Hollow gets a soul hunger gauge in the chain's place: bone while fed,
+ * amber while ravenous, and empty with a flashing red outline while starving, with a bar above it
+ * that fills while the Devour key is held on prey. A Visored gets a
  * mask gauge there: white in a red outline, emptying while its Hollow mask is on; grey, filling while the
  * next cannot be called; and bone once it can. A Quincy gets a reishi gauge beside the reiryoku bar
  * instead (or beyond the chain, hunger or mask gauge), outlined blue
@@ -149,18 +150,20 @@ public final class ReiryokuHud {
         ItemStack held = player.getMainHandItem();
         ZanpakutoBlade blade = ZanpakutoItem.blade(held);
         boolean shikaiRings = blade.released() && ZanpakutoLogic.isOwnBlade(held, player);
+        // The gather bar's one place holds a Cero (a Hollow's, an Arrancar's or a masked Visored's) or a Getsuga
+        // Tenshō. The server gathers one at a time, but the Getsuga's bar is this client's guess from the key, so a
+        // Cero's, which only the server's own beam starts, hides it.
+        float cero = HollowKeys.ceroProgress(deltaTracker.getGameTimeDeltaPartialTick(false));
         if (shikaiRings) {
             int colour = 0xFF000000 | blade.colour();
             for (int ring = 2; ring < 2 + SHIKAI_OUTLINE; ring++) {
                 graphics.renderOutline(x - ring, y - ring, WIDTH + 2 * ring, HEIGHT + 2 * ring, colour);
             }
-            float gather = ZanpakutoKeys.gatherProgress(deltaTracker.getGameTimeDeltaPartialTick(false));
+            float gather = cero > 0.0F ? 0.0F : ZanpakutoKeys.gatherProgress(deltaTracker.getGameTimeDeltaPartialTick(false));
             if (gather > 0.0F) {
                 drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, gather, gather >= 1.0F ? GATHER_FULL : colour);
             }
         }
-        // A Hollow never holds a released zanpakutō of its own, so the gather bar's place is free for its Cero.
-        float cero = HollowKeys.ceroProgress(deltaTracker.getGameTimeDeltaPartialTick(false));
         if (cero > 0.0F) {
             drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, cero, cero >= 1.0F ? GATHER_FULL : CERO_FILL);
         }

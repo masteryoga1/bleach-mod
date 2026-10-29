@@ -87,9 +87,16 @@ public final class ArrancarLogic {
         return origin == HollowTier.GILLIAN ? HollowTier.HOLLOW : origin;
     }
 
-    /** The form whose Cero this soul gathers: an Arrancar's origin, or a Hollow's own form. */
+    /**
+     * The form whose Cero this soul gathers: an Arrancar's origin, a Hollow's own form, and a masked Visored with the
+     * training, a Gillian.
+     */
     public static HollowTier ceroForm(SoulData data) {
-        return isArrancar(data) ? origin(data) : HollowTier.of(data);
+        if (isArrancar(data)) {
+            return origin(data);
+        }
+        // A masked Visored whose masks have been worn long enough gathers a Gillian's Cero (see VisoredLogic#maskedCero).
+        return VisoredLogic.maskedCero(data) ? HollowTier.GILLIAN : HollowTier.of(data);
     }
 
     // ---- Numbers by origin ----
