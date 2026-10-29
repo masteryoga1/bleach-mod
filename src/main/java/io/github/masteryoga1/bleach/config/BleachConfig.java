@@ -660,6 +660,19 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue INNER_HOLLOW_MEND_PER_SECOND;
     public static final ModConfigSpec.DoubleValue INNER_HOLLOW_LOSS_HEALTH;
 
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_COST_SHARE;
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_MIN_COST;
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_DRAIN_SHARE_PER_SECOND;
+    public static final ModConfigSpec.IntValue VISORED_MASK_BASE_SECONDS;
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_SECONDS_PER_MINUTE_WORN;
+    public static final ModConfigSpec.IntValue VISORED_MASK_MAX_SECONDS;
+    public static final ModConfigSpec.IntValue VISORED_MASK_MIN_WAIT_SECONDS;
+    public static final ModConfigSpec.IntValue VISORED_MASK_CRUMBLE_WAIT_SECONDS;
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_SPEED_BONUS;
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_REIATSU_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue VISORED_MASK_SHATTER_HEALTH_SHARE;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -1052,7 +1065,8 @@ public final class BleachConfig {
                 .comment("Extra blocks a Hollow player can fall unharmed.")
                 .defineInRange("safe_fall_extra", 3.0, 0.0, 64.0);
         VILLAGERS_TRADE_WITH_HOLLOWS = builder
-                .comment("Whether villagers and wandering traders trade with Hollow and Arrancar players.")
+                .comment("Whether villagers and wandering traders trade with Hollow and Arrancar players, and masked"
+                        + " Visored.")
                 .define("villagers_trade", false);
         DEVOUR_HOLD_TICKS = builder
                 .comment("Ticks the Devour key must be held on a Hollow or a player.")
@@ -2551,8 +2565,9 @@ public final class BleachConfig {
         builder.push("visored");
         VISORED_ENABLED = builder
                 .comment("Whether souls can take a Hollow in and face it at all. Off: no wound counts, the Hollow stays"
-                        + " silent, the soul screen says nothing of it and no fight starts (one under way breaks off),"
-                        + " but every soul keeps its Hollow for when it is turned on again.")
+                        + " silent, the soul screen says nothing of it, no fight starts (one under way breaks off) and no"
+                        + " mask goes on (one that is on comes off), but every soul keeps its Hollow for when it is"
+                        + " turned on again.")
                 .define("enabled", true);
         builder.push("hollowfication");
         VISORED_MIN_MAX_REIRYOKU = builder
@@ -2613,6 +2628,46 @@ public final class BleachConfig {
                 .comment("The host's health at which the inner Hollow's last blow stops and the fight is lost, so a loss"
                         + " never kills: 2 is one heart.")
                 .defineInRange("loss_health", 2.0, 1.0, 20.0);
+        builder.pop();
+
+        builder.push("mask");
+        VISORED_MASK_COST_SHARE = builder
+                .comment("Share of maximum reiryoku paid to call the mask.")
+                .defineInRange("cost_share", 0.10, 0.0, 1.0);
+        VISORED_MASK_MIN_COST = builder
+                .comment("The least it costs to call.")
+                .defineInRange("min_cost", 10.0, 0.0, 1_000.0);
+        VISORED_MASK_DRAIN_SHARE_PER_SECOND = builder
+                .comment("Share of maximum reiryoku drained each second it is on, less with Reiatsu Control as Shikai's"
+                        + " is.")
+                .defineInRange("drain_share_per_second", 0.004, 0.0, 0.1);
+        VISORED_MASK_BASE_SECONDS = builder
+                .comment("How long a first mask lasts.")
+                .defineInRange("base_seconds", 11, 1, 3_600);
+        VISORED_MASK_SECONDS_PER_MINUTE_WORN = builder
+                .comment("Seconds a mask gains for every minute masks have been worn.")
+                .defineInRange("seconds_per_minute_worn", 3.0, 0.0, 600.0);
+        VISORED_MASK_MAX_SECONDS = builder
+                .comment("The longest a mask lasts. The top of the range is Mashiro's 15 hours.")
+                .defineInRange("max_seconds", 180, 1, 54_000);
+        VISORED_MASK_MIN_WAIT_SECONDS = builder
+                .comment("The least wait after taking it off. The wait is otherwise as long as it was worn.")
+                .defineInRange("min_wait_seconds", 3, 0, 600);
+        VISORED_MASK_CRUMBLE_WAIT_SECONDS = builder
+                .comment("The least wait after it crumbles, runs dry or shatters.")
+                .defineInRange("crumble_wait_seconds", 60, 0, 3_600);
+        VISORED_MASK_SPEED_BONUS = builder
+                .comment("Movement speed added, as a share of base speed.")
+                .defineInRange("speed_bonus", 0.25, 0.0, 2.0);
+        VISORED_MASK_DAMAGE_MULTIPLIER = builder
+                .comment("Melee damage multiplier.")
+                .defineInRange("damage_multiplier", 1.5, 1.0, 5.0);
+        VISORED_MASK_REIATSU_MULTIPLIER = builder
+                .comment("Reiatsu multiplier, for the reiatsu difference and every sense of it.")
+                .defineInRange("reiatsu_multiplier", 1.5, 1.0, 10.0);
+        VISORED_MASK_SHATTER_HEALTH_SHARE = builder
+                .comment("Share of maximum health lost to blows in one wearing that shatters it; half of it cracks it.")
+                .defineInRange("shatter_health_share", 0.30, 0.05, 10.0);
         builder.pop();
         builder.pop();
 

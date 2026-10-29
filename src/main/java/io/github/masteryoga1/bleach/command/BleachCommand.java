@@ -141,7 +141,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach zanpakuto &lt;players&gt; name    (as if the spirit's test was passed)
  * /bleach zanpakuto &lt;players&gt; seal    (a constant release can be released for the first time again)
  * /bleach zanpakuto &lt;players&gt; reset
- * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|reset&gt;   (duel starts a fight here, rooting as needed)
+ * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|mask|unmask|reset&gt;   (duel fights here, rooting as needed)
+ * /bleach visored &lt;players&gt; train &lt;0..86400&gt;   (seconds the mask has been worn)
  * /bleach quincy &lt;players&gt; bloodline &lt;none|gemischt|echt&gt;   (as if chosen, with no word and no Cross)
  * /bleach quincy &lt;players&gt; training &lt;0..100000&gt;   (raises the tier to match, never lowers it)
  * /bleach quincy &lt;players&gt; reishi &lt;amount&gt;   (up to the soul's maximum)
@@ -166,6 +167,8 @@ public final class BleachCommand {
     private static final int MAX_TRAINING = 100000;
     /** The most souls devoured the command sets. */
     private static final int MAX_SOULS = 100000;
+    /** The most seconds of mask time {@code /bleach visored … train} sets: a day, all of it counted. */
+    private static final int MAX_TRAIN_SECONDS = 86_400;
     /** The {@code /bleach garganta} kinds that bring Arrancar: a lone Número, or a Privaron Espada and its Fracción. */
     private static final String NUMERO = "numero";
     private static final String PRIVARON = "privaron";
@@ -314,6 +317,9 @@ public final class BleachCommand {
                                         .executes(BleachCommand::resetZanpakuto))))
                 .then(Commands.literal("visored")
                         .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.literal("train")
+                                        .then(Commands.argument("seconds", IntegerArgumentType.integer(0, MAX_TRAIN_SECONDS))
+                                                .executes(BleachCommand::visoredTrain)))
                                 .then(Commands.argument("action", StringArgumentType.word())
                                         .suggests(VISORED_ACTIONS)
                                         .executes(BleachCommand::visored))))
@@ -1331,9 +1337,11 @@ public final class BleachCommand {
 
     /**
      * Drives the road to a Visored one step at a time: {@code root} plants the Hollow now, with its signs;
-     * {@code ready} also lets it be faced now; {@code duel} starts the fight where the player stands, rooting and
-     * readying as needed, though never on Peaceful or with the path turned off; {@code subdue} makes the soul a
-     * Visored, winning a fight under way; and {@code reset} ends any fight and takes the Hollow away.
+     * {@code ready} also lets it be faced now, or a Visored call its mask again now; {@code duel} starts the fight
+     * where the player stands, rooting and readying as needed, though never on Peaceful or with the path turned off;
+     * {@code subdue} makes the soul a Visored, winning a fight under way; {@code mask} puts a Visored's mask on with
+     * no cost and no wait, and {@code unmask} takes it off; and {@code reset} ends any fight, takes any mask off and
+     * takes the Hollow away.
      */
     private static int visored(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "action");
@@ -1373,8 +1381,10 @@ public final class BleachCommand {
                     VisoredEvents.takeRoot(player, data, now);
                 }
                 ShinigamiProgress.Visored record = VisoredLogic.record(data);
-                if (action == VisoredAction.READY && !record.subdued()) {
-                    VisoredLogic.setRecord(data, record.withDuelReadyAt(now));
+                if (action == VisoredAction.READY) {
+                    // A beaten Hollow is never faced again, but its mask can be called now.
+                    VisoredLogic.setRecord(data, record.subdued() ? record.withMaskReadyAt(now)
+                            : record.withDuelReadyAt(now));
                 }
             }
             case DUEL -> {
@@ -1398,12 +1408,53 @@ public final class BleachCommand {
                     VisoredEvents.subdue(player, data, now);
                 }
             }
+            case MASK -> {
+                // The line the player would have seen; a forced mask is never HELD, WAITING or TOO_WEAK.
+                VisoredEvents.MaskStart start = VisoredEvents.putOnMask(player, data, now, true);
+                if (start != VisoredEvents.MaskStart.PUT_ON) {
+                    String key = start.messageKey();
+                    return key != null
+                            ? Component.translatable(key)
+                            : Component.literal(start.name().toLowerCase(Locale.ROOT));
+                }
+            }
+            case UNMASK -> {
+                if (!VisoredLogic.isMasked(data)) {
+                    return Component.translatable("message.bleach.visored.mask.not_worn");
+                }
+                VisoredEvents.endMask(player, data, VisoredEvents.MaskEnd.TAKEN_OFF, now);
+            }
             case RESET -> {
                 VisoredEvents.endAll(player, data, now);
                 VisoredLogic.setRecord(data, ShinigamiProgress.Visored.NONE);
             }
         }
         return null;
+    }
+
+    /**
+     * Sets how many seconds a soul's masks have been worn, which sets how long its next mask lasts; a mask on keeps
+     * its length. Refused for a soul with no Shinigami power.
+     */
+    private static int visoredTrain(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        long ticks = IntegerArgumentType.getInteger(context, "seconds") * 20L;
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            if (!ShinigamiLogic.hasShinigamiPower(data)) {
+                refuseArts(context.getSource(), player, Component.translatable("message.bleach.visored.no_power"));
+                continue;
+            }
+            VisoredLogic.setRecord(data, VisoredLogic.record(data).withMaskTrainedTicks(ticks));
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.visored.success",
+                    "train", count), true);
+        }
+        return count;
     }
 
     // ---- /bleach quincy ----
@@ -1830,7 +1881,7 @@ public final class BleachCommand {
 
     /** What {@code /bleach visored <players>} does. */
     private enum VisoredAction implements StringRepresentable {
-        ROOT, READY, DUEL, SUBDUE, RESET;
+        ROOT, READY, DUEL, SUBDUE, MASK, UNMASK, RESET;
 
         @Override
         public String getSerializedName() {

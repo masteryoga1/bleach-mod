@@ -27,8 +27,9 @@ public final class BleachNetwork {
      * 14: the Gran Rey Cero key and the Arrancar record's Gran Rey Cero wait.
      * 15: the Arrancar record's rank, and the Arrancar's number in the Hollow look.
      * 16: the Visored record in ShinigamiProgress.
+     * 17: {@code ZanpakutoKey.MASK} and the mask's four fields in the Visored record.
      */
-    private static final String VERSION = "16";
+    private static final String VERSION = "17";
 
     private BleachNetwork() {
     }

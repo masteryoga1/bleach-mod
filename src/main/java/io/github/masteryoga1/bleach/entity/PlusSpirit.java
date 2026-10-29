@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.soul.ChainEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.PlusEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
@@ -146,14 +147,13 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
         goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }
 
-    /** A player who is a Hollow or an Arrancar, whom a Plus runs from as from any Hollow. */
+    /** A player who is a Hollow, an Arrancar or a masked Visored, whom a Plus runs from as from any Hollow. */
     private static boolean isHollowPlayer(LivingEntity entity) {
         if (!(entity instanceof Player player) || !EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(player)
                 || !SoulLogic.hasSoul(player)) {
             return false;
         }
-        SoulState state = SoulLogic.get(player).state();
-        return state == SoulState.HOLLOW || state == SoulState.ARRANCAR;
+        return HollowPlayerLogic.seenAsHollow(SoulLogic.get(player));
     }
 
     @Override

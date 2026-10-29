@@ -56,6 +56,8 @@ public final class HollowPlayerLogic {
     public static final int LOOK_NUMBER_SHIFT = 9;
     /** The seven bits that hold it, from {@link #LOOK_NUMBER_SHIFT} up: 0 to 127, of which 0 to 99 are used. */
     public static final int LOOK_NUMBER_MASK = 0x7F << LOOK_NUMBER_SHIFT;
+    /** A Visored's Hollow mask is on (drawn on any soul state that is not a Hollow or Arrancar). */
+    public static final int LOOK_MASK = 1 << 16;
     /** How many mask shapes there are: 0 skull, 1 fanged, 2 horned, 3 beaked. */
     public static final int MASK_VARIANTS = 4;
     /** The food level a starving Hollow is held at: exactly the client's own limit for sprinting. */
@@ -266,12 +268,20 @@ public final class HollowPlayerLogic {
     }
 
     /**
+     * Whether this soul looks a Hollow to the living and the dead: a Hollow, an Arrancar, or a Visored with its mask
+     * on. For villagers and Pluses only; to every other rule a masked Visored is the Shinigami it is.
+     */
+    public static boolean seenAsHollow(SoulData data) {
+        return isHollowOrArrancar(data) || VisoredLogic.isMasked(data);
+    }
+
+    /**
      * Whether villagers and wandering traders turn away from this player: a Hollow or an Arrancar, which to the
-     * living is a Hollow still, under survival's rules.
+     * living is a Hollow still, or a masked Visored, under survival's rules.
      */
     public static boolean shunnedByVillagers(Player player) {
         return !BleachConfig.get(BleachConfig.VILLAGERS_TRADE_WITH_HOLLOWS) && survivalRules(player)
-                && SoulLogic.hasSoul(player) && isHollowOrArrancar(SoulLogic.get(player));
+                && SoulLogic.hasSoul(player) && seenAsHollow(SoulLogic.get(player));
     }
 
     /** Which shape of mask a Hollow player wears: the same on every client and in every session. */
@@ -281,25 +291,26 @@ public final class HollowPlayerLogic {
 
     /**
      * The look bits the soul's saved data gives, so its owner's client can work them out too: red eyes
-     * while hungry, the Menos form, and an Arrancar's tattooed number.
+     * while hungry, the Menos form, an Arrancar's tattooed number, and a Visored's mask while it is on.
      */
     public static int hollowLook(SoulData data) {
         int look = isHollow(data) && data.hollow().hungerStarted() && band(data) != Band.FED ? LOOK_RAVENOUS : 0;
-        return look | HollowTier.of(data).lookBit() | ArrancarRank.lookBits(data);
+        return look | HollowTier.of(data).lookBit() | ArrancarRank.lookBits(data)
+                | (VisoredLogic.isMasked(data) ? LOOK_MASK : 0);
     }
 
     /**
      * Every look bit, with those only the server knows: the jaw open while devouring (and whether the
-     * prey is a Plus, whose hold has its own length), the mask cracked after a blow (or while it is torn at),
-     * a Cero gathering, and an Arrancar's Resurrección (see {@link ArrancarLogic#lookBits}). On a client's copy
-     * those are at their defaults and add nothing.
+     * prey is a Plus, whose hold has its own length), the mask cracked after a blow (or while it is torn at,
+     * or a Visored's under blows), a Cero gathering, and an Arrancar's Resurrección (see
+     * {@link ArrancarLogic#lookBits}). On a client's copy those are at their defaults and add nothing.
      */
     public static int hollowLook(SoulData data, long now) {
         int look = hollowLook(data) | ArrancarLogic.lookBits(data);
         if (data.devourTargetId >= 0) {
             look |= data.devourPlus ? LOOK_DEVOURING | LOOK_DEVOURING_PLUS : LOOK_DEVOURING;
         }
-        if (now < data.hollowCrackedUntil) {
+        if (now < data.hollowCrackedUntil || VisoredLogic.maskCracked(data)) {
             look |= LOOK_MASK_CRACKED;
         }
         if (data.ceroBeamId >= 0) {

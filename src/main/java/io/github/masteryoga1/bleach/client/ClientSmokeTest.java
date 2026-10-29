@@ -149,13 +149,16 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * first person, the player is mounted in a Caja of its own, which must hold it; sneaking must not get it
  * out, and when that cage is killed too it must let the player go, falling slowly. Then, a Shinigami
  * again by command, it faces its inner Hollow by command, which must come out beside it, and beats it by
- * command, after which the Hollow must be gone and the win must reach the client, before the run quits.
+ * command, after which the Hollow must be gone and the win must reach the client. Seen from in front, the
+ * Visored puts its Hollow mask on by command, which must reach the client with its look, and in first
+ * person, framed by the mask's edge, it must still be on; then the real Hollow Mask key takes it off, and
+ * the client must see it gone and its wait begun, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
- * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow and HUD
- * are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code
- * fails the run, and so does anything that did not reach the client as expected.
+ * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
+ * mask and HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the
+ * mod's client code fails the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -354,6 +357,7 @@ public final class ClientSmokeTest {
         checkMenosPlayer(minecraft, player, soul);
         checkArrancar(minecraft, player, soul);
         checkVisored(minecraft, player, soul);
+        checkVisoredMask(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -931,7 +935,14 @@ public final class ClientSmokeTest {
             }
             case 4305 -> command(minecraft, "bleach visored @s duel");
             case 4315 -> command(minecraft, "bleach visored @s subdue");
-            case 4350 -> {
+            // The Visored's mask by command, seen from in front; it would last past the end, so only the key takes it
+            // off. Then in first person, inside the mask's edge, and the real Hollow Mask key, held for two ticks.
+            case 4342 -> minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+            case 4345 -> command(minecraft, "bleach visored @s mask");
+            case 4370 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            case 4390 -> ZanpakutoKeys.MASK.setDown(true);
+            case 4392 -> ZanpakutoKeys.MASK.setDown(false);
+            case 4430 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1191,6 +1202,23 @@ public final class ClientSmokeTest {
                 () -> soul.shinigami().visored().subdued()
                         && nearest(minecraft, InnerHollow.class, 12.0, hollow -> true) == null,
                 "the beaten inner Hollow never went, or the win never reached the client");
+    }
+
+    /** The checks of the Visored's Hollow mask, each window from the step it follows. */
+    private static void checkVisoredMask(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (expectWithin(minecraft, 4346, 4365,
+                () -> soul.shinigami().visored().masked() && hasLook(player, HollowPlayerLogic.LOOK_MASK),
+                "the Hollow mask put on by command never reached the client, or its look never did")) {
+            shot(minecraft, "visored_mask");
+        }
+        if (expectWithin(minecraft, 4372, 4385, () -> soul.shinigami().visored().masked(),
+                "the Hollow mask came off before the Hollow Mask key was pressed")) {
+            shot(minecraft, "visored_mask_edge");
+        }
+        expectWithin(minecraft, 4393, 4415,
+                () -> !soul.shinigami().visored().masked() && !hasLook(player, HollowPlayerLogic.LOOK_MASK)
+                        && soul.shinigami().visored().maskReadyAt() > player.level().getGameTime(),
+                "the Hollow Mask key never took the mask off, or its wait never reached the client");
     }
 
     /** Whether an Arrancar NPC the player can see stands within 8 blocks as asked. */

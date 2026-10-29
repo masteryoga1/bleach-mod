@@ -11,9 +11,11 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * The zanpakutō keys: Release (Z) calls the blade's name, Seal (B) seals it, and Technique (G) is
- * held to gather a technique and let go to loose it. The server decides everything and says why
- * when it refuses; this only sends the presses. Changing hotbar slot or opening a screen while the
- * Technique key is held lets the gathered reiatsu go without loosing it.
+ * held to gather a technique and let go to loose it. Hollow Mask (M) is no zanpakutō key, but goes
+ * with them: a Visored presses it to call its Hollow mask and again to take it off, with or without
+ * a blade in hand. The server decides everything and says why when it refuses; this only sends the
+ * presses. Changing hotbar slot or opening a screen while the Technique key is held lets the
+ * gathered reiatsu go without loosing it.
  */
 public final class ZanpakutoKeys {
     public static final KeyMapping RELEASE = new KeyMapping("key.bleach.zanpakuto_release",
@@ -22,6 +24,8 @@ public final class ZanpakutoKeys {
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, BleachClient.KEY_CATEGORY);
     public static final KeyMapping TECHNIQUE = new KeyMapping("key.bleach.zanpakuto_technique",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, BleachClient.KEY_CATEGORY);
+    public static final KeyMapping MASK = new KeyMapping("key.bleach.visored_mask",
+            KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_M, BleachClient.KEY_CATEGORY);
 
     /**
      * Ticks a gather takes to fill, and how long it lasts before it fades, as the server's defaults.
@@ -37,6 +41,7 @@ public final class ZanpakutoKeys {
     private static boolean releaseWasDown;
     private static boolean sealWasDown;
     private static boolean techniqueWasDown;
+    private static boolean maskWasDown;
     /** Whether a gather was asked for and is still held. */
     private static boolean gathering;
     private static long gatherStartedAt;
@@ -62,15 +67,22 @@ public final class ZanpakutoKeys {
         while (TECHNIQUE.consumeClick()) {
             technique = true;
         }
+        boolean mask = false;
+        while (MASK.consumeClick()) {
+            mask = true;
+        }
         boolean releaseDown = RELEASE.isDown();
         boolean sealDown = SEAL.isDown();
         boolean techniqueDown = TECHNIQUE.isDown();
+        boolean maskDown = MASK.isDown();
         boolean wasReleaseDown = releaseWasDown;
         boolean wasSealDown = sealWasDown;
         boolean wasTechniqueDown = techniqueWasDown;
+        boolean wasMaskDown = maskWasDown;
         releaseWasDown = releaseDown;
         sealWasDown = sealDown;
         techniqueWasDown = techniqueDown;
+        maskWasDown = maskDown;
 
         LocalPlayer player = minecraft.player;
         if (player == null || minecraft.getConnection() == null) {
@@ -83,6 +95,10 @@ public final class ZanpakutoKeys {
         }
         if (inGame && seal && !wasSealDown) {
             BleachNetwork.requestZanpakutoKey(ZanpakutoKey.SEAL);
+        }
+        // Once per press: a click, or the key found down after it was up, as with the technique.
+        if (inGame && (mask || maskDown) && !wasMaskDown) {
+            BleachNetwork.requestZanpakutoKey(ZanpakutoKey.MASK);
         }
 
         if (!gathering && inGame && !wasTechniqueDown && (techniqueDown || technique)) {

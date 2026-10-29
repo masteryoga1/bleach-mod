@@ -102,7 +102,8 @@ public final class ShikaiEvents {
     /**
      * A zanpakutō key pressed on the client. Refusals are shown above the hotbar. A Hollow's and an
      * Arrancar's keys go to {@link ArrancarEvents#onKey} instead, which has no Shikai for them: there,
-     * release and seal tear at a Menos's mask, or call out and end an Arrancar's Resurrección.
+     * release and seal tear at a Menos's mask, or call out and end an Arrancar's Resurrección. M, the
+     * Hollow mask, goes to {@link VisoredEvents#onMaskKey}, with no blade needed in hand.
      */
     public static void onKey(ServerPlayer player, ZanpakutoKey key) {
         if (!player.isAlive() || player.isSpectator()) {
@@ -134,6 +135,7 @@ public final class ShikaiEvents {
             }
             case TECHNIQUE_RELEASE -> fire(player);
             case TECHNIQUE_CANCEL -> cancelGather(player, data);
+            case MASK -> VisoredEvents.onMaskKey(player, data, player.level().getGameTime());
             default -> {
             }
         }

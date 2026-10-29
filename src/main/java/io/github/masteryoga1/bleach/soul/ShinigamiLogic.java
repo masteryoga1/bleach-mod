@@ -70,8 +70,8 @@ public final class ShinigamiLogic {
      * Jinzen); a Shinigami or Substitute who knows the name hears {@code .named} (release it). A
      * Quincy who has passed on and whom the Academy will not take hears {@code quincy.rukongai}. A
      * Hollow hears {@code hollow} until it has devoured a soul, and {@code hollow.fed} after. A soul with
-     * Shinigami power and a Hollow rooted in it hears about that Hollow instead, until it is beaten (see
-     * {@link VisoredLogic#nextStepKey}).
+     * Shinigami power and a Hollow rooted in it hears about that Hollow instead, until it is beaten, and
+     * then about its mask, until it first wears it (see {@link VisoredLogic#nextStepKey}).
      */
     public static String nextStepKey(SoulData data, long now) {
         if (isPowerLent(data, now)) {

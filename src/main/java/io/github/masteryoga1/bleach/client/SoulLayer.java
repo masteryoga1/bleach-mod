@@ -7,11 +7,16 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.SoulAppearance;
+import io.github.masteryoga1.bleach.soul.SoulAttachments;
+import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
@@ -26,15 +31,19 @@ import org.joml.Vector3f;
 /**
  * Draws what a player's soul shows on the outside: a Plus's Chain of Fate hanging from the chest,
  * shorter as it wears away; a Hollow's bone mask in one of four shapes, its jaw hanging open while it
- * devours, cracked after a blow, and with red eyes while it is ravenous; and an Arrancar's hole and the
- * remnant of its mask, and, released, its Hollow body and mask. The chain is built from vanilla models;
- * the mask, the hole and the Hollow body are placeholder art drawn by the art script. The hole and the
- * remnant are drawn by two helpers that an Arrancar NPC's renderer borrows too ({@link ArrancarNpcRenderer}).
+ * devours, cracked after a blow, and with red eyes while it is ravenous; an Arrancar's hole and the
+ * remnant of its mask, and, released, its Hollow body and mask; and a Visored's Hollow mask while it is on,
+ * a white skull with red stripes over the left eye, which only those who see spirits see. The chain is built
+ * from vanilla models; the masks, the hole and the Hollow body are placeholder art drawn by the art script.
+ * The hole and the remnant are drawn by two helpers that an Arrancar NPC's renderer borrows too
+ * ({@link ArrancarNpcRenderer}).
  */
 public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
     public static final ResourceLocation MASK = BleachMod.id("textures/entity/hollow_player_mask.png");
     public static final ResourceLocation MASK_CRACKED = BleachMod.id("textures/entity/hollow_player_mask_cracked.png");
     public static final ResourceLocation MASK_EYES = BleachMod.id("textures/entity/hollow_player_mask_eyes.png");
+    /** A Visored's mask, on the skull's plate and jaw: whiter than a Hollow's, red-striped, with no cracked look. */
+    public static final ResourceLocation VISORED_MASK = BleachMod.id("textures/entity/visored_mask.png");
     /** An Arrancar's hole, on the body and jacket in the skin's layout, clear everywhere else. */
     public static final ResourceLocation HOLE = BleachMod.id("textures/entity/arrancar_hole.png");
     /**
@@ -85,6 +94,9 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
             } else if (bareHead) {
                 renderFragment(poseStack, buffer, packedLight, player, look);
             }
+        } else if ((look.hollowLook() & HollowPlayerLogic.LOOK_MASK) != 0 && bareHead && viewerSeesSpirits()) {
+            // Only those who see spirits see it: a Substitute's living body is seen by all, but not its mask.
+            renderVisoredMask(poseStack, buffer, packedLight, player);
         }
     }
 
@@ -121,6 +133,36 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
                     OverlayTexture.NO_OVERLAY, -1);
         }
         poseStack.popPose();
+    }
+
+    /**
+     * A Visored's Hollow mask on the posed head: the plain skull's plate and its shut jaw, in the Visored's own
+     * texture. It takes the scene's light, with no eyes that glow, and has no cracked look of its own: a crack
+     * shows only from inside, in the wearer's first-person edge.
+     */
+    private void renderVisoredMask(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
+                                   AbstractClientPlayer player) {
+        poseStack.pushPose();
+        getParentModel().getHead().translateAndRotate(poseStack);
+        // Shape 0 is the plain skull: the plate and the jaw, with no tusks, horns or beak.
+        mask.setup(0, false);
+        mask.renderToBuffer(poseStack, buffer.getBuffer(RenderType.entityCutoutNoCull(VISORED_MASK)), packedLight,
+                LivingEntityRenderer.getOverlayCoords(player, 0.0F), -1);
+        poseStack.popPose();
+    }
+
+    /**
+     * Whether the local player sees spirits, by the rules {@link ClientSouls#isHiddenFromViewer} keeps: one in
+     * creative or spectator mode does, as one aware of spirits does, and every soul is seen before the server has
+     * sent the viewer's own.
+     */
+    private static boolean viewerSeesSpirits() {
+        LocalPlayer viewer = Minecraft.getInstance().player;
+        if (viewer == null || viewer.isCreative() || viewer.isSpectator()) {
+            return true;
+        }
+        SoulData own = viewer.getData(SoulAttachments.SOUL);
+        return !own.isInitialized() || SoulLogic.isAware(own);
     }
 
     /**

@@ -14,10 +14,12 @@ import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyProgress;
 import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import net.minecraft.client.AttackIndicatorStatus;
@@ -39,8 +41,10 @@ import net.minecraft.world.item.ItemStack;
  * second gauge beside it for the Chain of Fate, which turns red once Encroachment sets in, and is
  * outlined red while the Plus gnaws at it with the Devour key. A Hollow gets a soul hunger gauge in
  * the chain's place: bone while fed, amber while ravenous, and empty with a flashing red outline
- * while starving, with a bar above it that fills while the Devour key is held on prey. A Quincy gets
- * a reishi gauge beside the reiryoku bar instead (or beyond the chain or hunger gauge), outlined blue
+ * while starving, with a bar above it that fills while the Devour key is held on prey. A Visored gets a
+ * mask gauge there: white in a red outline, emptying while its Hollow mask is on; grey, filling while the
+ * next cannot be called; and bone once it can. A Quincy gets a reishi gauge beside the reiryoku bar
+ * instead (or beyond the chain, hunger or mask gauge), outlined blue
  * under Blut Vene and red under Blut Arterie, with Hollow poison filling it violet from the top
  * (flickering once the poison brings pangs) and a bar above it that fills as the Cross is drawn, over
  * the form's draw time. That bar turns orange when a Letzt Stil draw is charged for a Letzt Pfeil,
@@ -106,6 +110,11 @@ public final class ReiryokuHud {
     private static final int DEVOUR_FILL = 0xFFE8E4D6;
     /** Around the chain gauge while a Plus gnaws at its own chain. */
     private static final int GNAW_OUTLINE = 0xFFB03030;
+    /** A Visored's mask: white in a red outline while worn, grey while the next waits, bone (as when fed) once ready. */
+    private static final int MASK_WORN = 0xFFF4F2EC;
+    private static final int MASK_WORN_OUTLINE = 0xFFB0201C;
+    private static final int MASK_WAITING = 0xFF8A8A8A;
+    private static final int MASK_READY = 0xFFE8E4D6;
 
     private ReiryokuHud() {
     }
@@ -139,7 +148,8 @@ public final class ReiryokuHud {
         }
         ItemStack held = player.getMainHandItem();
         ZanpakutoBlade blade = ZanpakutoItem.blade(held);
-        if (blade.released() && ZanpakutoLogic.isOwnBlade(held, player)) {
+        boolean shikaiRings = blade.released() && ZanpakutoLogic.isOwnBlade(held, player);
+        if (shikaiRings) {
             int colour = 0xFF000000 | blade.colour();
             for (int ring = 2; ring < 2 + SHIKAI_OUTLINE; ring++) {
                 graphics.renderOutline(x - ring, y - ring, WIDTH + 2 * ring, HEIGHT + 2 * ring, colour);
@@ -157,7 +167,11 @@ public final class ReiryokuHud {
 
         boolean chainShown = data.state() == SoulState.PLUS && data.chainMaxTicks() > 0;
         boolean hungerShown = data.state() == SoulState.HOLLOW && data.hollow().hungerStarted();
-        int sx = x + WIDTH + 2;
+        // A Visored is never a Plus or a Hollow, so the slot is free for its mask.
+        boolean maskShown = !chainShown && !hungerShown && VisoredLogic.isVisored(data) && VisoredLogic.enabled();
+        // A Visored often holds its blade released, so its mask gauge steps out past the Shikai rings.
+        int shift = maskShown && shikaiRings ? SHIKAI_OUTLINE : 0;
+        int sx = x + WIDTH + 2 + shift;
         if (chainShown) {
             drawGauge(graphics, sx, y, data.chainFraction(),
                     SoulLogic.isEncroaching(data) ? CHAIN_FILL_ENCROACHING : CHAIN_FILL);
@@ -166,10 +180,12 @@ public final class ReiryokuHud {
             }
         } else if (hungerShown) {
             renderHunger(graphics, player, data, sx, y, deltaTracker.getGameTimeDeltaPartialTick(false));
+        } else if (maskShown) {
+            renderVisoredMask(graphics, data, sx, y, player.level().getGameTime());
         }
 
-        // The reishi gauge goes beyond the chain or hunger one, should a soul ever have both.
-        int rx = chainShown || hungerShown ? x + 2 * WIDTH + 8 : x + WIDTH + 6;
+        // The reishi gauge goes beyond the chain, hunger or mask one, should a soul ever have both.
+        int rx = chainShown || hungerShown || maskShown ? x + 2 * WIDTH + 8 + shift : x + WIDTH + 6;
         if (QuincyLogic.canUsePowers(data)) {
             renderReishi(graphics, player, data, rx, y);
         } else if (QuincyArtsLogic.isSealed(data)) {
@@ -203,6 +219,23 @@ public final class ReiryokuHud {
         float hold = HollowKeys.holdProgress(partialTick);
         if (hold > 0.0F) {
             drawGather(graphics, x, y - GATHER_GAP - GATHER_HEIGHT, hold, hold >= 1.0F ? GATHER_FULL : DEVOUR_FILL);
+        }
+    }
+
+    /**
+     * A Visored's Hollow mask, read from its own synced record against this client's clock, so the gauge can be
+     * a tick or two behind the server: while the mask is on, white and emptying as its time runs out, in a red
+     * outline; while the next cannot be called, grey and filling as the wait runs; full and bone once it can.
+     */
+    private static void renderVisoredMask(GuiGraphics graphics, SoulData data, int x, int y, long now) {
+        ShinigamiProgress.Visored record = VisoredLogic.record(data);
+        if (record.masked()) {
+            drawGauge(graphics, x, y, VisoredLogic.maskLeft(record, now), MASK_WORN);
+            graphics.renderOutline(x - 1, y - 1, WIDTH + 2, HEIGHT + 2, MASK_WORN_OUTLINE);
+        } else if (now < record.maskReadyAt()) {
+            drawGauge(graphics, x, y, VisoredLogic.maskRecovered(record, now), MASK_WAITING);
+        } else {
+            drawGauge(graphics, x, y, 1.0F, MASK_READY);
         }
     }
 
