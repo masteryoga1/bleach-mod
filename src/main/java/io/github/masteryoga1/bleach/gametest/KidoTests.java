@@ -690,13 +690,15 @@ public final class KidoTests {
             helper.assertTrue(data.xp(Stat.KIDO) == 4, "Shō on the pig left " + data.xp(Stat.KIDO) + " Kidō xp");
             helper.assertTrue(kidoLeaning(data) == 1, "Shō on a pig leaned the Asauchi " + kidoLeaning(data) + " to kidō");
 
-            // In creative, a strike pays, trains and leans nothing.
+            // In creative, a strike on a Hollow pays, trains and leans nothing.
+            discard(pig);
+            spider = HollowPlayerTests.placed(helper, ModEntities.SPIDER_HOLLOW.get(), 4, 8);
             SoulData creativeData = ShinigamiTests.student(60.0F);
             Player creative = caster(helper, GameType.CREATIVE, creativeData);
             creative.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
-            creative.lookAt(EntityAnchorArgument.Anchor.EYES, pig.getBoundingBox().getCenter());
-            pig.invulnerableTime = 0;
-            assertRefusal(helper, press(creative, now + 40L), null, "a creative student's Shō at the pig");
+            creative.lookAt(EntityAnchorArgument.Anchor.EYES, spider.getBoundingBox().getCenter());
+            assertRefusal(helper, press(creative, now + 40L), null, "a creative student's Shō at the Spider Hollow");
+            helper.assertFalse(unhurt(spider), "the creative student's Shō did not hurt the Spider Hollow");
             helper.assertTrue(creativeData.level(Stat.KIDO) == 0 && creativeData.xp(Stat.KIDO) == 0,
                     "a creative student trained Kidō to " + creativeData.level(Stat.KIDO) + " and "
                             + creativeData.xp(Stat.KIDO) + " xp");
