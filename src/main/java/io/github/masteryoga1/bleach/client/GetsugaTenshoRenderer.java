@@ -18,11 +18,20 @@ import net.minecraft.util.Mth;
  * Getsuga Tenshō: a glowing crescent standing across its path with its middle leading, as wide and
  * tall as the charge made it (the same size the server cuts with) and tinted the blade's colour. It
  * glows as brightly in the dark as at noon, fades in as it leaves the blade and out as its flight
- * ends, and is seen from both sides.
+ * ends, and is seen from both sides. The black one, loosed from behind a Visored's mask, is drawn twice:
+ * a taller red crescent first, then a black one over it, so a red edge shows around a black core.
  */
 public final class GetsugaTenshoRenderer extends EntityRenderer<GetsugaTensho> {
     private static final ResourceLocation TEXTURE = BleachMod.id("textures/entity/getsuga_tensho.png");
     private static final RenderType TYPE = RenderType.entityTranslucentEmissive(TEXTURE);
+    /** The black core's own type, the same look but a different type, so asking for it draws the red edge first. */
+    private static final RenderType CORE_TYPE = RenderType.entityTranslucentEmissive(TEXTURE, false);
+    private static final int RED_EDGE = 0xC8141E;
+    private static final int BLACK_CORE = 0x0E0A12;
+    /** How much taller the red edge stands than the black core. */
+    private static final float EDGE_SCALE = 1.4F;
+    /** How far in from the texture's top and bottom rows the red edge samples, so its rim shows past the core's. */
+    private static final float EDGE_INSET = 0.15F;
     /** Quads along the arc. */
     private static final int SEGMENTS = 12;
     /** The arc runs this far either side of straight ahead. */
@@ -48,32 +57,48 @@ public final class GetsugaTenshoRenderer extends EntityRenderer<GetsugaTensho> {
             float charge = crescent.charge();
             float halfWidth = GetsugaTensho.halfWidthFor(charge);
             float halfHeight = GetsugaTensho.halfHeightFor(charge);
-            int colour = Math.round(alpha * 255.0F) << 24 | (crescent.colour() & 0xFFFFFF);
+            int alphaBits = Math.round(alpha * 255.0F) << 24;
             poseStack.pushPose();
             // Turned the way it was launched, so local +z points along its flight.
             poseStack.mulPose(Axis.YP.rotationDegrees(-Mth.rotLerp(partialTick, crescent.yRotO, crescent.getYRot())));
             poseStack.mulPose(Axis.XP.rotationDegrees(Mth.lerp(partialTick, crescent.xRotO, crescent.getXRot())));
             PoseStack.Pose pose = poseStack.last();
-            VertexConsumer consumer = buffer.getBuffer(TYPE);
-            for (int i = 0; i < SEGMENTS; i++) {
-                float u0 = (float) i / SEGMENTS;
-                float u1 = (float) (i + 1) / SEGMENTS;
-                float a0 = (u0 * 2.0F - 1.0F) * ARC_DEGREES * Mth.DEG_TO_RAD;
-                float a1 = (u1 * 2.0F - 1.0F) * ARC_DEGREES * Mth.DEG_TO_RAD;
-                float x0 = halfWidth * Mth.sin(a0);
-                float z0 = BOW * halfWidth * Mth.cos(a0);
-                float t0 = halfHeight * (TIP_THICKNESS + (1.0F - TIP_THICKNESS) * Mth.cos(a0));
-                float x1 = halfWidth * Mth.sin(a1);
-                float z1 = BOW * halfWidth * Mth.cos(a1);
-                float t1 = halfHeight * (TIP_THICKNESS + (1.0F - TIP_THICKNESS) * Mth.cos(a1));
-                vertex(consumer, pose, x0, t0, z0, u0, 0.0F, colour);
-                vertex(consumer, pose, x0, -t0, z0, u0, 1.0F, colour);
-                vertex(consumer, pose, x1, -t1, z1, u1, 1.0F, colour);
-                vertex(consumer, pose, x1, t1, z1, u1, 0.0F, colour);
+            if (crescent.isBlack()) {
+                // The red edge's rows sit further in, where the texture is denser, so its rim outlasts the core's.
+                strip(buffer.getBuffer(TYPE), pose, halfWidth, halfHeight * EDGE_SCALE, EDGE_INSET, 1.0F - EDGE_INSET,
+                        alphaBits | RED_EDGE);
+                strip(buffer.getBuffer(CORE_TYPE), pose, halfWidth, halfHeight, 0.0F, 1.0F, alphaBits | BLACK_CORE);
+            } else {
+                strip(buffer.getBuffer(TYPE), pose, halfWidth, halfHeight, 0.0F, 1.0F,
+                        alphaBits | (crescent.colour() & 0xFFFFFF));
             }
             poseStack.popPose();
         }
         super.render(crescent, entityYaw, partialTick, poseStack, buffer, packedLight);
+    }
+
+    /**
+     * The crescent's quads along the arc, {@code halfHeight} tall at its middle and thinning to the tips, in one
+     * colour, sampling the texture's rows from {@code vTop} at its top edge to {@code vBottom} at its bottom.
+     */
+    private static void strip(VertexConsumer consumer, PoseStack.Pose pose, float halfWidth, float halfHeight, float vTop,
+                              float vBottom, int colour) {
+        for (int i = 0; i < SEGMENTS; i++) {
+            float u0 = (float) i / SEGMENTS;
+            float u1 = (float) (i + 1) / SEGMENTS;
+            float a0 = (u0 * 2.0F - 1.0F) * ARC_DEGREES * Mth.DEG_TO_RAD;
+            float a1 = (u1 * 2.0F - 1.0F) * ARC_DEGREES * Mth.DEG_TO_RAD;
+            float x0 = halfWidth * Mth.sin(a0);
+            float z0 = BOW * halfWidth * Mth.cos(a0);
+            float t0 = halfHeight * (TIP_THICKNESS + (1.0F - TIP_THICKNESS) * Mth.cos(a0));
+            float x1 = halfWidth * Mth.sin(a1);
+            float z1 = BOW * halfWidth * Mth.cos(a1);
+            float t1 = halfHeight * (TIP_THICKNESS + (1.0F - TIP_THICKNESS) * Mth.cos(a1));
+            vertex(consumer, pose, x0, t0, z0, u0, vTop, colour);
+            vertex(consumer, pose, x0, -t0, z0, u0, vBottom, colour);
+            vertex(consumer, pose, x1, -t1, z1, u1, vBottom, colour);
+            vertex(consumer, pose, x1, t1, z1, u1, vTop, colour);
+        }
     }
 
     /**

@@ -37,6 +37,7 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
+import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
@@ -46,6 +47,7 @@ import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
@@ -152,13 +154,19 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * command, after which the Hollow must be gone and the win must reach the client. Seen from in front, the
  * Visored puts its Hollow mask on by command, which must reach the client with its look, and in first
  * person, framed by the mask's edge, it must still be on; then the real Hollow Mask key takes it off, and
- * the client must see it gone and its wait begun, before the run quits.
+ * the client must see it gone and its wait begun. Last, seen from behind and looking up, the Visored learns
+ * Zangetsu's name again and releases it, is given ten minutes of masks worn by command and puts the mask back
+ * on by command, which must reach the client with the training. Holding the real Cero key must gather a Cero
+ * at its face in the masked Visored's crimson, and letting it go past half must fire it four blocks wide; then
+ * the Getsuga Tenshō it looses must reach the client as the black one. The soul screen is opened on the masked
+ * Visored before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask and HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the
- * mod's client code fails the run, and so does anything that did not reach the client as expected.
+ * mask, masked Cero, black Getsuga Tenshō and HUD are drawn, and screenshots of the main moments are saved
+ * for review. Any crash in the mod's client code fails the run, and so does anything that did not reach the
+ * client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -171,6 +179,8 @@ public final class ClientSmokeTest {
     private static final double FOOTING_MIN_HEIGHT = 8.0;
     /** How far the Arrancar's Sonído must carry the player: further than a first Shunpo goes. */
     private static final double SONIDO_MIN_DISTANCE = 8.0;
+    /** The masks' time worn that {@code bleach visored @s train 600} gives: ten minutes, the masked Cero's gate. */
+    private static final long VISORED_TRAINED_TICKS = 12_000L;
     /** How high the Negación light must lift the player before it is left. */
     private static final double NEGACION_MIN_RISE = 2.0;
     /** How far around the player the summoned Hollows and Plus, and the Garganta, are looked for. */
@@ -358,6 +368,7 @@ public final class ClientSmokeTest {
         checkArrancar(minecraft, player, soul);
         checkVisored(minecraft, player, soul);
         checkVisoredMask(minecraft, player, soul);
+        checkVisoredArts(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -942,7 +953,39 @@ public final class ClientSmokeTest {
             case 4370 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             case 4390 -> ZanpakutoKeys.MASK.setDown(true);
             case 4392 -> ZanpakutoKeys.MASK.setDown(false);
-            case 4430 -> {
+            // The Visored's arts, seen from behind and looking up so neither carves anything. The reset makes the
+            // blade's state certain after the run's many changes, and the fresh Asauchi in hand is bound to Zangetsu
+            // again; the reiryoku comes after the name, so the name's growth does not matter. Ten minutes of masks
+            // worn opens the masked Cero.
+            case 4440 -> {
+                command(minecraft, "bleach zanpakuto @s reset");
+                command(minecraft, "bleach zanpakuto @s spirit bleach:zangetsu");
+                command(minecraft, "bleach zanpakuto @s bond 1000");
+                command(minecraft, "bleach zanpakuto @s name");
+                command(minecraft, "bleach reiryoku @s 800 800");
+                command(minecraft, "bleach visored @s train 600");
+                command(minecraft, "tp @s ~ ~ ~ 0 -30");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            }
+            case 4450 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+            // Forced, so the wait from the key does not matter; at ten minutes trained it lasts 41 seconds, past the end.
+            case 4465 -> command(minecraft, "bleach visored @s mask");
+            // The real key: held, the masked Cero gathers; let go at 35 of its 50 ticks, it fires at 70%.
+            case 4475 -> HollowKeys.CERO.setDown(true);
+            case 4510 -> HollowKeys.CERO.setDown(false);
+            // Held for a second, then let go: a black Getsuga Tenshō of two-thirds charge.
+            case 4540 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_PRESS);
+            case 4560 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_RELEASE);
+            // As the soul screen key opens it: the Visored's state, its mask's time left and the masked Cero's key.
+            case 4584 -> minecraft.setScreen(new SoulStatsScreen());
+            case 4588 -> {
+                expect(minecraft, minecraft.screen instanceof SoulStatsScreen && soul.shinigami().visored().masked()
+                                && VisoredLogic.ceroUnlocked(soul),
+                        "the soul screen was not open on the masked Visored with the masked Cero");
+                shot(minecraft, "stats_visored");
+            }
+            case 4590 -> minecraft.setScreen(null);
+            case 4600 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1219,6 +1262,36 @@ public final class ClientSmokeTest {
                 () -> !soul.shinigami().visored().masked() && !hasLook(player, HollowPlayerLogic.LOOK_MASK)
                         && soul.shinigami().visored().maskReadyAt() > player.level().getGameTime(),
                 "the Hollow Mask key never took the mask off, or its wait never reached the client");
+    }
+
+    /** The checks of the masked Visored's arts, each window from the step it follows. */
+    private static void checkVisoredArts(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        expectWithin(minecraft, 4452, 4464, () -> ZanpakutoItem.blade(player.getMainHandItem()).released(),
+                "Zangetsu was not released again for the Visored");
+        expectWithin(minecraft, 4466, 4474,
+                () -> soul.shinigami().visored().masked()
+                        && soul.shinigami().visored().maskTrainedTicks() >= VISORED_TRAINED_TICKS,
+                "the Hollow mask put on again by command, or the masks' training, never reached the client");
+        if (expectWithin(minecraft, 4477, 4500,
+                () -> ownCero(minecraft, player,
+                        beam -> beam.isCharging() && beam.colour() == HollowCero.VISORED_CRIMSON) != null
+                        && HollowKeys.ceroProgress(0.0F) > 0.0F,
+                "holding the Cero key with the mask on never gathered a crimson Cero")) {
+            shot(minecraft, "visored_cero_charge");
+        }
+        if (expectWithin(minecraft, 4511, 4530,
+                () -> ownCero(minecraft, player, beam -> beam.isFired() && beam.colour() == HollowCero.VISORED_CRIMSON
+                        && beam.radius() > 1.9F) != null,
+                "letting the Cero key go never fired the masked Visored's wide crimson Cero")) {
+            shot(minecraft, "visored_cero");
+        }
+        // Once it has faded in, so the shot shows it whole.
+        if (expectWithin(minecraft, 4561, 4580,
+                () -> nearest(minecraft, GetsugaTensho.class, 48.0, crescent -> crescent.isBlack() && crescent.age() >= 2)
+                        != null,
+                "the masked Visored's Getsuga Tenshō never reached the client as the black one")) {
+            shot(minecraft, "visored_getsuga");
+        }
     }
 
     /** Whether an Arrancar NPC the player can see stands within 8 blocks as asked. */

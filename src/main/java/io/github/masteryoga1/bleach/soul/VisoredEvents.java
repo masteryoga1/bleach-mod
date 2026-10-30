@@ -831,9 +831,9 @@ public final class VisoredEvents {
      * <p>The record is written once ({@link VisoredLogic#maskEnded}): the wait for the next mask starts, as long as
      * this one was worn and at least {@code min_wait_seconds}, or {@code crumble_wait_seconds} when it crumbled, ran
      * dry or shattered, and the time worn trains the next. Then the crack share is cleared and the boosts come off,
-     * a crumbled, dry or shattered mask leaves its wearer winded, and the ending is heard, seen and told. Creative
-     * waits for nothing, trains nothing and is never winded. REMOVED, every way that is not the mask's own doing, is
-     * silent.
+     * a masked Cero still gathering fizzles for free (one already fired is paid for), a crumbled, dry or shattered
+     * mask leaves its wearer winded, and the ending is heard, seen and told. Creative waits for nothing, trains
+     * nothing and is never winded. REMOVED, every way that is not the mask's own doing, is silent.
      */
     public static void endMask(Player player, SoulData data, MaskEnd end, long now) {
         ShinigamiProgress.Visored record = VisoredLogic.record(data);
@@ -844,6 +844,8 @@ public final class VisoredEvents {
         VisoredLogic.setRecord(data, VisoredLogic.maskEnded(record, now, end.crumbles(), creative));
         data.maskDamageShare = 0.0F;
         removeMaskBody(player);
+        // A Cero gathering in the mask fizzles with it, for free; one already fired is paid for.
+        HollowCero.cancel(player, data);
         if (end.crumbles() && !creative) {
             SoulLogic.exhaust(player);
         }
@@ -859,8 +861,8 @@ public final class VisoredEvents {
 
     /**
      * A creature's blow landed on a masked wearer. The health it took, after armour and absorption, counts as a share
-     * of maximum health; half of {@code shatter_health_share} in one wearing cracks the mask, heard once, and all of
-     * it shatters it. A new wearing starts whole.
+     * of maximum health; half of {@code shatter_health_share} in one wearing cracks the mask, heard once, which breaks
+     * a masked Cero's gathering, and all of it shatters it. A new wearing starts whole.
      */
     public static void noteMaskBlow(Player player, SoulData data, float damage, long now) {
         if (!VisoredLogic.isMasked(data) || !(damage > 0.0F)) {
@@ -871,6 +873,8 @@ public final class VisoredEvents {
         if (data.maskDamageShare >= BleachConfig.get(BleachConfig.VISORED_MASK_SHATTER_HEALTH_SHARE)) {
             endMask(player, data, MaskEnd.SHATTERED, now);
         } else if (!wasCracked && VisoredLogic.maskCracked(data)) {
+            // A fresh crack breaks a masked Cero's gathering, as a Hollow's does (HollowCero#tick).
+            data.hollowFreshCrackAt = now;
             SpiritSenses.play(player, ModSounds.MASK_CRACK.get(), SoundSource.PLAYERS, 0.8F, 1.2F, false);
         }
     }
