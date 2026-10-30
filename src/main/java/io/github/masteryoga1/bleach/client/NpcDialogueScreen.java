@@ -6,7 +6,6 @@ import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.network.OpenDialoguePayload;
-import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.Stat;
@@ -114,10 +113,8 @@ public final class NpcDialogueScreen extends Screen {
         SoulData data = minecraft.player.getData(SoulAttachments.SOUL);
         for (int i = 0; i < ShinigamiNpc.EXAMINED_ARTS.size() && i < required.size(); i++) {
             Stat art = ShinigamiNpc.EXAMINED_ARTS.get(i);
-            Stat examined = ShinigamiLogic.examinedStat(art);
-            Component name = examined == art ? art.displayName()
-                    : Component.translatable("screen.bleach.dialogue.exam.via", art.displayName(), examined.displayName());
-            int have = data.level(examined);
+            Component name = art.displayName();
+            int have = data.level(art);
             int need = required.get(i);
             boolean passed = have >= need;
             examLines.add(passed ? Component.translatable("screen.bleach.dialogue.exam.passed", name)

@@ -25,6 +25,7 @@ import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
+import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.BloodlineChoice;
@@ -47,6 +48,7 @@ import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
@@ -68,8 +70,10 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffects;
@@ -77,6 +81,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.level.GameRules;
@@ -87,6 +92,7 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.client.event.ClientChatReceivedEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 /**
@@ -162,13 +168,19 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * Visored. Last, seen from in front, the Hollow is taken away and rooted again by command, and seizes the body by
  * command, which must reach the client as half a mask; in first person, framed by the left half of the mask's edge,
  * it must still hold the body, and then the real Hollow Mask key tears the half mask off, and the client must see it
- * gone and the weariness after it, before the run quits.
+ * gone and the weariness after it.
+ *
+ * <p>Finally, seen from behind, the Shinigami is given Kidō 10 by command, and the real Kidō key casts Hadō #1 Shō, the
+ * spell a soul that never chose falls back on, at a summoned villager, which must be hurt, and the cast must train
+ * Kidō. Sneaking with the key must choose #4 Byakurai, which must reach the client and which the action bar must name;
+ * the key alone then casts it, whose white trace must reach the client in the colour of the client's own synced copy
+ * of the spell, and it must train Kidō again, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask, masked Cero, black Getsuga Tenshō, half mask and HUD are drawn, and screenshots of the main moments are saved
- * for review. Any crash in the mod's client code fails the run, and so does anything that did not reach the
+ * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō trace and HUD are drawn, and screenshots of the main moments
+ * are saved for review. Any crash in the mod's client code fails the run, and so does anything that did not reach the
  * client as expected.
  */
 public final class ClientSmokeTest {
@@ -232,12 +244,24 @@ public final class ClientSmokeTest {
     private static float healthBefore;
     /** The tick the player landed after Vollständig, or -1 before then. */
     private static int landedAt = -1;
+    /** The last line the server put on the action bar, and the tick it came, for the checks that read it. */
+    @Nullable
+    private static Component actionBar;
+    private static int actionBarAt;
 
     private ClientSmokeTest() {
     }
 
     public static boolean isEnabled() {
         return Boolean.getBoolean("bleach.smokeTest");
+    }
+
+    /** Keeps each line the server puts on the action bar, which the game itself keeps out of reach. */
+    static void onSystemChat(ClientChatReceivedEvent.System event) {
+        if (event.isOverlay()) {
+            actionBar = event.getMessage();
+            actionBarAt = ticksInWorld;
+        }
     }
 
     static void onClientTick(ClientTickEvent.Post event) {
@@ -373,6 +397,7 @@ public final class ClientSmokeTest {
         checkVisoredMask(minecraft, player, soul);
         checkVisoredArts(minecraft, player, soul);
         checkVisoredTakeover(minecraft, player, soul);
+        checkKido(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -1004,7 +1029,35 @@ public final class ClientSmokeTest {
             case 4645 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             case 4670 -> ZanpakutoKeys.MASK.setDown(true);
             case 4672 -> ZanpakutoKeys.MASK.setDown(false);
+            // Kidō, seen from behind and facing south. The run's Quincy power is taken away first, since an awakened
+            // Quincy cannot use Kidō (by its tier alone: a reset would leave the bloodline open, and the steps wait for
+            // it), and the Hollow too, so its voice never takes the action bar. At Kidō 10 the soul knows Shō and
+            // Byakurai, and having never chosen, it casts Shō first. The villager stands tall enough for a level beam
+            // from the eyes to meet it.
             case 4700 -> {
+                command(minecraft, "bleach tier @s quincy 0");
+                command(minecraft, "bleach visored @s reset");
+                command(minecraft, "bleach stat @s kido 10");
+                command(minecraft, "bleach reiryoku @s 800 800");
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            }
+            case 4702 -> command(minecraft, "summon minecraft:villager ~ ~ ~4 {NoAI:1b,Silent:1b}");
+            // The real Kidō key, held for two ticks: one press, which casts Shō.
+            case 4710 -> KidoKeys.CAST.setDown(true);
+            case 4712 -> KidoKeys.CAST.setDown(false);
+            // Sneaking, the real key chooses the next spell, Byakurai, and casts nothing; then the key alone casts it.
+            case 4735 -> minecraft.options.keyShift.setDown(true);
+            case 4738 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 4740 -> KidoKeys.CAST.setDown(false);
+            case 4742 -> minecraft.options.keyShift.setDown(false);
+            // At full strength, since it has no incantation: about 9 of the villager's 20, so it lives.
+            case 4760 -> KidoKeys.CAST.setDown(true);
+            case 4762 -> KidoKeys.CAST.setDown(false);
+            case 4800 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1331,6 +1384,68 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 4673, 4690,
                 () -> !hasLook(player, HollowPlayerLogic.LOOK_TAKEN_OVER) && player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN),
                 "the Hollow Mask key never tore the half mask off, or the weariness after it never reached the client");
+    }
+
+    /**
+     * The checks of Kidō, each window from the step it follows. Two checks after one step start a tick apart, since a
+     * window is known by its first tick.
+     */
+    private static void checkKido(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        expectWithin(minecraft, 4713, 4730, () -> soul.level(Stat.KIDO) == 10 && soul.xp(Stat.KIDO) >= 1,
+                "the Kidō key never cast Shō (the action bar last read: " + lastActionBar() + ")");
+        // Shō does about 3 of its 20; a villager is no spirit, so anyone sees it hurt.
+        expectWithin(minecraft, 4714, 4730,
+                () -> nearest(minecraft, Villager.class, 8.0, villager -> villager.getHealth() < villager.getMaxHealth())
+                        != null,
+                "Shō never struck the villager");
+        if (expectWithin(minecraft, 4741, 4757,
+                () -> soul.shinigami().kido().chosen().equals(Optional.of(KidoSpell.BYAKURAI.location()))
+                        && byakuraiChosenShown(minecraft),
+                "Sneak and the Kidō key never chose Byakurai, or the action bar never named it")) {
+            shot(minecraft, "kido_chosen");
+        }
+        // The colour is the client's own copy of the spell's, so this also proves the spells reached it. Once the trace
+        // has been drawn, so the shot shows it.
+        if (expectWithin(minecraft, 4761, 4780,
+                () -> ownCero(minecraft, player, beam -> beam.isFired() && beam.colour() == byakuraiColour(minecraft)
+                        && beam.firedAge(0.0F) >= 1.0F) != null,
+                "the Kidō key never cast Byakurai, or its trace never reached the client in the synced spell's colour"
+                        + " (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_byakurai");
+        }
+        // Shō gave 2 with its strike, and Byakurai gives at least 2 more. Its 32 reiryoku come back too fast to check.
+        expectWithin(minecraft, 4762, 4780, () -> soul.xp(Stat.KIDO) >= 4, "Byakurai never trained Kidō");
+    }
+
+    /** Byakurai as this client's copy of the synced Kidō spells has it, or null if the client never had them. */
+    @Nullable
+    private static KidoSpell byakurai(Minecraft minecraft) {
+        return KidoSpell.get(minecraft.level, KidoSpell.BYAKURAI.location()).map(Holder.Reference::value).orElse(null);
+    }
+
+    /** Byakurai's trace colour as this client's copy of the spells has it, or -1, which no trace has, without them. */
+    private static int byakuraiColour(Minecraft minecraft) {
+        KidoSpell spell = byakurai(minecraft);
+        return spell != null ? spell.look().colour() : -1;
+    }
+
+    /** Whether the action bar names Byakurai as the chosen spell, in the line built from this client's copy of it. */
+    private static boolean byakuraiChosenShown(Minecraft minecraft) {
+        KidoSpell spell = byakurai(minecraft);
+        return spell != null && actionBarShows(Component.translatable("message.bleach.kido.chosen", spell.title()));
+    }
+
+    /** The last line the server put on the action bar, for a failure to name the refusal it may have been. */
+    private static String lastActionBar() {
+        return actionBar == null ? "nothing" : "\"" + actionBar.getString() + "\"";
+    }
+
+    /**
+     * Whether the last line the server put on the action bar reads as this one, and came at least two ticks ago: a
+     * screenshot shows the last frame drawn, so one taken as the line comes would miss it.
+     */
+    private static boolean actionBarShows(Component line) {
+        return actionBar != null && ticksInWorld - actionBarAt >= 2 && actionBar.getString().equals(line.getString());
     }
 
     /** Whether an Arrancar NPC the player can see stands within 8 blocks as asked. */

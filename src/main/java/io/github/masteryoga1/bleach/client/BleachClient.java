@@ -90,6 +90,7 @@ public final class BleachClient {
         NeoForge.EVENT_BUS.addListener(BleachClient::onRenderLiving);
         if (ClientSmokeTest.isEnabled()) {
             NeoForge.EVENT_BUS.addListener(ClientSmokeTest::onClientTick);
+            NeoForge.EVENT_BUS.addListener(ClientSmokeTest::onSystemChat);
         }
     }
 
@@ -115,6 +116,7 @@ public final class BleachClient {
         event.register(QuincyClient.FORM_KEY);
         event.register(HollowKeys.DEVOUR);
         event.register(HollowKeys.CERO);
+        event.register(KidoKeys.CAST);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
@@ -271,6 +273,7 @@ public final class BleachClient {
         ZanpakutoKeys.tick(minecraft);
         QuincyClient.tick(minecraft);
         HollowKeys.tick(minecraft);
+        KidoKeys.tick(minecraft);
 
         if (minecraft.level != null) {
             SpiritShimmer.tick(minecraft);

@@ -188,7 +188,7 @@ public final class AcademyTests {
         helper.assertFalse(ShinigamiEvents.graduate(player), "an untrained student graduated");
         helper.assertTrue(ShinigamiLogic.isStudent(data), "failing the exams ended the studies");
 
-        ShinigamiLogic.graduationRequirements().forEach((art, level) -> data.setLevel(ShinigamiLogic.examinedStat(art), level));
+        ShinigamiLogic.graduationRequirements().forEach((art, level) -> data.setLevel(art, level));
         float before = data.maxReiryoku();
         helper.assertTrue(ShinigamiEvents.graduate(player), "a trained student failed the exams");
         helper.assertTrue(data.state() == SoulState.SHINIGAMI && data.tier(PowerPath.SHINIGAMI) == 1,

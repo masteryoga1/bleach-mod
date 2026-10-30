@@ -222,6 +222,12 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue GETSUGA_MAX_HARDNESS;
     public static final ModConfigSpec.IntValue GETSUGA_BLOCK_BUDGET;
 
+    public static final ModConfigSpec.DoubleValue KIDO_POWER_PER_LEVEL;
+    public static final ModConfigSpec.DoubleValue KIDO_EISHOHAKI_SHARE;
+    public static final ModConfigSpec.DoubleValue KIDO_EISHOHAKI_SHARE_PER_LEVEL;
+    public static final ModConfigSpec.DoubleValue KIDO_EISHOHAKI_MAX_SHARE;
+    public static final ModConfigSpec.IntValue KIDO_STRIKE_XP_BONUS;
+
     public static final ModConfigSpec.EnumValue<BloodlineMode> QUINCY_BLOODLINE_MODE;
     public static final ModConfigSpec.DoubleValue QUINCY_CHANCE;
     public static final ModConfigSpec.DoubleValue QUINCY_ECHT_CHANCE;
@@ -836,8 +842,8 @@ public final class BleachConfig {
                 .comment("Hohō level a student needs to graduate.")
                 .defineInRange("graduation_hoho_level", 5, 0, 100);
         GRADUATION_KIDO_LEVEL = builder
-                .comment("Kidō level a student needs to graduate. Until kidō exists this is checked against Reiatsu Control, which kidō rests on.")
-                .defineInRange("graduation_kido_level", 2, 0, 100);
+                .comment("Kidō level a student needs to graduate. Kidō trains by casting spells (see [kido]).")
+                .defineInRange("graduation_kido_level", 5, 0, 100);
         ASAUCHI_REISSUE_MINUTES = builder
                 .comment("Minutes before the Academy hands the same soul another Asauchi.")
                 .defineInRange("asauchi_reissue_minutes", 10, 0, 1_440);
@@ -1325,6 +1331,32 @@ public final class BleachConfig {
         GETSUGA_BLOCK_BUDGET = builder
                 .comment("Most blocks one can cut through.")
                 .defineInRange("block_budget", 24, 0, 256);
+        builder.pop();
+
+        builder.comment("Kidō. The spells themselves are data, at data/<namespace>/bleach/kido_spell/<name>.json, read when"
+                        + " a world loads (not on /reload).")
+                .push("kido");
+        KIDO_POWER_PER_LEVEL = builder
+                .comment("How much stronger each Kidō level makes a spell, as a share of its strength: 0.02 is 2% a level,"
+                        + " so Kidō 40 makes a spell 1.8 times as strong, before its cap.")
+                .defineInRange("power_per_level", 0.02, 0.0, 0.2);
+        KIDO_EISHOHAKI_SHARE = builder
+                .comment("Share of its strength a spell that has an incantation keeps when it is cast by name alone with"
+                        + " the Kidō key (Eishōhaki), at the Kidō level it needs for that: 0.5 is half. Spells without an"
+                        + " incantation always cast at full strength.")
+                .defineInRange("eishohaki_share", 0.5, 0.0, 1.0);
+        KIDO_EISHOHAKI_SHARE_PER_LEVEL = builder
+                .comment("Share added to that for each Kidō level above the one the spell needs: 0.02 brings half to 80%"
+                        + " in 15 levels.")
+                .defineInRange("eishohaki_share_per_level", 0.02, 0.0, 0.2);
+        KIDO_EISHOHAKI_MAX_SHARE = builder
+                .comment("Most of its strength a spell with an incantation keeps cast by name alone. Never below"
+                        + " eishohaki_share.")
+                .defineInRange("eishohaki_max_share", 0.8, 0.0, 1.0);
+        KIDO_STRIKE_XP_BONUS = builder
+                .comment("Kidō xp a cast earns on top of the spell's own when it strikes a creature it may strike. 0 for"
+                        + " none.")
+                .defineInRange("strike_xp_bonus", 1, 0, 100);
         builder.pop();
 
         builder.push("quincy");

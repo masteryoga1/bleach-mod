@@ -24,9 +24,6 @@ import net.minecraft.world.item.component.CustomModelData;
  * config, so game tests can call them directly. {@code now} is the level's game time.
  */
 public final class ShinigamiLogic {
-    /** Kidō cannot be trained until spells exist, so its exam is sat through Reiatsu Control. */
-    public static final boolean KIDO_TRAINABLE = false;
-
     private static final int TICKS_PER_MINUTE = 1200;
     private static final long TICKS_PER_DAY = 24000L;
     /** However much Hohō a soul has, reishi footing never costs less than this share of its drain. */
@@ -129,11 +126,6 @@ public final class ShinigamiLogic {
         data.setShinigami(data.shinigami().withEnrolled(true));
     }
 
-    /** The stat an art is examined through: Kidō is examined through Reiatsu Control until it can be trained. */
-    public static Stat examinedStat(Stat art) {
-        return art == Stat.KIDO && !KIDO_TRAINABLE ? Stat.REIATSU_CONTROL : art;
-    }
-
     /** The level each of the four Zankensoki must reach for a student to graduate. */
     public static Map<Stat, Integer> graduationRequirements() {
         Map<Stat, Integer> requirements = new EnumMap<>(Stat.class);
@@ -148,7 +140,7 @@ public final class ShinigamiLogic {
     public static List<Stat> graduationShortfall(SoulData data) {
         List<Stat> missing = new ArrayList<>();
         graduationRequirements().forEach((art, level) -> {
-            if (data.level(examinedStat(art)) < level) {
+            if (data.level(art) < level) {
                 missing.add(art);
             }
         });
@@ -333,7 +325,8 @@ public final class ShinigamiLogic {
 
     // ---- Shunpo ----
 
-    private static boolean spirituallyTrained(SoulData data) {
+    /** A Shinigami's power, or an Academy student: who may learn the Shinigami arts (Shunpo, reishi footing and Kidō). */
+    static boolean spirituallyTrained(SoulData data) {
         return hasShinigamiPower(data) || isStudent(data);
     }
 

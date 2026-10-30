@@ -1,0 +1,28 @@
+{
+  "kind": "hado",
+  "number": 4,
+  "name": {"translate": "kido.bleach.byakurai"},
+  "shape": "beam",
+  "level": 3,
+  "by_name_level": 3,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.04,
+  "min_cost": 2.0,
+  "cooldown_ticks": 20,
+  "xp": 2,
+  "look": {
+    "colour": "#EEF4FF",
+    "sound": "minecraft:entity.lightning_bolt.impact",
+    "pitch": 1.8,
+    "particle": "minecraft:electric_spark"
+  },
+  "effect": {
+    "damage": 2.0,
+    "damage_per_root": 0.2,
+    "max_damage": 16.0,
+    "range": 32.0,
+    "radius": 0.12,
+    "pierce": 2
+  }
+}
