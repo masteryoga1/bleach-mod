@@ -1029,12 +1029,13 @@ public final class ClientSmokeTest {
             case 4645 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             case 4670 -> ZanpakutoKeys.MASK.setDown(true);
             case 4672 -> ZanpakutoKeys.MASK.setDown(false);
-            // Kidō, seen from behind and facing south. The run's Echt Quincy blood is taken away first, since an
-            // awakened Quincy cannot use Kidō, and the Hollow too, so its voice never takes the action bar. At Kidō 10
-            // the soul knows Shō and Byakurai, and having never chosen, it casts Shō first. The villager stands tall
-            // enough for a level beam from the eyes to meet it.
+            // Kidō, seen from behind and facing south. The run's Quincy power is taken away first, since an awakened
+            // Quincy cannot use Kidō (by its tier alone: a reset would leave the bloodline open, and the steps wait for
+            // it), and the Hollow too, so its voice never takes the action bar. At Kidō 10 the soul knows Shō and
+            // Byakurai, and having never chosen, it casts Shō first. The villager stands tall enough for a level beam
+            // from the eyes to meet it.
             case 4700 -> {
-                command(minecraft, "bleach quincy @s reset");
+                command(minecraft, "bleach tier @s quincy 0");
                 command(minecraft, "bleach visored @s reset");
                 command(minecraft, "bleach stat @s kido 10");
                 command(minecraft, "bleach reiryoku @s 800 800");
