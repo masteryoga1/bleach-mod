@@ -206,6 +206,15 @@ public final class KidoTests {
         }
     }
 
+    /** A dirt wall across the lane, so a beam that missed or pierced through cannot fly on into another test. */
+    private static void buildWall(GameTestHelper helper) {
+        for (int y = 2; y <= 5; y++) {
+            for (int z = 6; z <= 10; z++) {
+                helper.setBlock(11, y, z, Blocks.DIRT);
+            }
+        }
+    }
+
     /** The dirt wall across the lane, its middle column whole. */
     private static void assertWallStands(GameTestHelper helper) {
         for (int y = 2; y <= 5; y++) {
@@ -381,7 +390,8 @@ public final class KidoTests {
             helper.assertFalse(KidoLogic.mayChoose(KidoLogic.Refusal.UNTRAINED)
                     || KidoLogic.mayChoose(KidoLogic.Refusal.UNABLE), "an untrained or unable soul may choose");
 
-            // Creative pays nothing, waits for nothing and trains nothing.
+            // Creative pays nothing, waits for nothing and trains nothing. The wall stops both bolts in this test.
+            buildWall(helper);
             KidoSpell byakurai = spell(helper, KidoSpell.BYAKURAI).value();
             assertRefusal(helper, KidoEvents.cast(creative, byakurai, KidoLogic.Form.NAME, now), null,
                     "a creative Shinigami's Byakurai");
@@ -391,6 +401,7 @@ public final class KidoTests {
             helper.assertTrue(creativeData.level(Stat.KIDO) == 3 && creativeData.xp(Stat.KIDO) == 0,
                     "a creative caster trained Kidō to " + creativeData.level(Stat.KIDO) + " and "
                             + creativeData.xp(Stat.KIDO) + " xp");
+            assertWallStands(helper);
         } finally {
             VisoredEvents.endTakeover(host, hostData, VisoredEvents.TakeoverEnd.REMOVED, now);
             VisoredEvents.endAll(masked, maskedData, now);
@@ -573,11 +584,7 @@ public final class KidoTests {
         Player player = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 3));
         SoulData data = SoulLogic.get(player);
         KidoLogic.choose(data, KidoSpell.BYAKURAI.location());
-        for (int y = 2; y <= 5; y++) {
-            for (int z = 6; z <= 10; z++) {
-                helper.setBlock(11, y, z, Blocks.DIRT);
-            }
-        }
+        buildWall(helper);
         PlusSpirit plus = HollowPlayerTests.placed(helper, ModEntities.PLUS.get(), 4, 8);
         SpiderHollow spider = HollowPlayerTests.placed(helper, ModEntities.SPIDER_HOLLOW.get(), 7, 8);
         Pig pig = null;
