@@ -40,7 +40,7 @@ import net.neoforged.neoforge.registries.DataPackRegistryEvent;
  * @param level         the Kidō level to cast it at all: by its incantation, or by name if it has none
  * @param byNameLevel   the Kidō level to cast it by name alone, never below {@code level}; read only for a spell
  *                      with an incantation
- * @param chantTicks    ticks of chanting before a chanted cast goes off (read from 6b)
+ * @param chantTicks    ticks of chanting before a chanted cast goes off
  * @param incantations  the whole chants that cast it in chat, at most {@link #MAX_INCANTATIONS}, each at most
  *                      {@link #MAX_INCANTATION_LENGTH} characters (chat's limit); none means it has no known
  *                      incantation and loses nothing cast by name
@@ -88,6 +88,10 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public static final ResourceKey<KidoSpell> SHO = ResourceKey.create(REGISTRY, BleachMod.id("sho"));
     /** Hadō #4 Byakurai, a narrow pale bolt from the index finger. */
     public static final ResourceKey<KidoSpell> BYAKURAI = ResourceKey.create(REGISTRY, BleachMod.id("byakurai"));
+    /** Hadō #31 Shakkahō, a crimson blast that bursts and burns. */
+    public static final ResourceKey<KidoSpell> SHAKKAHO = ResourceKey.create(REGISTRY, BleachMod.id("shakkaho"));
+    /** Hadō #33 Sōkatsui, a wide blue blast. */
+    public static final ResourceKey<KidoSpell> SOKATSUI = ResourceKey.create(REGISTRY, BleachMod.id("sokatsui"));
 
     /** Kind, then number, then id: the order spells are listed and chosen in. */
     public static final Comparator<Holder.Reference<KidoSpell>> ORDER =
@@ -266,7 +270,7 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      * @param blastRadius   how far about where it bursts the blast reaches, in blocks (0 for none)
      * @param blastShare    the blast's share of the damage
      * @param knockback     push along it, on top of the blow's own
-     * @param burnSeconds   seconds a creature it strikes burns (read from 6b)
+     * @param burnSeconds   seconds a creature it strikes burns
      */
     public record Effect(float damage, float damagePerRoot, float maxDamage, double range, float radius, int pierce,
                          float blastRadius, float blastShare, float knockback, float burnSeconds) {

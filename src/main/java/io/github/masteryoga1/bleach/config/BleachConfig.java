@@ -227,6 +227,11 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue KIDO_EISHOHAKI_SHARE_PER_LEVEL;
     public static final ModConfigSpec.DoubleValue KIDO_EISHOHAKI_MAX_SHARE;
     public static final ModConfigSpec.IntValue KIDO_STRIKE_XP_BONUS;
+    public static final ModConfigSpec.BooleanValue KIDO_CHAT_CASTING;
+    public static final ModConfigSpec.IntValue KIDO_CHANT_XP_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue KIDO_MISFIRE_CHANCE;
+    public static final ModConfigSpec.IntValue KIDO_MISFIRE_LEVELS;
+    public static final ModConfigSpec.DoubleValue KIDO_MISFIRE_DAMAGE_SHARE;
 
     public static final ModConfigSpec.EnumValue<BloodlineMode> QUINCY_BLOODLINE_MODE;
     public static final ModConfigSpec.DoubleValue QUINCY_CHANCE;
@@ -1357,6 +1362,28 @@ public final class BleachConfig {
                 .comment("Kidō xp a cast earns on top of the spell's own when it strikes a creature it may strike. 0 for"
                         + " none.")
                 .defineInRange("strike_xp_bonus", 1, 0, 100);
+        KIDO_CHAT_CASTING = builder
+                .comment("Whether typing a spell's whole incantation in chat casts it, spoken aloud to those nearby who see"
+                        + " spirits instead of being sent to chat. Off, chat is never read for Kidō: spells that have an"
+                        + " incantation are cast only by name with the Kidō key, and a Shinigami whose power is lent cannot"
+                        + " cast.")
+                .define("chat_casting", true);
+        KIDO_CHANT_XP_MULTIPLIER = builder
+                .comment("How many times the Kidō xp of a cast by name a chanted cast earns: 2 is twice.")
+                .defineInRange("chant_xp_multiplier", 2, 1, 10);
+        KIDO_MISFIRE_CHANCE = builder
+                .comment("Chance that a spell with an incantation, cast by name alone with the Kidō key, bursts in its"
+                        + " caster's hand at the Kidō level it needs for that: 0.3 is 30%. A chanted spell, a spell without"
+                        + " an incantation, and creative never misfire. 0 for never.")
+                .defineInRange("misfire_chance", 0.3, 0.0, 1.0);
+        KIDO_MISFIRE_LEVELS = builder
+                .comment("Kidō levels above that over which the chance falls away to nothing: 10 takes 30% down by 3% a"
+                        + " level.")
+                .defineInRange("misfire_levels", 10, 1, 100);
+        KIDO_MISFIRE_DAMAGE_SHARE = builder
+                .comment("Share of the spell's damage a misfire does to its caster, who is never put below one heart by"
+                        + " it. The reiryoku is spent and the hands wait as for a cast.")
+                .defineInRange("misfire_damage_share", 0.25, 0.0, 1.0);
         builder.pop();
 
         builder.push("quincy");
