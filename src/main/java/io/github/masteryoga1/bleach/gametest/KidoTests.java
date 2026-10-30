@@ -904,6 +904,9 @@ public final class KidoTests {
         helper.assertTrue(mute.chantable(), "a spell whose incantation is \"!!!\" has none: " + mute.incantations());
         helper.assertFalse(KidoLogic.hears(mute, BleachMod.id("test_chant"), "!!!")
                 || KidoLogic.hears(mute, BleachMod.id("test_chant"), ""), "an incantation of \"!!!\" was heard");
+        // Nor is its call alone, which the empty incantation followed by the call would otherwise be.
+        helper.assertFalse(KidoLogic.hears(mute, BleachMod.id("test_chant"), "Hadō #99, Test chant!"),
+                "the call alone was heard as the incantation of a spell whose incantation folds to nothing");
 
         // Of the world's spells, the one that hears the line; the chosen one only when it hears it too, and the Kidō
         // level is the cast's to refuse.
@@ -1311,7 +1314,10 @@ public final class KidoTests {
             assertNear(helper, beside.getHealth(), 7.698, "the health of the pig beside it");
             helper.assertTrue(beside.getRemainingFireTicks() <= 0, "the burst set the pig beside it alight");
             helper.assertTrue(unhurt(beyond), "the burst reached the pig beyond it");
-            HollowPlayerTests.assertClose(helper, player.getHealth(), 20.0, "the caster's health after its own burst");
+            // The mock caster is not in the level, so no burst could find it: the rule that spares it is asked
+            // directly, and its health shows only that the cast did not misfire.
+            helper.assertFalse(CeroBeam.mayStrike(player, player), "a Hadō's burst may strike its own caster");
+            HollowPlayerTests.assertClose(helper, player.getHealth(), 20.0, "the caster's health after a cast at roll 1");
             for (int z = 8; z <= 10; z++) {
                 helper.assertBlockNotPresent(Blocks.FIRE, 6, 2, z);
             }
