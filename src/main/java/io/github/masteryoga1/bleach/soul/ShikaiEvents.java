@@ -168,7 +168,8 @@ public final class ShikaiEvents {
         if (ShinigamiLogic.isPowerLent(data, now)) {
             return Result.LENT;
         }
-        if (!ZanpakutoLogic.canWield(data)) {
+        // The Hollow holding the body says it is the blade (Ch. 218): it does not answer its host.
+        if (!ZanpakutoLogic.canWield(data) || VisoredLogic.takenOver(data)) {
             return Result.SILENT;
         }
         if (player.tickCount - data.lastShikaiChangeTick < SETTLE_TICKS) {
@@ -318,7 +319,7 @@ public final class ShikaiEvents {
         if (ShinigamiLogic.isPowerLent(data, now)) {
             return GatherResult.LENT;
         }
-        if (!ZanpakutoLogic.canWield(data) || spirit.isEmpty()) {
+        if (!ZanpakutoLogic.canWield(data) || spirit.isEmpty() || VisoredLogic.takenOver(data)) {
             return GatherResult.SILENT;
         }
         if (now - data.lastGetsugaAt < BleachConfig.get(BleachConfig.GETSUGA_COOLDOWN_TICKS)) {
@@ -339,7 +340,8 @@ public final class ShikaiEvents {
     /**
      * Swings the gathered reiatsu out as a Getsuga Tenshō, as strong as the gathering and the soul's
      * reiryoku allow. Behind a Visored's mask it is the black crescent, half again as strong, decided as the
-     * blade swings ({@link VisoredLogic#blackGetsuga}). Null, firing nothing, if nothing was gathering or the
+     * blade swings ({@link VisoredLogic#blackGetsuga}). Loosed behind the mask near death, it lets the Hollow
+     * take the body ({@link VisoredLogic#losesControl}). Null, firing nothing, if nothing was gathering or the
      * blade can no longer do it.
      */
     @Nullable
@@ -376,6 +378,11 @@ public final class ShikaiEvents {
                 black ? BLACK_FIRE_PITCH : 1.0F, false);
         data.lastGetsugaAt = now;
         noteGetsugaFired(player, data, charge);
+        // Reaching for the Hollow's power at the edge of death lets it in, even behind a beaten Hollow's mask
+        // (Ch. 211-213, 218).
+        if (black && VisoredLogic.losesControl(data, player.getHealth(), player.getMaxHealth(), now)) {
+            VisoredEvents.startTakeover(player, data, true, now);
+        }
         return crescent;
     }
 
@@ -412,10 +419,13 @@ public final class ShikaiEvents {
         return namedNow;
     }
 
-    /** Whether the held blade can still loose a Getsuga Tenshō: the soul's own, released, with the technique, power in hand. */
+    /**
+     * Whether the held blade can still loose a Getsuga Tenshō: the soul's own, released, with the technique, power in
+     * hand, and not while its Hollow holds the body.
+     */
     private static boolean mayGetsuga(Player player, SoulData data, ItemStack stack, long now) {
         if (!ZanpakutoLogic.isOwnBlade(stack, player) || ShinigamiLogic.isPowerLent(data, now)
-                || !ZanpakutoLogic.canWield(data) || data.jinzen != null) {
+                || !ZanpakutoLogic.canWield(data) || data.jinzen != null || VisoredLogic.takenOver(data)) {
             return false;
         }
         ZanpakutoBlade blade = ZanpakutoItem.blade(stack);

@@ -283,8 +283,11 @@ public final class ShinigamiEvents {
             return false;
         }
         long now = performer.level().getGameTime();
-        if (!ShinigamiLogic.canPerformKonso(data, now)) {
-            String key = ShinigamiLogic.hasShinigamiPower(data) && ShinigamiLogic.isPowerLent(data, now)
+        // The Hollow holding the body sends no soul on.
+        boolean taken = VisoredLogic.takenOver(data);
+        if (taken || !ShinigamiLogic.canPerformKonso(data, now)) {
+            String key = taken ? "message.bleach.visored.takeover.sealed"
+                    : ShinigamiLogic.hasShinigamiPower(data) && ShinigamiLogic.isPowerLent(data, now)
                     ? "message.bleach.power_lent" : "message.bleach.konso.untrained";
             performer.displayClientMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY), true);
             return false;
@@ -368,7 +371,10 @@ public final class ShinigamiEvents {
         }
         long now = giver.level().getGameTime();
         if (targetData.state() == SoulState.PLUS) {
-            if (ShinigamiLogic.hasShinigamiPower(giverData) && ShinigamiLogic.isPowerLent(giverData, now)) {
+            if (VisoredLogic.takenOver(giverData)) {
+                giver.displayClientMessage(Component.translatable("message.bleach.visored.takeover.sealed")
+                        .withStyle(ChatFormatting.GRAY), true);
+            } else if (ShinigamiLogic.hasShinigamiPower(giverData) && ShinigamiLogic.isPowerLent(giverData, now)) {
                 giver.displayClientMessage(Component.translatable("message.bleach.power_lent").withStyle(ChatFormatting.GRAY), true);
             } else if (!ShinigamiLogic.canPerformKonso(giverData, now)) {
                 giver.displayClientMessage(Component.translatable("message.bleach.konso.untrained").withStyle(ChatFormatting.GRAY), true);
@@ -382,6 +388,12 @@ public final class ShinigamiEvents {
 
     /** The first use of the blade on a Human asks the Shinigami to be sure; a second one makes the offer. */
     private static void offerPower(Player giver, SoulData giverData, Player human, SoulData humanData, long now) {
+        // The Hollow holding the body gives none of its power away.
+        if (VisoredLogic.takenOver(giverData)) {
+            giver.displayClientMessage(Component.translatable("message.bleach.visored.takeover.sealed")
+                    .withStyle(ChatFormatting.GRAY), true);
+            return;
+        }
         if (ShinigamiLogic.isPowerLent(giverData, now)) {
             giver.displayClientMessage(Component.translatable("message.bleach.power_lent").withStyle(ChatFormatting.GRAY), true);
             return;
@@ -477,6 +489,10 @@ public final class ShinigamiEvents {
             return true;
         }
         SoulData offererData = SoulLogic.get(offerer);
+        // The Hollow holding the offerer's body gives nothing: neither Konsō nor its power.
+        if (VisoredLogic.takenOver(offererData)) {
+            return true;
+        }
         switch (offer.kind()) {
             case KONSO -> {
                 if (ShinigamiLogic.canPerformKonso(offererData, now)) {

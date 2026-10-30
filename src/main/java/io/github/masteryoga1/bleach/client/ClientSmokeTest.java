@@ -159,12 +159,15 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * on by command, which must reach the client with the training. Holding the real Cero key must gather a Cero
  * at its face in the masked Visored's crimson, and letting it go past half must fire it four blocks wide; then
  * the Getsuga Tenshō it looses must reach the client as the black one. The soul screen is opened on the masked
- * Visored before the run quits.
+ * Visored. Last, seen from in front, the Hollow is taken away and rooted again by command, and seizes the body by
+ * command, which must reach the client as half a mask; in first person, framed by the left half of the mask's edge,
+ * it must still hold the body, and then the real Hollow Mask key tears the half mask off, and the client must see it
+ * gone and the weariness after it, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask, masked Cero, black Getsuga Tenshō and HUD are drawn, and screenshots of the main moments are saved
+ * mask, masked Cero, black Getsuga Tenshō, half mask and HUD are drawn, and screenshots of the main moments are saved
  * for review. Any crash in the mod's client code fails the run, and so does anything that did not reach the
  * client as expected.
  */
@@ -369,6 +372,7 @@ public final class ClientSmokeTest {
         checkVisored(minecraft, player, soul);
         checkVisoredMask(minecraft, player, soul);
         checkVisoredArts(minecraft, player, soul);
+        checkVisoredTakeover(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -985,7 +989,22 @@ public final class ClientSmokeTest {
                 shot(minecraft, "stats_visored");
             }
             case 4590 -> minecraft.setScreen(null);
+            // The Hollow's hold, seen from in front: the reset takes the mask off and the Hollow away, so the Hollow
+            // rooted again by command is not yet beaten, and it seizes the body by command with half a mask, for ten
+            // seconds, past the key. The rooting's Nausea and Weakness are cleared first, so the shots are not blurred.
+            // Then in first person, and the real Hollow Mask key, held for two ticks, tears the half mask off.
             case 4600 -> {
+                command(minecraft, "bleach visored @s reset");
+                command(minecraft, "bleach visored @s root");
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+            }
+            case 4605 -> command(minecraft, "effect clear @s");
+            case 4610 -> command(minecraft, "bleach visored @s takeover");
+            case 4645 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            case 4670 -> ZanpakutoKeys.MASK.setDown(true);
+            case 4672 -> ZanpakutoKeys.MASK.setDown(false);
+            case 4700 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1292,6 +1311,26 @@ public final class ClientSmokeTest {
                 "the masked Visored's Getsuga Tenshō never reached the client as the black one")) {
             shot(minecraft, "visored_getsuga");
         }
+    }
+
+    /** The checks of the Hollow's hold, each window from the step it follows. */
+    private static void checkVisoredTakeover(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (expectWithin(minecraft, 4612, 4640,
+                () -> hasLook(player, HollowPlayerLogic.LOOK_TAKEN_OVER) && !hasLook(player, HollowPlayerLogic.LOOK_MASK)
+                        && soul.shinigami().visored().rooted() && !soul.shinigami().visored().subdued(),
+                "the Hollow's hold by command never reached the client as the half mask of a Hollow not yet beaten")) {
+            shot(minecraft, "visored_half_mask");
+        }
+        // With no mask on, the edge drawn is the left half the half mask gives.
+        if (expectWithin(minecraft, 4650, 4665,
+                () -> hasLook(player, HollowPlayerLogic.LOOK_TAKEN_OVER) && !soul.shinigami().visored().masked(),
+                "the Hollow let go of the body before the Hollow Mask key was pressed")) {
+            shot(minecraft, "visored_half_mask_edge");
+        }
+        // The weariness comes only with a tear-off or a run-out, and the run-out is still seconds away.
+        expectWithin(minecraft, 4673, 4690,
+                () -> !hasLook(player, HollowPlayerLogic.LOOK_TAKEN_OVER) && player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN),
+                "the Hollow Mask key never tore the half mask off, or the weariness after it never reached the client");
     }
 
     /** Whether an Arrancar NPC the player can see stands within 8 blocks as asked. */

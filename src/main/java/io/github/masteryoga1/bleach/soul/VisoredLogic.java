@@ -17,13 +17,16 @@ import net.minecraft.world.entity.player.Player;
  * wounds it, when the rooted Hollow speaks and can be faced, what the soul screen says meanwhile, how strong the
  * inner Hollow is and where its losing blow stops, and what the beaten Hollow's mask costs, how long it lasts and
  * grows, what it gives and how long the next one waits. With the mask on come its two arts: the masked Cero, once
- * masks have been worn long enough ({@link #maskedCero}), and the black Getsuga Tenshō ({@link #blackGetsuga}). A
- * Visored is a soul with Shinigami power whose Hollow is beaten ({@link #isVisored}); there is no Visored state and
- * no Hollow tier, so to every other rule it is a Shinigami, masked or not. Like {@link ArrancarLogic}, these read
- * only their arguments and the config, send nothing and are safe on both sides, so game tests and the client can
- * call them directly; the one write is {@link #setRecord}. What they do to a player, the fight itself and the mask's
- * upkeep are in {@link VisoredEvents}, and the Hollow that steps out is {@link InnerHollow}. {@code now} is the
- * level's game time.
+ * masks have been worn long enough ({@link #maskedCero}), and the black Getsuga Tenshō ({@link #blackGetsuga}).
+ * Before the win, the Hollow may seize the body near death ({@link #mayBeTakenOver}), and behind the mask when its
+ * host reaches for its power at low health ({@link #losesControl}); with a server's leave, a fight lost once too
+ * often makes the soul a Hollow ({@link #fallsOnLoss}). Whether it holds the body now is server-side only
+ * ({@link #takenOver}). A Visored is a soul with Shinigami power whose Hollow is beaten ({@link #isVisored}); there
+ * is no Visored state and no Hollow tier, so to every other rule it is a Shinigami, masked or not. Like
+ * {@link ArrancarLogic}, these read only their arguments and the config, send nothing and are safe on both sides, so
+ * game tests and the client can call them directly; the one write is {@link #setRecord}. What they do to a player,
+ * the fight itself, the mask's upkeep and the Hollow's hold are in {@link VisoredEvents}, and the Hollow that steps
+ * out is {@link InnerHollow}. {@code now} is the level's game time.
  */
 public final class VisoredLogic {
     /** Blocks from its host at which the inner Hollow steps out. */
@@ -54,6 +57,8 @@ public final class VisoredLogic {
     public static final ResourceLocation MASK_SPEED_ID = BleachMod.id("visored_mask_speed");
     /** The mask's melee damage, a multiplier of everything else (transient). */
     public static final ResourceLocation MASK_DAMAGE_ID = BleachMod.id("visored_mask_damage");
+    /** The melee damage the Hollow adds while it holds its host's body, a multiplier of everything else (transient). */
+    public static final ResourceLocation TAKEOVER_DAMAGE_ID = BleachMod.id("visored_takeover_damage");
 
     private static final long TICKS_PER_MINUTE = 1200L;
 
@@ -476,6 +481,86 @@ public final class VisoredLogic {
     public static float getsugaFactor(SoulData data) {
         return blackGetsuga(data) ? (float) BleachConfig.get(BleachConfig.VISORED_BLACK_GETSUGA_MULTIPLIER) : 1.0F;
     }
+
+    // ---- The Hollow's hold ----
+
+    /**
+     * Whether the inner Hollow holds this soul's body now. Server-side only: the time it lets go is not saved or sent, so
+     * this is false on a client's copy (its owner's client reads {@link HollowPlayerLogic#LOOK_TAKEN_OVER}).
+     */
+    public static boolean takenOver(SoulData data) {
+        return data.takeoverEndsAt != ShinigamiProgress.NEVER;
+    }
+
+    /** Whether {@code spacing_seconds} have passed since the last takeover began. */
+    public static boolean takeoverSpaced(SoulData data, long now) {
+        return now - data.lastTakeoverAt >= BleachConfig.get(BleachConfig.VISORED_TAKEOVER_SPACING_SECONDS) * 20L;
+    }
+
+    /**
+     * Whether a blow near death may let this soul's Hollow seize its body: the path on, rooted and not yet beaten, with
+     * its own Shinigami power not lent away, not already seized, and the spacing past.
+     */
+    public static boolean mayBeTakenOver(SoulData data, long now) {
+        ShinigamiProgress.Visored record = record(data);
+        return enabled() && record.rooted() && !record.subdued() && ShinigamiLogic.hasShinigamiPower(data)
+                && !ShinigamiLogic.isPowerLent(data, now) && !takenOver(data) && takeoverSpaced(data, now);
+    }
+
+    /**
+     * Whether a blow that took the health from {@code before} to {@code after} brought it near death: from above
+     * {@code health_share} of the maximum to that share or less, and still alive. One blow below the line does not count
+     * again.
+     */
+    public static boolean isTakeoverBlow(float before, float after, float maxHealth) {
+        double line = maxHealth * BleachConfig.get(BleachConfig.VISORED_TAKEOVER_HEALTH_SHARE);
+        return after > 0.0F && after <= line && before > line;
+    }
+
+    /**
+     * The chance a blow near death lets the Hollow in: {@code chance}, or {@code chance_after_getsuga} when higher within
+     * {@code getsuga_window_seconds} of a Getsuga Tenshō loosed at {@code lastGetsugaAt}.
+     */
+    public static double takeoverChance(long lastGetsugaAt, long now) {
+        double chance = BleachConfig.get(BleachConfig.VISORED_TAKEOVER_CHANCE);
+        long window = BleachConfig.get(BleachConfig.VISORED_TAKEOVER_GETSUGA_WINDOW_SECONDS) * 20L;
+        long since = now - lastGetsugaAt;
+        return window > 0L && since >= 0L && since <= window
+                ? Math.max(chance, BleachConfig.get(BleachConfig.VISORED_TAKEOVER_CHANCE_AFTER_GETSUGA)) : chance;
+    }
+
+    /** Whether a roll from 0 (inclusive) to 1 (exclusive) lets the Hollow in at this chance: 1 always, 0 never. */
+    public static boolean takeoverRolled(double roll, double chance) {
+        return roll < chance;
+    }
+
+    /**
+     * Whether a Getsuga Tenshō loosed now, at this health, makes the Visored lose control: the black one (its mask on,
+     * the path on), its power not lent, not already seized, the spacing past, and alive at {@code masked_health_share}
+     * of its maximum health or less.
+     */
+    public static boolean losesControl(SoulData data, float health, float maxHealth, long now) {
+        return blackGetsuga(data) && !ShinigamiLogic.isPowerLent(data, now) && !takenOver(data)
+                && takeoverSpaced(data, now) && health > 0.0F
+                && health <= maxHealth * BleachConfig.get(BleachConfig.VISORED_TAKEOVER_MASKED_HEALTH_SHARE);
+    }
+
+    /** How long the Hollow holds the body, in ticks: {@code masked_seconds} behind a mask, else {@code seconds}. */
+    public static long takeoverTicks(boolean masked) {
+        return (masked ? BleachConfig.get(BleachConfig.VISORED_TAKEOVER_MASKED_SECONDS)
+                : BleachConfig.get(BleachConfig.VISORED_TAKEOVER_SECONDS)) * 20L;
+    }
+
+    /**
+     * Whether a fight lost that brings the count to {@code losses} makes the soul a Hollow: with {@code fall_into_hollow}
+     * on, at {@code losses_to_fall} or past it.
+     */
+    public static boolean fallsOnLoss(int losses) {
+        return BleachConfig.get(BleachConfig.VISORED_FALL_INTO_HOLLOW)
+                && losses >= BleachConfig.get(BleachConfig.VISORED_LOSSES_TO_FALL);
+    }
+
+    // ---- Helpers ----
 
     /** Whole seconds from {@code now} until {@code at}, rounded up, and never below 0: for the fight's bar. */
     public static long secondsUntil(long at, long now) {

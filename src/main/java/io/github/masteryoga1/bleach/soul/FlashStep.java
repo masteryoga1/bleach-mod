@@ -83,6 +83,11 @@ public final class FlashStep {
             refuse(player, "message.bleach.gritz.bound");
             return;
         }
+        // The Hollow holding the body does not flash step for its host.
+        if (VisoredLogic.takenOver(data)) {
+            refuse(player, "message.bleach.visored.takeover.sealed");
+            return;
+        }
         if (!ShinigamiLogic.canFlashStep(data, now)) {
             // A Hollow is told that Sonído is an Arrancar's, not that it never learned Shunpo.
             refuse(player, HollowPlayerLogic.isHollow(data) ? "message.bleach.sonido.hollow"

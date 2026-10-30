@@ -237,6 +237,15 @@ public final class SoulData {
     /** Game time a blow last cracked this Hollow's whole mask, or {@link #NEVER}: a fresh crack breaks a Cero's gather. */
     long hollowFreshCrackAt = NEVER;
     /**
+     * Game time the inner Hollow lets go of this soul's body, or {@link #NEVER} while it holds none (see
+     * {@link VisoredEvents#startTakeover}).
+     */
+    long takeoverEndsAt = NEVER;
+    /** Game time the last takeover began, for the spacing between them. Starts over on logging in. */
+    long lastTakeoverAt = NEVER;
+    /** Set by a fight lost once too often, with the fall turned on: the soul becomes a Hollow at its next tick. */
+    boolean fallPending;
+    /**
      * Game time of the first press that arms a Menos's tear at its own mask, waiting for the second, or
      * {@link #NEVER} (see {@link ArrancarEvents}).
      */
