@@ -1029,9 +1029,13 @@ public final class ClientSmokeTest {
             case 4645 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             case 4670 -> ZanpakutoKeys.MASK.setDown(true);
             case 4672 -> ZanpakutoKeys.MASK.setDown(false);
-            // Kidō, seen from behind and facing south. At Kidō 10 the soul knows Shō and Byakurai, and having never
-            // chosen, it casts Shō first. The villager stands tall enough for a level beam from the eyes to meet it.
+            // Kidō, seen from behind and facing south. The run's Echt Quincy blood is taken away first, since an
+            // awakened Quincy cannot use Kidō, and the Hollow too, so its voice never takes the action bar. At Kidō 10
+            // the soul knows Shō and Byakurai, and having never chosen, it casts Shō first. The villager stands tall
+            // enough for a level beam from the eyes to meet it.
             case 4700 -> {
+                command(minecraft, "bleach quincy @s reset");
+                command(minecraft, "bleach visored @s reset");
                 command(minecraft, "bleach stat @s kido 10");
                 command(minecraft, "bleach reiryoku @s 800 800");
                 command(minecraft, "tp @s ~ ~ ~ 0 0");
@@ -1387,7 +1391,7 @@ public final class ClientSmokeTest {
      */
     private static void checkKido(Minecraft minecraft, LocalPlayer player, SoulData soul) {
         expectWithin(minecraft, 4713, 4730, () -> soul.level(Stat.KIDO) == 10 && soul.xp(Stat.KIDO) >= 1,
-                "the Kidō key never cast Shō");
+                "the Kidō key never cast Shō (the action bar last read: " + lastActionBar() + ")");
         // Shō does about 3 of its 20; a villager is no spirit, so anyone sees it hurt.
         expectWithin(minecraft, 4714, 4730,
                 () -> nearest(minecraft, Villager.class, 8.0, villager -> villager.getHealth() < villager.getMaxHealth())
@@ -1404,7 +1408,8 @@ public final class ClientSmokeTest {
         if (expectWithin(minecraft, 4761, 4780,
                 () -> ownCero(minecraft, player, beam -> beam.isFired() && beam.colour() == byakuraiColour(minecraft)
                         && beam.firedAge(0.0F) >= 1.0F) != null,
-                "the Kidō key never cast Byakurai, or its trace never reached the client in the synced spell's colour")) {
+                "the Kidō key never cast Byakurai, or its trace never reached the client in the synced spell's colour"
+                        + " (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_byakurai");
         }
         // Shō gave 2 with its strike, and Byakurai gives at least 2 more. Its 32 reiryoku come back too fast to check.
@@ -1427,6 +1432,11 @@ public final class ClientSmokeTest {
     private static boolean byakuraiChosenShown(Minecraft minecraft) {
         KidoSpell spell = byakurai(minecraft);
         return spell != null && actionBarShows(Component.translatable("message.bleach.kido.chosen", spell.title()));
+    }
+
+    /** The last line the server put on the action bar, for a failure to name the refusal it may have been. */
+    private static String lastActionBar() {
+        return actionBar == null ? "nothing" : "\"" + actionBar.getString() + "\"";
     }
 
     /**
