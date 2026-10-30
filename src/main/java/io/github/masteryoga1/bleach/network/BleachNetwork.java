@@ -11,7 +11,9 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenPage;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import java.util.List;
+import java.util.Optional;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -28,8 +30,9 @@ public final class BleachNetwork {
      * 15: the Arrancar record's rank, and the Arrancar's number in the Hollow look.
      * 16: the Visored record in ShinigamiProgress.
      * 17: {@code ZanpakutoKey.MASK} and the mask's four fields in the Visored record.
+     * 18: the Kidō key, the synced Kidō spells and the Kidō record in ShinigamiProgress.
      */
-    private static final String VERSION = "17";
+    private static final String VERSION = "18";
 
     private BleachNetwork() {
     }
@@ -55,6 +58,7 @@ public final class BleachNetwork {
                         BloodlineChoicePayload::handle)
                 .playToServer(QuincyKeyPayload.TYPE, QuincyKeyPayload.STREAM_CODEC, QuincyKeyPayload::handle)
                 .playToServer(HollowKeyPayload.TYPE, HollowKeyPayload.STREAM_CODEC, HollowKeyPayload::handle)
+                .playToServer(KidoKeyPayload.TYPE, KidoKeyPayload.STREAM_CODEC, KidoKeyPayload::handle)
                 .playToClient(PesquisaPayload.TYPE, PesquisaPayload.STREAM_CODEC, PesquisaPayload::handle);
     }
 
@@ -162,5 +166,13 @@ public final class BleachNetwork {
      */
     public static void requestHollowKey(HollowKey key, int target) {
         PacketDistributor.sendToServer(new HollowKeyPayload(key, target));
+    }
+
+    /**
+     * Tells the server the Kidō key went down (to cast the chosen spell, or to choose the next one while sneaking) or
+     * came up, or that a screen opened while it was held. Only the Kidō page names a spell; the key sends none.
+     */
+    public static void requestKidoKey(KidoKeyPayload.KidoKey key, Optional<ResourceLocation> spell) {
+        PacketDistributor.sendToServer(new KidoKeyPayload(key, spell));
     }
 }

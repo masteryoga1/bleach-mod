@@ -4,11 +4,12 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Where a soul stands on the road to becoming a Shinigami: Academy enrolment, the Asauchi it was
- * issued, power lent to or taken from a Shinigami, Konsō performed, and the Hollow a Visored carries
- * inside. Saved with the soul and sent to its owner's client. Times are game times in ticks;
+ * issued, power lent to or taken from a Shinigami, Konsō performed, the Hollow a Visored carries
+ * inside, and its Kidō. Saved with the soul and sent to its owner's client. Times are game times in ticks;
  * {@link #NEVER} means it never happened.
  *
  * @param enrolled        whether a Rukongai soul is studying at the Academy
@@ -22,18 +23,20 @@ import net.minecraft.core.BlockPos;
  * @param academyPos      the nearest Academy this soul was told about, if any
  * @param visored         the Hollow that took root in this soul's wounds, the fights with it and its mask (see
  *                        {@link VisoredLogic}); it belongs to the soul's Shinigami power, so it is kept here
+ * @param kido            the Kidō spell this soul chose to cast with the Kidō key (see {@link KidoLogic})
  */
 public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long powerLentUntil, float lentReiryoku,
                                 long gavePowerAt, long woundedMetAt, long konsoDay, int konsoRewards,
-                                Optional<BlockPos> academyPos, Visored visored) {
+                                Optional<BlockPos> academyPos, Visored visored, Kido kido) {
     /** Far enough in the past that {@code now - NEVER} cannot overflow. */
     public static final long NEVER = Long.MIN_VALUE / 2;
 
     public static final ShinigamiProgress NONE =
-            new ShinigamiProgress(false, NEVER, 0L, 0.0F, NEVER, NEVER, -1L, 0, Optional.empty(), Visored.NONE);
+            new ShinigamiProgress(false, NEVER, 0L, 0.0F, NEVER, NEVER, -1L, 0, Optional.empty(), Visored.NONE, Kido.NONE);
 
-    // Every field is read leniently, so one bad value falls back to its default on its own, and a save from
-    // before the Visored has no "visored" at all and reads as having no Hollow inside.
+    // Every field is read leniently, so one bad value falls back to its default on its own, a save from before
+    // the Visored has no "visored" at all and reads as having no Hollow inside, and a save from before Kidō has no
+    // "kido" and reads as no spell chosen.
     public static final Codec<ShinigamiProgress> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.lenientOptionalFieldOf("enrolled", false).forGetter(ShinigamiProgress::enrolled),
             Codec.LONG.lenientOptionalFieldOf("asauchi_issued_at", NEVER).forGetter(ShinigamiProgress::asauchiIssuedAt),
@@ -44,70 +47,77 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
             Codec.LONG.lenientOptionalFieldOf("konso_day", -1L).forGetter(ShinigamiProgress::konsoDay),
             Codec.INT.lenientOptionalFieldOf("konso_rewards", 0).forGetter(ShinigamiProgress::konsoRewards),
             BlockPos.CODEC.lenientOptionalFieldOf("academy_pos").forGetter(ShinigamiProgress::academyPos),
-            Visored.CODEC.lenientOptionalFieldOf("visored", Visored.NONE).forGetter(ShinigamiProgress::visored)
+            Visored.CODEC.lenientOptionalFieldOf("visored", Visored.NONE).forGetter(ShinigamiProgress::visored),
+            Kido.CODEC.lenientOptionalFieldOf("kido", Kido.NONE).forGetter(ShinigamiProgress::kido)
     ).apply(instance, ShinigamiProgress::new));
 
-    /** A missing Visored record is no Hollow inside. */
+    /** A missing Visored record is no Hollow inside, and a missing Kidō record no spell chosen. */
     public ShinigamiProgress {
         visored = visored == null ? Visored.NONE : visored;
+        kido = kido == null ? Kido.NONE : kido;
     }
 
-    /** The nine-part record of 5i, with no Hollow inside. */
+    /** The nine-part record of 5i, with no Hollow inside and no Kidō spell chosen. */
     public ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long powerLentUntil, float lentReiryoku,
                              long gavePowerAt, long woundedMetAt, long konsoDay, int konsoRewards,
                              Optional<BlockPos> academyPos) {
         this(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt, woundedMetAt, konsoDay,
-                konsoRewards, academyPos, Visored.NONE);
+                konsoRewards, academyPos, Visored.NONE, Kido.NONE);
     }
 
     public ShinigamiProgress withEnrolled(boolean value) {
         return new ShinigamiProgress(value, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, academyPos, visored);
+                woundedMetAt, konsoDay, konsoRewards, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withAsauchiIssuedAt(long value) {
         return new ShinigamiProgress(enrolled, value, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, academyPos, visored);
+                woundedMetAt, konsoDay, konsoRewards, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withPowerLentUntil(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, value, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, academyPos, visored);
+                woundedMetAt, konsoDay, konsoRewards, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withLentReiryoku(float value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, value, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, academyPos, visored);
+                woundedMetAt, konsoDay, konsoRewards, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withGavePowerAt(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, value,
-                woundedMetAt, konsoDay, konsoRewards, academyPos, visored);
+                woundedMetAt, konsoDay, konsoRewards, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withWoundedMetAt(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                value, konsoDay, konsoRewards, academyPos, visored);
+                value, konsoDay, konsoRewards, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withKonsoDay(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, value, konsoRewards, academyPos, visored);
+                woundedMetAt, value, konsoRewards, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withKonsoRewards(int value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, value, academyPos, visored);
+                woundedMetAt, konsoDay, value, academyPos, visored, kido);
     }
 
     public ShinigamiProgress withAcademyPos(Optional<BlockPos> value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, value, visored);
+                woundedMetAt, konsoDay, konsoRewards, value, visored, kido);
     }
 
     public ShinigamiProgress withVisored(Visored value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, academyPos, value);
+                woundedMetAt, konsoDay, konsoRewards, academyPos, value, kido);
+    }
+
+    public ShinigamiProgress withKido(Kido value) {
+        return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
+                woundedMetAt, konsoDay, konsoRewards, academyPos, visored, value);
     }
 
     /**
@@ -228,6 +238,31 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
         public Visored withMaskTrainedTicks(long value) {
             return new Visored(wounds, lastWoundAt, rootedAt, losses, duelReadyAt, subduedAt, maskChangedAt, maskEndsAt,
                     maskReadyAt, value);
+        }
+    }
+
+    /**
+     * The soul's Kidō: the spell it chose to cast with the Kidō key, if any (see {@link KidoLogic}). Saved with the
+     * rest and read leniently, so a save from before Kidō, or an unreadable choice, reads as {@link #NONE}. A choice
+     * of a spell the world no longer has, or the soul cannot yet cast, is kept, and the first spell it knows is cast
+     * in its place.
+     *
+     * @param chosen the id of the chosen spell, or empty before the first choice
+     */
+    public record Kido(Optional<ResourceLocation> chosen) {
+        public static final Kido NONE = new Kido(Optional.empty());
+
+        public static final Codec<Kido> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                ResourceLocation.CODEC.lenientOptionalFieldOf("chosen").forGetter(Kido::chosen)
+        ).apply(instance, Kido::new));
+
+        /** A missing choice is none. */
+        public Kido {
+            chosen = chosen == null ? Optional.empty() : chosen;
+        }
+
+        public Kido withChosen(Optional<ResourceLocation> value) {
+            return new Kido(value);
         }
     }
 }

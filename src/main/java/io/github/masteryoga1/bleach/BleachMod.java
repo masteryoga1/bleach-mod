@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import io.github.masteryoga1.bleach.advancement.BleachTriggers;
 import io.github.masteryoga1.bleach.command.BleachCommand;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModArmorMaterials;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
@@ -49,6 +50,7 @@ public final class BleachMod {
         modEventBus.addListener(BleachNetwork::register);
         modEventBus.addListener(ModEntities::onAttributes);
         modEventBus.addListener(ZanpakutoSpirits::register);
+        modEventBus.addListener(KidoSpell::register);
 
         SoulEvents.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(BleachCommand::register);

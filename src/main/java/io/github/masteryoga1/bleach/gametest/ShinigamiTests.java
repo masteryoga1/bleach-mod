@@ -133,18 +133,18 @@ public final class ShinigamiTests {
         data.setLevel(Stat.ZANJUTSU, 4);
         data.setLevel(Stat.HAKUDA, 5);
         data.setLevel(Stat.HOHO, 5);
-        data.setLevel(Stat.REIATSU_CONTROL, 2);
+        data.setLevel(Stat.KIDO, 5);
         helper.assertTrue(ShinigamiLogic.graduationShortfall(data).equals(List.of(Stat.ZANJUTSU)),
                 "short of Zanjutsu, the exams found " + ShinigamiLogic.graduationShortfall(data));
         helper.assertFalse(ShinigamiLogic.canGraduate(data), "graduated without the Zanjutsu");
 
         data.setLevel(Stat.ZANJUTSU, 5);
-        data.setLevel(Stat.REIATSU_CONTROL, 1);
+        data.setLevel(Stat.KIDO, 4);
+        data.setLevel(Stat.REIATSU_CONTROL, 50);
         helper.assertTrue(ShinigamiLogic.graduationShortfall(data).equals(List.of(Stat.KIDO)),
-                "short of Reiatsu Control, the exams found " + ShinigamiLogic.graduationShortfall(data));
-        helper.assertTrue(ShinigamiLogic.examinedStat(Stat.KIDO) == Stat.REIATSU_CONTROL, "Kidō is not examined through Reiatsu Control");
+                "short of Kidō, the exams found " + ShinigamiLogic.graduationShortfall(data));
 
-        data.setLevel(Stat.REIATSU_CONTROL, 2);
+        data.setLevel(Stat.KIDO, 5);
         data.setReiryoku(5.0F);
         helper.assertTrue(ShinigamiLogic.canGraduate(data), "a ready student could not graduate");
         helper.assertFalse(ShinigamiLogic.canGraduate(soul(SoulState.RUKONGAI, 40.0F)), "a soul graduated without enrolling");

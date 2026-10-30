@@ -1,0 +1,29 @@
+{
+  "kind": "hado",
+  "number": 1,
+  "name": {"translate": "kido.bleach.sho"},
+  "shape": "beam",
+  "level": 0,
+  "by_name_level": 0,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.02,
+  "min_cost": 1.0,
+  "cooldown_ticks": 10,
+  "xp": 1,
+  "look": {
+    "colour": "#CFE6FF",
+    "sound": "minecraft:entity.wind_charge.wind_burst",
+    "pitch": 1.6,
+    "particle": "minecraft:small_gust"
+  },
+  "effect": {
+    "damage": 1.0,
+    "damage_per_root": 0.05,
+    "max_damage": 4.0,
+    "range": 6.0,
+    "radius": 0.3,
+    "pierce": 1,
+    "knockback": 1.2
+  }
+}
