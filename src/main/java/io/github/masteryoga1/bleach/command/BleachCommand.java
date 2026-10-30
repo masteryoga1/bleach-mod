@@ -141,7 +141,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach zanpakuto &lt;players&gt; name    (as if the spirit's test was passed)
  * /bleach zanpakuto &lt;players&gt; seal    (a constant release can be released for the first time again)
  * /bleach zanpakuto &lt;players&gt; reset
- * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|mask|unmask|reset&gt;   (duel fights here, rooting as needed)
+ * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|mask|unmask|takeover|reset&gt;
+ *                                    (duel fights here, rooting as needed)
  * /bleach visored &lt;players&gt; train &lt;0..86400&gt;   (seconds the mask has been worn)
  * /bleach quincy &lt;players&gt; bloodline &lt;none|gemischt|echt&gt;   (as if chosen, with no word and no Cross)
  * /bleach quincy &lt;players&gt; training &lt;0..100000&gt;   (raises the tier to match, never lowers it)
@@ -1340,8 +1341,10 @@ public final class BleachCommand {
      * {@code ready} also lets it be faced now, or a Visored call its mask again now; {@code duel} starts the fight
      * where the player stands, rooting and readying as needed, though never on Peaceful or with the path turned off;
      * {@code subdue} makes the soul a Visored, winning a fight under way; {@code mask} puts a Visored's mask on with
-     * no cost and no wait, and {@code unmask} takes it off; and {@code reset} ends any fight, takes any mask off and
-     * takes the Hollow away.
+     * no cost and no wait, and {@code unmask} takes it off; {@code takeover} lets the Hollow seize the body now, with no
+     * roll, health or spacing: the 5-second kind behind a mask that is on; never with the path off, unrooted, lent, in a
+     * fight, in creative or spectator mode or held by Negación, nor on a beaten Hollow without its mask on; and
+     * {@code reset} ends any takeover and fight, takes any mask off and takes the Hollow away.
      */
     private static int visored(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "action");
@@ -1423,6 +1426,16 @@ public final class BleachCommand {
                     return Component.translatable("message.bleach.visored.mask.not_worn");
                 }
                 VisoredEvents.endMask(player, data, VisoredEvents.MaskEnd.TAKEN_OFF, now);
+            }
+            case TAKEOVER -> {
+                if (!VisoredLogic.enabled()) {
+                    return Component.translatable("message.bleach.visored.disabled");
+                }
+                // The kind that fits the soul: behind its mask if one is on, else the half mask, which a beaten Hollow
+                // never forms.
+                if (!VisoredEvents.startTakeover(player, data, VisoredLogic.isMasked(data), now)) {
+                    return Component.literal("refused");
+                }
             }
             case RESET -> {
                 VisoredEvents.endAll(player, data, now);
@@ -1881,7 +1894,7 @@ public final class BleachCommand {
 
     /** What {@code /bleach visored <players>} does. */
     private enum VisoredAction implements StringRepresentable {
-        ROOT, READY, DUEL, SUBDUE, MASK, UNMASK, RESET;
+        ROOT, READY, DUEL, SUBDUE, MASK, UNMASK, TAKEOVER, RESET;
 
         @Override
         public String getSerializedName() {

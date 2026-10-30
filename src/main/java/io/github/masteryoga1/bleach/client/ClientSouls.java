@@ -19,20 +19,20 @@ public final class ClientSouls {
 
     /**
      * How an entity's soul looks: the local player's from its own data, others' from what the server sent.
-     * The local player's Hollow jaw (and how long its hold is) and cracked mask come from the server too,
-     * which alone knows them, and so does an Arrancar's Resurrección, with the Vasto Lorde's bone it brings
-     * back to one that rose from a Vasto Lorde.
+     * The local player's Hollow jaw (and how long its hold is), cracked mask and the half mask its inner Hollow
+     * forms when it seizes the body come from the server too, which alone knows them, and so does an Arrancar's
+     * Resurrección, with the Vasto Lorde's bone it brings back to one that rose from a Vasto Lorde.
      */
     public static SoulAppearance appearance(Entity entity) {
         LocalPlayer self = Minecraft.getInstance().player;
         if (entity == self) {
             SoulAppearance own = SoulAppearance.of(self, self.getData(SoulAttachments.SOUL));
-            // The devouring and cracked bits live only on the server, which sends them to the owner too, and so
-            // does an Arrancar's release, a transient, with the Vasto Lorde's bone it brings back. Those two are
-            // taken for an Arrancar only: a Hollow's own data tells its form more freshly than a look sent
+            // The devouring, cracked and taken-over bits live only on the server, which sends them to the owner too,
+            // and so does an Arrancar's release, a transient, with the Vasto Lorde's bone it brings back. Those two
+            // are taken for an Arrancar only: a Hollow's own data tells its form more freshly than a look sent
             // before the form changed.
             int fromServer = HollowPlayerLogic.LOOK_DEVOURING | HollowPlayerLogic.LOOK_DEVOURING_PLUS
-                    | HollowPlayerLogic.LOOK_MASK_CRACKED;
+                    | HollowPlayerLogic.LOOK_MASK_CRACKED | HollowPlayerLogic.LOOK_TAKEN_OVER;
             if (own.state() == SoulState.ARRANCAR) {
                 fromServer |= HollowPlayerLogic.LOOK_RESURRECCION | HollowPlayerLogic.LOOK_VASTO_LORDE;
             }

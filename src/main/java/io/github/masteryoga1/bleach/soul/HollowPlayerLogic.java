@@ -58,6 +58,11 @@ public final class HollowPlayerLogic {
     public static final int LOOK_NUMBER_MASK = 0x7F << LOOK_NUMBER_SHIFT;
     /** A Visored's Hollow mask is on (drawn on any soul state that is not a Hollow or Arrancar). */
     public static final int LOOK_MASK = 1 << 16;
+    /**
+     * The inner Hollow holds a Shinigami's body: half of a Visored's mask, over the left of the face, under a full mask if
+     * one is on. Server-side only; its owner's client is sent it (see ClientSouls).
+     */
+    public static final int LOOK_TAKEN_OVER = 1 << 17;
     /** How many mask shapes there are: 0 skull, 1 fanged, 2 horned, 3 beaked. */
     public static final int MASK_VARIANTS = 4;
     /** The food level a starving Hollow is held at: exactly the client's own limit for sprinting. */
@@ -302,8 +307,9 @@ public final class HollowPlayerLogic {
     /**
      * Every look bit, with those only the server knows: the jaw open while devouring (and whether the
      * prey is a Plus, whose hold has its own length), the mask cracked after a blow (or while it is torn at,
-     * or a Visored's under blows), a Cero gathering, and an Arrancar's Resurrección (see
-     * {@link ArrancarLogic#lookBits}). On a client's copy those are at their defaults and add nothing.
+     * or a Visored's under blows), a Cero gathering, the half mask while the Hollow holds the body, and an
+     * Arrancar's Resurrección (see {@link ArrancarLogic#lookBits}). On a client's copy those are at their
+     * defaults and add nothing.
      */
     public static int hollowLook(SoulData data, long now) {
         int look = hollowLook(data) | ArrancarLogic.lookBits(data);
@@ -315,6 +321,9 @@ public final class HollowPlayerLogic {
         }
         if (data.ceroBeamId >= 0) {
             look |= LOOK_CERO_CHARGING;
+        }
+        if (VisoredLogic.takenOver(data)) {
+            look |= LOOK_TAKEN_OVER;
         }
         return look;
     }

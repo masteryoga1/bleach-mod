@@ -33,8 +33,9 @@ import org.joml.Vector3f;
  * shorter as it wears away; a Hollow's bone mask in one of four shapes, its jaw hanging open while it
  * devours, cracked after a blow, and with red eyes while it is ravenous; an Arrancar's hole and the
  * remnant of its mask, and, released, its Hollow body and mask; and a Visored's Hollow mask while it is on,
- * a white skull with red stripes over the left eye, which only those who see spirits see. The chain is built
- * from vanilla models; the masks, the hole and the Hollow body are placeholder art drawn by the art script.
+ * a white skull with red stripes over the left eye, and, while its Hollow holds the body, half of it, which
+ * only those who see spirits see. The chain is built from vanilla models; the masks, the hole and the Hollow
+ * body are placeholder art drawn by the art script.
  * The hole and the remnant are drawn by two helpers that an Arrancar NPC's renderer borrows too
  * ({@link ArrancarNpcRenderer}).
  */
@@ -44,6 +45,11 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
     public static final ResourceLocation MASK_EYES = BleachMod.id("textures/entity/hollow_player_mask_eyes.png");
     /** A Visored's mask, on the skull's plate and jaw: whiter than a Hollow's, red-striped, with no cracked look. */
     public static final ResourceLocation VISORED_MASK = BleachMod.id("textures/entity/visored_mask.png");
+    /**
+     * The half mask the Hollow forms when it seizes a soul before it is beaten: the Visored's mask, on the left half
+     * only (Ch. 165).
+     */
+    public static final ResourceLocation VISORED_HALF_MASK = BleachMod.id("textures/entity/visored_half_mask.png");
     /** An Arrancar's hole, on the body and jacket in the skin's layout, clear everywhere else. */
     public static final ResourceLocation HOLE = BleachMod.id("textures/entity/arrancar_hole.png");
     /**
@@ -94,9 +100,12 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
             } else if (bareHead) {
                 renderFragment(poseStack, buffer, packedLight, player, look);
             }
-        } else if ((look.hollowLook() & HollowPlayerLogic.LOOK_MASK) != 0 && bareHead && viewerSeesSpirits()) {
-            // Only those who see spirits see it: a Substitute's living body is seen by all, but not its mask.
-            renderVisoredMask(poseStack, buffer, packedLight, player);
+        } else if ((look.hollowLook() & (HollowPlayerLogic.LOOK_MASK | HollowPlayerLogic.LOOK_TAKEN_OVER)) != 0 && bareHead
+                && viewerSeesSpirits()) {
+            // Only those who see spirits see it: a Substitute's living body is seen by all, but not its mask. A mask that is
+            // on covers the half one a takeover forms.
+            renderVisoredMask(poseStack, buffer, packedLight, player,
+                    (look.hollowLook() & HollowPlayerLogic.LOOK_MASK) != 0 ? VISORED_MASK : VISORED_HALF_MASK);
         }
     }
 
@@ -136,17 +145,18 @@ public final class SoulLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
     }
 
     /**
-     * A Visored's Hollow mask on the posed head: the plain skull's plate and its shut jaw, in the Visored's own
-     * texture. It takes the scene's light, with no eyes that glow, and has no cracked look of its own: a crack
-     * shows only from inside, in the wearer's first-person edge.
+     * A Visored's Hollow mask on the posed head: the plain skull's plate and its shut jaw, in this texture, the
+     * Visored's own or the half of it a takeover forms, whose clear half on the wearer's right the cut-out leaves out.
+     * It takes the scene's light, with no eyes that glow, and has no cracked look of its own: a crack shows only from
+     * inside, in the wearer's first-person edge.
      */
     private void renderVisoredMask(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
-                                   AbstractClientPlayer player) {
+                                   AbstractClientPlayer player, ResourceLocation texture) {
         poseStack.pushPose();
         getParentModel().getHead().translateAndRotate(poseStack);
         // Shape 0 is the plain skull: the plate and the jaw, with no tusks, horns or beak.
         mask.setup(0, false);
-        mask.renderToBuffer(poseStack, buffer.getBuffer(RenderType.entityCutoutNoCull(VISORED_MASK)), packedLight,
+        mask.renderToBuffer(poseStack, buffer.getBuffer(RenderType.entityCutoutNoCull(texture)), packedLight,
                 LivingEntityRenderer.getOverlayCoords(player, 0.0F), -1);
         poseStack.popPose();
     }

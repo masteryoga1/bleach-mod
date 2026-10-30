@@ -53,11 +53,13 @@ import net.minecraft.world.level.Level;
 /**
  * The soul screen: state, reiryoku, a Plus's Chain of Fate or a Hollow's soul hunger, the zanpakutō (or
  * until it has a name, the Asauchi bond; for an Arrancar, its own blade and whether it is released), a
- * Visored's Hollow mask and how near it is to the masked Cero, Hollows purified and slain and Pluses sent
- * on, Hollow Bait crushed and contests with the Quincy Hunter, the souls a Hollow has devoured and what
- * they were, Quincy blood (its reishi and Blut, the Hollow poison in it, souls destroyed and how rich the
- * reishi is here, how far its arts have come, and the Quincy Elder's lessons), stats with training
- * progress, awakened powers (an Arrancar's with the form it rose from and its rank) and what comes next.
+ * Visored's Hollow mask and how near it is to the masked Cero, whether a Hollow rooted in the soul has its
+ * body or may seize it (and, when a server lets lost fights make a Hollow, how many it has won), Hollows
+ * purified and slain and Pluses sent on, Hollow Bait crushed and contests with the Quincy Hunter, the souls
+ * a Hollow has devoured and what they were, Quincy blood (its reishi and Blut, the Hollow poison in it,
+ * souls destroyed and how rich the reishi is here, how far its arts have come, and the Quincy Elder's
+ * lessons), stats with training progress, awakened powers (an Arrancar's with the form it rose from and its
+ * rank) and what comes next.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -135,7 +137,8 @@ public final class SoulStatsScreen extends Screen {
      * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
      * more between sections, and the stats and powers headings only with {@code headers}; with no
      * {@code graphics}, only measures them. A Visored, while the server has the path on, says so on its state
-     * row and gets two rows of its own after the zanpakutō's (see {@link #visoredRows}).
+     * row and gets two rows of its own after the zanpakutō's (see {@link #visoredRows}), and a soul with a Hollow
+     * rooted in it gets the rows of {@link #takeoverRows}.
      *
      * @return where the next step starts
      */
@@ -193,6 +196,7 @@ public final class SoulStatsScreen extends Screen {
         if (visored) {
             y = visoredRows(graphics, player, data, left, y, line);
         }
+        y = takeoverRows(graphics, player, data, left, y, line);
         HuntRecord hunt = data.hunt();
         if (hunt.purified() + hunt.slain() + hunt.sentOn() > 0) {
             text(graphics, Component.translatable("screen.bleach.soul.hunt",
@@ -300,6 +304,37 @@ public final class SoulStatsScreen extends Screen {
                         duration(record.maskTrainedTicks()), duration(VisoredLogic.ceroUnlockTicks()));
         text(graphics, cero, left, y, GREY);
         return y + line;
+    }
+
+    /**
+     * The rows of a soul with a Hollow rooted in it, while the server has the path on: that the Hollow has its body now
+     * (the look the server sends), or, before the win, that it may seize it near death; and, before the win with the fall
+     * turned on, how many fights the Hollow has won, red when one more makes a Hollow.
+     *
+     * @return where the next row starts
+     */
+    private int takeoverRows(@Nullable GuiGraphics graphics, Player player, SoulData data, int left, int y, int line) {
+        if (!VisoredLogic.enabled() || !VisoredLogic.isRooted(data) || !ShinigamiLogic.hasShinigamiPower(data)) {
+            return y;
+        }
+        ShinigamiProgress.Visored record = VisoredLogic.record(data);
+        if ((ClientSouls.appearance(player).hollowLook() & HollowPlayerLogic.LOOK_TAKEN_OVER) != 0) {
+            text(graphics, Component.translatable("screen.bleach.soul.takeover.on"), left, y, WHITE);
+            y += line;
+        } else if (!record.subdued() && (BleachConfig.get(BleachConfig.VISORED_TAKEOVER_CHANCE) > 0.0
+                || BleachConfig.get(BleachConfig.VISORED_TAKEOVER_CHANCE_AFTER_GETSUGA) > 0.0)) {
+            text(graphics, Component.translatable("screen.bleach.soul.takeover.near_death"), left, y, GREY);
+            y += line;
+        }
+        if (!record.subdued() && BleachConfig.get(BleachConfig.VISORED_FALL_INTO_HOLLOW)) {
+            int needed = BleachConfig.get(BleachConfig.VISORED_LOSSES_TO_FALL);
+            boolean last = record.losses() + 1 >= needed;
+            text(graphics, last ? Component.translatable("screen.bleach.soul.takeover.last")
+                    : Component.translatable("screen.bleach.soul.takeover.losses", record.losses(), needed),
+                    left, y, last ? ENCROACHING : GREY);
+            y += line;
+        }
+        return y;
     }
 
     /** Ticks as {@code mm:ss}, or {@code hh:mm:ss} from an hour; never below 0. */

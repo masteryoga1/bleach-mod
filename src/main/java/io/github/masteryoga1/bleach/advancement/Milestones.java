@@ -175,6 +175,8 @@ public final class Milestones {
     public static final String VISORED = "visored";
     /** Put its beaten Hollow's mask on for the first time: Hollowfication as the Visored mean it (Ch. 253). */
     public static final String MASKED = "masked";
+    /** Its inner Hollow seized its body in a fight, before or after the win. Granted when it happens (VisoredEvents). */
+    public static final String TAKEN_OVER = "taken_over";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 
     private static final int TRAINED_LEVEL = 5;

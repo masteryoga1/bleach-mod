@@ -1518,6 +1518,25 @@ def visored_mask():
     return c
 
 
+# The wearer's right half of the Visored mask's nets: the plate (texOffs 0, 0; 9 x 7 x 1) and the jaw (0, 8; 7 x 2 x 1).
+# Top, bottom and front run from the wearer's right at the texture's left; the back runs the other way; the right-side
+# face goes whole. The middle columns (the plate's x 5, the jaw's x 4, and their mirrors) stay.
+HALF_MASK_CLEARED = [
+    (1, 0, 5, 1), (10, 0, 14, 1), (0, 1, 1, 8), (1, 1, 5, 8), (16, 1, 20, 8),   # plate: top, bottom, side, front, back
+    (1, 8, 4, 9), (8, 8, 11, 9), (0, 9, 1, 11), (1, 9, 4, 11), (13, 9, 16, 11),  # jaw: the same five
+]
+
+
+def visored_half_mask():
+    """The half mask the Hollow forms when it seizes a soul before it is beaten (Ch. 165): the Visored's mask on the
+    wearer's left half only, with the red stripes over the left eye. Every face of the plate and the jaw loses its
+    wearer's-right half (see HALF_MASK_CLEARED), so the cut-out skull shows only the left."""
+    c = visored_mask()
+    for x0, y0, x1, y1 in HALF_MASK_CLEARED:
+        c.rect(x0, y0, x1, y1, CLEAR)
+    return c
+
+
 def mask_edge_reach(x, y):
     """Where a pixel of the edge lies against the oval a Hollow sees through: above 1 is outside it."""
     return ((x + 0.5 - 32) / 29) ** 2 + ((y + 0.5 - 16) / 13) ** 2
@@ -1639,6 +1658,7 @@ TEXTURES = {
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,
     "entity/visored_mask.png": visored_mask,
+    "entity/visored_half_mask.png": visored_half_mask,
     "misc/hollow_mask_edge.png": hollow_mask_edge,
     "misc/hollow_mask_edge_cracked.png": hollow_mask_edge_cracked,
 }

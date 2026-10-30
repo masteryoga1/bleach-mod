@@ -679,6 +679,20 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue VISORED_CERO_RADIUS;
     public static final ModConfigSpec.DoubleValue VISORED_BLACK_GETSUGA_MULTIPLIER;
 
+    public static final ModConfigSpec.DoubleValue VISORED_TAKEOVER_CHANCE;
+    public static final ModConfigSpec.DoubleValue VISORED_TAKEOVER_CHANCE_AFTER_GETSUGA;
+    public static final ModConfigSpec.IntValue VISORED_TAKEOVER_GETSUGA_WINDOW_SECONDS;
+    public static final ModConfigSpec.DoubleValue VISORED_TAKEOVER_HEALTH_SHARE;
+    public static final ModConfigSpec.IntValue VISORED_TAKEOVER_SPACING_SECONDS;
+    public static final ModConfigSpec.IntValue VISORED_TAKEOVER_SECONDS;
+    public static final ModConfigSpec.DoubleValue VISORED_TAKEOVER_DAMAGE_BONUS;
+    public static final ModConfigSpec.DoubleValue VISORED_TAKEOVER_HEAL_PER_SECOND;
+    public static final ModConfigSpec.IntValue VISORED_TAKEOVER_WEARINESS_SECONDS;
+    public static final ModConfigSpec.DoubleValue VISORED_TAKEOVER_MASKED_HEALTH_SHARE;
+    public static final ModConfigSpec.IntValue VISORED_TAKEOVER_MASKED_SECONDS;
+    public static final ModConfigSpec.BooleanValue VISORED_FALL_INTO_HOLLOW;
+    public static final ModConfigSpec.IntValue VISORED_LOSSES_TO_FALL;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -2631,8 +2645,9 @@ public final class BleachConfig {
                 .comment("Health the inner Hollow mends each second once 5 seconds pass without a blow from its host.")
                 .defineInRange("mend_per_second", 1.0, 0.0, 100.0);
         INNER_HOLLOW_LOSS_HEALTH = builder
-                .comment("The host's health at which the inner Hollow's last blow stops and the fight is lost, so a loss"
-                        + " never kills: 2 is one heart.")
+                .comment("The host's health at which the inner Hollow's last blow stops and the fight is lost, and below"
+                        + " which no blow takes it while the Hollow holds its body ([visored.hold]), so neither kills: 2 is"
+                        + " one heart.")
                 .defineInRange("loss_health", 2.0, 1.0, 20.0);
         builder.pop();
 
@@ -2694,6 +2709,55 @@ public final class BleachConfig {
         VISORED_BLACK_GETSUGA_MULTIPLIER = builder
                 .comment("Damage multiplier of a Getsuga Tenshō loosed with the mask on: the black one.")
                 .defineInRange("black_getsuga_multiplier", 1.5, 1.0, 5.0);
+        builder.pop();
+
+        builder.push("hold");
+        VISORED_TAKEOVER_CHANCE = builder
+                .comment("Chance that a blow which brings a soul whose Hollow is rooted but not beaten from above"
+                        + " health_share of its health to that or less, in a fight, lets the Hollow seize its body. 0 leaves"
+                        + " only chance_after_getsuga.")
+                .defineInRange("chance", 0.35, 0.0, 1.0);
+        VISORED_TAKEOVER_CHANCE_AFTER_GETSUGA = builder
+                .comment("The chance instead, when higher, within getsuga_window_seconds of the soul loosing a Getsuga"
+                        + " Tenshō: reaching for the blade's power lets the Hollow in.")
+                .defineInRange("chance_after_getsuga", 0.6, 0.0, 1.0);
+        VISORED_TAKEOVER_GETSUGA_WINDOW_SECONDS = builder
+                .comment("Seconds after a Getsuga Tenshō during which chance_after_getsuga is used. 0 turns it off.")
+                .defineInRange("getsuga_window_seconds", 30, 0, 600);
+        VISORED_TAKEOVER_HEALTH_SHARE = builder
+                .comment("Share of maximum health a blow must bring the soul to, from above it: 0.2 is 2 hearts of 10.")
+                .defineInRange("health_share", 0.2, 0.01, 1.0);
+        VISORED_TAKEOVER_SPACING_SECONDS = builder
+                .comment("Seconds from the start of one takeover, of either kind, before another can start. Not saved: it"
+                        + " starts over on logging in.")
+                .defineInRange("spacing_seconds", 120, 0, 3_600);
+        VISORED_TAKEOVER_SECONDS = builder
+                .comment("Seconds the Hollow holds the body, unless the Hollow Mask key tears its mask off sooner.")
+                .defineInRange("seconds", 10, 1, 120);
+        VISORED_TAKEOVER_DAMAGE_BONUS = builder
+                .comment("Melee damage added while the Hollow holds the body, as a share of all of it (0.3 is 30% more).")
+                .defineInRange("damage_bonus", 0.3, 0.0, 5.0);
+        VISORED_TAKEOVER_HEAL_PER_SECOND = builder
+                .comment("Health healed each whole second the Hollow holds the body: 1 is half a heart.")
+                .defineInRange("heal_per_second", 1.0, 0.0, 20.0);
+        VISORED_TAKEOVER_WEARINESS_SECONDS = builder
+                .comment("Seconds of Slowness and Weakness after the Hollow lets go or its mask is torn off. 0 for none.")
+                .defineInRange("weariness_seconds", 10, 0, 120);
+        VISORED_TAKEOVER_MASKED_HEALTH_SHARE = builder
+                .comment("A Visored who looses the black Getsuga Tenshō at this share of maximum health or less loses"
+                        + " control to its Hollow (0.25 is 2½ hearts of 10). 0 turns it off.")
+                .defineInRange("masked_health_share", 0.25, 0.0, 1.0);
+        VISORED_TAKEOVER_MASKED_SECONDS = builder
+                .comment("Seconds a Visored's Hollow holds the body when it loses control behind the mask.")
+                .defineInRange("masked_seconds", 5, 1, 120);
+        VISORED_FALL_INTO_HOLLOW = builder
+                .comment("Whether losing the fight with the inner Hollow losses_to_fall times makes the soul a Hollow, its"
+                        + " Shinigami power gone under the mask. Off, a loss only puts the next fight off.")
+                .define("fall_into_hollow", false);
+        VISORED_LOSSES_TO_FALL = builder
+                .comment("With fall_into_hollow on: a fight lost that brings the soul's count of losses to this or past it"
+                        + " makes it a Hollow.")
+                .defineInRange("losses_to_fall", 3, 1, 100);
         builder.pop();
         builder.pop();
 

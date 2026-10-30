@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.soul;
 
+import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.registry.ModEntities;
@@ -20,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.Difficulty;
@@ -73,6 +75,13 @@ import org.joml.Vector3f;
  * on death, logging out, a server stop and whenever its soul may no longer wear it. Every end goes through
  * {@link #endMask}, which starts the wait for the next. The mask is on while the saved record says so, so the
  * owner's client sees it, and a save that still holds one (a crash) has it taken off at the next login.
+ *
+ * <p>Before the win, a blow that brings its host near death may let the Hollow seize the body for a few seconds
+ * ({@link #startTakeover}), and a Visored who looses the black Getsuga Tenshō at low health loses control the same way:
+ * it hits harder and heals, no blow takes it below {@code loss_health}, and the host's Shinigami arts do not answer it
+ * until the Hollow Mask key tears the mask off or the time runs out. Every end goes through {@link #endTakeover}. With
+ * a server's leave, a fight lost once too often makes the soul a Hollow ({@link #fall}). A takeover is held only in
+ * transient fields of the soul, so nothing of it is saved or sent but its look.
  */
 public final class VisoredEvents {
     private static final String PREFIX = "message.bleach.visored.";
@@ -81,6 +90,10 @@ public final class VisoredEvents {
     private static final ChatFormatting[] MUTED = {ChatFormatting.GRAY, ChatFormatting.ITALIC};
     private static final ChatFormatting[] PLAIN = {ChatFormatting.GRAY};
     private static final ChatFormatting[] GOLDEN = {ChatFormatting.GOLD};
+    /** Chat styles: the Hollow seizing the body, and the soul falling to it. */
+    private static final ChatFormatting[] SEIZED = {ChatFormatting.RED};
+    private static final ChatFormatting[] FALLEN = {ChatFormatting.DARK_RED, ChatFormatting.BOLD};
+    private static final String DEVOUR_KEY = "key.bleach.devour";
 
     /** Points tried around the host for the Hollow to step out at, turning by {@link #SPAWN_TURN_DEGREES}. */
     private static final int SPAWN_TRIES = 8;
@@ -116,6 +129,8 @@ public final class VisoredEvents {
     private static final double MASK_DUST_SPREAD = 0.25;
     /** How far in front of the eyes, along the look, the black reiatsu gathers, in blocks. */
     private static final double MASK_FACE_AHEAD = 0.3;
+    /** The sculk's charge as the Hollow's mask forms by itself, lower than a mask called. */
+    private static final float TAKEOVER_PITCH = 0.5F;
 
     /** Every fight under way, by its host's UUID. Server thread only. */
     private static final Map<UUID, Duel> DUELS = new HashMap<>();
@@ -210,9 +225,9 @@ public final class VisoredEvents {
     }
 
     /**
-     * Wounds after they land; the host's shield first of all, so nothing else weighs a blow that should not land; the
-     * loss clamp last of all, after every other change to the blow; and the ends that come from outside the host's
-     * tick: deaths, logging out and the server stopping.
+     * Wounds and blows near death after they land; the host's shield first of all, so nothing else weighs a blow that
+     * should not land; the loss clamp and a takeover's floor last of all, after every other change to the blow; and the
+     * ends that come from outside the host's tick: deaths, logging out, another world and the server stopping.
      */
     public static void register(IEventBus bus) {
         bus.addListener(VisoredEvents::onDamageTaken);
@@ -220,12 +235,14 @@ public final class VisoredEvents {
         bus.addListener(EventPriority.LOWEST, VisoredEvents::onDamagePre);
         bus.addListener(VisoredEvents::onDeath);
         bus.addListener(VisoredEvents::onLoggedOut);
+        bus.addListener(VisoredEvents::onChangedDimension);
         bus.addListener(VisoredEvents::onServerStopping);
     }
 
     /**
-     * Each tick of a living player, server side: the fight's upkeep for its host, then, outside a fight, the mask's
-     * upkeep while it is on and the Hollow's voice. A masked soul is beaten, so it never has a fight.
+     * Each tick of a living player, server side: the fight's upkeep for its host, then, outside a fight, the fall a
+     * fight lost once too often left, the takeover's upkeep while the Hollow holds the body, the mask's upkeep while it
+     * is on and the Hollow's voice, silent while it holds the body. A masked soul is beaten, so it never has a fight.
      */
     public static void tick(Player player, SoulData data, long now) {
         if (player.level().isClientSide()) {
@@ -237,11 +254,21 @@ public final class VisoredEvents {
             // A fight that ended this tick has had its last words.
             return;
         }
+        if (data.fallPending) {
+            // Lost once too often, out of the damage pipeline the losing blow may have come from.
+            data.fallPending = false;
+            fall(player, data, now);
+            return;
+        }
+        boolean taken = VisoredLogic.takenOver(data);
+        if (taken) {
+            takeoverUpkeep(player, data, now);
+        }
         if (VisoredLogic.isMasked(data)) {
             maskUpkeep(player, data, now);
         }
         String voice = VisoredLogic.voiceKey(data, player.getUUID(), now);
-        if (voice != null) {
+        if (voice != null && !taken) {
             speak(player, voice);
         }
     }
@@ -308,8 +335,12 @@ public final class VisoredEvents {
         }
     }
 
-    /** Ends a fight (BROKEN_OFF) and takes the mask off (REMOVED): for logging out, resets and commands. */
+    /**
+     * Ends a takeover (REMOVED) and a fight (BROKEN_OFF), and takes the mask off (REMOVED): for logging out, resets and
+     * commands.
+     */
     public static void endAll(Player player, SoulData data, long now) {
+        endTakeover(player, data, TakeoverEnd.REMOVED, now);
         if (isDuelling(player)) {
             endDuel(player, data, DuelEnd.BROKEN_OFF, now);
         }
@@ -322,8 +353,8 @@ public final class VisoredEvents {
      * Brings the Hollow out to fight its host where the host stands. The first check that fails gives the result: a
      * fight already under way, the path turned off (even when forced), no Shinigami power or lent away, the Hollow
      * already beaten, not ready yet or in creative or spectator mode (both skipped when forced), Peaceful, and another
-     * fight too close by. A forced fight roots an unrooted soul silently first. On the client, nothing happens and
-     * the result is {@link DuelStart#NOT_READY}.
+     * fight too close by. A forced fight roots an unrooted soul silently first. A Hollow holding its host's body lets go
+     * of it once it has stepped out. On the client, nothing happens and the result is {@link DuelStart#NOT_READY}.
      */
     public static DuelStart beginDuel(Player host, SoulData data, long now, boolean force) {
         if (!(host.level() instanceof ServerLevel level)) {
@@ -379,6 +410,8 @@ public final class VisoredEvents {
             DUELS.remove(duel.hostId);
             return DuelStart.NOT_READY;
         }
+        // The Hollow comes out to fight, and lets go of the body.
+        endTakeover(host, data, TakeoverEnd.REMOVED, now);
         hollow.setTarget(host);
         if (bar != null) {
             bar.setProgress(1.0F);
@@ -412,7 +445,9 @@ public final class VisoredEvents {
     /**
      * Ends the host's fight, if it has one: off the table, the bar taken down, and the Hollow gone in a burst of white.
      * A win makes the soul a Visored; a loss is counted, leaves the host weak and puts the next fight off by
-     * {@code retry_minutes}; a fight broken off puts it off as long, and counts nothing.
+     * {@code retry_minutes}, and, with {@code fall_into_hollow} on, the loss that brings the count to
+     * {@code losses_to_fall} makes the soul a Hollow at its next tick ({@link #fall}) instead of being told; a fight
+     * broken off puts the next off as long, and counts nothing.
      */
     public static void endDuel(Player host, SoulData data, DuelEnd end, long now) {
         Duel duel = DUELS.remove(host.getUUID());
@@ -437,12 +472,17 @@ public final class VisoredEvents {
         switch (end) {
             case WIN -> subdue(host, data, now);
             case LOSS -> {
-                VisoredLogic.setRecord(data, record.withLosses(record.losses() + 1)
-                        .withDuelReadyAt(now + VisoredLogic.retryTicks()));
+                int losses = record.losses() + 1;
+                VisoredLogic.setRecord(data, record.withLosses(losses).withDuelReadyAt(now + VisoredLogic.retryTicks()));
                 host.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, VisoredLogic.LOSS_EFFECT_TICKS));
                 host.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, VisoredLogic.LOSS_EFFECT_TICKS));
-                chat(host, "lost", PLAIN, BleachConfig.get(BleachConfig.INNER_HOLLOW_RETRY_MINUTES));
-                speak(host, "lost");
+                if (VisoredLogic.fallsOnLoss(losses)) {
+                    // The fall comes at the host's next tick (see tick): this may be inside the losing blow.
+                    data.fallPending = true;
+                } else {
+                    chat(host, "lost", PLAIN, BleachConfig.get(BleachConfig.INNER_HOLLOW_RETRY_MINUTES));
+                    speak(host, "lost");
+                }
             }
             case BROKEN_OFF -> {
                 VisoredLogic.setRecord(data, record.withDuelReadyAt(now + VisoredLogic.retryTicks()));
@@ -743,10 +783,17 @@ public final class VisoredEvents {
     }
 
     /**
-     * The M key, server side: off if on, otherwise on, telling a refusal. Taking it off is always allowed, held, lent
-     * or not.
+     * The M key, server side: first of all it tears off the mask a Hollow holding the body has formed, and a Visored's
+     * own mask with it; otherwise off if on, otherwise on, telling a refusal. Taking it off is always allowed, held,
+     * lent or not.
      */
     public static void onMaskKey(Player player, SoulData data, long now) {
+        if (VisoredLogic.takenOver(data)) {
+            // Torn off, as Ichigo tore his (Ch. 166); a Visored's own mask comes away with it.
+            endTakeover(player, data, TakeoverEnd.TORN_OFF, now);
+            endMask(player, data, MaskEnd.TAKEN_OFF, now);
+            return;
+        }
         if (VisoredLogic.isMasked(data)) {
             endMask(player, data, MaskEnd.TAKEN_OFF, now);
             return;
@@ -948,12 +995,191 @@ public final class VisoredEvents {
         }
     }
 
+    // ---- The Hollow's hold ----
+
+    /** How the Hollow let go of the body. */
+    public enum TakeoverEnd {
+        /** The Hollow Mask key tore its mask off: wearied. */
+        TORN_OFF,
+        /** Its time ran out: wearied. */
+        RAN_OUT,
+        /** Every way that is not the takeover's own doing: silent, and no weariness. */
+        REMOVED
+    }
+
+    /**
+     * The Hollow seizes the body, half a mask forming over its host's face, or behind the mask a Visored wears when
+     * {@code masked}. False, changing nothing, off a server level, with the path off, unrooted, without Shinigami power or
+     * lent, already seized, in a fight with its Hollow, dead, in creative or spectator mode, or held by Negación; and for
+     * a kind that does not fit the soul: half a mask once its Hollow is beaten, or {@code masked} without the mask on
+     * ({@code masked ? !VisoredLogic.isMasked(data) : VisoredLogic.record(data).subdued()}). Callers decide when (a blow
+     * near death, the black Getsuga Tenshō, the command); this checks only what may never be.
+     *
+     * <p>For {@code seconds} ({@code masked_seconds} behind a mask) it then hits harder, heals each second and no blow
+     * takes it below {@code loss_health}, while its Shinigami arts do not answer it; a Getsuga Tenshō gathering is let
+     * go. The mask forms in white reiatsu at the face with the sculk's charge, pitched lower than a mask called, and the
+     * Hollow's stir, for those who see spirits; the host is told in chat how to tear it off, and the Hollow speaks.
+     */
+    public static boolean startTakeover(Player player, SoulData data, boolean masked, long now) {
+        if (!(player.level() instanceof ServerLevel level) || !VisoredLogic.enabled() || !VisoredLogic.isRooted(data)
+                || !ShinigamiLogic.hasShinigamiPower(data) || ShinigamiLogic.isPowerLent(data, now)
+                || VisoredLogic.takenOver(data) || isDuelling(player) || !player.isAlive() || player.isCreative()
+                || player.isSpectator() || Negacion.held(player)) {
+            return false;
+        }
+        if (masked ? !VisoredLogic.isMasked(data) : VisoredLogic.record(data).subdued()) {
+            return false;
+        }
+        data.lastTakeoverAt = now;
+        data.takeoverEndsAt = now + VisoredLogic.takeoverTicks(masked);
+        ShikaiEvents.cancelGather(player, data);
+        applyTakeoverBody(player);
+        Vec3 face = player.getEyePosition().add(player.getLookAngle().scale(MASK_FACE_AHEAD));
+        SpiritSenses.particles(level, WHITE_DUST, face.x, face.y, face.z, MASK_ON_DUST, MASK_DUST_SPREAD,
+                MASK_DUST_SPREAD, MASK_DUST_SPREAD, 0.0);
+        SpiritSenses.play(player, SoundEvents.SCULK_BLOCK_CHARGE, SoundSource.PLAYERS, 1.0F, TAKEOVER_PITCH, false);
+        SpiritSenses.play(player, ModSounds.HOLLOW_AMBIENT.get(), SoundSource.PLAYERS, 0.8F, 1.2F, false);
+        chat(player, "takeover.begun", SEIZED, Component.keybind("key.bleach.visored_mask"));
+        speak(player, masked ? "takeover.masked" : "takeover");
+        if (player instanceof ServerPlayer serverPlayer) {
+            Milestones.grant(serverPlayer, Milestones.TAKEN_OVER);
+        }
+        return true;
+    }
+
+    /**
+     * The single exit: every way the Hollow lets go of the body goes through here. Nothing when it holds none.
+     *
+     * <p>The boost comes off. REMOVED stops there, silent. A mask torn off or a time run out leaves the host slow and
+     * weak for {@code weariness_seconds}, and the half mask falls away in bone and white dust; a tear-off is told, and a
+     * Hollow whose time ran out has the last word.
+     */
+    public static void endTakeover(Player player, SoulData data, TakeoverEnd end, long now) {
+        if (!VisoredLogic.takenOver(data)) {
+            return;
+        }
+        data.takeoverEndsAt = ShinigamiProgress.NEVER;
+        removeTakeoverBody(player);
+        if (end == TakeoverEnd.REMOVED) {
+            return;
+        }
+        int weariness = BleachConfig.get(BleachConfig.VISORED_TAKEOVER_WEARINESS_SECONDS) * SECOND_TICKS;
+        if (weariness > 0) {
+            player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, weariness));
+            player.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, weariness));
+        }
+        maskFalls(player, 0.8F, 1.1F, MASK_OFF_DUST, end == TakeoverEnd.TORN_OFF ? "takeover.torn_off" : null);
+        if (end == TakeoverEnd.RAN_OUT) {
+            speak(player, "takeover.ended");
+        }
+    }
+
+    /** Ends each player's takeover REMOVED at its own level's game time: the server-stop path. */
+    public static void endTakeovers(Iterable<? extends Player> players) {
+        for (Player player : players) {
+            endTakeover(player, SoulLogic.get(player), TakeoverEnd.REMOVED, player.level().getGameTime());
+        }
+    }
+
+    /**
+     * A creature's blow that landed, with the health before it: on a soul whose Hollow may seize it
+     * ({@link VisoredLogic#mayBeTakenOver}), one that brought it near death ({@link VisoredLogic#isTakeoverBlow}) lets
+     * the Hollow in at the chance {@link VisoredLogic#takeoverChance} gives. Never its own Hollow's blow (the fight's
+     * losing blow leaves its host near death), never in a fight, and never on Peaceful, where the Hollow stays quiet, as
+     * it does for the fight.
+     */
+    private static void noteNearDeath(Player player, SoulData data, LivingEntity attacker, float healthBefore, long now) {
+        if (attacker instanceof InnerHollow || isDuelling(player) || !VisoredLogic.mayBeTakenOver(data, now)
+                || !VisoredLogic.isTakeoverBlow(healthBefore, player.getHealth(), player.getMaxHealth())
+                || player.level().getDifficulty() == Difficulty.PEACEFUL) {
+            return;
+        }
+        double chance = VisoredLogic.takeoverChance(data.lastGetsugaAt, now);
+        if (VisoredLogic.takeoverRolled(player.getRandom().nextDouble(), chance)) {
+            startTakeover(player, data, false, now);
+        }
+    }
+
+    /**
+     * One tick while the Hollow holds the body, in this order: it lets go at once (REMOVED) when its host may no longer
+     * be held (the path off, no longer rooted, no Shinigami power or lent, dead, in creative or spectator mode, asleep
+     * or held by Negación); it heals its host on each whole second from the start, while the world's time runs (a frozen
+     * server still ticks its players); it lets go (RAN_OUT) when its time is up, a last second healed first; and the
+     * boost is set again, which puts back anything that took it off. A masked Visored's mask that crumbles meanwhile
+     * leaves the takeover going under the half mask: there is no end for that.
+     */
+    private static void takeoverUpkeep(Player player, SoulData data, long now) {
+        if (!VisoredLogic.enabled() || !VisoredLogic.isRooted(data) || !ShinigamiLogic.hasShinigamiPower(data)
+                || ShinigamiLogic.isPowerLent(data, now) || !player.isAlive() || player.isCreative()
+                || player.isSpectator() || player.isSleeping() || Negacion.held(player)) {
+            endTakeover(player, data, TakeoverEnd.REMOVED, now);
+            return;
+        }
+        long elapsed = now - data.lastTakeoverAt;
+        if (elapsed > 0L && elapsed % SECOND_TICKS == 0L && player.level().tickRateManager().runsNormally()) {
+            float heal = (float) BleachConfig.get(BleachConfig.VISORED_TAKEOVER_HEAL_PER_SECOND);
+            if (heal > 0.0F) {
+                player.heal(heal);
+            }
+        }
+        if (now >= data.takeoverEndsAt) {
+            endTakeover(player, data, TakeoverEnd.RAN_OUT, now);
+            return;
+        }
+        applyTakeoverBody(player);
+    }
+
+    /**
+     * The Hollow's melee damage, a transient modifier through {@link HollowBody#setModifier}, which writes only when it
+     * changes: never saved, so no save holds it. It multiplies with a mask's own.
+     */
+    private static void applyTakeoverBody(Player player) {
+        HollowBody.setModifier(player, Attributes.ATTACK_DAMAGE, VisoredLogic.TAKEOVER_DAMAGE_ID,
+                BleachConfig.get(BleachConfig.VISORED_TAKEOVER_DAMAGE_BONUS),
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+    }
+
+    /** Takes the Hollow's melee damage off. */
+    private static void removeTakeoverBody(Player player) {
+        HollowBody.setModifier(player, Attributes.ATTACK_DAMAGE, VisoredLogic.TAKEOVER_DAMAGE_ID, 0.0,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+    }
+
+    /**
+     * The soul falls to its Hollow and becomes one, at the tick after the fight lost once too often: checked again
+     * here (the path and {@code fall_into_hollow} on, rooted and not beaten, with Shinigami power, alive, and not in
+     * creative or spectator mode), and otherwise nothing happens. Any takeover ends and a released blade seals without a
+     * word, the Hollow is gone from the record (a soul purified later starts over with none), and the soul becomes a plain
+     * Hollow as a Plus whose chain ran out does ({@link SoulLogic#hollowfy}), heard by all, with the Hollow's word and
+     * the hint to devour. It keeps its strength, its stats, its zanpakutō and every other record; its Hollow body comes
+     * on by itself next tick.
+     */
+    private static void fall(Player player, SoulData data, long now) {
+        ShinigamiProgress.Visored record = VisoredLogic.record(data);
+        if (!VisoredLogic.enabled() || !BleachConfig.get(BleachConfig.VISORED_FALL_INTO_HOLLOW) || !record.rooted()
+                || record.subdued() || !ShinigamiLogic.hasShinigamiPower(data) || !player.isAlive()
+                || player.isCreative() || player.isSpectator()) {
+            return;
+        }
+        endTakeover(player, data, TakeoverEnd.REMOVED, now);
+        ShikaiEvents.forceSeal(player, data, null);
+        VisoredLogic.setRecord(data, ShinigamiProgress.Visored.NONE);
+        SoulLogic.hollowfy(player, data);
+        // Heard by all, as a Plus's chain breaking is: a Hollow is born where anyone stands.
+        player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAVAGER_ROAR,
+                SoundSource.PLAYERS, 1.5F, 0.6F);
+        chat(player, "fallen", FALLEN);
+        player.sendSystemMessage(Component.translatable("message.bleach.hollow_player.hint", Component.keybind(DEVOUR_KEY))
+                .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        speak(player, "fallen");
+    }
+
     // ---- Listeners ----
 
     /**
-     * A blow that landed on a player may crack its mask, and may be a wound: only one with damage from a creature,
-     * read once the health after it is known, so only the health it took counts. A wearer's own blows never crack
-     * its mask, and a killing blow leaves the mask to death's ending.
+     * A blow that landed on a player may crack its mask, may let a rooted Hollow seize the body, and may be a wound: only
+     * one with damage from a creature, read once the health after it is known, so only the health it took counts. A
+     * wearer's own blows never crack its mask or let its Hollow in, and a killing blow leaves both to death's ending.
      */
     private static void onDamageTaken(LivingDamageEvent.Post event) {
         if (!(event.getEntity() instanceof Player player) || player.level().isClientSide() || !SoulLogic.hasSoul(player)
@@ -964,6 +1190,9 @@ public final class VisoredEvents {
         long now = player.level().getGameTime();
         if (attacker != player && !player.isDeadOrDying()) {
             noteMaskBlow(player, data, event.getNewDamage(), now);
+            // Before the wound, so the blow that roots a Hollow never lets it in at once. Post's new damage is the
+            // health lost.
+            noteNearDeath(player, data, attacker, player.getHealth() + event.getNewDamage(), now);
         }
         if (VisoredLogic.isWoundingSource(attacker, data)
                 && VisoredLogic.isWound(player.getHealth(), player.getMaxHealth())) {
@@ -994,30 +1223,37 @@ public final class VisoredEvents {
     /**
      * The Hollow's losing blow, once armour and every other listener have had their say and before absorption: cut
      * so it leaves its host at {@code loss_health} (or where it was, if already lower), and the fight is lost. A loss
-     * never kills.
+     * never kills. And, while the Hollow holds a body, any blow but one that passes invulnerability is cut the same
+     * way, so a takeover never kills.
      */
     private static void onDamagePre(LivingDamageEvent.Pre event) {
         if (!(event.getEntity() instanceof Player host) || host.level().isClientSide()) {
             return;
         }
-        Duel duel = DUELS.get(host.getUUID());
         DamageSource source = event.getSource();
-        if (duel == null || source.getEntity() != duel.hollow) {
-            return;
-        }
         float health = host.getHealth();
         float absorption = host.getAbsorptionAmount();
-        if (VisoredLogic.isLosingBlow(health, absorption, event.getNewDamage())) {
-            event.setNewDamage(VisoredLogic.clampedBlow(event.getNewDamage(), health, absorption,
-                    (float) BleachConfig.get(BleachConfig.INNER_HOLLOW_LOSS_HEALTH)));
-            endDuel(host, SoulLogic.get(host), DuelEnd.LOSS, host.level().getGameTime());
+        float floor = (float) BleachConfig.get(BleachConfig.INNER_HOLLOW_LOSS_HEALTH);
+        Duel duel = DUELS.get(host.getUUID());
+        if (duel != null && source.getEntity() == duel.hollow) {
+            if (VisoredLogic.isLosingBlow(health, absorption, event.getNewDamage())) {
+                event.setNewDamage(VisoredLogic.clampedBlow(event.getNewDamage(), health, absorption, floor));
+                endDuel(host, SoulLogic.get(host), DuelEnd.LOSS, host.level().getGameTime());
+            }
+            return;
+        }
+        // The Hollow holding the body will not let it die (Ch. 165), though /kill and the void still can.
+        if (SoulLogic.hasSoul(host) && VisoredLogic.takenOver(SoulLogic.get(host))
+                && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)
+                && VisoredLogic.isLosingBlow(health, absorption, event.getNewDamage())) {
+            event.setNewDamage(VisoredLogic.clampedBlow(event.getNewDamage(), health, absorption, floor));
         }
     }
 
     /**
-     * A host that dies breaks its fight off, and a Visored that dies takes its mask off, before the soul is copied to
-     * the respawned player. A Hollow killed by its host is beaten; one that died any other way ({@code /kill}) breaks
-     * the fight off.
+     * A host that dies breaks its fight off, a Hollow holding a body that dies lets go of it, and a Visored that dies
+     * takes its mask off, before the soul is copied to the respawned player. A Hollow killed by its host is beaten; one
+     * that died any other way ({@code /kill}) breaks the fight off.
      */
     private static void onDeath(LivingDeathEvent event) {
         LivingEntity victim = event.getEntity();
@@ -1036,6 +1272,7 @@ public final class VisoredEvents {
                 endDuel(duel.host, SoulLogic.get(duel.host), DuelEnd.BROKEN_OFF, now);
             }
         } else if (victim instanceof Player player) {
+            endTakeover(player, SoulLogic.get(player), TakeoverEnd.REMOVED, now);
             if (isDuelling(player)) {
                 endDuel(player, SoulLogic.get(player), DuelEnd.BROKEN_OFF, now);
             }
@@ -1044,21 +1281,33 @@ public final class VisoredEvents {
     }
 
     /**
-     * A fight and a mask do not outlast the session. This runs before the player is saved, so the waits for the next
-     * are.
+     * A takeover, a fight and a mask do not outlast the session. This runs before the player is saved, so the waits for
+     * the next are.
      */
     private static void onLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         Player player = event.getEntity();
         endAll(player, SoulLogic.get(player), player.level().getGameTime());
     }
 
+    /** The Hollow holding a body lets go of it in another world, as a fight breaks off there. */
+    private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        Player player = event.getEntity();
+        if (player.level().isClientSide() || !SoulLogic.hasSoul(player)) {
+            return;
+        }
+        endTakeover(player, SoulLogic.get(player), TakeoverEnd.REMOVED, player.level().getGameTime());
+    }
+
     /**
-     * A stop saves every player before any of them logs out, so every fight is broken off and every mask taken off
-     * here first, or the saves would hold the fight's end as the next try instead of the wait, and a mask still on.
+     * A stop saves every player before any of them logs out, so every takeover is ended, every fight broken off and
+     * every mask taken off here first, or the saves would hold the fight's end as the next try instead of the wait, and
+     * a mask still on.
      */
     private static void onServerStopping(ServerStoppingEvent event) {
         breakOffAll();
-        endMasks(event.getServer().getPlayerList().getPlayers());
+        List<ServerPlayer> players = event.getServer().getPlayerList().getPlayers();
+        endTakeovers(players);
+        endMasks(players);
     }
 
     // ---- Lines ----

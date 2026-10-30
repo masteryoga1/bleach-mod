@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:hollowfied",
+  "display": {
+    "icon": {
+      "id": "minecraft:skeleton_skull"
+    },
+    "title": {
+      "translate": "advancements.bleach.taken_over.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.taken_over.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "taken_over": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "taken_over"
+      }
+    }
+  }
+}
