@@ -1544,8 +1544,11 @@ public final class ClientSmokeTest {
                 "holding the Kidō key never gathered Raikōhō's orb, or it never reached the client")) {
             shot(minecraft, "kido_raikoho_gather");
         }
-        // Shut before the let-go at 5106, so only the gather going off by itself can pass it.
-        if (expectWithin(minecraft, 5076, 5105, () -> ownTrace(minecraft, player, KidoSpell.RAIKOHO) != null,
+        // Shut before the let-go at 5106, and only a bolt longer than the orb's own harmless 1-block shot, which the orb
+        // fires if nothing looses the gather: so only the gather going off by itself can pass it.
+        if (expectWithin(minecraft, 5076, 5105, () -> ownCero(minecraft, player, beam -> beam.isFired()
+                        && beam.colour() == colourOf(minecraft, KidoSpell.RAIKOHO) && beam.firedAge(0.0F) >= 1.0F
+                        && beam.reach().length() > 2.0) != null,
                 "Raikōhō never went off once gathered, or its yellow trace never reached the client"
                         + " (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_raikoho");
