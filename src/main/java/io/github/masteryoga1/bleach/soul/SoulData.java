@@ -285,6 +285,12 @@ public final class SoulData {
     KidoLogic.Chant kidoChant;
     /** Game time this soul's last chant was heard in chat, for the spacing between spoken chants. */
     long lastChantHeardAt = NEVER;
+    /**
+     * The spell this soul is gathering in its palm on the Kidō key, or null (see {@link KidoEvents}). Not saved: a
+     * gather ends with the session.
+     */
+    @Nullable
+    KidoLogic.Gather kidoGather;
     /** The Gran Rey Cero this Arrancar is gathering, by entity id, or -1 (see {@link GranReyCero}). */
     int granReyCeroBeamId = -1;
     /** Game time the Gran Rey Cero being gathered started, or {@link #NEVER}. */

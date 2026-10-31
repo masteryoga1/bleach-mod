@@ -368,6 +368,8 @@
   "kido.bleach.byakurai": "Byakurai",
   "kido.bleach.shakkaho": "Shakkahō",
   "kido.bleach.sokatsui": "Sōkatsui",
+  "kido.bleach.tenran": "Tenran",
+  "kido.bleach.raikoho": "Raikōhō",
   "arrancar_blade.bleach.halcon": "Halcón",
   "arrancar_blade.bleach.halcon.command": "Dive",
   "arrancar_blade.bleach.cuervo": "Cuervo",
@@ -787,6 +789,9 @@
   "message.bleach.kido.chant_too_soon": "Catch your breath before you chant again",
   "message.bleach.kido.misfire": "%s bursts in your hand!",
   "message.bleach.kido.incantation": "The incantation of %s, to say whole in chat:",
+  "message.bleach.kido.gather_begun": "%s gathers in your palm",
+  "message.bleach.kido.gather_scattered": "%s scatters: hold the Kidō key until it has gathered",
+  "message.bleach.kido.gather_broken": "%s is broken before it has gathered",
 
   "message.bleach.bloodline.quincy": "Quincy blood runs in your veins: you are %s",
   "message.bleach.bloodline.human": "Your blood is ordinary. Your path lies elsewhere",

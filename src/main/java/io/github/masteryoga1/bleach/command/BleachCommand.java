@@ -38,6 +38,7 @@ import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
+import io.github.masteryoga1.bleach.soul.KidoEvents;
 import io.github.masteryoga1.bleach.soul.MenosEvolution;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
@@ -1139,6 +1140,7 @@ public final class BleachCommand {
             DevourEvents.stopGnaw(SoulLogic.get(player));
             HollowCero.cancel(player, SoulLogic.get(player));
             GranReyCero.cancel(player, SoulLogic.get(player));
+            KidoEvents.dropGather(player, SoulLogic.get(player));
             HollowBody.leaveBodyIfWorn(player, SoulLogic.get(player));
             VisoredEvents.endAll(player, SoulLogic.get(player), player.level().getGameTime());
             SoulData fresh = new SoulData();
