@@ -1365,8 +1365,8 @@ public final class BleachConfig {
         KIDO_CHAT_CASTING = builder
                 .comment("Whether typing a spell's whole incantation in chat casts it, spoken aloud to those nearby who see"
                         + " spirits instead of being sent to chat. Off, chat is never read for Kidō: spells that have an"
-                        + " incantation are cast only by name with the Kidō key, and a Shinigami whose power is lent cannot"
-                        + " cast.")
+                        + " incantation are cast only by name with the Kidō key, choosing one does not print its"
+                        + " incantation, and a Shinigami whose power is lent cannot cast.")
                 .define("chat_casting", true);
         KIDO_CHANT_XP_MULTIPLIER = builder
                 .comment("How many times the Kidō xp of a cast by name a chanted cast earns: 2 is twice.")

@@ -196,7 +196,8 @@ public final class KidoEvents {
                 ? Component.translatable("message.bleach.kido.chosen.by_name_later", spell.title(), spell.byNameLevel())
                 : Component.translatable("message.bleach.kido.chosen", spell.title());
         player.displayClientMessage(line.withStyle(ChatFormatting.GRAY), true);
-        if (spell.chantable()) {
+        // Only where a chant can be heard: with chat casting off, the lines would promise what the server ignores.
+        if (spell.chantable() && BleachConfig.get(BleachConfig.KIDO_CHAT_CASTING)) {
             printIncantations(player, spell);
         }
         return null;
