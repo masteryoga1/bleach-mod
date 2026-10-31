@@ -185,7 +185,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * key twice must choose #58 Tenran, and the key alone must blow it at a fresh villager, which must be hurt, and its pale
  * trace must reach the client. Last, given Kidō 42, sneaking with the key must choose #63 Raikōhō, and holding the key
  * must gather its yellow orb at the palm, which must reach the client with no bolt before it; then the bolt must go off
- * by itself and its yellow trace reach the client, before the run quits.
+ * by itself, the key still held, and its yellow trace reach the client, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -1130,9 +1130,9 @@ public final class ClientSmokeTest {
             case 5027 -> KidoKeys.CAST.setDown(false);
             case 5029 -> minecraft.options.keyShift.setDown(false);
             // The real key, held: one press, and Raikōhō gathers in the palm for a second and goes off by itself, about
-            // 5080. The let-go comes after that, so it finds nothing gathering and does nothing.
+            // 5080. The let-go comes only after the bolt's window has closed, so the bolt cannot be the let-go's.
             case 5060 -> KidoKeys.CAST.setDown(true);
-            case 5090 -> KidoKeys.CAST.setDown(false);
+            case 5106 -> KidoKeys.CAST.setDown(false);
             case 5120 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
@@ -1544,7 +1544,8 @@ public final class ClientSmokeTest {
                 "holding the Kidō key never gathered Raikōhō's orb, or it never reached the client")) {
             shot(minecraft, "kido_raikoho_gather");
         }
-        if (expectWithin(minecraft, 5076, 5110, () -> ownTrace(minecraft, player, KidoSpell.RAIKOHO) != null,
+        // Shut before the let-go at 5106, so only the gather going off by itself can pass it.
+        if (expectWithin(minecraft, 5076, 5105, () -> ownTrace(minecraft, player, KidoSpell.RAIKOHO) != null,
                 "Raikōhō never went off once gathered, or its yellow trace never reached the client"
                         + " (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_raikoho");
