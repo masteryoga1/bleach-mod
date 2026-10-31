@@ -54,7 +54,9 @@ import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -74,6 +76,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffects;
@@ -174,7 +177,11 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * spell a soul that never chose falls back on, at a summoned villager, which must be hurt, and the cast must train
  * Kidō. Sneaking with the key must choose #4 Byakurai, which must reach the client and which the action bar must name;
  * the key alone then casts it, whose white trace must reach the client in the colour of the client's own synced copy
- * of the spell, and it must train Kidō again, before the run quits.
+ * of the spell, and it must train Kidō again. Sneaking with the key once more must choose #31 Shakkahō and print its
+ * incantation in the chat. Its romaji, sent through the real chat as a player types it, must be spoken back to the
+ * player, and the spell must not go off before the chant is said; then it must, its crimson trace must reach the
+ * client, and the chanted cast must train Kidō twice over. Last, #33 Sōkatsui's incantation in the mod's own English,
+ * sent the same way, must cast it, whose blue trace must reach the client, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -219,6 +226,8 @@ public final class ClientSmokeTest {
     private static final int FIRST_STEP_TICK = 40;
     /** How long the steps wait on the bloodline answer before the run fails. */
     private static final int BLOODLINE_WAIT_TICKS = 400;
+    /** How many of the server's last chat lines are kept for the checks that read them. */
+    private static final int CHAT_LINES_KEPT = 16;
 
     private static boolean worldRequested;
     private static int ticksWaiting;
@@ -248,6 +257,8 @@ public final class ClientSmokeTest {
     @Nullable
     private static Component actionBar;
     private static int actionBarAt;
+    /** The last lines the server put in the chat, oldest first, as plain text, for the checks that read them. */
+    private static final Deque<String> chatLines = new ArrayDeque<>();
 
     private ClientSmokeTest() {
     }
@@ -256,11 +267,19 @@ public final class ClientSmokeTest {
         return Boolean.getBoolean("bleach.smokeTest");
     }
 
-    /** Keeps each line the server puts on the action bar, which the game itself keeps out of reach. */
+    /**
+     * Keeps each line the server puts on the action bar, which the game itself keeps out of reach, and the last few it
+     * puts in the chat: a spoken line and a printed incantation come as such system lines, not as player chat.
+     */
     static void onSystemChat(ClientChatReceivedEvent.System event) {
         if (event.isOverlay()) {
             actionBar = event.getMessage();
             actionBarAt = ticksInWorld;
+        } else {
+            chatLines.addLast(event.getMessage().getString());
+            while (chatLines.size() > CHAT_LINES_KEPT) {
+                chatLines.removeFirst();
+            }
         }
     }
 
@@ -1029,11 +1048,11 @@ public final class ClientSmokeTest {
             case 4645 -> minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             case 4670 -> ZanpakutoKeys.MASK.setDown(true);
             case 4672 -> ZanpakutoKeys.MASK.setDown(false);
-            // Kidō, seen from behind and facing south. The run's Quincy power is taken away first, since an awakened
-            // Quincy cannot use Kidō (by its tier alone: a reset would leave the bloodline open, and the steps wait for
-            // it), and the Hollow too, so its voice never takes the action bar. At Kidō 10 the soul knows Shō and
-            // Byakurai, and having never chosen, it casts Shō first. The villager stands tall enough for a level beam
-            // from the eyes to meet it.
+            // Kidō by name, and Shakkahō and Sōkatsui by incantation, seen from behind and facing south. The run's Quincy
+            // power is taken away first, since an awakened Quincy cannot use Kidō (by its tier alone: a reset would leave
+            // the bloodline open, and the steps wait for it), and the Hollow too, so its voice never takes the action
+            // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and having never chosen, it casts Shō
+            // first. The villager stands tall enough for a level beam from the eyes to meet it.
             case 4700 -> {
                 command(minecraft, "bleach tier @s quincy 0");
                 command(minecraft, "bleach visored @s reset");
@@ -1057,7 +1076,23 @@ public final class ClientSmokeTest {
             // At full strength, since it has no incantation: about 9 of the villager's 20, so it lives.
             case 4760 -> KidoKeys.CAST.setDown(true);
             case 4762 -> KidoKeys.CAST.setDown(false);
-            case 4800 -> {
+            // Sneaking again, the key chooses Shakkahō, and the server prints its incantation in the chat, to be read.
+            case 4770 -> minecraft.options.keyShift.setDown(true);
+            case 4773 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 4775 -> KidoKeys.CAST.setDown(false);
+            case 4777 -> minecraft.options.keyShift.setDown(false);
+            // Its romaji, sent whole through the real chat as a player types it: the server keeps it from the chat and
+            // speaks it instead, and casts the spell 30 ticks on, at full strength, where the player then looks. The key
+            // is never pressed on a spell with an incantation, whose cast by name may misfire.
+            case 4790 -> chant(minecraft, KidoSpell.SHAKKAHO, 0);
+            // Shakkahō's 15 or so killed the first villager, so a fresh one stands for Sōkatsui.
+            case 4870 -> command(minecraft, "summon minecraft:villager ~ ~ ~4 {NoAI:1b,Silent:1b}");
+            // Sōkatsui in the mod's own English, its second incantation. Shakkahō's cooldown let the hands go about 4851.
+            case 4880 -> chant(minecraft, KidoSpell.SOKATSUI, 1);
+            case 4960 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1406,33 +1441,84 @@ public final class ClientSmokeTest {
         }
         // The colour is the client's own copy of the spell's, so this also proves the spells reached it. Once the trace
         // has been drawn, so the shot shows it.
-        if (expectWithin(minecraft, 4761, 4780,
-                () -> ownCero(minecraft, player, beam -> beam.isFired() && beam.colour() == byakuraiColour(minecraft)
-                        && beam.firedAge(0.0F) >= 1.0F) != null,
+        if (expectWithin(minecraft, 4761, 4780, () -> ownTrace(minecraft, player, KidoSpell.BYAKURAI) != null,
                 "the Kidō key never cast Byakurai, or its trace never reached the client in the synced spell's colour"
                         + " (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_byakurai");
         }
         // Shō gave 2 with its strike, and Byakurai gives at least 2 more. Its 32 reiryoku come back too fast to check.
         expectWithin(minecraft, 4762, 4780, () -> soul.xp(Stat.KIDO) >= 4, "Byakurai never trained Kidō");
+        // Choosing a spell with an incantation prints it in the player's own chat, as the client's copy of it reads.
+        expectWithin(minecraft, 4776, 4789,
+                () -> soul.shinigami().kido().chosen().equals(Optional.of(KidoSpell.SHAKKAHO.location()))
+                        && chatShows(incantation(minecraft, KidoSpell.SHAKKAHO, 0)),
+                "Sneak and the Kidō key never chose Shakkahō, or its incantation never reached the chat");
+        // The chant sent at 4790 takes 30 ticks to say, so a trace this soon would be a cast that never waited for it.
+        if (ticksInWorld >= 4791 && ticksInWorld <= 4815) {
+            int crimson = colourOf(minecraft, KidoSpell.SHAKKAHO);
+            expect(minecraft, ownCero(minecraft, player, beam -> beam.colour() == crimson) == null,
+                    "Shakkahō went off before its chant was done");
+        }
+        // The line is kept from the chat, and the server speaks it instead, to its caster too, as a system line.
+        expectWithin(minecraft, 4791, 4815, () -> spokenBack(player, incantation(minecraft, KidoSpell.SHAKKAHO, 0)),
+                "the chant was never spoken back to its caster");
+        if (expectWithin(minecraft, 4821, 4860, () -> ownTrace(minecraft, player, KidoSpell.SHAKKAHO) != null,
+                "the chant of Shakkahō never cast it, or its crimson trace never reached the client"
+                        + " (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_shakkaho");
+        }
+        // Shō and Byakurai left at least 4, a chant of Shakkahō gives 6, or 8 with its strike, and a cast by name at most
+        // 4. Kidō 11 is 420 xp from 10, so nothing rolls over into a level and the count only grows.
+        expectWithin(minecraft, 4822, 4860, () -> soul.xp(Stat.KIDO) >= 10,
+                "the chant of Shakkahō never trained Kidō twice over");
+        if (expectWithin(minecraft, 4921, 4955, () -> ownTrace(minecraft, player, KidoSpell.SOKATSUI) != null,
+                "the English chant of Sōkatsui never cast it, or its blue trace never reached the client"
+                        + " (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_sokatsui");
+        }
     }
 
-    /** Byakurai as this client's copy of the synced Kidō spells has it, or null if the client never had them. */
+    /** The spell as this client's copy of the synced Kidō spells has it, or null if the client never had it. */
     @Nullable
-    private static KidoSpell byakurai(Minecraft minecraft) {
-        return KidoSpell.get(minecraft.level, KidoSpell.BYAKURAI.location()).map(Holder.Reference::value).orElse(null);
+    private static KidoSpell synced(Minecraft minecraft, ResourceKey<KidoSpell> key) {
+        return KidoSpell.get(minecraft.level, key.location()).map(Holder.Reference::value).orElse(null);
     }
 
-    /** Byakurai's trace colour as this client's copy of the spells has it, or -1, which no trace has, without them. */
-    private static int byakuraiColour(Minecraft minecraft) {
-        KidoSpell spell = byakurai(minecraft);
+    /** The spell's trace colour as this client's copy of the spells has it, or -1, which no trace has, without it. */
+    private static int colourOf(Minecraft minecraft, ResourceKey<KidoSpell> key) {
+        KidoSpell spell = synced(minecraft, key);
         return spell != null ? spell.look().colour() : -1;
+    }
+
+    /** The player's own trace of the spell, in its colour as this client's copy has it, once drawn for a tick, or null. */
+    @Nullable
+    private static CeroBeam ownTrace(Minecraft minecraft, LocalPlayer player, ResourceKey<KidoSpell> key) {
+        int colour = colourOf(minecraft, key);
+        return ownCero(minecraft, player, beam -> beam.isFired() && beam.colour() == colour && beam.firedAge(0.0F) >= 1.0F);
+    }
+
+    /** The spell's incantation at this place in its list, as this client's copy of it has it, or null without one. */
+    @Nullable
+    private static String incantation(Minecraft minecraft, ResourceKey<KidoSpell> key, int index) {
+        KidoSpell spell = synced(minecraft, key);
+        return spell != null && index < spell.incantations().size() ? spell.incantations().get(index) : null;
     }
 
     /** Whether the action bar names Byakurai as the chosen spell, in the line built from this client's copy of it. */
     private static boolean byakuraiChosenShown(Minecraft minecraft) {
-        KidoSpell spell = byakurai(minecraft);
+        KidoSpell spell = synced(minecraft, KidoSpell.BYAKURAI);
         return spell != null && actionBarShows(Component.translatable("message.bleach.kido.chosen", spell.title()));
+    }
+
+    /** Whether one of the server's last chat lines reads as this one, give or take the spaces about it. */
+    private static boolean chatShows(@Nullable String line) {
+        return line != null && chatLines.stream().anyMatch(seen -> seen.strip().equals(line.strip()));
+    }
+
+    /** Whether the chat shows this said aloud in the player's name, as vanilla shows a chat line and the mod a speech. */
+    private static boolean spokenBack(LocalPlayer player, @Nullable String text) {
+        return text != null && chatShows(Component.translatable("chat.type.text", player.getDisplayName(),
+                Component.literal(text)).getString());
     }
 
     /** The last line the server put on the action bar, for a failure to name the refusal it may have been. */
@@ -1570,6 +1656,25 @@ public final class ClientSmokeTest {
     private static void command(Minecraft minecraft, String command) {
         BleachMod.LOGGER.info("Smoke test: /{}", command);
         minecraft.player.connection.sendCommand(command);
+    }
+
+    /**
+     * Sends a line to the server's chat as the chat screen does, untrimmed: unsigned on a dev client, which has no chat
+     * session, and the integrated server, which enforces no secure profile, takes it so.
+     */
+    private static void chat(Minecraft minecraft, String text) {
+        BleachMod.LOGGER.info("Smoke test: chat {}", text);
+        minecraft.player.connection.sendChat(text);
+    }
+
+    /** Says the spell's incantation at this place in its list in chat, as the client's copy of it reads, or fails. */
+    private static void chant(Minecraft minecraft, ResourceKey<KidoSpell> key, int index) {
+        String line = incantation(minecraft, key, index);
+        if (line == null) {
+            fail(minecraft, "the client's copy of " + key.location() + " has no incantation " + (index + 1) + " to say");
+        } else {
+            chat(minecraft, line);
+        }
     }
 
     private static void expect(Minecraft minecraft, boolean condition, String problem) {

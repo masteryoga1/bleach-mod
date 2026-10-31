@@ -1,0 +1,34 @@
+{
+  "kind": "hado",
+  "number": 33,
+  "name": {"translate": "kido.bleach.sokatsui"},
+  "shape": "beam",
+  "level": 8,
+  "by_name_level": 14,
+  "chant_ticks": 40,
+  "incantations": [
+    "Kunrinsha yo! Chiniku no kamen, banshō, habataki, hito no na o kansu mono yo! Shinri to sessei, tsumi shiranu yume no kabe ni wazuka ni tsume o tate yo!!",
+    "O you who reign! Mask of flesh and blood, all things, beating of wings, you who are crowned with the name of Man! Truth and restraint: on the wall of dreams that knows no sin, sink in your claws, if only a little!"
+  ],
+  "cost_share": 0.08,
+  "min_cost": 4.0,
+  "cooldown_ticks": 40,
+  "xp": 4,
+  "look": {
+    "colour": "#3A7BFF",
+    "sound": "minecraft:item.firecharge.use",
+    "pitch": 0.7,
+    "particle": "minecraft:soul_fire_flame"
+  },
+  "effect": {
+    "damage": 5.0,
+    "damage_per_root": 0.35,
+    "max_damage": 34.0,
+    "range": 20.0,
+    "radius": 0.6,
+    "pierce": 1,
+    "blast_radius": 2.5,
+    "blast_share": 0.6,
+    "knockback": 0.6
+  }
+}

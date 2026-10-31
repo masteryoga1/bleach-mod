@@ -68,7 +68,8 @@ import org.joml.Vector3f;
  * <p>Other shots strike the same way, as a {@link Kind} of their own: an Arrancar's Bala is a quiet one that
  * stops at the first creature (see {@link io.github.masteryoga1.bleach.soul.Bala}), and is seen as a short
  * {@link #trace}; an Arrancar's Gran Rey Cero gathers and fires as this entity, with a kind of its own (see
- * {@link io.github.masteryoga1.bleach.soul.GranReyCero}).
+ * {@link io.github.masteryoga1.bleach.soul.GranReyCero}). A shot that stops at its last creature may burst
+ * there too ({@link #burstAt}), as a Hadō does.
  *
  * <p>The server decides everything; a client only keeps the orb at the caster's mouth and draws it, then
  * the beam, from the synced data. It is never saved. A {@code /summon} with {@code Reach} raises a
@@ -128,7 +129,10 @@ public class CeroBeam extends Entity {
     private static final float BLAST_PITCH = 1.2F;
     private static final int BLAST_SMOKE = 12;
     private static final double BLAST_SMOKE_SPREAD = 0.6;
-    /** The puff a quiet shot ({@link Kind#quiet}) leaves where a wall or a shield stops it, in place of a burst. */
+    /**
+     * The puff a quiet shot ({@link Kind#quiet}) leaves where a wall or a shield stops it, or where it bursts at its last
+     * creature ({@link #burstAt}), in place of a burst.
+     */
     private static final int QUIET_SMOKE = 4;
     private static final double QUIET_SMOKE_SPREAD = 0.1;
     private static final double SMOKE_SPEED = 0.02;
@@ -214,9 +218,9 @@ public class CeroBeam extends Entity {
 
     /**
      * What one Cero did: where it started and where it stopped, whether it burst on a block (not when a
-     * shield, or the last creature its {@link Kind} may strike, took it first) and whether a shield stopped
-     * it, the creatures the beam struck, nearest first (not those only the blast caught), and how many
-     * blocks the blast broke.
+     * shield, or the last creature its {@link Kind} may strike, took it first; see {@link #burstAt} to burst
+     * there) and whether a shield stopped it, the creatures the beam struck, nearest first (not those only the
+     * blast caught), and how many blocks the blast broke.
      */
     public record Shot(Vec3 from, Vec3 to, boolean hitBlock, boolean blocked, List<LivingEntity> struck,
                        int blocksBroken) {
@@ -489,8 +493,7 @@ public class CeroBeam extends Entity {
         }
         entries.sort(Comparator.comparingDouble(entry -> entry.at().distanceToSqr(from)));
 
-        DamageSource source = new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
-                .getHolderOrThrow(kind.damage()), direct != null ? direct : shooter, shooter);
+        DamageSource source = sourceOf(level, shooter, direct, kind);
         Vec3 push = pushAlong(heading, shooter);
         List<LivingEntity> struck = new ArrayList<>();
         boolean blocked = false;
@@ -533,21 +536,38 @@ public class CeroBeam extends Entity {
             }
         }
         SoundSource category = shooter != null ? shooter.getSoundSource() : SoundSource.HOSTILE;
-        if ((hitBlock || blocked) && kind.quiet()) {
-            SpiritSenses.particles(level, ParticleTypes.SMOKE, to.x, to.y, to.z, QUIET_SMOKE, QUIET_SMOKE_SPREAD,
-                    QUIET_SMOKE_SPREAD, QUIET_SMOKE_SPREAD, SMOKE_SPEED);
-        } else if (hitBlock || blocked) {
-            SpiritSenses.particles(level, ParticleTypes.EXPLOSION, to.x, to.y, to.z, 1, 0.0, 0.0, 0.0, 0.0);
-            SpiritSenses.particles(level, ParticleTypes.LARGE_SMOKE, to.x, to.y, to.z, BLAST_SMOKE, BLAST_SMOKE_SPREAD,
-                    BLAST_SMOKE_SPREAD, BLAST_SMOKE_SPREAD, SMOKE_SPEED);
-            SpiritSenses.play(level, to.x, to.y, to.z, SoundEvents.GENERIC_EXPLODE.value(), category, BLAST_VOLUME,
-                    BLAST_PITCH, false);
+        if (hitBlock || blocked) {
+            burstLook(level, to, kind, category);
         }
         if (!kind.quiet()) {
             SpiritSenses.play(level, from.x, from.y, from.z, ModSounds.CERO_FIRE.get(), category, FIRE_VOLUME, 1.0F,
                     false);
         }
         return new Shot(from, to, hitBlock, blocked, struck, broken);
+    }
+
+    /**
+     * Bursts a shot that stopped at its last creature, as {@link #fire} bursts one that met a block: what the shooter
+     * may strike within the blast radius of {@code shot.to()}, where the beam met that creature, but not what the beam
+     * struck, takes the blast's share of the damage, and the kind's puff of smoke or burst is left there. It breaks no
+     * blocks. Nothing happens when the shot met a block (fire burst it already) or a shield, struck fewer creatures
+     * than its kind's pierce, or has no blast. {@code direct} and {@code dir} are those the shot was fired with, so the
+     * blast's damage and heading are the beam's own.
+     */
+    public static void burstAt(ServerLevel level, @Nullable LivingEntity shooter, @Nullable Entity direct, Shot shot,
+                               Vec3 dir, Spec spec, Kind kind) {
+        // Struck as many as its pierce, so the beam ended at the last of them; one met but not hurt reads as no hit.
+        if (shot.hitBlock() || shot.blocked() || shot.struck().size() < kind.pierce() || spec.blastRadius() <= 0.0F) {
+            return;
+        }
+        Vec3 heading = dir.normalize();
+        // A direction of zero (or not a number) went nowhere, as in fire.
+        if (!(heading.lengthSqr() >= 0.5)) {
+            return;
+        }
+        Vec3 to = shot.to();
+        blast(level, shooter, sourceOf(level, shooter, direct, kind), to, heading, spec, shot.struck());
+        burstLook(level, to, kind, shooter != null ? shooter.getSoundSource() : SoundSource.HOSTILE);
     }
 
     /**
@@ -868,6 +888,17 @@ public class CeroBeam extends Entity {
     }
 
     /**
+     * The damage a beam of this kind deals: of the kind's damage type, from {@code direct} (or the shooter when null),
+     * caused by the shooter. Public, so what a caller adds to a shot, such as the burn a Hadō leaves, is weighed against
+     * the same source.
+     */
+    public static DamageSource sourceOf(ServerLevel level, @Nullable LivingEntity shooter, @Nullable Entity direct,
+                                        Kind kind) {
+        return new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                .getHolderOrThrow(kind.damage()), direct != null ? direct : shooter, shooter);
+    }
+
+    /**
      * The way along the level to push what the beam strikes: its own heading, flattened, or, for a beam
      * straight up or down, the way the shooter faces (no way at all without one).
      */
@@ -881,9 +912,9 @@ public class CeroBeam extends Entity {
     }
 
     /**
-     * The burst where the beam meets a block: what the shooter may strike within the blast radius of
-     * {@code at}, which the beam itself did not strike and which stands in the open from just short of
-     * the block, takes the blast's share of the damage.
+     * The burst where the beam meets a block, or its last creature ({@link #burstAt}): what the shooter may
+     * strike within the blast radius of {@code at}, which the beam itself did not strike and which stands in
+     * the open from just short of that point, takes the blast's share of the damage.
      */
     private static void blast(ServerLevel level, @Nullable LivingEntity shooter, DamageSource source, Vec3 at,
                               Vec3 heading, Spec spec, List<LivingEntity> struck) {
@@ -903,6 +934,23 @@ public class CeroBeam extends Entity {
                 target.hurt(source, damage);
             }
         }
+    }
+
+    /**
+     * What is seen and heard where a shot bursts or a shield stops it: a quiet kind's puff of smoke, or a loud one's
+     * flash, smoke and bang. Only those who see spirits see or hear it.
+     */
+    private static void burstLook(ServerLevel level, Vec3 at, Kind kind, SoundSource category) {
+        if (kind.quiet()) {
+            SpiritSenses.particles(level, ParticleTypes.SMOKE, at.x, at.y, at.z, QUIET_SMOKE, QUIET_SMOKE_SPREAD,
+                    QUIET_SMOKE_SPREAD, QUIET_SMOKE_SPREAD, SMOKE_SPEED);
+            return;
+        }
+        SpiritSenses.particles(level, ParticleTypes.EXPLOSION, at.x, at.y, at.z, 1, 0.0, 0.0, 0.0, 0.0);
+        SpiritSenses.particles(level, ParticleTypes.LARGE_SMOKE, at.x, at.y, at.z, BLAST_SMOKE, BLAST_SMOKE_SPREAD,
+                BLAST_SMOKE_SPREAD, BLAST_SMOKE_SPREAD, SMOKE_SPEED);
+        SpiritSenses.play(level, at.x, at.y, at.z, SoundEvents.GENERIC_EXPLODE.value(), category, BLAST_VOLUME,
+                BLAST_PITCH, false);
     }
 
     /** The creature's box, or the box of whichever of its parts is nearest to this point. */

@@ -277,6 +277,14 @@ public final class SoulData {
     boolean balaHeld;
     /** Game time this soul's hands are free to cast Kidō again (see {@link KidoEvents}). */
     long kidoReadyAt = NEVER;
+    /**
+     * The incantation this soul is chanting, or null (see {@link KidoEvents#chant}). Not saved: a chant ends with the
+     * session.
+     */
+    @Nullable
+    KidoLogic.Chant kidoChant;
+    /** Game time this soul's last chant was heard in chat, for the spacing between spoken chants. */
+    long lastChantHeardAt = NEVER;
     /** The Gran Rey Cero this Arrancar is gathering, by entity id, or -1 (see {@link GranReyCero}). */
     int granReyCeroBeamId = -1;
     /** Game time the Gran Rey Cero being gathered started, or {@link #NEVER}. */

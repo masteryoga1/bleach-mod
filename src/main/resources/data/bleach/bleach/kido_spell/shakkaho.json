@@ -1,0 +1,34 @@
+{
+  "kind": "hado",
+  "number": 31,
+  "name": {"translate": "kido.bleach.shakkaho"},
+  "shape": "beam",
+  "level": 5,
+  "by_name_level": 10,
+  "chant_ticks": 30,
+  "incantations": [
+    "Kunrinsha yo! Chiniku no kamen, banshō, habataki, hito no na o kansu mono yo! Shōnetsu to sōran, umihedate sakamaki minami e to ho o susume yo!",
+    "O you who reign! Mask of flesh and blood, all things, beating of wings, you who are crowned with the name of Man! Searing heat and strife: the parted sea rolls back. Advance to the south!"
+  ],
+  "cost_share": 0.06,
+  "min_cost": 3.0,
+  "cooldown_ticks": 30,
+  "xp": 3,
+  "look": {
+    "colour": "#E0301E",
+    "sound": "minecraft:entity.blaze.shoot",
+    "pitch": 0.9,
+    "particle": "minecraft:flame"
+  },
+  "effect": {
+    "damage": 4.0,
+    "damage_per_root": 0.3,
+    "max_damage": 28.0,
+    "range": 24.0,
+    "radius": 0.35,
+    "pierce": 1,
+    "blast_radius": 1.5,
+    "blast_share": 0.5,
+    "burn_seconds": 3.0
+  }
+}
