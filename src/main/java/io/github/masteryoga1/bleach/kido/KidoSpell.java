@@ -236,7 +236,7 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         NONE,
         /** A beam struck at once along the caster's look, through the Cero's engine. */
         BEAM,
-        /** A gust widening from the hand, striking, pushing and blinding every creature in it at once. */
+        /** A gust widening from the hand, striking and pushing every creature in it at once, and blinding the players. */
         GUST;
 
         public static final Codec<Shape> CODEC = StringRepresentable.fromEnum(Shape::values);
