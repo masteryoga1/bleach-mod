@@ -1,7 +1,9 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
+import io.github.masteryoga1.bleach.registry.BleachTags;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
@@ -11,15 +13,20 @@ import javax.annotation.Nullable;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 
 /**
  * The rules of Kidō: who may cast, the spells a soul knows by its Kidō level and the one it has chosen, the gate
  * on casting by name alone, a spell's strength, cost and training, how a line said in chat is heard as an
- * incantation, and the misfire of a cast by name. Like {@link ShinigamiLogic}, these only read and change a
- * {@link SoulData}, a spell and the config ({@link #mayCast} also asks the player whether it lives, watches or is
- * held), so game tests can call them directly. Casting itself is {@link KidoEvents#cast}. {@code now} is the
- * level's game time.
+ * incantation, the misfire of a cast by name, the gather of a spell held in the palm on the key, the hand (a spell
+ * may be weaker cast with no zanpakutō at hand) and the reiatsu gap that cuts what a spell does besides its blow.
+ * Like {@link ShinigamiLogic}, these only read and change a {@link SoulData}, a spell and the config
+ * ({@link #mayCast} also asks the player whether it lives, watches or is held, and the hand and the gap look at the
+ * caster and the creature), so game tests can call them directly. Casting itself is {@link KidoEvents#cast}.
+ * {@code now} is the level's game time.
  *
  * <p>There is no list of learned spells: the Kidō level alone unlocks a spell, at its {@code level}. A spell
  * with an incantation needs its higher {@code by_name_level} to be cast by name alone (Eishōhaki), and is weaker
@@ -31,6 +38,7 @@ public final class KidoLogic {
     public static final float MIN_LEFT = 0.5F;
     /** The least health a misfire leaves its caster: one heart. */
     public static final float MISFIRE_FLOOR = 2.0F;
+    private static final float TICKS_PER_SECOND = 20.0F;
 
     /** Every combining mark, such as a macron or an accent, once a line is decomposed. */
     private static final Pattern MARKS = Pattern.compile("\\p{M}+");
@@ -56,14 +64,19 @@ public final class KidoLogic {
         NEEDS_NAME_LEVEL("message.bleach.kido.needs_level.by_name"),
         /** The hands are still busy from the last cast. Told nothing, as a line every half second would bury the rest. */
         COOLDOWN(null),
-        /** A Getsuga Tenshō or a Cero is gathering: one art at a time. */
+        /**
+         * A Getsuga Tenshō, a Cero or a spell held on the Kidō key is gathering, or the soul sits in Jinzen as a spell
+         * would begin to gather: one art at a time.
+         */
         GATHERING("message.bleach.getsuga.already_gathering"),
         /** The cast would leave it with less than {@link KidoLogic#MIN_LEFT} reiryoku. */
         TOO_WEAK("message.bleach.kido.too_weak"),
         /** A chant is already being said: the key and a second chant wait for it. */
         CHANTING("message.bleach.kido.chanting"),
         /** Cast by name alone, the spell burst in the caster's hand: paid for, and nothing cast. */
-        MISFIRED("message.bleach.kido.misfire");
+        MISFIRED("message.bleach.kido.misfire"),
+        /** Let go before it had gathered: nothing was spent, and nothing is cast. */
+        SCATTERED("message.bleach.kido.gather_scattered");
 
         @Nullable
         private final String messageKey;
@@ -84,6 +97,13 @@ public final class KidoLogic {
      * it halfway), and the game time it goes off. Transient: it is never saved.
      */
     public record Chant(ResourceLocation id, KidoSpell spell, long firesAt) {
+    }
+
+    /**
+     * A spell gathering in the palm on the Kidō key: the spell, by id and as it was then, when it goes off, and the orb
+     * that shows it (null when the level refused one). Transient.
+     */
+    public record Gather(ResourceLocation id, KidoSpell spell, long firesAt, @Nullable CeroBeam orb) {
     }
 
     private KidoLogic() {
@@ -204,6 +224,32 @@ public final class KidoLogic {
     }
 
     /**
+     * 1 with a zanpakutō at hand ({@link #bladeAtHand}), else the spell's {@code bare_share}: the share of its strength
+     * the hand leaves it. It cuts the damage, the push and the blindness alike, as the form's share does.
+     */
+    public static float handShare(KidoSpell spell, Player caster) {
+        return bladeAtHand(caster) ? 1.0F : spell.effect().bareShare();
+    }
+
+    /**
+     * A zanpakutō ({@link BleachTags#ZANPAKUTO}) in the off hand or anywhere on the hotbar, the main hand included:
+     * held, or worn sheathed, as {@link ShinigamiLogic#sheathedModel} draws a blade on the hotbar. One deeper in the
+     * inventory is not at hand, and no other sword is a zanpakutō.
+     */
+    public static boolean bladeAtHand(Player player) {
+        if (player.getOffhandItem().is(BleachTags.ZANPAKUTO)) {
+            return true;
+        }
+        // The main hand is the selected hotbar slot, so the hotbar covers it.
+        for (int slot = 0; slot < Inventory.getSelectionSize(); slot++) {
+            if (player.getInventory().getItem(slot).is(BleachTags.ZANPAKUTO)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * A spell's damage: its own and more for each square root of maximum reiryoku, made stronger by each Kidō level
      * ({@code power_per_level}), up to its cap; then the form's share of that.
      */
@@ -212,6 +258,30 @@ public final class KidoLogic {
         double raw = effect.damage() + effect.damagePerRoot() * Math.sqrt(Math.max(0.0F, data.maxReiryoku()));
         double grown = raw * (1.0 + BleachConfig.get(BleachConfig.KIDO_POWER_PER_LEVEL) * data.level(Stat.KIDO));
         return (float) (Math.min(effect.maxDamage(), grown) * share);
+    }
+
+    /**
+     * How much of a Kidō blow's push and blindness, and a Hadō's burn, this creature feels: 1 without a soul, else the
+     * reiatsu gap or its Hierro, whichever cuts more, weighed as {@link ReiatsuEvents} weighs a blow from this caster.
+     * Those have no attacker for the gap to weigh as they land, so they are cut by it here instead, and a soul whose
+     * reiatsu dwarfs the caster's shrugs them off as it does the blow.
+     */
+    public static float gap(Player caster, LivingEntity target, DamageSource source) {
+        if (!SoulLogic.hasSoul(target)) {
+            return 1.0F;
+        }
+        float attacker = SoulLogic.reiatsu(caster) * QuincyLogic.reiatsuFactor(caster);
+        float victim = SoulLogic.reiatsu(target);
+        return Math.min(SoulLogic.reiatsuDamageMultiplier(attacker, victim),
+                Hierro.multiplier(target, source, attacker, victim));
+    }
+
+    /**
+     * Ticks a gust of this spell blinds a player at this share and gap: its {@code blind_seconds} at the share and cut
+     * by the gap, rounded; 0 for none.
+     */
+    public static int blindTicks(KidoSpell spell, float share, float gap) {
+        return Math.max(0, Math.round(spell.effect().blindSeconds() * TICKS_PER_SECOND * share * gap));
     }
 
     /** The reiryoku a cast costs: the spell's share of the maximum, but never less than its least cost. */
@@ -238,12 +308,18 @@ public final class KidoLogic {
         return form == Form.CHANT ? earned * BleachConfig.get(BleachConfig.KIDO_CHANT_XP_MULTIPLIER) : earned;
     }
 
-    // ---- The chant ----
+    // ---- The chant and the gather ----
 
     /** The chant this soul is saying, or null. Server only (the field is transient). */
     @Nullable
     public static Chant pending(SoulData data) {
         return data.kidoChant;
+    }
+
+    /** The spell this soul is gathering on the key, or null. Server only (the field is transient). */
+    @Nullable
+    public static Gather gathering(SoulData data) {
+        return data.kidoGather;
     }
 
     /**

@@ -180,7 +180,7 @@ public final class HollowKeys {
         if (!ceroHolding) {
             ownCero = null;
         } else if (!gathering(ownCero, player)) {
-            ownCero = findOwnCero(player);
+            ownCero = findOwnCero(player, data);
         }
     }
 
@@ -236,12 +236,24 @@ public final class HollowKeys {
 
     /** The player's own Cero that is gathering about its mouth, if the server has sent one. */
     @Nullable
-    private static CeroBeam findOwnCero(LocalPlayer player) {
+    private static CeroBeam findOwnCero(LocalPlayer player, SoulData data) {
+        // A Visored's Kidō gathers as a charging beam too, so for one only the server's word that a Cero gathers will
+        // do. A Hollow or an Arrancar casts no Kidō, so every beam it gathers is a Cero.
+        boolean castsKido = data.state() != SoulState.HOLLOW && data.state() != SoulState.ARRANCAR;
+        if (castsKido && !serverCeroGathering(player)) {
+            return null;
+        }
         // The orb sits ahead of the eyes by a share of the player's size, so a box that grows with it holds it.
         double reach = CeroBeam.LOOK_MUZZLE_AHEAD * player.getScale() + 1.0;
         List<CeroBeam> found = player.level().getEntitiesOfClass(CeroBeam.class, player.getBoundingBox().inflate(reach),
                 beam -> gathering(beam, player));
         return found.isEmpty() ? null : found.get(0);
+    }
+
+    /** Whether the server says this player's Cero is gathering, in the look it sends the player too. */
+    private static boolean serverCeroGathering(LocalPlayer player) {
+        return player.hasData(SoulAttachments.APPEARANCE)
+                && (player.getData(SoulAttachments.APPEARANCE).hollowLook() & HollowPlayerLogic.LOOK_CERO_CHARGING) != 0;
     }
 
     /** Whether this Cero is the player's own, in its world, and still gathering. */

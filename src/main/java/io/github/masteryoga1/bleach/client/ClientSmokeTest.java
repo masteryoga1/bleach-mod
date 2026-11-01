@@ -180,15 +180,19 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * of the spell, and it must train Kidō again. Sneaking with the key once more must choose #31 Shakkahō and print its
  * incantation in the chat. Its romaji, sent through the real chat as a player types it, must be spoken back to the
  * player, and the spell must not go off before the chant is said; then it must, its crimson trace must reach the
- * client, and the chanted cast must train Kidō twice over. Last, #33 Sōkatsui's incantation in the mod's own English,
- * sent the same way, must cast it, whose blue trace must reach the client, before the run quits.
+ * client, and the chanted cast must train Kidō twice over. Then #33 Sōkatsui's incantation in the mod's own English,
+ * sent the same way, must cast it, whose blue trace must reach the client. Given Kidō 18 by command, sneaking with the
+ * key twice must choose #58 Tenran, and the key alone must blow it at a fresh villager, which must be hurt, and its pale
+ * trace must reach the client. Last, given Kidō 42, sneaking with the key must choose #63 Raikōhō, and holding the key
+ * must gather its yellow orb at the palm, which must reach the client with no bolt before it; then the bolt must go off
+ * by itself, the key still held, and its yellow trace reach the client, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō trace and HUD are drawn, and screenshots of the main moments
- * are saved for review. Any crash in the mod's client code fails the run, and so does anything that did not reach the
- * client as expected.
+ * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces and orb, and HUD are drawn, and screenshots of the
+ * main moments are saved for review. Any crash in the mod's client code fails the run, and so does anything that did
+ * not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -1092,7 +1096,44 @@ public final class ClientSmokeTest {
             case 4870 -> command(minecraft, "summon minecraft:villager ~ ~ ~4 {NoAI:1b,Silent:1b}");
             // Sōkatsui in the mod's own English, its second incantation. Shakkahō's cooldown let the hands go about 4851.
             case 4880 -> chant(minecraft, KidoSpell.SOKATSUI, 1);
+            // Tenran by the key, then Raikōhō gathered with the key held, seen from behind and facing south. The
+            // villagers about are killed first, so a hurt one can only be the fresh one Tenran struck. Kidō 18 teaches
+            // Tenran, and the reiryoku is filled again.
             case 4960 -> {
+                command(minecraft, "kill @e[type=minecraft:villager,distance=..8]");
+                command(minecraft, "bleach stat @s kido 18");
+                command(minecraft, "bleach reiryoku @s 800 800");
+            }
+            case 4962 -> command(minecraft, "summon minecraft:villager ~ ~ ~4 {NoAI:1b,Silent:1b}");
+            // Sneaking, the real key chooses twice: Sōkatsui after Shakkahō, still chosen as a chant chooses nothing, then
+            // Tenran.
+            case 4965 -> minecraft.options.keyShift.setDown(true);
+            case 4968 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 4970 -> KidoKeys.CAST.setDown(false);
+            case 4972 -> KidoKeys.CAST.setDown(true);
+            case 4974 -> KidoKeys.CAST.setDown(false);
+            case 4976 -> minecraft.options.keyShift.setDown(false);
+            // The key alone casts Tenran at once, at full strength, as it has no incantation; its let-go finds nothing
+            // gathering, so it does nothing.
+            case 4990 -> KidoKeys.CAST.setDown(true);
+            case 4992 -> KidoKeys.CAST.setDown(false);
+            // At Kidō 42 Raikōhō cast by name never misfires, so no beat is left to chance. Sneaking, the key chooses it.
+            case 5020 -> command(minecraft, "bleach stat @s kido 42");
+            case 5022 -> minecraft.options.keyShift.setDown(true);
+            case 5025 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5027 -> KidoKeys.CAST.setDown(false);
+            case 5029 -> minecraft.options.keyShift.setDown(false);
+            // The real key, held: one press, and Raikōhō gathers in the palm for a second and goes off by itself, about
+            // 5080. The let-go comes only after the bolt's window has closed, so the bolt cannot be the let-go's.
+            case 5060 -> KidoKeys.CAST.setDown(true);
+            case 5106 -> KidoKeys.CAST.setDown(false);
+            case 5120 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1434,8 +1475,7 @@ public final class ClientSmokeTest {
                         != null,
                 "Shō never struck the villager");
         if (expectWithin(minecraft, 4741, 4757,
-                () -> soul.shinigami().kido().chosen().equals(Optional.of(KidoSpell.BYAKURAI.location()))
-                        && byakuraiChosenShown(minecraft),
+                () -> chosenIs(soul, KidoSpell.BYAKURAI) && byakuraiChosenShown(minecraft),
                 "Sneak and the Kidō key never chose Byakurai, or the action bar never named it")) {
             shot(minecraft, "kido_chosen");
         }
@@ -1450,8 +1490,7 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 4762, 4780, () -> soul.xp(Stat.KIDO) >= 4, "Byakurai never trained Kidō");
         // Choosing a spell with an incantation prints it in the player's own chat, as the client's copy of it reads.
         expectWithin(minecraft, 4776, 4789,
-                () -> soul.shinigami().kido().chosen().equals(Optional.of(KidoSpell.SHAKKAHO.location()))
-                        && chatShows(incantation(minecraft, KidoSpell.SHAKKAHO, 0)),
+                () -> chosenIs(soul, KidoSpell.SHAKKAHO) && chatShows(incantation(minecraft, KidoSpell.SHAKKAHO, 0)),
                 "Sneak and the Kidō key never chose Shakkahō, or its incantation never reached the chat");
         // The chant sent at 4790 takes 30 ticks to say, so a trace this soon would be a cast that never waited for it.
         if (ticksInWorld >= 4791 && ticksInWorld <= 4815) {
@@ -1476,6 +1515,49 @@ public final class ClientSmokeTest {
                         + " (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_sokatsui");
         }
+        // Kidō 18 teaches Tenran, the spell after Sōkatsui.
+        expectWithin(minecraft, 4977, 4989, () -> chosenIs(soul, KidoSpell.TENRAN),
+                "Sneak and the Kidō key never chose Tenran");
+        // The gust's pale streak along its middle is the one part of it a client can be asked about.
+        if (expectWithin(minecraft, 4991, 5010, () -> ownTrace(minecraft, player, KidoSpell.TENRAN) != null,
+                "the Kidō key never cast Tenran, or its pale trace never reached the client"
+                        + " (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_tenran");
+        }
+        // About 3.6 of its 20 bare-handed, 5.1 with a zanpakutō at hand. A villager with no free will is never seen pushed.
+        expectWithin(minecraft, 4992, 5010,
+                () -> nearest(minecraft, Villager.class, 8.0,
+                        villager -> villager.isAlive() && villager.getHealth() < villager.getMaxHealth()) != null,
+                "Tenran never struck the villager");
+        expectWithin(minecraft, 5030, 5049, () -> chosenIs(soul, KidoSpell.RAIKOHO),
+                "Sneak and the Kidō key never chose Raikōhō");
+        // The key held from 5060 gathers it for a second first, so a yellow bolt this soon never waited for the gather.
+        if (ticksInWorld >= 5061 && ticksInWorld <= 5075) {
+            int yellow = colourOf(minecraft, KidoSpell.RAIKOHO);
+            expect(minecraft, ownCero(minecraft, player, beam -> beam.isFired() && beam.colour() == yellow) == null,
+                    "Raikōhō went off before it had gathered");
+        }
+        // The orb is a charging Cero in the spell's colour at the palm, which the camera behind the player sees.
+        if (expectWithin(minecraft, 5062, 5075,
+                () -> ownCero(minecraft, player,
+                        beam -> beam.isCharging() && beam.colour() == colourOf(minecraft, KidoSpell.RAIKOHO)) != null,
+                "holding the Kidō key never gathered Raikōhō's orb, or it never reached the client")) {
+            shot(minecraft, "kido_raikoho_gather");
+        }
+        // Shut before the let-go at 5106, and only a bolt longer than the orb's own harmless 1-block shot, which the orb
+        // fires if nothing looses the gather: so only the gather going off by itself can pass it.
+        if (expectWithin(minecraft, 5076, 5105, () -> ownCero(minecraft, player, beam -> beam.isFired()
+                        && beam.colour() == colourOf(minecraft, KidoSpell.RAIKOHO) && beam.firedAge(0.0F) >= 1.0F
+                        && beam.reach().length() > 2.0) != null,
+                "Raikōhō never went off once gathered, or its yellow trace never reached the client"
+                        + " (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_raikoho");
+        }
+    }
+
+    /** Whether the soul's chosen spell, as the client's copy of it has it, is this one. */
+    private static boolean chosenIs(SoulData soul, ResourceKey<KidoSpell> key) {
+        return soul.shinigami().kido().chosen().equals(Optional.of(key.location()));
     }
 
     /** The spell as this client's copy of the synced Kidō spells has it, or null if the client never had it. */

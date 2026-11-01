@@ -69,7 +69,8 @@ import org.joml.Vector3f;
  * stops at the first creature (see {@link io.github.masteryoga1.bleach.soul.Bala}), and is seen as a short
  * {@link #trace}; an Arrancar's Gran Rey Cero gathers and fires as this entity, with a kind of its own (see
  * {@link io.github.masteryoga1.bleach.soul.GranReyCero}). A shot that stops at its last creature may burst
- * there too ({@link #burstAt}), as a Hadō does.
+ * there too ({@link #burstAt}), as a Hadō does. A Hadō gathered in the palm is this entity's orb too, charged as a
+ * quiet kind, and a Hadō's gust finds what it reaches with {@link #inCone}.
  *
  * <p>The server decides everything; a client only keeps the orb at the caster's mouth and draws it, then
  * the beam, from the synced data. It is never saved. A {@code /summon} with {@code Reach} raises a
@@ -138,6 +139,8 @@ public class CeroBeam extends Entity {
     private static final double SMOKE_SPEED = 0.02;
     /** Below this squared length the beam runs too nearly straight up or down to push anything along it. */
     private static final double FLAT_EPSILON = 1.0E-6;
+    /** A box weighed this close to a cone's apex is in the cone whatever the angle (see {@link #inCone}). */
+    private static final double APEX_EPSILON = 1.0E-3;
     /** How far short of unloaded ground a beam stops, so looking along it never loads a chunk. */
     private static final double UNLOADED_MARGIN = 0.01;
 
@@ -243,7 +246,10 @@ public class CeroBeam extends Entity {
         }
     }
 
-    /** Where the beam first meets a creature, and the box it meets there: the creature's own, or a part's. */
+    /**
+     * Where the beam first meets a creature, or where a cone weighs it ({@link #inCone}), and the box it meets there:
+     * the creature's own, or a part's.
+     */
     private record Entry(LivingEntity target, Vec3 at, AABB box) {
     }
 
@@ -268,7 +274,8 @@ public class CeroBeam extends Entity {
 
     /**
      * Starts a beam gathering as {@link #charge(ServerLevel, LivingEntity, Spec)} does, which strikes as this
-     * kind when it fires, by itself or sooner: a Gran Rey Cero is gathered so.
+     * kind when it fires, by itself or sooner, with the charge's sound unless the kind is quiet: a Gran Rey Cero is
+     * gathered so, and a Hadō's orb in the palm, quietly.
      */
     @Nullable
     public static CeroBeam charge(ServerLevel level, LivingEntity shooter, Spec spec, Kind kind) {
@@ -288,8 +295,11 @@ public class CeroBeam extends Entity {
         if (!level.addFreshEntity(beam)) {
             return null;
         }
-        SpiritSenses.play(level, muzzle.x, muzzle.y, muzzle.z, ModSounds.CERO_CHARGE.get(), shooter.getSoundSource(),
-                CHARGE_VOLUME, 1.0F, false);
+        // The Warden's charge is the Cero's own sound: a quiet kind's caller gives its orb a sound of its own.
+        if (!kind.quiet()) {
+            SpiritSenses.play(level, muzzle.x, muzzle.y, muzzle.z, ModSounds.CERO_CHARGE.get(), shooter.getSoundSource(),
+                    CHARGE_VOLUME, 1.0F, false);
+        }
         return beam;
     }
 
@@ -598,6 +608,46 @@ public class CeroBeam extends Entity {
     }
 
     /**
+     * Every creature the shooter may strike that stands, by its own box or one of its parts', within range of the apex
+     * and within half the angle (in degrees) of the axis, in the open from the apex: nearest first. A box is weighed at
+     * its point nearest the axis point nearest its centre (the axis running from the apex for the range), so a large
+     * creature at the edge is caught. A box holding the apex is in, and a block between the apex and the middle of the
+     * box keeps it out, as it keeps a burst off what stands behind it. Strikes nothing: a Hadō's gust asks it, and does
+     * the rest. Empty for no range or no axis; the range is at most the longest beam's.
+     */
+    public static List<LivingEntity> inCone(ServerLevel level, @Nullable LivingEntity shooter, Vec3 apex, Vec3 axis,
+                                            double range, float angle) {
+        Vec3 heading = axis.normalize();
+        // No reach, or a way of zero (or not a number), finds nothing.
+        if (!(range > 0.0) || !(heading.lengthSqr() >= 0.5)) {
+            return new ArrayList<>();
+        }
+        double reach = Math.min(range, MAX_REACH);
+        double edge = Math.cos(Math.toRadians(angle / 2.0));
+        List<Entry> entries = new ArrayList<>();
+        for (LivingEntity target : SpiritProjectiles.creaturesIn(level, AABB.ofSize(apex, 2.0 * reach, 2.0 * reach,
+                2.0 * reach), target -> mayStrike(shooter, target))) {
+            // Its own box first, then its parts', as nearestBox walks them.
+            Entry entry = coneEntry(level, target, target.getBoundingBox(), apex, heading, reach, edge);
+            PartEntity<?>[] parts = target.isMultipartEntity() ? target.getParts() : null;
+            if (parts != null) {
+                for (int i = 0; entry == null && i < parts.length; i++) {
+                    entry = coneEntry(level, target, parts[i].getBoundingBox(), apex, heading, reach, edge);
+                }
+            }
+            if (entry != null) {
+                entries.add(entry);
+            }
+        }
+        entries.sort(Comparator.comparingDouble(entry -> entry.at().distanceToSqr(apex)));
+        List<LivingEntity> found = new ArrayList<>(entries.size());
+        for (Entry entry : entries) {
+            found.add(entry.target());
+        }
+        return found;
+    }
+
+    /**
      * Whether a Cero fired by {@code owner} may strike this creature. A Hollow's strikes only what it
      * would hunt or fight: its target, whatever last hurt it, or its prey ({@link HollowLogic#isPreyFor}),
      * and never another Hollow, a Plus (spirit or player), a player in creative or spectator mode, or
@@ -877,6 +927,35 @@ public class CeroBeam extends Entity {
         AABB grown = box.inflate(radius);
         Vec3 at = grown.contains(from) ? from : grown.clip(from, to).orElse(null);
         return at == null ? null : new Entry(target, at, box);
+    }
+
+    /**
+     * Where a cone from {@code apex} along {@code heading} weighs this box, and the box, or null when it is not in the
+     * cone: the box's point nearest the axis point nearest its centre must lie within {@code reach} of the apex and at
+     * least {@code edge} (the cosine of half the angle) along the axis, and the box's middle in the open from the apex.
+     * The point is always on the box, near its point nearest the axis: for a large box at the edge of the cone the two
+     * may be a degree or two apart.
+     */
+    @Nullable
+    private static Entry coneEntry(Level level, LivingEntity target, AABB box, Vec3 apex, Vec3 heading, double reach,
+                                   double edge) {
+        Vec3 centre = box.getCenter();
+        Vec3 at;
+        if (box.contains(apex)) {
+            at = apex;
+        } else {
+            Vec3 onAxis = apex.add(heading.scale(Mth.clamp(centre.subtract(apex).dot(heading), 0.0, reach)));
+            at = new Vec3(Mth.clamp(onAxis.x, box.minX, box.maxX), Mth.clamp(onAxis.y, box.minY, box.maxY),
+                    Mth.clamp(onAxis.z, box.minZ, box.maxZ));
+        }
+        Vec3 offset = at.subtract(apex);
+        double distance = offset.length();
+        // Written so that an angle that is not a number lets in only what holds the apex.
+        if (!(distance <= reach) || !(distance < APEX_EPSILON || offset.dot(heading) >= edge * distance)) {
+            return null;
+        }
+        return level.clip(new ClipContext(apex, centre, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
+                CollisionContext.empty())).getType() == HitResult.Type.MISS ? new Entry(target, at, box) : null;
     }
 
     /** Whether nothing solid stands between this point and the nearest point of the box. */

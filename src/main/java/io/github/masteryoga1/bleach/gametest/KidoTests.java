@@ -13,6 +13,7 @@ import io.github.masteryoga1.bleach.network.KidoKeyPayload;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.HollowTier;
+import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.Negacion;
@@ -32,6 +33,7 @@ import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.Holder;
@@ -49,15 +51,21 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Marker;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -72,31 +80,45 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for Kidō: the spells as data (the four shipped Hadō, two with incantations, their order, and a broken or empty
+ * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, their order, and a broken or empty
  * file read leniently and clamped, and each spell sent as the sync sends it), who may cast and who may only choose, the
  * spells a Kidō level knows and the one chosen, the gate and the share of casting by name alone, a spell's power and
  * cost, what a Hadō strikes and what it spares, Kidō training up to the Academy's exam, how a line said in chat is heard
- * as an incantation, the chant's time and what breaks it, the misfire of a cast by name, and the burst, burn and blast
- * of Shakkahō and Sōkatsui. The by-name gate and share are also tested on a spell built in code ({@link #chantSpell}).
- * Mock players are not in the world and never tick, so the Kidō key is pressed by calling {@link KidoEvents#onKey} with
- * the time it would come at, and the game time stands still within a test: a later time passed in stands for a later
- * tick. Chat cannot be sent in a game test, so a line is heard by calling {@link KidoEvents#chant}, and a pending chant
- * goes off by calling {@link KidoEvents#tick} with the time it would come at; a misfire's roll is passed to the
- * five-argument {@code KidoEvents.cast}. Casters stand at {@link #LANE} in the {@code field} template, facing east, and
- * every cast goes east down the lane into a creature or the dirt wall; every creature, trace, light, takeover, mask,
- * gathering and team a test makes is put away within its first tick.
+ * as an incantation, the chant's time and what breaks it, the misfire of a cast by name, the burst, burn and blast of
+ * Shakkahō and Sōkatsui, Tenran's widening gust (what it reaches and what a wall keeps from it, its push away from the
+ * caster, the players it blinds and what spares them, and its loss without a zanpakutō at hand), and Raikōhō gathered
+ * in the palm on the Kidō key (nothing spent until it goes off, the misfire drawn only then, and what lets it go,
+ * scatters, breaks or drops it). The by-name gate and share are also tested on a spell built in code
+ * ({@link #chantSpell}). Mock players are not in the world and never tick, so the Kidō key is pressed and let go by
+ * calling {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a
+ * later time passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
+ * {@link KidoEvents#chant}, and a pending chant or gather goes off by calling {@link KidoEvents#tick} with the time it
+ * would come at; a misfire's roll is passed to the five-argument {@code KidoEvents.cast}, and for a gather, which draws
+ * its own roll as it goes off, the misfire chance is set to 1 or 0 for that one call. No cone can find a mock player,
+ * so a gust's blow is given to one directly ({@link KidoEvents#gustBlow}). Raikōhō's heavy bolt is taken by an iron
+ * golem, whose 100 health outlasts it. Casters stand at {@link #LANE} in the {@code field} template, facing east: every
+ * beam goes east down the lane into a creature or the dirt wall, and every gust east along it, ending within the field;
+ * every creature, trace, orb, light, takeover, mask, gathering and team a test makes is put away within its first tick.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class KidoTests {
     /** Where a caster stands in the field: the middle of block (1, 2, 8), at the west end of a lane running east. */
     private static final Vec3 LANE = new Vec3(1.5, 2.0, 8.5);
+    /** Where a player struck by a gust stands: three blocks down the lane, in the middle of the gust. */
+    private static final Vec3 DOWN_THE_LANE = new Vec3(4.5, 2.0, 8.5);
     /** The yaw that faces east, down the lane. */
     private static final float EAST = -90.0F;
     private static final long DAY = 24_000L;
     /** How near a spell's numbers must come to those worked out by hand. */
     private static final double NUMBER_EPSILON = 0.01;
+    /** How near the health a blow leaves must come, a few blows' rounding allowed. */
+    private static final double HEALTH_EPSILON = 0.02;
+    /** How near a push must come to the speed worked out by hand. */
+    private static final double PUSH_EPSILON = 0.05;
     private static final String TEAM = "bleach_kido_test";
+    private static final int TENRAN_COLOUR = 0xD2EEE6;
+    private static final int RAIKOHO_COLOUR = 0xFFE23A;
 
     private KidoTests() {
     }
@@ -134,7 +156,7 @@ public final class KidoTests {
      * A Hadō #99 built in code, a beam with one incantation ("test chant"), known from this Kidō level and cast by
      * name from that one: a spell with an incantation whose numbers a test can rely on whatever the data says. Its
      * numbers are those drafted for Shakkahō: 4 damage and 0.3 per root of reiryoku up to 28, 6% of the maximum (at
-     * least 3), a cooldown of 30 ticks and 3 xp.
+     * least 3), a cooldown of 30 ticks and 3 xp. It loses nothing without a blade and does not gather in the palm.
      */
     private static KidoSpell chantSpell(int level, int byName) {
         return chantSpell(level, byName, List.of("test chant"));
@@ -145,10 +167,10 @@ public final class KidoTests {
         return new KidoSpell(KidoSpell.Kind.HADO, 99, Component.literal("Test"), KidoSpell.Shape.BEAM, level, byName,
                 30, incantations, 0.06F, 3.0F, 30, 3,
                 new KidoSpell.Look(0xE0301E, Optional.empty(), 0.9F, Optional.empty()),
-                new KidoSpell.Effect(4.0F, 0.3F, 28.0F, 24.0, 0.35F, 1, 1.5F, 0.5F, 0.0F, 3.0F));
+                new KidoSpell.Effect(4.0F, 0.3F, 28.0F, 24.0, 0.35F, 1, 1.5F, 0.5F, 0.0F, 3.0F, 60.0F, 0.0F, 1.0F), 0);
     }
 
-    /** The spell's first incantation: canon's romaji. */
+    /** The spell's first incantation: its chosen romaji reading. */
     private static String romaji(GameTestHelper helper, ResourceKey<KidoSpell> key) {
         return spell(helper, key).value().incantations().get(0);
     }
@@ -162,6 +184,12 @@ public final class KidoTests {
     @Nullable
     private static KidoLogic.Chant pending(SoulData data) {
         return KidoLogic.pending(data);
+    }
+
+    /** The spell this soul is gathering in its palm on the Kidō key, or null. */
+    @Nullable
+    private static KidoLogic.Gather gathering(SoulData data) {
+        return KidoLogic.gathering(data);
     }
 
     /** The spells' keys, in their order. */
@@ -180,7 +208,11 @@ public final class KidoTests {
     }
 
     private static void assertNear(GameTestHelper helper, double actual, double expected, String what) {
-        helper.assertTrue(Math.abs(actual - expected) < NUMBER_EPSILON, what + " is " + actual + ", not " + expected);
+        assertNear(helper, actual, expected, NUMBER_EPSILON, what);
+    }
+
+    private static void assertNear(GameTestHelper helper, double actual, double expected, double epsilon, String what) {
+        helper.assertTrue(Math.abs(actual - expected) < epsilon, what + " is " + actual + ", not " + expected);
     }
 
     /** The Kidō key pressed alone at this time: the chosen spell, cast by name. */
@@ -193,6 +225,18 @@ public final class KidoTests {
     @Nullable
     private static KidoLogic.Refusal next(Player player, long now) {
         return KidoEvents.onKey(player, KidoKeyPayload.KidoKey.NEXT, Optional.empty(), now);
+    }
+
+    /** The Kidō key let go at this time, as a payload's time is: the tick just ended. */
+    @Nullable
+    private static KidoLogic.Refusal release(Player player, long now) {
+        return KidoEvents.onKey(player, KidoKeyPayload.KidoKey.RELEASE, Optional.empty(), now);
+    }
+
+    /** A screen opened at this time while the Kidō key was held. */
+    @Nullable
+    private static KidoLogic.Refusal cancel(Player player, long now) {
+        return KidoEvents.onKey(player, KidoKeyPayload.KidoKey.CANCEL, Optional.empty(), now);
     }
 
     /** The spell this soul has stored as its choice, if any. */
@@ -226,6 +270,17 @@ public final class KidoTests {
     /** Runs the body with this setting on or off, and puts it back, so it changes only within this one tick. */
     private static void withConfig(ModConfigSpec.BooleanValue value, boolean set, Runnable body) {
         boolean before = BleachConfig.get(value);
+        value.set(set);
+        try {
+            body.run();
+        } finally {
+            value.set(before);
+        }
+    }
+
+    /** The same for a number: a chance set to 1 or 0, so no roll decides a test. */
+    private static void withConfig(ModConfigSpec.DoubleValue value, double set, Runnable body) {
+        double before = BleachConfig.get(value);
         value.set(set);
         try {
             body.run();
@@ -275,6 +330,73 @@ public final class KidoTests {
         HollowPlayerTests.assertClose(helper, data.reiryoku(), before, "the reiryoku of " + what);
     }
 
+    /**
+     * A survival Shinigami of 1,000 at Kidō 42, where Raikōhō cast by name keeps 70% and never misfires, with Raikōhō
+     * chosen, at {@link #LANE} and turned down it.
+     */
+    private static Player gatherer(GameTestHelper helper) {
+        Player player = caster(helper, GameType.SURVIVAL, shinigami(1_000.0F, 42));
+        KidoLogic.choose(SoulLogic.get(player), KidoSpell.RAIKOHO.location());
+        downTheLane(player);
+        return player;
+    }
+
+    /** {@link #assertGatherEnds(GameTestHelper, Player, long, String, BiConsumer)} for a new {@link #gatherer}. */
+    private static void assertGatherEnds(GameTestHelper helper, long now, String what,
+                                         BiConsumer<Player, SoulData> state) {
+        assertGatherEnds(helper, gatherer(helper), now, what, state);
+    }
+
+    /**
+     * Begins Raikōhō on this soul's key, which must gather with its orb, then puts the soul in this state and ticks it:
+     * the gather must go, its orb with it, with nothing spent or trained.
+     */
+    private static void assertGatherEnds(GameTestHelper helper, Player player, long now, String what,
+                                         BiConsumer<Player, SoulData> state) {
+        SoulData data = SoulLogic.get(player);
+        assertRefusal(helper, press(player, now), null, "Raikōhō's key for " + what);
+        CeroBeam orb = orbOf(helper, data, "Raikōhō for " + what);
+        state.accept(player, data);
+        KidoEvents.tick(player, data, now + 1L);
+        helper.assertTrue(gathering(data) == null, "the gather of " + what + " was kept: " + gathering(data));
+        helper.assertTrue(orb.isRemoved(), "the orb of " + what + " outlived its gather");
+        helper.assertTrue(data.xp(Stat.KIDO) == 0, "the gather of " + what + " trained " + data.xp(Stat.KIDO) + " Kidō xp");
+        HollowPlayerTests.assertClose(helper, data.reiryoku(), 1_000.0, "the reiryoku of " + what);
+    }
+
+    /** An iron golem standing still at this block of the field: 100 health, which outlasts Raikōhō, and no push. */
+    private static IronGolem golem(GameTestHelper helper, int x, int z) {
+        return HollowPlayerTests.placed(helper, EntityType.IRON_GOLEM, x, z);
+    }
+
+    /** The Ceros in this test's structure still charging: the orbs of spells gathering in the palm. */
+    private static List<CeroBeam> charging(GameTestHelper helper) {
+        return helper.getLevel().getEntitiesOfClass(CeroBeam.class, helper.getBounds(), CeroBeam::isCharging);
+    }
+
+    /** The orb of the spell this soul is gathering, which must be there and still charging. */
+    private static CeroBeam orbOf(GameTestHelper helper, SoulData data, String what) {
+        KidoLogic.Gather gather = gathering(data);
+        CeroBeam orb = gather != null ? gather.orb() : null;
+        helper.assertTrue(orb != null && orb.isCharging(), what + " did not gather with its orb: " + gather);
+        return orb;
+    }
+
+    /** A Shinigami of this much reiryoku in this game mode, with full health, standing {@link #DOWN_THE_LANE}. */
+    private static Player victim(GameTestHelper helper, GameType mode, float maxReiryoku) {
+        Player player = caster(helper, mode, shinigami(maxReiryoku, 0));
+        Vec3 at = helper.absoluteVec(DOWN_THE_LANE);
+        player.moveTo(at.x, at.y, at.z, EAST, 0.0F);
+        player.setHealth(20.0F);
+        return player;
+    }
+
+    /** The blindness on this creature, or null for none. */
+    @Nullable
+    private static MobEffectInstance blindness(LivingEntity creature) {
+        return creature.getEffect(MobEffects.BLINDNESS);
+    }
+
     private static void removeTeam(Scoreboard scoreboard) {
         PlayerTeam team = scoreboard.getPlayerTeam(TEAM);
         if (team != null) {
@@ -300,12 +422,13 @@ public final class KidoTests {
 
     /**
      * What a shipped spell with an incantation is: a Hadō beam known from its level and cast by name alone from a higher
-     * one, said for its chant time, with two incantations (canon's romaji, then the mod's own English) that still fit
-     * chat with the spell's call after them, and each heard whole, alone and with that call. {@code what} is the
-     * spell's name as a player types it in the call ("Hadō #31, Shakkahō!").
+     * one, said for its chant time, with this many incantations (the chosen romaji reading, then the mod's own English,
+     * then any other romaji reading) that still fit chat with the spell's call after them, and each heard whole, alone
+     * and with that call. {@code what} is the spell's name as a player types it in the call ("Hadō #31, Shakkahō!").
      */
     private static void assertChanted(GameTestHelper helper, KidoSpell spell, ResourceLocation id, String what,
-                                      String nameKey, int number, int level, int byName, int chantTicks, int colour) {
+                                      String nameKey, int number, int level, int byName, int chantTicks, int colour,
+                                      int incantations) {
         helper.assertTrue(spell.kind() == KidoSpell.Kind.HADO && spell.number() == number,
                 what + " is " + spell.kind() + " #" + spell.number());
         helper.assertTrue(spell.name().getContents() instanceof TranslatableContents name && nameKey.equals(name.getKey()),
@@ -316,7 +439,7 @@ public final class KidoTests {
         helper.assertTrue(spell.chantTicks() == chantTicks, what + " is chanted for " + spell.chantTicks() + " ticks");
         helper.assertTrue(spell.look().colour() == colour,
                 what + "'s colour is " + Integer.toHexString(spell.look().colour()));
-        helper.assertTrue(spell.chantable() && spell.incantations().size() == 2,
+        helper.assertTrue(spell.chantable() && spell.incantations().size() == incantations,
                 what + " has incantations " + spell.incantations());
         String call = " Hadō #" + number + ", " + what + "!";
         for (String line : spell.incantations()) {
@@ -327,14 +450,14 @@ public final class KidoTests {
         }
     }
 
-    /** What a shipped spell without an incantation is: a Hadō beam with no blast, cast by name from its own level. */
+    /** What a shipped spell without an incantation is: a Hadō of this shape with no blast, cast by name from its level. */
     private static void assertShipped(GameTestHelper helper, KidoSpell spell, String what, String nameKey, int number,
-                                      int level, int colour) {
+                                      int level, int colour, KidoSpell.Shape shape) {
         helper.assertTrue(spell.kind() == KidoSpell.Kind.HADO && spell.number() == number,
                 what + " is " + spell.kind() + " #" + spell.number());
         helper.assertTrue(spell.name().getContents() instanceof TranslatableContents name && nameKey.equals(name.getKey()),
                 what + " is named " + spell.name());
-        helper.assertTrue(spell.shape() == KidoSpell.Shape.BEAM && spell.castable(), what + " is of shape " + spell.shape());
+        helper.assertTrue(spell.shape() == shape && spell.castable(), what + " is of shape " + spell.shape());
         helper.assertTrue(spell.level() == level && spell.byNameLevel() == level,
                 what + " needs Kidō " + spell.level() + ", and " + spell.byNameLevel() + " by name");
         helper.assertTrue(spell.incantations().isEmpty() && !spell.chantable(), what + " has incantations "
@@ -350,17 +473,18 @@ public final class KidoTests {
     public static void kidoSpellsLoadInOrderAndClamp(GameTestHelper helper) {
         Registry<KidoSpell> spells = spells(helper);
         helper.assertTrue(spells.containsKey(KidoSpell.SHO) && spells.containsKey(KidoSpell.BYAKURAI)
-                && spells.containsKey(KidoSpell.SHAKKAHO) && spells.containsKey(KidoSpell.SOKATSUI),
+                && spells.containsKey(KidoSpell.SHAKKAHO) && spells.containsKey(KidoSpell.SOKATSUI)
+                && spells.containsKey(KidoSpell.TENRAN) && spells.containsKey(KidoSpell.RAIKOHO),
                 "the shipped spells did not load: " + spells.keySet());
         // A data pack may add its own, so only the mod's are held to their order.
         List<ResourceKey<KidoSpell>> shipped = ids(KidoSpell.sorted(spells)).stream()
                 .filter(key -> BleachMod.MODID.equals(key.location().getNamespace()))
                 .toList();
-        helper.assertTrue(shipped.equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI, KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI)),
-                "the mod's spells sort as " + shipped);
+        helper.assertTrue(shipped.equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI, KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI,
+                KidoSpell.TENRAN, KidoSpell.RAIKOHO)), "the mod's spells sort as " + shipped);
 
         KidoSpell sho = spell(helper, KidoSpell.SHO).value();
-        assertShipped(helper, sho, "Shō", "kido.bleach.sho", 1, 0, 0xCFE6FF);
+        assertShipped(helper, sho, "Shō", "kido.bleach.sho", 1, 0, 0xCFE6FF, KidoSpell.Shape.BEAM);
         assertNear(helper, sho.costShare(), 0.02, "Shō's share of reiryoku");
         assertNear(helper, sho.minCost(), 1.0, "Shō's least cost");
         helper.assertTrue(sho.cooldownTicks() == 10 && sho.xp() == 1,
@@ -369,7 +493,7 @@ public final class KidoTests {
         assertNear(helper, sho.effect().knockback(), 1.2, "Shō's push");
 
         KidoSpell byakurai = spell(helper, KidoSpell.BYAKURAI).value();
-        assertShipped(helper, byakurai, "Byakurai", "kido.bleach.byakurai", 4, 3, 0xEEF4FF);
+        assertShipped(helper, byakurai, "Byakurai", "kido.bleach.byakurai", 4, 3, 0xEEF4FF, KidoSpell.Shape.BEAM);
         assertNear(helper, byakurai.costShare(), 0.04, "Byakurai's share of reiryoku");
         assertNear(helper, byakurai.minCost(), 2.0, "Byakurai's least cost");
         helper.assertTrue(byakurai.cooldownTicks() == 20 && byakurai.xp() == 2,
@@ -380,7 +504,7 @@ public final class KidoTests {
         // The two with incantations: chanted from their level, and cast by name alone only from a higher one.
         KidoSpell shakkaho = spell(helper, KidoSpell.SHAKKAHO).value();
         assertChanted(helper, shakkaho, KidoSpell.SHAKKAHO.location(), "Shakkahō", "kido.bleach.shakkaho", 31, 5, 10, 30,
-                0xE0301E);
+                0xE0301E, 2);
         assertNear(helper, shakkaho.costShare(), 0.06, "Shakkahō's share of reiryoku");
         assertNear(helper, shakkaho.minCost(), 3.0, "Shakkahō's least cost");
         helper.assertTrue(shakkaho.cooldownTicks() == 30 && shakkaho.xp() == 3,
@@ -394,7 +518,7 @@ public final class KidoTests {
 
         KidoSpell sokatsui = spell(helper, KidoSpell.SOKATSUI).value();
         assertChanted(helper, sokatsui, KidoSpell.SOKATSUI.location(), "Sōkatsui", "kido.bleach.sokatsui", 33, 8, 14, 40,
-                0x3A7BFF);
+                0x3A7BFF, 2);
         assertNear(helper, sokatsui.costShare(), 0.08, "Sōkatsui's share of reiryoku");
         assertNear(helper, sokatsui.minCost(), 4.0, "Sōkatsui's least cost");
         helper.assertTrue(sokatsui.cooldownTicks() == 40 && sokatsui.xp() == 4,
@@ -406,16 +530,66 @@ public final class KidoTests {
         assertNear(helper, sokatsui.effect().burnSeconds(), 0.0, "Sōkatsui's burn");
         assertNear(helper, sokatsui.effect().knockback(), 0.6, "Sōkatsui's push");
 
+        // Tenran has no incantation either, and widens from the hand as a gust that blinds, weaker without a blade.
+        KidoSpell tenran = spell(helper, KidoSpell.TENRAN).value();
+        assertShipped(helper, tenran, "Tenran", "kido.bleach.tenran", 58, 18, TENRAN_COLOUR, KidoSpell.Shape.GUST);
+        assertNear(helper, tenran.costShare(), 0.1, "Tenran's share of reiryoku");
+        assertNear(helper, tenran.minCost(), 6.0, "Tenran's least cost");
+        helper.assertTrue(tenran.cooldownTicks() == 60 && tenran.xp() == 5,
+                "Tenran waits " + tenran.cooldownTicks() + " ticks and trains " + tenran.xp() + " xp");
+        helper.assertTrue(tenran.gatherTicks() == 0 && !tenran.gathers(), "Tenran gathers for " + tenran.gatherTicks()
+                + " ticks");
+        assertNear(helper, tenran.effect().range(), 8.0, "Tenran's reach");
+        assertNear(helper, tenran.effect().angle(), 70.0, "Tenran's width");
+        assertNear(helper, tenran.effect().knockback(), 1.0, "Tenran's push");
+        assertNear(helper, tenran.effect().blindSeconds(), 2.0, "Tenran's blindness");
+        assertNear(helper, tenran.effect().bareShare(), 0.7, "the share of Tenran cast with no blade at hand");
+
+        // Raikōhō is chanted from its level, or cast by name from a higher one after gathering a second in the palm.
+        KidoSpell raikoho = spell(helper, KidoSpell.RAIKOHO).value();
+        assertChanted(helper, raikoho, KidoSpell.RAIKOHO.location(), "Raikōhō", "kido.bleach.raikoho", 63, 25, 32, 50,
+                RAIKOHO_COLOUR, 3);
+        assertNear(helper, raikoho.costShare(), 0.18, "Raikōhō's share of reiryoku");
+        assertNear(helper, raikoho.minCost(), 12.0, "Raikōhō's least cost");
+        helper.assertTrue(raikoho.cooldownTicks() == 100 && raikoho.xp() == 6,
+                "Raikōhō waits " + raikoho.cooldownTicks() + " ticks and trains " + raikoho.xp() + " xp");
+        helper.assertTrue(raikoho.gatherTicks() == 20 && raikoho.gathers(), "Raikōhō gathers for "
+                + raikoho.gatherTicks() + " ticks");
+        assertNear(helper, raikoho.effect().range(), 32.0, "Raikōhō's reach");
+        assertNear(helper, raikoho.effect().radius(), 0.5, "Raikōhō's half-width");
+        helper.assertTrue(raikoho.effect().pierce() == 1, "Raikōhō stops after " + raikoho.effect().pierce() + " creatures");
+        assertNear(helper, raikoho.effect().blastRadius(), 3.0, "Raikōhō's burst");
+        assertNear(helper, raikoho.effect().blastShare(), 0.6, "the share of Raikōhō's burst");
+        assertNear(helper, raikoho.effect().knockback(), 0.6, "Raikōhō's push");
+        assertNear(helper, raikoho.effect().blindSeconds(), 0.0, "Raikōhō's blindness");
+        assertNear(helper, raikoho.effect().bareShare(), 1.0, "the share of Raikōhō cast with no blade at hand");
+
+        // The spells written before gusts and gathers read the defaults, which change nothing for them.
+        for (KidoSpell older : List.of(sho, byakurai, shakkaho, sokatsui)) {
+            String what = "Hadō #" + older.number();
+            helper.assertTrue(older.gatherTicks() == 0 && !older.gathers(), what + " gathers for " + older.gatherTicks()
+                    + " ticks");
+            assertNear(helper, older.effect().angle(), 60.0, what + "'s width");
+            assertNear(helper, older.effect().blindSeconds(), 0.0, what + "'s blindness");
+            assertNear(helper, older.effect().bareShare(), 1.0, "the share of " + what + " cast with no blade at hand");
+        }
+
         List<ResourceKey<KidoSpell>> fourth = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.HADO, 4));
         helper.assertTrue(fourth.equals(List.of(KidoSpell.BYAKURAI)), "Hadō #4 is " + fourth);
         List<ResourceKey<KidoSpell>> thirtyFirst = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.HADO, 31));
         helper.assertTrue(thirtyFirst.equals(List.of(KidoSpell.SHAKKAHO)), "Hadō #31 is " + thirtyFirst);
+        List<ResourceKey<KidoSpell>> fiftyEighth = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.HADO, 58));
+        helper.assertTrue(fiftyEighth.equals(List.of(KidoSpell.TENRAN)), "Hadō #58 is " + fiftyEighth);
+        List<ResourceKey<KidoSpell>> sixtyThird = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.HADO, 63));
+        helper.assertTrue(sixtyThird.equals(List.of(KidoSpell.RAIKOHO)), "Hadō #63 is " + sixtyThird);
         helper.assertTrue(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 1).isEmpty(), "a Bakudō #1 loaded");
 
         // Every value wrong in its own way: each falls back or is clamped alone, and the rest of the spell stays.
-        String broken = "{\"number\": -5, \"shape\": \"gust\", \"level\": 7, \"by_name_level\": 2, \"cost_share\": 9,"
-                + " \"cooldown_ticks\": 0, \"incantations\": [\"\", \"" + "x".repeat(300) + "\", \"ok\"],"
-                + " \"effect\": {\"range\": 1000, \"pierce\": 0, \"damage\": \"lots\"}}";
+        String broken = "{\"number\": -5, \"shape\": \"spiral\", \"level\": 7, \"by_name_level\": 2, \"cost_share\": 9,"
+                + " \"cooldown_ticks\": 0, \"gather_ticks\": 1000,"
+                + " \"incantations\": [\"\", \"" + "x".repeat(300) + "\", \"ok\"],"
+                + " \"effect\": {\"range\": 1000, \"pierce\": 0, \"damage\": \"lots\", \"angle\": 400,"
+                + " \"blind_seconds\": -1, \"bare_share\": 3}}";
         KidoSpell parsed = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(broken)).getOrThrow();
         helper.assertTrue(parsed.number() == 0, "a number of -5 read as " + parsed.number());
         helper.assertTrue(parsed.shape() == KidoSpell.Shape.NONE && !parsed.castable(),
@@ -424,17 +598,25 @@ public final class KidoTests {
                 "a level of 7 by name from 2 read as " + parsed.level() + " by name from " + parsed.byNameLevel());
         assertNear(helper, parsed.costShare(), 1.0, "a share of reiryoku of 9");
         helper.assertTrue(parsed.cooldownTicks() == 1, "a cooldown of 0 read as " + parsed.cooldownTicks());
+        helper.assertTrue(parsed.gatherTicks() == 100 && parsed.gathers(),
+                "a gather of 1000 ticks read as " + parsed.gatherTicks());
         helper.assertTrue(parsed.incantations().equals(List.of("ok")) && parsed.chantable(),
                 "a blank, an over-long and a good incantation read as " + parsed.incantations());
         assertNear(helper, parsed.effect().range(), 128.0, "a reach of 1000");
         helper.assertTrue(parsed.effect().pierce() == 1, "a pierce of 0 read as " + parsed.effect().pierce());
         assertNear(helper, parsed.effect().damage(), 0.0, "a damage of \"lots\"");
+        assertNear(helper, parsed.effect().angle(), 180.0, "a width of 400 degrees");
+        assertNear(helper, parsed.effect().blindSeconds(), 0.0, "a blindness of -1 seconds");
+        assertNear(helper, parsed.effect().bareShare(), 1.0, "a share of 3 with no blade at hand");
         KidoSpell empty = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{}")).getOrThrow();
         helper.assertFalse(empty.castable(), "an empty spell file can be cast, as a " + empty.shape());
+        KidoSpell gust = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{\"shape\": \"gust\"}"))
+                .getOrThrow();
+        helper.assertTrue(gust.shape() == KidoSpell.Shape.GUST && gust.castable(), "a gust read as a " + gust.shape());
 
         // Sent to a client as the sync sends it: encoded with the world's registries to NBT, and read back.
         RegistryOps<Tag> ops = helper.getLevel().registryAccess().createSerializationContext(NbtOps.INSTANCE);
-        for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, parsed)) {
+        for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, parsed)) {
             Tag sent = KidoSpell.CODEC.encodeStart(ops, spell).getOrThrow();
             KidoSpell read = KidoSpell.CODEC.parse(ops, sent).getOrThrow();
             helper.assertTrue(read.equals(spell), "sent " + spell + " but read " + read);
@@ -1352,6 +1534,534 @@ public final class KidoTests {
             // What the slain pig dropped.
             level.getEntitiesOfClass(ItemEntity.class, helper.getBounds()).forEach(Entity::discard);
             level.getEntitiesOfClass(ExperienceOrb.class, helper.getBounds()).forEach(Entity::discard);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    // ---- Tenran ----
+
+    /**
+     * No wall here: a pig stands where it would go, and the gust ends at x 10.1, short of the field's edge. Nothing behind
+     * or beside the hand can be in a cone 70° wide pointing east.
+     */
+    @GameTest(template = "field")
+    public static void tenranBlowsAWideningCone(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        for (int y = 2; y <= 4; y++) {
+            helper.setBlock(4, y, 7, Blocks.STONE);
+        }
+        // At Kidō 18, Tenran's own level, with no zanpakutō at hand.
+        Player player = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 18));
+        SoulData data = SoulLogic.get(player);
+        KidoLogic.choose(data, KidoSpell.TENRAN.location());
+        downTheLane(player);
+        Pig near = HollowPlayerTests.placed(helper, EntityType.PIG, 4, 8);
+        Pig wide = HollowPlayerTests.placed(helper, EntityType.PIG, 7, 11);
+        Pig aside = HollowPlayerTests.placed(helper, EntityType.PIG, 5, 13);
+        Pig far = HollowPlayerTests.placed(helper, EntityType.PIG, 11, 8);
+        Pig behind = HollowPlayerTests.placed(helper, EntityType.PIG, 6, 6);
+        try {
+            // From the hand, 70° wide and 8 blocks long: the near pig is 2.5 blocks out at 17° and the wide one 6.0 out
+            // at 26°. The pig aside is at 54°, the far one 9.0 blocks out, and the one behind the column, at 21°, is in
+            // the cone but not in the open.
+            List<LivingEntity> reached = CeroBeam.inCone(level, player, CeroBeam.muzzleOf(player, 1.0F),
+                    player.getLookAngle(), 8.0, 70.0F);
+            helper.assertTrue(reached.equals(List.of(near, wide)), "Tenran's cone holds " + reached);
+
+            // 1.5 and 0.08 per root of 400, 36% stronger at Kidō 18: 4.216, of which a bare hand keeps 70%, 2.951.
+            assertRefusal(helper, press(player, now), null, "Tenran by name at Kidō 18");
+            assertNear(helper, near.getHealth(), 7.049, "the near pig's health after Tenran");
+            assertNear(helper, wide.getHealth(), 7.049, "the wide pig's health after Tenran");
+            for (Pig pig : List.of(aside, far, behind)) {
+                helper.assertTrue(unhurt(pig), "Tenran hurt a pig outside its cone, at " + pig.getHealth());
+            }
+            // The blow's own 0.4 toward the hand, halved, then 70% of Tenran's push of 1 away from the caster.
+            Vec3 pushed = near.getDeltaMovement();
+            assertNear(helper, pushed.x, 0.9, PUSH_EPSILON, "the near pig's push east");
+            assertNear(helper, pushed.z, 0.0, PUSH_EPSILON, "the near pig's push north or south");
+            Vec3 outward = wide.getDeltaMovement();
+            helper.assertTrue(outward.x > 0.6 && outward.z > 0.3, "the wide pig was pushed " + outward
+                    + ", not away from the caster");
+            for (Pig pig : List.of(near, wide, aside, far, behind)) {
+                helper.assertTrue(blindness(pig) == null, "Tenran blinded a pig");
+            }
+            helper.assertTrue(player.getLastHurtMob() == wide, "the caster last hurt " + player.getLastHurtMob());
+            DamageSource source = near.getLastDamageSource();
+            helper.assertTrue(source != null && source.is(KidoEvents.HADO) && source.getEntity() == player
+                    && source.getDirectEntity() != null && !(source.getDirectEntity() instanceof LivingEntity),
+                    "the near pig was struck by " + source);
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 360.0, "the reiryoku after Tenran");
+            helper.assertFalse(KidoLogic.ready(data, now + 59L), "the hands were free a tick before Tenran's cooldown");
+            helper.assertTrue(KidoLogic.ready(data, now + 60L), "the hands were not free after Tenran's cooldown");
+            helper.assertTrue(data.xp(Stat.KIDO) == 6, "Tenran on two pigs trained " + data.xp(Stat.KIDO)
+                    + " Kidō xp, not 5 and 1");
+            for (int y = 2; y <= 4; y++) {
+                helper.assertBlockPresent(Blocks.STONE, 4, y, 7);
+            }
+            helper.assertFalse(level.getEntitiesOfClass(CeroBeam.class, helper.getBounds(),
+                    beam -> beam.isFired() && beam.colour() == TENRAN_COLOUR).isEmpty(), "Tenran drew no trace");
+
+            assertRefusal(helper, press(player, now + 1L), KidoLogic.Refusal.COOLDOWN, "Tenran again a tick later");
+        } finally {
+            discard(near, wide, aside, far, behind);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void tenranIsWeakerWithoutABlade(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell tenran = spell(helper, KidoSpell.TENRAN).value();
+        KidoSpell byakurai = spell(helper, KidoSpell.BYAKURAI).value();
+        KidoSpell raikoho = spell(helper, KidoSpell.RAIKOHO).value();
+        Player player = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 18));
+        SoulData data = SoulLogic.get(player);
+        KidoLogic.choose(data, KidoSpell.TENRAN.location());
+        downTheLane(player);
+        SoulData lent = shinigami(400.0F, 18);
+        ShinigamiLogic.transferFromShinigami(lent, ShinigamiTests.soul(SoulState.HUMAN, 100.0F), now);
+        lent.setReiryoku(lent.maxReiryoku());
+        KidoLogic.choose(lent, KidoSpell.TENRAN.location());
+        Player lender = caster(helper, GameType.SURVIVAL, lent);
+        Player novice = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 17));
+        Player creative = caster(helper, GameType.CREATIVE, shinigami(400.0F, 18));
+        SoulData creativeData = SoulLogic.get(creative);
+        downTheLane(creative);
+        Pig pig = HollowPlayerTests.placed(helper, EntityType.PIG, 4, 8);
+        Pig again = null;
+        try {
+            // A zanpakutō is at hand in the off hand or on the hotbar, the main hand among it, and not deeper in the
+            // inventory; no other sword is one.
+            Player bare = helper.makeMockPlayer(GameType.SURVIVAL);
+            Player sword = helper.makeMockPlayer(GameType.SURVIVAL);
+            sword.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_SWORD));
+            Player packed = helper.makeMockPlayer(GameType.SURVIVAL);
+            packed.getInventory().setItem(20, ZanpakutoTests.asauchi());
+            Player offHand = helper.makeMockPlayer(GameType.SURVIVAL);
+            offHand.setItemInHand(InteractionHand.OFF_HAND, ZanpakutoTests.asauchi());
+            Player sheathed = helper.makeMockPlayer(GameType.SURVIVAL);
+            sheathed.getInventory().setItem(5, ZanpakutoTests.asauchi());
+            Player drawn = helper.makeMockPlayer(GameType.SURVIVAL);
+            drawn.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
+            assertNear(helper, KidoLogic.handShare(tenran, bare), 0.7, "Tenran's share with empty hands");
+            assertNear(helper, KidoLogic.handShare(tenran, sword), 0.7, "Tenran's share with an iron sword in the hand");
+            assertNear(helper, KidoLogic.handShare(tenran, packed), 0.7, "Tenran's share with an Asauchi off the hotbar");
+            assertNear(helper, KidoLogic.handShare(tenran, offHand), 1.0, "Tenran's share with an Asauchi in the off hand");
+            assertNear(helper, KidoLogic.handShare(tenran, sheathed), 1.0,
+                    "Tenran's share with an Asauchi on the hotbar, not chosen");
+            assertNear(helper, KidoLogic.handShare(tenran, drawn), 1.0, "Tenran's share with an Asauchi in the hand");
+            assertNear(helper, KidoLogic.handShare(byakurai, bare), 1.0, "Byakurai's share with empty hands");
+            assertNear(helper, KidoLogic.handShare(raikoho, bare), 1.0, "Raikōhō's share with empty hands");
+            // With no incantation, it never misfires and keeps all of itself by name, and its call is only chat.
+            assertNear(helper, KidoLogic.misfireChance(tenran, 18), 0.0, "Tenran's chance to misfire at Kidō 18");
+            assertNear(helper, KidoLogic.share(tenran, KidoLogic.Form.NAME, 18), 1.0, "the share of Tenran by name");
+            helper.assertFalse(tenran.chantable(), "Tenran can be chanted: " + tenran.incantations());
+            heardAs(helper, KidoEvents.chant(player, "Hadō #58, Tenran!", now), KidoEvents.Heard.Outcome.PLAIN, null,
+                    null, "Tenran's call");
+
+            // An Asauchi in the hand: the whole 4.216, and the blow's 0.4 halved and all of the push of 1.
+            player.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
+            assertRefusal(helper, press(player, now), null, "Tenran with an Asauchi in the hand");
+            assertNear(helper, pig.getHealth(), 5.784, "the pig's health after Tenran with a blade at hand");
+            assertNear(helper, pig.getDeltaMovement().x, 1.2, PUSH_EPSILON, "the pig's push from Tenran with a blade");
+
+            // The hand empty again: 70% of the blow and of the push.
+            player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            discard(pig);
+            again = HollowPlayerTests.placed(helper, EntityType.PIG, 4, 8);
+            assertRefusal(helper, press(player, now + 60L), null, "Tenran with empty hands");
+            assertNear(helper, again.getHealth(), 7.049, "the pig's health after Tenran with no blade at hand");
+            assertNear(helper, again.getDeltaMovement().x, 0.9, PUSH_EPSILON, "the pig's push from Tenran with no blade");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 320.0, "the reiryoku after Tenran twice");
+
+            // A lender may not cast it by name, a soul below its level may not cast it at all, and creative pays,
+            // waits and trains nothing. The creative gust blows down the empty lane.
+            assertRefusal(helper, press(lender, now), KidoLogic.Refusal.LENT,
+                    "the Tenran of a Shinigami whose power is lent");
+            HollowPlayerTests.assertClose(helper, lent.reiryoku(), 200.0, "the lender's reiryoku");
+            assertRefusal(helper, KidoEvents.cast(novice, tenran, KidoLogic.Form.NAME, now), KidoLogic.Refusal.NEEDS_LEVEL,
+                    "Tenran at Kidō 17");
+            discard(again);
+            assertRefusal(helper, KidoEvents.cast(creative, tenran, KidoLogic.Form.NAME, now), null,
+                    "a creative Shinigami's Tenran");
+            HollowPlayerTests.assertClose(helper, creativeData.reiryoku(), 400.0, "a creative caster's reiryoku");
+            helper.assertTrue(creativeData.xp(Stat.KIDO) == 0, "a creative caster trained " + creativeData.xp(Stat.KIDO)
+                    + " Kidō xp");
+            assertWallStands(helper);
+        } finally {
+            discard(pig, again);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    /** Nothing is cast here: each blow is given directly, since no cone can find a mock player. */
+    @GameTest(template = "field")
+    public static void tenranBlindsThePlayersItReaches(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        KidoSpell tenran = spell(helper, KidoSpell.TENRAN).value();
+        KidoSpell raikoho = spell(helper, KidoSpell.RAIKOHO).value();
+        Player player = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 18));
+        SoulData data = SoulLogic.get(player);
+        downTheLane(player);
+        Player even = victim(helper, GameType.SURVIVAL, 400.0F);
+        Player strong = victim(helper, GameType.SURVIVAL, 4_000.0F);
+        Player reeling = victim(helper, GameType.SURVIVAL, 400.0F);
+        Player held = victim(helper, GameType.SURVIVAL, 400.0F);
+        Player creative = victim(helper, GameType.CREATIVE, 400.0F);
+        NegacionLight light = NegacionLight.place(level, held, null);
+        Pig pig = HollowPlayerTests.placed(helper, EntityType.PIG, 4, 10);
+        // As the gust strikes: from a marker at the hand, never added to the world, caused by the caster.
+        Marker marker = new Marker(EntityType.MARKER, level);
+        marker.setPos(CeroBeam.muzzleOf(player, 1.0F));
+        DamageSource source = CeroBeam.sourceOf(level, player, marker, new CeroBeam.Kind(KidoEvents.HADO, true, 1));
+        float damage = KidoLogic.power(tenran, data, 0.7F);
+        try {
+            assertNear(helper, damage, 2.951, "Tenran's blow with no blade at hand");
+            helper.assertTrue(light != null && held.startRiding(light, true) && Negacion.held(held),
+                    "the mock Shinigami could not be held");
+
+            // As strong as the caster: the whole blow, 70% of 2 seconds' blindness, and the push.
+            helper.assertTrue(KidoEvents.gustBlow(player, even, source, tenran, 0.7F, damage),
+                    "Tenran's blow did not land on a soul as strong as the caster");
+            assertNear(helper, even.getHealth(), 17.049, HEALTH_EPSILON, "the even soul's health");
+            MobEffectInstance blind = blindness(even);
+            helper.assertTrue(blind != null && blind.getDuration() == 28 && blind.getAmplifier() == 0
+                    && !blind.isVisible() && blind.showIcon() && !blind.isAmbient(),
+                    "Tenran blinded the even soul with " + blind + ", not 28 ticks with an icon and no swirl");
+            assertNear(helper, even.getDeltaMovement().x, 0.9, PUSH_EPSILON, "the even soul's push");
+
+            // Ten times the caster's reiatsu: the gap lets 3 parts in 10 of the blow, the push and the blindness through.
+            assertNear(helper, KidoLogic.gap(player, strong, source), 0.3, "the gap to a soul of ten times the reiatsu");
+            helper.assertTrue(KidoEvents.gustBlow(player, strong, source, tenran, 0.7F, damage),
+                    "Tenran's blow did not land on the strong soul");
+            assertNear(helper, strong.getHealth(), 19.115, HEALTH_EPSILON, "the strong soul's health");
+            MobEffectInstance dimmed = blindness(strong);
+            helper.assertTrue(dimmed != null && dimmed.getDuration() == 8,
+                    "Tenran blinded the strong soul with " + dimmed + ", not 8 ticks");
+            assertNear(helper, strong.getDeltaMovement().x, 0.41, PUSH_EPSILON, "the strong soul's push");
+
+            // Inside the frames of a stronger blow the gust does not land, so it pushes nothing; it blinds all the same.
+            land(helper, reeling, reeling.damageSources().generic(), 5.0F, "the blow of 5");
+            reeling.setDeltaMovement(Vec3.ZERO);
+            helper.assertFalse(KidoEvents.gustBlow(player, reeling, source, tenran, 0.7F, damage),
+                    "Tenran's blow landed inside the frames of a stronger one");
+            HollowPlayerTests.assertClose(helper, reeling.getHealth(), 15.0, "the reeling soul's health");
+            MobEffectInstance screened = blindness(reeling);
+            helper.assertTrue(screened != null && screened.getDuration() == 28,
+                    "Tenran blinded the reeling soul with " + screened + ", not 28 ticks");
+            helper.assertTrue(reeling.getDeltaMovement().lengthSqr() == 0.0,
+                    "Tenran pushed the reeling soul " + reeling.getDeltaMovement());
+
+            // Negación's hold and creative spare a soul wholly.
+            helper.assertFalse(KidoEvents.gustBlow(player, held, source, tenran, 0.7F, damage),
+                    "Tenran's blow landed on a soul Negación holds");
+            helper.assertTrue(blindness(held) == null, "Tenran blinded a soul Negación holds");
+            HollowPlayerTests.assertClose(helper, held.getHealth(), 20.0, "the held soul's health");
+            helper.assertFalse(KidoEvents.gustBlow(player, creative, source, tenran, 0.7F, damage),
+                    "Tenran's blow landed on a creative player");
+            helper.assertTrue(blindness(creative) == null, "Tenran blinded a creative player");
+
+            // A creature without a soul feels it all, and only a player is blinded.
+            helper.assertTrue(KidoEvents.gustBlow(player, pig, source, tenran, 0.7F, damage),
+                    "Tenran's blow did not land on the pig");
+            helper.assertTrue(blindness(pig) == null, "Tenran blinded the pig");
+            assertNear(helper, KidoLogic.gap(player, pig, source), 1.0, "the gap to a creature without a soul");
+
+            // 2 seconds at the share and through the gap, rounded; Raikōhō blinds no one.
+            helper.assertTrue(KidoLogic.blindTicks(tenran, 1.0F, 1.0F) == 40, "Tenran's whole blindness is "
+                    + KidoLogic.blindTicks(tenran, 1.0F, 1.0F) + " ticks");
+            helper.assertTrue(KidoLogic.blindTicks(tenran, 0.7F, 1.0F) == 28, "Tenran's bare-handed blindness is "
+                    + KidoLogic.blindTicks(tenran, 0.7F, 1.0F) + " ticks");
+            helper.assertTrue(KidoLogic.blindTicks(tenran, 0.7F, 0.3F) == 8, "Tenran's bare-handed blindness through a"
+                    + " gap of 0.3 is " + KidoLogic.blindTicks(tenran, 0.7F, 0.3F) + " ticks");
+            helper.assertTrue(KidoLogic.blindTicks(tenran, 1.0F, 0.0F) == 0, "Tenran's blindness through no gap is "
+                    + KidoLogic.blindTicks(tenran, 1.0F, 0.0F) + " ticks");
+            helper.assertTrue(KidoLogic.blindTicks(raikoho, 1.0F, 1.0F) == 0, "Raikōhō blinds for "
+                    + KidoLogic.blindTicks(raikoho, 1.0F, 1.0F) + " ticks");
+        } finally {
+            held.stopRiding();
+            discard(light, pig, marker);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    // ---- Raikōhō and the key gather ----
+
+    @GameTest(template = "field")
+    public static void raikohoGathersByKeyThenStrikes(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        Player player = gatherer(helper);
+        SoulData data = SoulLogic.get(player);
+        IronGolem golem = golem(helper, 6, 8);
+        IronGolem chanted = null;
+        try {
+            // Pressed, it gathers in the palm for a second, shown by an orb, with nothing spent, cooled or trained.
+            assertRefusal(helper, press(player, now), null, "Raikōhō's key at Kidō 42");
+            KidoLogic.Gather gather = gathering(data);
+            helper.assertTrue(gather != null && gather.id().equals(KidoSpell.RAIKOHO.location())
+                    && gather.firesAt() == now + 20L, "Raikōhō gathers as " + gather + ", not until " + (now + 20L));
+            CeroBeam orb = orbOf(helper, data, "Raikōhō's key");
+            helper.assertTrue(orb.colour() == RAIKOHO_COLOUR && orb.chargeTicks() == 20 + KidoEvents.ORB_SLACK_TICKS,
+                    "Raikōhō's orb is " + Integer.toHexString(orb.colour()) + " for " + orb.chargeTicks() + " ticks");
+            List<CeroBeam> ceros = helper.getLevel().getEntitiesOfClass(CeroBeam.class, helper.getBounds());
+            helper.assertTrue(ceros.equals(List.of(orb)), "the Ceros about Raikōhō's gather are " + ceros);
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 1_000.0, "the reiryoku once Raikōhō began to gather");
+            helper.assertTrue(KidoLogic.ready(data, now), "beginning to gather kept the hands busy");
+            HollowPlayerTests.assertClose(helper, golem.getHealth(), 100.0, "the golem's health as Raikōhō gathers");
+
+            // One art at a time: the key again and a chant wait for it, and choosing goes on.
+            assertRefusal(helper, press(player, now + 1L), KidoLogic.Refusal.GATHERING, "the Kidō key while gathering");
+            helper.assertTrue(gathering(data) == gather, "the key again changed the gather to " + gathering(data));
+            heardAs(helper, KidoEvents.chant(player, romaji(helper, KidoSpell.RAIKOHO), now + 2L),
+                    KidoEvents.Heard.Outcome.REFUSED, KidoSpell.RAIKOHO, KidoLogic.Refusal.GATHERING,
+                    "Raikōhō's romaji while it gathers");
+            helper.assertTrue(pending(data) == null, "a chant began over the gather: " + pending(data));
+            assertRefusal(helper, next(player, now + 3L), null, "Sneak and the key while gathering");
+            helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.SHO)),
+                    "Sneak and the key after Raikōhō chose " + stored(data));
+            helper.assertTrue(gathering(data) == gather, "choosing while gathering left the gather as " + gathering(data));
+
+            // A tick short of its time it still gathers.
+            KidoEvents.tick(player, data, now + 19L);
+            helper.assertTrue(gathering(data) == gather, "a tick short of its time, the gather is " + gathering(data));
+            HollowPlayerTests.assertClose(helper, golem.getHealth(), 100.0, "the golem's health a tick short of the gather");
+
+            // On time it goes off by name: 8 and 0.5 per root of 1,000, 84% stronger at Kidō 42, of which 70% is
+            // 30.669, paid for, cooled and trained with the strike bonus.
+            KidoEvents.tick(player, data, now + 20L);
+            helper.assertTrue(gathering(data) == null, "the gather was kept once it went off: " + gathering(data));
+            helper.assertTrue(orb.isRemoved(), "Raikōhō's orb outlived its gather");
+            assertNear(helper, golem.getHealth(), 69.331, HEALTH_EPSILON, "the golem's health after Raikōhō by name");
+            DamageSource source = golem.getLastDamageSource();
+            helper.assertTrue(source != null && source.is(KidoEvents.HADO) && source.getEntity() == player,
+                    "the golem was struck by " + source);
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 820.0, "the reiryoku after Raikōhō by name");
+            helper.assertFalse(KidoLogic.ready(data, now + 119L), "the hands were free a tick before Raikōhō's cooldown");
+            helper.assertTrue(KidoLogic.ready(data, now + 120L), "the hands were not free after Raikōhō's cooldown");
+            helper.assertTrue(data.xp(Stat.KIDO) == 7, "Raikōhō by name on the golem trained " + data.xp(Stat.KIDO)
+                    + " Kidō xp, not 6 and 1");
+            helper.assertTrue(charging(helper).isEmpty(), "an orb is still charging: " + charging(helper));
+
+            // Let go once it has gone off, the key does nothing.
+            assertRefusal(helper, release(player, now + 25L), null, "the Kidō key let go after Raikōhō went off");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 820.0, "the reiryoku once the key was let go");
+
+            // Chanted in English once the hands are free: a chant shows no orb in the palm.
+            discard(golem);
+            chanted = golem(helper, 6, 8);
+            heardAs(helper, KidoEvents.chant(player, english(helper, KidoSpell.RAIKOHO), now + 120L),
+                    KidoEvents.Heard.Outcome.STARTED, KidoSpell.RAIKOHO, null, "Raikōhō's English");
+            KidoLogic.Chant chant = pending(data);
+            helper.assertTrue(chant != null && chant.firesAt() == now + 170L,
+                    "the English chant goes off as " + chant + ", not at " + (now + 170L));
+            helper.assertTrue(charging(helper).isEmpty(), "the chant shows an orb: " + charging(helper));
+
+            // Over a chant, the key on Raikōhō gathers nothing.
+            KidoLogic.choose(data, KidoSpell.RAIKOHO.location());
+            helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.RAIKOHO)), "the choice is " + stored(data));
+            assertRefusal(helper, press(player, now + 121L), KidoLogic.Refusal.CHANTING, "Raikōhō's key while chanting");
+            helper.assertTrue(gathering(data) == null, "the key gathered over a chant: " + gathering(data));
+            helper.assertTrue(charging(helper).isEmpty(), "the key over a chant showed an orb: " + charging(helper));
+            helper.assertTrue(pending(data) == chant, "the key over a chant changed it to " + pending(data));
+
+            // Chanted, at full strength, 43.813, and trained twice over.
+            KidoEvents.tick(player, data, now + 170L);
+            helper.assertTrue(pending(data) == null, "the English chant was still pending once it went off");
+            assertNear(helper, chanted.getHealth(), 56.187, HEALTH_EPSILON, "the golem's health after the chanted Raikōhō");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 640.0, "the reiryoku after the chanted Raikōhō");
+            helper.assertTrue(data.xp(Stat.KIDO) == 21, "the chanted Raikōhō on the golem left " + data.xp(Stat.KIDO)
+                    + " Kidō xp, not 7 and twice 7");
+        } finally {
+            KidoEvents.dropGather(player, data);
+            discard(golem, chanted);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void raikohoMisfiresOnlyWhenItGoesOff(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell raikoho = spell(helper, KidoSpell.RAIKOHO).value();
+        // At Kidō 32, Raikōhō's by-name level: half strength and a 30% chance to misfire.
+        Player player = caster(helper, GameType.SURVIVAL, shinigami(1_000.0F, 32));
+        SoulData data = SoulLogic.get(player);
+        player.setHealth(20.0F);
+        KidoLogic.choose(data, KidoSpell.RAIKOHO.location());
+        downTheLane(player);
+        IronGolem golem = golem(helper, 6, 8);
+        try {
+            assertNear(helper, KidoLogic.misfireChance(raikoho, 32), 0.3, "Raikōhō's chance to misfire at Kidō 32");
+            assertNear(helper, KidoLogic.misfireChance(raikoho, 37), 0.15, "Raikōhō's chance to misfire at Kidō 37");
+            assertNear(helper, KidoLogic.misfireChance(raikoho, 42), 0.0, "Raikōhō's chance to misfire at Kidō 42");
+            assertNear(helper, KidoLogic.share(raikoho, KidoLogic.Form.NAME, 32), 0.5,
+                    "the share of Raikōhō by name at Kidō 32");
+
+            // Nothing is rolled as the key is pressed: a sure misfire then changes nothing.
+            withConfig(BleachConfig.KIDO_MISFIRE_CHANCE, 1.0, () -> assertRefusal(helper, press(player, now), null,
+                    "Raikōhō's key with a misfire certain"));
+            helper.assertTrue(gathering(data) != null, "Raikōhō did not gather with a misfire certain");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 1_000.0, "the reiryoku once Raikōhō began to gather");
+            // Rolled as it goes off, with no chance: it strikes at half strength, 19.525.
+            withConfig(BleachConfig.KIDO_MISFIRE_CHANCE, 0.0, () -> KidoEvents.tick(player, data, now + 20L));
+            helper.assertTrue(gathering(data) == null, "the gather was kept once it went off: " + gathering(data));
+            assertNear(helper, golem.getHealth(), 80.475, HEALTH_EPSILON, "the golem's health after Raikōhō by name");
+            HollowPlayerTests.assertClose(helper, player.getHealth(), 20.0, "the caster's health after Raikōhō by name");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 820.0, "the reiryoku after Raikōhō by name");
+            helper.assertTrue(data.xp(Stat.KIDO) == 7, "Raikōhō by name on the golem trained " + data.xp(Stat.KIDO)
+                    + " Kidō xp, not 6 and 1");
+
+            // Gathered with no chance and gone off with a certain one: it bursts in the hand, paid for, and a quarter
+            // of its 19.525 hurts the caster.
+            withConfig(BleachConfig.KIDO_MISFIRE_CHANCE, 0.0, () -> assertRefusal(helper, press(player, now + 120L), null,
+                    "Raikōhō's key with no chance to misfire"));
+            CeroBeam orb = orbOf(helper, data, "Raikōhō's second key");
+            withConfig(BleachConfig.KIDO_MISFIRE_CHANCE, 1.0, () -> KidoEvents.tick(player, data, now + 140L));
+            helper.assertTrue(gathering(data) == null, "the misfired gather was kept: " + gathering(data));
+            helper.assertTrue(orb.isRemoved(), "the misfired Raikōhō's orb outlived its gather");
+            assertNear(helper, golem.getHealth(), 80.475, HEALTH_EPSILON, "the golem's health after the misfire");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 640.0, "the reiryoku after the misfire");
+            assertNear(helper, player.getHealth(), 15.119, HEALTH_EPSILON, "the caster's health after the misfire");
+            helper.assertFalse(KidoLogic.ready(data, now + 239L), "the hands were free a tick before the misfire's cooldown");
+            helper.assertTrue(data.xp(Stat.KIDO) == 7, "the misfire trained " + (data.xp(Stat.KIDO) - 7) + " Kidō xp");
+            assertWallStands(helper);
+        } finally {
+            KidoEvents.dropGather(player, data);
+            discard(golem);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void whatBreaksOrScattersAGather(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        SpiderHollow spider = HollowPlayerTests.placed(helper, ModEntities.SPIDER_HOLLOW.get(), 8, 3);
+        // Its soul made now, so the reiatsu gap weighs its blow alike each time.
+        spider.soul();
+        Player player = gatherer(helper);
+        SoulData data = SoulLogic.get(player);
+        Player held = gatherer(helper);
+        NegacionLight light = null;
+        Player taken = gatherer(helper);
+        SoulData takenData = SoulLogic.get(taken);
+        VisoredLogic.setRecord(takenData, VisoredLogic.record(takenData).withRootedAt(now - DAY));
+        Player zangetsu = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZANGETSU);
+        SoulData zangetsuData = SoulLogic.get(zangetsu);
+        Player sitting = gatherer(helper);
+        SoulData sittingData = SoulLogic.get(sitting);
+        Player seated = gatherer(helper);
+        SoulData seatedData = SoulLogic.get(seated);
+        try {
+            // Let go too soon, it scatters, with nothing spent, cooled or trained.
+            assertRefusal(helper, press(player, now), null, "the first key");
+            CeroBeam orb = orbOf(helper, data, "the first key");
+            assertRefusal(helper, release(player, now + 5L), KidoLogic.Refusal.SCATTERED,
+                    "the Kidō key let go a quarter of a second in");
+            helper.assertTrue(gathering(data) == null && orb.isRemoved(), "the gather let go too soon was kept");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 1_000.0, "the reiryoku once the gather scattered");
+            helper.assertTrue(KidoLogic.ready(data, now + 6L), "a scattered gather kept the hands busy");
+            helper.assertTrue(data.xp(Stat.KIDO) == 0, "a scattered gather trained " + data.xp(Stat.KIDO) + " Kidō xp");
+
+            // A screen opened over the held key scatters it too; with nothing gathering it means nothing.
+            assertRefusal(helper, press(player, now + 10L), null, "the second key");
+            orb = orbOf(helper, data, "the second key");
+            assertRefusal(helper, cancel(player, now + 11L), KidoLogic.Refusal.SCATTERED,
+                    "a screen opened while Raikōhō gathered");
+            helper.assertTrue(gathering(data) == null && orb.isRemoved(), "the gather under a screen was kept");
+            assertRefusal(helper, cancel(player, now + 11L), null, "a screen opened with nothing gathering");
+
+            // A creature's blow that lands breaks it.
+            assertRefusal(helper, press(player, now + 20L), null, "the third key");
+            orb = orbOf(helper, data, "the third key");
+            land(helper, player, player.damageSources().mobAttack(spider), 2.0F, "the Spider Hollow's blow");
+            helper.assertTrue(gathering(data) == null && orb.isRemoved(), "the Spider Hollow's blow left the gather");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 1_000.0, "the reiryoku once the blow broke the gather");
+
+            // Fire and magic come from no creature; a portal drops it.
+            assertRefusal(helper, press(player, now + 30L), null, "the fourth key");
+            orb = orbOf(helper, data, "the fourth key");
+            land(helper, player, player.damageSources().onFire(), 1.0F, "the fire");
+            land(helper, player, player.damageSources().magic(), 1.0F, "the magic");
+            helper.assertTrue(gathering(data) != null && orb.isCharging(), "burning or magic broke the gather");
+            NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerChangedDimensionEvent(player, Level.OVERWORLD, Level.NETHER));
+            helper.assertTrue(gathering(data) == null && orb.isRemoved(), "the gather went through the portal");
+
+            // Dropped, its orb goes with it.
+            assertRefusal(helper, press(player, now + 40L), null, "the fifth key");
+            orb = orbOf(helper, data, "the fifth key");
+            KidoEvents.dropGather(player, data);
+            helper.assertTrue(gathering(data) == null && orb.isRemoved(), "the dropped gather was kept");
+
+            // Let go two ticks before its time, it scatters; one tick before, it goes off, as the next tick would loose it.
+            assertRefusal(helper, press(player, now + 50L), null, "the sixth key");
+            KidoLogic.Gather early = gathering(data);
+            helper.assertTrue(early != null && early.firesAt() == now + 70L, "the sixth gather goes off as " + early);
+            orb = orbOf(helper, data, "the sixth key");
+            assertRefusal(helper, release(player, now + 68L), KidoLogic.Refusal.SCATTERED,
+                    "the Kidō key let go two ticks before the gather's time");
+            helper.assertTrue(gathering(data) == null && orb.isRemoved(), "the gather let go two ticks early was kept");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 1_000.0, "the reiryoku once that gather scattered");
+            assertRefusal(helper, press(player, now + 80L), null, "the seventh key");
+            KidoLogic.Gather onTime = gathering(data);
+            helper.assertTrue(onTime != null && onTime.firesAt() == now + 100L, "the seventh gather goes off as " + onTime);
+            orb = orbOf(helper, data, "the seventh key");
+            assertRefusal(helper, release(player, now + 99L), null, "the Kidō key let go a tick before the gather's time");
+            helper.assertTrue(gathering(data) == null && orb.isRemoved(), "the gather let go on time was kept");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 820.0, "the reiryoku once that gather went off");
+            helper.assertTrue(data.xp(Stat.KIDO) == 6, "Raikōhō at the wall trained " + data.xp(Stat.KIDO) + " Kidō xp");
+            helper.assertFalse(KidoLogic.ready(data, now + 198L), "the hands were free a tick before Raikōhō's cooldown");
+            helper.assertTrue(KidoLogic.ready(data, now + 199L), "the hands were not free after Raikōhō's cooldown");
+            assertWallStands(helper);
+
+            // Each gathering first, so its end is not for want of beginning: death, a hold, a takeover, another art
+            // and Jinzen.
+            assertGatherEnds(helper, now, "a Shinigami who died", (soul, soulData) -> soul.setHealth(0.0F));
+            NegacionLight placed = NegacionLight.place(level, held, null);
+            light = placed;
+            assertGatherEnds(helper, held, now, "a Shinigami held by Negación", (soul, soulData) -> helper.assertTrue(
+                    placed != null && soul.startRiding(placed, true) && Negacion.held(soul),
+                    "the mock Shinigami could not be held"));
+            assertGatherEnds(helper, taken, now, "a soul whose Hollow took its body", (soul, soulData) -> helper.assertTrue(
+                    VisoredEvents.startTakeover(soul, soulData, false, now) && VisoredLogic.takenOver(soulData),
+                    "the rooted Hollow did not seize its host"));
+            Vec3 lane = helper.absoluteVec(LANE);
+            zangetsu.moveTo(lane.x, lane.y, lane.z, EAST, 0.0F);
+            downTheLane(zangetsu);
+            helper.assertTrue(ShikaiEvents.release(zangetsu) == ShikaiEvents.Result.RELEASED, "Zangetsu would not release");
+            // Its release paid for, it is filled up again and taught Kidō 42 and Raikōhō.
+            zangetsuData.setMaxReiryoku(1_000.0F);
+            zangetsuData.setReiryoku(1_000.0F);
+            zangetsuData.setLevel(Stat.KIDO, 42);
+            KidoLogic.choose(zangetsuData, KidoSpell.RAIKOHO.location());
+            assertGatherEnds(helper, zangetsu, now, "a Shinigami gathering a Getsuga Tenshō", (soul, soulData) ->
+                    helper.assertTrue(ShikaiEvents.gather(soul) == ShikaiEvents.GatherResult.GATHERING,
+                            "released Zangetsu did not gather"));
+            assertGatherEnds(helper, sitting, now, "a Shinigami who sat in Jinzen",
+                    (soul, soulData) -> JinzenLogic.begin(soul, soulData, now));
+            // Already sitting in Jinzen, the key gathers nothing, so no orb shows for a tick.
+            JinzenLogic.begin(seated, seatedData, now);
+            assertRefusal(helper, press(seated, now), KidoLogic.Refusal.GATHERING, "the Kidō key in Jinzen");
+            helper.assertTrue(gathering(seatedData) == null, "the key gathered in Jinzen: " + gathering(seatedData));
+            helper.assertTrue(charging(helper).isEmpty(), "an orb is still charging: " + charging(helper));
+        } finally {
+            KidoEvents.dropGather(player, data);
+            ShikaiEvents.cancelGather(zangetsu, zangetsuData);
+            VisoredEvents.endTakeover(taken, takenData, VisoredEvents.TakeoverEnd.REMOVED, now);
+            JinzenLogic.end(sitting, sittingData);
+            JinzenLogic.end(seated, seatedData);
+            held.stopRiding();
+            discard(light, spider);
             discardBeams(helper);
         }
         helper.succeed();

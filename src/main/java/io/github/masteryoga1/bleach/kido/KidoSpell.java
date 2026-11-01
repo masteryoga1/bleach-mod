@@ -25,8 +25,8 @@ import net.neoforged.neoforge.registries.DataPackRegistryEvent;
  * (not on {@code /reload}). Its id is its key: {@code bleach:byakurai} is Hadō #4 Byakurai. It says what kind of
  * spell it is and its number in that kind, its name, what it does ({@link Shape}, which is Java, so data cannot
  * invent behaviour), the Kidō levels it needs, what it costs and how long the hands stay busy after it, the Kidō
- * xp it trains, how it looks and its numbers. The rules of casting are in
- * {@link io.github.masteryoga1.bleach.soul.KidoLogic}.
+ * xp it trains, how it looks, its numbers, and how long it gathers in the palm cast by name. The rules of casting
+ * are in {@link io.github.masteryoga1.bleach.soul.KidoLogic}.
  *
  * <p>Every field may be left out and every number is clamped to its range, so a mistake in one spell file falls
  * back field by field instead of stopping the world from loading, as any error in a data pack registry would. A
@@ -48,15 +48,21 @@ import net.neoforged.neoforge.registries.DataPackRegistryEvent;
  * @param minCost       the least reiryoku a cast costs
  * @param cooldownTicks ticks before the caster's hands can cast again, at least 1
  * @param xp            the Kidō xp a cast trains
+ * @param gatherTicks   ticks a cast by name gathers in the palm, the Kidō key held, before it goes off (0 for at
+ *                      once), at most five seconds
  */
 public record KidoSpell(Kind kind, int number, Component name, Shape shape, int level, int byNameLevel,
                         int chantTicks, List<String> incantations, float costShare, float minCost,
-                        int cooldownTicks, int xp, Look look, Effect effect) {
+                        int cooldownTicks, int xp, Look look, Effect effect, int gatherTicks) {
     public static final int MAX_NUMBER = 999;
     public static final int MAX_LEVEL = 1_000;
     public static final int MAX_INCANTATIONS = 8;
     public static final int MAX_INCANTATION_LENGTH = 256;
+    /** The farthest a gust reaches, whatever its range says, so the box it looks in stays small. */
+    public static final double GUST_MAX_RANGE = 32.0;
     private static final int MAX_CHANT_TICKS = 1_200;
+    /** The longest a spell gathers in the palm: five seconds of a held key. */
+    private static final int MAX_GATHER_TICKS = 100;
     private static final int MAX_COOLDOWN_TICKS = 6_000;
     private static final int MAX_XP = 1_000;
     private static final float MAX_MIN_COST = 10_000.0F;
@@ -76,7 +82,8 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
             Codec.INT.lenientOptionalFieldOf("cooldown_ticks", 20).forGetter(KidoSpell::cooldownTicks),
             Codec.INT.lenientOptionalFieldOf("xp", 1).forGetter(KidoSpell::xp),
             Look.CODEC.lenientOptionalFieldOf("look", Look.NONE).forGetter(KidoSpell::look),
-            Effect.CODEC.lenientOptionalFieldOf("effect", Effect.NONE).forGetter(KidoSpell::effect)
+            Effect.CODEC.lenientOptionalFieldOf("effect", Effect.NONE).forGetter(KidoSpell::effect),
+            Codec.INT.lenientOptionalFieldOf("gather_ticks", 0).forGetter(KidoSpell::gatherTicks)
     ).apply(instance, KidoSpell::new));
 
     // ---- The registry ----
@@ -92,6 +99,10 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public static final ResourceKey<KidoSpell> SHAKKAHO = ResourceKey.create(REGISTRY, BleachMod.id("shakkaho"));
     /** Hadō #33 Sōkatsui, a wide blue blast. */
     public static final ResourceKey<KidoSpell> SOKATSUI = ResourceKey.create(REGISTRY, BleachMod.id("sokatsui"));
+    /** Hadō #58 Tenran, a gust widening from the hand. */
+    public static final ResourceKey<KidoSpell> TENRAN = ResourceKey.create(REGISTRY, BleachMod.id("tenran"));
+    /** Hadō #63 Raikōhō, a yellow bolt gathered in the palm. */
+    public static final ResourceKey<KidoSpell> RAIKOHO = ResourceKey.create(REGISTRY, BleachMod.id("raikoho"));
 
     /** Kind, then number, then id: the order spells are listed and chosen in. */
     public static final Comparator<Holder.Reference<KidoSpell>> ORDER =
@@ -115,6 +126,7 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         xp = Mth.clamp(xp, 0, MAX_XP);
         look = look == null ? Look.NONE : look;
         effect = effect == null ? Effect.NONE : effect;
+        gatherTicks = Mth.clamp(gatherTicks, 0, MAX_GATHER_TICKS);
     }
 
     /**
@@ -158,6 +170,11 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     /** Whether it has a known incantation, so casting it by name alone weakens it and needs a higher level. */
     public boolean chantable() {
         return !incantations.isEmpty();
+    }
+
+    /** Whether a cast by name gathers in the palm, the Kidō key held, before it goes off. */
+    public boolean gathers() {
+        return gatherTicks > 0;
     }
 
     /** Its title, such as "Hadō #4 Byakurai": its kind's name, its number and its name. */
@@ -218,7 +235,9 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         /** Nothing: the default, and what an unknown shape reads as. Never cast. */
         NONE,
         /** A beam struck at once along the caster's look, through the Cero's engine. */
-        BEAM;
+        BEAM,
+        /** A gust widening from the hand, striking and pushing every creature in it at once, and blinding the players. */
+        GUST;
 
         public static final Codec<Shape> CODEC = StringRepresentable.fromEnum(Shape::values);
 
@@ -264,16 +283,20 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      * @param damage        damage before reiryoku is added
      * @param damagePerRoot damage added per square root of the caster's maximum reiryoku
      * @param maxDamage     the most damage once the Kidō level has grown it, before the form's share is taken
-     * @param range         how far it reaches, in blocks
-     * @param radius        its half-width, in blocks
+     * @param range         how far it reaches, in blocks (a gust at most {@link KidoSpell#GUST_MAX_RANGE})
+     * @param radius        its half-width, in blocks (for a gust, only its streak's)
      * @param pierce        how many creatures it may strike that it meets before it stops
      * @param blastRadius   how far about where it bursts the blast reaches, in blocks (0 for none)
      * @param blastShare    the blast's share of the damage
-     * @param knockback     push along it, on top of the blow's own
+     * @param knockback     push along it (a gust's, away from the caster), on top of the blow's own
      * @param burnSeconds   seconds a creature it strikes burns
+     * @param angle         a gust's whole width, in degrees, from 1 to 180
+     * @param blindSeconds  seconds a player it reaches is blinded, from 0 to 30
+     * @param bareShare     the share of its strength left to a caster with no zanpakutō at hand, from 0 to 1
      */
     public record Effect(float damage, float damagePerRoot, float maxDamage, double range, float radius, int pierce,
-                         float blastRadius, float blastShare, float knockback, float burnSeconds) {
+                         float blastRadius, float blastShare, float knockback, float burnSeconds, float angle,
+                         float blindSeconds, float bareShare) {
         // Built before NONE, with plain defaults: making NONE calls the spell's clamp, which may set the spell up,
         // and the spell's codec reads this one.
         public static final Codec<Effect> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -286,11 +309,18 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
                 Codec.FLOAT.lenientOptionalFieldOf("blast_radius", 0.0F).forGetter(Effect::blastRadius),
                 Codec.FLOAT.lenientOptionalFieldOf("blast_share", 0.5F).forGetter(Effect::blastShare),
                 Codec.FLOAT.lenientOptionalFieldOf("knockback", 0.0F).forGetter(Effect::knockback),
-                Codec.FLOAT.lenientOptionalFieldOf("burn_seconds", 0.0F).forGetter(Effect::burnSeconds)
+                Codec.FLOAT.lenientOptionalFieldOf("burn_seconds", 0.0F).forGetter(Effect::burnSeconds),
+                Codec.FLOAT.lenientOptionalFieldOf("angle", 60.0F).forGetter(Effect::angle),
+                Codec.FLOAT.lenientOptionalFieldOf("blind_seconds", 0.0F).forGetter(Effect::blindSeconds),
+                Codec.FLOAT.lenientOptionalFieldOf("bare_share", 1.0F).forGetter(Effect::bareShare)
         ).apply(instance, Effect::new));
 
-        /** No damage, a reach of 16 blocks, a fifth of a block either side of its line, stopping at the first creature. */
-        public static final Effect NONE = new Effect(0.0F, 0.0F, 1_000.0F, 16.0, 0.2F, 1, 0.0F, 0.5F, 0.0F, 0.0F);
+        /**
+         * No damage, a reach of 16 blocks, a fifth of a block either side of its line, stopping at the first creature;
+         * a sixty-degree gust that blinds no one, and no loss without a blade.
+         */
+        public static final Effect NONE = new Effect(0.0F, 0.0F, 1_000.0F, 16.0, 0.2F, 1, 0.0F, 0.5F, 0.0F, 0.0F, 60.0F,
+                0.0F, 1.0F);
 
         public Effect {
             damage = within(damage, 0.0F, 1_000.0F);
@@ -303,6 +333,9 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
             blastShare = within(blastShare, 0.0F, 1.0F);
             knockback = within(knockback, 0.0F, 10.0F);
             burnSeconds = within(burnSeconds, 0.0F, 60.0F);
+            angle = within(angle, 1.0F, 180.0F);
+            blindSeconds = within(blindSeconds, 0.0F, 30.0F);
+            bareShare = within(bareShare, 0.0F, 1.0F);
         }
     }
 }

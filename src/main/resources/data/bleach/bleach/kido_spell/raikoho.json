@@ -1,0 +1,36 @@
+{
+  "kind": "hado",
+  "number": 63,
+  "name": {"translate": "kido.bleach.raikoho"},
+  "shape": "beam",
+  "level": 25,
+  "by_name_level": 32,
+  "chant_ticks": 50,
+  "gather_ticks": 20,
+  "incantations": [
+    "Sanzai suru kemono no hone! Sentō, kōshō, kōtetsu no sharin. Ugokeba kaze, tomareba sora. Yari utsu neiro ga kojō ni michiru!",
+    "Bones of beasts, lying scattered! Spire, crimson crystal, wheel of steel. When it moves, wind; when it stops, sky. Spears strike, and their tone fills the hollow castle!",
+    "Sanzai suru kemono no hone! Sentō, kōshō, kōtetsu no sharin. Ugokeba kaze, tomareba sora. Yari utsu neiro ga kyōjō ni michiru!"
+  ],
+  "cost_share": 0.18,
+  "min_cost": 12.0,
+  "cooldown_ticks": 100,
+  "xp": 6,
+  "look": {
+    "colour": "#FFE23A",
+    "sound": "minecraft:entity.lightning_bolt.impact",
+    "pitch": 0.9,
+    "particle": "minecraft:electric_spark"
+  },
+  "effect": {
+    "damage": 8.0,
+    "damage_per_root": 0.5,
+    "max_damage": 48.0,
+    "range": 32.0,
+    "radius": 0.5,
+    "pierce": 1,
+    "blast_radius": 3.0,
+    "blast_share": 0.6,
+    "knockback": 0.6
+  }
+}

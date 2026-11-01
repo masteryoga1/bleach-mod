@@ -1,0 +1,31 @@
+{
+  "kind": "hado",
+  "number": 58,
+  "name": {"translate": "kido.bleach.tenran"},
+  "shape": "gust",
+  "level": 18,
+  "by_name_level": 18,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.1,
+  "min_cost": 6.0,
+  "cooldown_ticks": 60,
+  "xp": 5,
+  "look": {
+    "colour": "#D2EEE6",
+    "sound": "minecraft:entity.breeze.wind_burst",
+    "pitch": 0.8,
+    "particle": "minecraft:gust"
+  },
+  "effect": {
+    "damage": 1.5,
+    "damage_per_root": 0.08,
+    "max_damage": 8.0,
+    "range": 8.0,
+    "radius": 0.3,
+    "knockback": 1.0,
+    "angle": 70.0,
+    "blind_seconds": 2.0,
+    "bare_share": 0.7
+  }
+}
