@@ -60,6 +60,7 @@ import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -84,6 +85,7 @@ import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
@@ -99,6 +101,7 @@ import net.neoforged.neoforge.common.EffectCures;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.NeoForgeMod;
+import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.event.entity.living.LivingEntityUseItemEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
@@ -2293,6 +2296,7 @@ public final class KidoTests {
         IronGolem second = null;
         IronGolem behind = null;
         IronGolem close = null;
+        IronGolem ahead = null;
         try {
             // Sai's 420.16 against the golem's 100: its arms bound for the whole three seconds, hidden, and unhurt.
             assertRefusal(helper, KidoEvents.cast(player, sai, KidoLogic.Form.NAME, now), null, "Sai at the golem");
@@ -2367,8 +2371,13 @@ public final class KidoTests {
             aim = KidoEvents.bindAim(player, sai);
             helper.assertTrue(aim.target() == close, "Sai's ray from within the golem met " + aim.target());
             assertNear(helper, aim.end().x - player.getX(), 0.9, "where Sai's ray left the golem it began in");
+            // But one pressed to the caster's back is behind the ray, which goes on to the golem ahead.
+            close.moveTo(player.getX() - 0.75, player.getY(), player.getZ());
+            ahead = golem(helper, 6, 8);
+            aim = KidoEvents.bindAim(player, sai);
+            helper.assertTrue(aim.target() == ahead, "Sai's ray with a golem at the caster's back met " + aim.target());
         } finally {
-            discard(golem, plus, second, behind, close);
+            discard(golem, plus, second, behind, close, ahead);
             discardBeams(helper);
         }
         helper.succeed();
@@ -2593,6 +2602,12 @@ public final class KidoTests {
                     "Sai on the guard");
             ModEffects.BAKUDO_BOUND.value().applyEffectTick(guard, 0);
             helper.assertFalse(guard.isUsingItem(), "the bound guard still holds its shield up");
+            // And a server's player lets go of a chest it had open, or a horse's packs: only its own inventory stays.
+            ServerPlayer opener = FakePlayerFactory.getMinecraft(helper.getLevel());
+            opener.containerMenu = ChestMenu.oneRow(1, opener.getInventory());
+            ModEffects.BAKUDO_BOUND.value().applyEffectTick(opener, 0);
+            helper.assertTrue(opener.containerMenu == opener.inventoryMenu, "the bound player still has open "
+                    + opener.containerMenu);
 
             // Lifted, the hold's modifiers go with it.
             golem.removeEffect(ModEffects.BAKUDO_HELD);

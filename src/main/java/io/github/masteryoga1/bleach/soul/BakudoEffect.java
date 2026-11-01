@@ -11,6 +11,7 @@ import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -143,8 +144,9 @@ public final class BakudoEffect extends MobEffect {
     /**
      * Each tick, before the creature moves. On the server, a creature Negación's light or a Caja has taken up is let
      * go of the bind, which vanilla then removes. A held body is rooted ({@link #hold}); bound arms let go of whatever
-     * they were using, a drawn bow, a raised shield or food, and a held Bala key. Then those who see spirits are shown
-     * the bind, now and then.
+     * they were using, a drawn bow, a raised shield or food, a held Bala key, and on the server any container a player
+     * has open but its own inventory: a chest opened before the bind, or a horse's packs, which the inventory key opens
+     * with no click to refuse. Then those who see spirits are shown the bind, now and then.
      */
     @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
@@ -157,6 +159,9 @@ public final class BakudoEffect extends MobEffect {
         } else {
             if (entity.isUsingItem()) {
                 entity.stopUsingItem();
+            }
+            if (entity instanceof ServerPlayer player && player.containerMenu != player.inventoryMenu) {
+                player.closeContainer();
             }
             if (level != null && entity instanceof Player player && SoulLogic.hasSoul(player)) {
                 Bala.release(SoulLogic.get(player));

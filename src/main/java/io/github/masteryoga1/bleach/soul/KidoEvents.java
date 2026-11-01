@@ -776,17 +776,21 @@ public final class KidoEvents {
      * creative player, one Negación holds) are passed by, so the ray goes on to what stands behind them, as a Hadō's
      * beam would; a part of a great creature stands for the whole. On a creature, the ray ends where it meets it. One
      * so close that the caster's eyes are within its widened box, which a projectile's search passes over, is met first
-     * of all, where the ray leaves it. Changes nothing. Public for tests.
+     * of all, where the ray leaves it, if any of it stands ahead of the eyes ({@link #ahead}): one pressed to the
+     * caster's back is behind the ray. Of two the eyes are within, the one reaching further ahead is met. Changes
+     * nothing. Public for tests.
      */
     public static BindAim bindAim(Player caster, KidoSpell spell) {
         float margin = spell.effect().radius();
         Vec3 eye = caster.getEyePosition();
-        Vec3 end = eye.add(caster.getViewVector(1.0F).scale(spell.effect().range()));
+        Vec3 look = caster.getViewVector(1.0F);
+        Vec3 end = eye.add(look.scale(spell.effect().range()));
         end = caster.level().clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster))
                 .getLocation();
         Entity met = null;
         Vec3 at = end;
         double nearest = Double.MAX_VALUE;
+        double farthest = 0.0;
         // Searched a margin wider than the ray, or a data pack's wide one would miss a creature it should meet.
         for (Entity entity : caster.level().getEntities(caster, new AABB(eye, end).inflate(1.0 + margin), candidate -> {
             LivingEntity body = SpiritProjectiles.bodyOf(candidate);
@@ -795,16 +799,39 @@ public final class KidoEvents {
         })) {
             // The box it met (a part's, for a great creature), widened by the margin.
             AABB box = entity.getBoundingBox().inflate(margin);
-            boolean inside = box.contains(eye);
-            Optional<Vec3> meets = inside ? Optional.of(box.clip(end, eye).orElse(end)) : box.clip(eye, end);
-            double distance = inside ? 0.0 : meets.map(eye::distanceToSqr).orElse(Double.MAX_VALUE);
-            if (distance < nearest) {
+            double distance;
+            double reach = 0.0;
+            Vec3 meets;
+            if (box.contains(eye)) {
+                reach = ahead(entity.getBoundingBox(), eye, look);
+                if (reach <= 0.0) {
+                    continue;
+                }
+                distance = 0.0;
+                meets = box.clip(end, eye).orElse(end);
+            } else {
+                Optional<Vec3> entry = box.clip(eye, end);
+                if (entry.isEmpty()) {
+                    continue;
+                }
+                distance = eye.distanceToSqr(entry.get());
+                meets = entry.get();
+            }
+            if (distance < nearest || distance == 0.0 && nearest == 0.0 && reach > farthest) {
                 nearest = distance;
+                farthest = reach;
                 met = entity;
-                at = meets.get();
+                at = meets;
             }
         }
         return met == null ? new BindAim(null, end) : new BindAim(SpiritProjectiles.bodyOf(met), at);
+    }
+
+    /** How far ahead of the eyes, along the look, this box reaches at its furthest corner: below 0 when wholly behind. */
+    private static double ahead(AABB box, Vec3 eye, Vec3 look) {
+        return Math.max((box.minX - eye.x) * look.x, (box.maxX - eye.x) * look.x)
+                + Math.max((box.minY - eye.y) * look.y, (box.maxY - eye.y) * look.y)
+                + Math.max((box.minZ - eye.z) * look.z, (box.maxZ - eye.z) * look.z);
     }
 
     /**
