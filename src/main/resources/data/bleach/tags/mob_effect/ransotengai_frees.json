@@ -2,6 +2,8 @@
   "values": [
     "minecraft:slowness",
     "minecraft:mining_fatigue",
-    "minecraft:weakness"
+    "minecraft:weakness",
+    "bleach:bakudo_bound",
+    "bleach:bakudo_held"
   ]
 }

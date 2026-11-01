@@ -66,6 +66,8 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     private static final int MAX_COOLDOWN_TICKS = 6_000;
     private static final int MAX_XP = 1_000;
     private static final float MAX_MIN_COST = 10_000.0F;
+    /** The longest a bind holds, whatever its file says: a minute. */
+    private static final float MAX_BIND_SECONDS = 60.0F;
 
     // Every field is read leniently, so one bad value falls back to its own default and the rest of the spell stays.
     public static final Codec<KidoSpell> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -103,6 +105,10 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public static final ResourceKey<KidoSpell> TENRAN = ResourceKey.create(REGISTRY, BleachMod.id("tenran"));
     /** Hadō #63 Raikōhō, a yellow bolt gathered in the palm. */
     public static final ResourceKey<KidoSpell> RAIKOHO = ResourceKey.create(REGISTRY, BleachMod.id("raikoho"));
+    /** Bakudō #1 Sai, which binds the arms behind the back. */
+    public static final ResourceKey<KidoSpell> SAI = ResourceKey.create(REGISTRY, BleachMod.id("sai"));
+    /** Bakudō #4 Hainawa, a rope that holds a creature where it stands. */
+    public static final ResourceKey<KidoSpell> HAINAWA = ResourceKey.create(REGISTRY, BleachMod.id("hainawa"));
 
     /** Kind, then number, then id: the order spells are listed and chosen in. */
     public static final Comparator<Holder.Reference<KidoSpell>> ORDER =
@@ -237,7 +243,12 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         /** A beam struck at once along the caster's look, through the Cero's engine. */
         BEAM,
         /** A gust widening from the hand, striking and pushing every creature in it at once, and blinding the players. */
-        GUST;
+        GUST,
+        /**
+         * A bind: the first creature it may bind in the caster's sight, its arms bound, its body held, or both, for a
+         * time weighed against its reiatsu.
+         */
+        BIND;
 
         public static final Codec<Shape> CODEC = StringRepresentable.fromEnum(Shape::values);
 
@@ -284,7 +295,7 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      * @param damagePerRoot damage added per square root of the caster's maximum reiryoku
      * @param maxDamage     the most damage once the Kidō level has grown it, before the form's share is taken
      * @param range         how far it reaches, in blocks (a gust at most {@link KidoSpell#GUST_MAX_RANGE})
-     * @param radius        its half-width, in blocks (for a gust, only its streak's)
+     * @param radius        its half-width, in blocks (for a gust, only its streak's; for a bind, its ray's margin)
      * @param pierce        how many creatures it may strike that it meets before it stops
      * @param blastRadius   how far about where it bursts the blast reaches, in blocks (0 for none)
      * @param blastShare    the blast's share of the damage
@@ -293,10 +304,12 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      * @param angle         a gust's whole width, in degrees, from 1 to 180
      * @param blindSeconds  seconds a player it reaches is blinded, from 0 to 30
      * @param bareShare     the share of its strength left to a caster with no zanpakutō at hand, from 0 to 1
+     * @param boundSeconds  seconds a bind ties the arms of the creature it reaches, at its full strength, from 0 to 60
+     * @param heldSeconds   seconds a bind holds that creature where it stands, at its full strength, from 0 to 60
      */
     public record Effect(float damage, float damagePerRoot, float maxDamage, double range, float radius, int pierce,
                          float blastRadius, float blastShare, float knockback, float burnSeconds, float angle,
-                         float blindSeconds, float bareShare) {
+                         float blindSeconds, float bareShare, float boundSeconds, float heldSeconds) {
         // Built before NONE, with plain defaults: making NONE calls the spell's clamp, which may set the spell up,
         // and the spell's codec reads this one.
         public static final Codec<Effect> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -312,15 +325,17 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
                 Codec.FLOAT.lenientOptionalFieldOf("burn_seconds", 0.0F).forGetter(Effect::burnSeconds),
                 Codec.FLOAT.lenientOptionalFieldOf("angle", 60.0F).forGetter(Effect::angle),
                 Codec.FLOAT.lenientOptionalFieldOf("blind_seconds", 0.0F).forGetter(Effect::blindSeconds),
-                Codec.FLOAT.lenientOptionalFieldOf("bare_share", 1.0F).forGetter(Effect::bareShare)
+                Codec.FLOAT.lenientOptionalFieldOf("bare_share", 1.0F).forGetter(Effect::bareShare),
+                Codec.FLOAT.lenientOptionalFieldOf("bound_seconds", 0.0F).forGetter(Effect::boundSeconds),
+                Codec.FLOAT.lenientOptionalFieldOf("held_seconds", 0.0F).forGetter(Effect::heldSeconds)
         ).apply(instance, Effect::new));
 
         /**
          * No damage, a reach of 16 blocks, a fifth of a block either side of its line, stopping at the first creature;
-         * a sixty-degree gust that blinds no one, and no loss without a blade.
+         * a sixty-degree gust that blinds no one, no loss without a blade, and no bind.
          */
         public static final Effect NONE = new Effect(0.0F, 0.0F, 1_000.0F, 16.0, 0.2F, 1, 0.0F, 0.5F, 0.0F, 0.0F, 60.0F,
-                0.0F, 1.0F);
+                0.0F, 1.0F, 0.0F, 0.0F);
 
         public Effect {
             damage = within(damage, 0.0F, 1_000.0F);
@@ -336,6 +351,8 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
             angle = within(angle, 1.0F, 180.0F);
             blindSeconds = within(blindSeconds, 0.0F, 30.0F);
             bareShare = within(bareShare, 0.0F, 1.0F);
+            boundSeconds = within(boundSeconds, 0.0F, MAX_BIND_SECONDS);
+            heldSeconds = within(heldSeconds, 0.0F, MAX_BIND_SECONDS);
         }
     }
 }

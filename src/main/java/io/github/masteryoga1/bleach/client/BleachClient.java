@@ -19,6 +19,7 @@ import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModMenus;
 import net.minecraft.client.KeyMapping;
@@ -33,6 +34,7 @@ import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
@@ -46,6 +48,8 @@ import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
+import net.neoforged.neoforge.client.extensions.common.IClientMobEffectExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import net.neoforged.neoforge.common.NeoForge;
@@ -81,6 +85,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachClient::registerScreens);
         modEventBus.addListener(BleachClient::registerRenderers);
         modEventBus.addListener(BleachModelLayers::register);
+        modEventBus.addListener(BleachClient::registerClientExtensions);
         QuincyClient.register(modEventBus);
         HollowPlayerClient.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(MenosPlayerRenderer::onRenderPlayer);
@@ -117,6 +122,25 @@ public final class BleachClient {
         event.register(HollowKeys.DEVOUR);
         event.register(HollowKeys.CERO);
         event.register(KidoKeys.CAST);
+    }
+
+    /**
+     * The Bakudō effects have no icon, on the HUD or in the inventory: the bind is drawn on the creature, and its
+     * refusals say it. The HUD would skip them anyway, as they are made with no icon, but the inventory draws every
+     * effect its client extension lets it.
+     */
+    private static void registerClientExtensions(RegisterClientExtensionsEvent event) {
+        event.registerMobEffect(new IClientMobEffectExtensions() {
+            @Override
+            public boolean isVisibleInInventory(MobEffectInstance instance) {
+                return false;
+            }
+
+            @Override
+            public boolean isVisibleInGui(MobEffectInstance instance) {
+                return false;
+            }
+        }, ModEffects.BAKUDO_BOUND, ModEffects.BAKUDO_HELD);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {

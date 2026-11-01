@@ -58,7 +58,7 @@ public final class FlashStep {
     /**
      * The player pressed the flash step key while steering this way (each from -1 to 1, as the
      * movement keys give them). An Arrancar uses Sonído instead (see {@link Sonido}), and a Quincy may
-     * Hirenkyaku (see {@link QuincyLogic#movementFor}).
+     * Hirenkyaku (see {@link QuincyLogic#movementFor}). A soul held by a Bakudō cannot flash step at all.
      */
     public static void perform(ServerPlayer player, float forward, float left) {
         if (!SoulLogic.hasSoul(player) || !player.isAlive() || player.isSpectator() || player.isPassenger()
@@ -68,6 +68,11 @@ public final class FlashStep {
         SoulData data = SoulLogic.get(player);
         ServerLevel level = player.serverLevel();
         long now = level.getGameTime();
+        // Before Sonído and Hirenkyaku, so all three meet the hold; arms that are only bound still step.
+        if (player.hasEffect(ModEffects.BAKUDO_HELD)) {
+            refuse(player, "message.bleach.bakudo.held");
+            return;
+        }
         if (ArrancarLogic.isArrancar(data)) {
             Sonido.perform(player, data, forward, left, now);
             return;

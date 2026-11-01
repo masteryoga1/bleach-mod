@@ -736,12 +736,13 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
     /**
      * A Sonído step along the ground this way, at most {@code distance} and its reach ({@link Sonido#distance}, less
      * under Slowness), landing at least {@code minDistance} away on footing it can stand on, past nothing solid,
-     * harmful or unloaded. Refused without AI, while riding, held, leaving, under Gritz, or before its cooldown is
-     * over. Returns whether it stepped.
+     * harmful or unloaded. Refused without AI, while riding, held, leaving, under Gritz or a Bakudō's hold, or before
+     * its cooldown is over. Returns whether it stepped.
      */
     public boolean sonido(Vec3 direction, double distance, double minDistance) {
         if (!(level() instanceof ServerLevel server) || isNoAi() || !isAlive() || departing || isPassenger()
-                || Negacion.held(this) || hasEffect(ModEffects.GRITZ) || server.getGameTime() < sonidoReadyAt) {
+                || Negacion.held(this) || hasEffect(ModEffects.GRITZ) || hasEffect(ModEffects.BAKUDO_HELD)
+                || server.getGameTime() < sonidoReadyAt) {
             return false;
         }
         Vec3 flat = new Vec3(direction.x, 0.0, direction.z);
@@ -773,11 +774,12 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
     /**
      * Fires a Bala at the middle of this creature, now, from where its Cero would gather: its soul's Bala, times the
      * damage multiplier, striking only what its Cero would ({@link CeroBeam#mayStrike}). The cooldown starts from
-     * here; this does not wait for it. Refused while dead, held or leaving. Returns whether it fired.
+     * here; this does not wait for it. Refused while dead, held, leaving, or with its arms bound by a Bakudō. Returns
+     * whether it fired.
      */
     public boolean fireBala(LivingEntity target) {
         if (!(level() instanceof ServerLevel server) || !isAlive() || departing || Negacion.held(this)
-                || target == null || !target.isAlive()) {
+                || hasEffect(ModEffects.BAKUDO_BOUND) || target == null || !target.isAlive()) {
             return false;
         }
         Vec3 from = ceroMuzzle(1.0F);

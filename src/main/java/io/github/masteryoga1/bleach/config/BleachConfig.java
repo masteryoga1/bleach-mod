@@ -232,6 +232,10 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue KIDO_MISFIRE_CHANCE;
     public static final ModConfigSpec.IntValue KIDO_MISFIRE_LEVELS;
     public static final ModConfigSpec.DoubleValue KIDO_MISFIRE_DAMAGE_SHARE;
+    public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_GRADE_PER_NUMBER;
+    public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_SKILL_PER_LEVEL;
+    public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_BREAK_BELOW;
+    public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_TAKEN_OVER_STRENGTH;
 
     public static final ModConfigSpec.EnumValue<BloodlineMode> QUINCY_BLOODLINE_MODE;
     public static final ModConfigSpec.DoubleValue QUINCY_CHANCE;
@@ -1384,6 +1388,25 @@ public final class BleachConfig {
                 .comment("Share of the spell's damage a misfire does to its caster, who is never put below one heart by"
                         + " it. The reiryoku is spent and the hands wait as for a cast.")
                 .defineInRange("misfire_damage_share", 0.25, 0.0, 1.0);
+        builder.comment("Bakudō, the binds: how strong a bind is against what it binds.").push("bakudo");
+        KIDO_BAKUDO_GRADE_PER_NUMBER = builder
+                .comment("How much stronger a bind is for each number of its spell, as a share of its caster's reiatsu:"
+                        + " 0.01 makes Bakudō #61 1.61 times as strong as #0 would be.")
+                .defineInRange("grade_per_number", 0.01, 0.0, 1.0);
+        KIDO_BAKUDO_SKILL_PER_LEVEL = builder
+                .comment("How much stronger each Kidō level makes a bind: 0.01 is 1% a level, so Kidō 40 makes it 1.4"
+                        + " times as strong.")
+                .defineInRange("skill_per_level", 0.01, 0.0, 1.0);
+        KIDO_BAKUDO_BREAK_BELOW = builder
+                .comment("A bind whose strength is below this share of its target's reiatsu is shrugged off at once: 0.5"
+                        + " is half. At or above it, the bind lasts its full time times its strength over that reiatsu,"
+                        + " never more than its full time.")
+                .defineInRange("break_below", 0.5, 0.0, 1.0);
+        KIDO_BAKUDO_TAKEN_OVER_STRENGTH = builder
+                .comment("How many times its own reiatsu a body seized by its Hollow counts against a bind. Anyone may"
+                        + " bind such a body, whatever the PvP and team rules.")
+                .defineInRange("taken_over_strength", 2.0, 1.0, 100.0);
+        builder.pop();
         builder.pop();
 
         builder.push("quincy");

@@ -185,7 +185,9 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * key twice must choose #58 Tenran, and the key alone must blow it at a fresh villager, which must be hurt, and its pale
  * trace must reach the client. Last, given Kidō 42, sneaking with the key must choose #63 Raikōhō, and holding the key
  * must gather its yellow orb at the palm, which must reach the client with no bolt before it; then the bolt must go off
- * by itself, the key still held, and its yellow trace reach the client, before the run quits.
+ * by itself, the key still held, and its yellow trace reach the client. Then sneaking with the key must choose Bakudō #1
+ * Sai, which comes after every Hadō, and the key alone must cast it at a fresh villager, whose pale gold trace must
+ * reach the client and stop at the villager; and the same for #4 Hainawa and its yellow trace, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -1055,8 +1057,9 @@ public final class ClientSmokeTest {
             // Kidō by name, and Shakkahō and Sōkatsui by incantation, seen from behind and facing south. The run's Quincy
             // power is taken away first, since an awakened Quincy cannot use Kidō (by its tier alone: a reset would leave
             // the bloodline open, and the steps wait for it), and the Hollow too, so its voice never takes the action
-            // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and having never chosen, it casts Shō
-            // first. The villager stands tall enough for a level beam from the eyes to meet it.
+            // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and Sai and Hainawa, which come after
+            // every Hadō; having never chosen, it casts Shō first. The villager stands tall enough for a level beam from
+            // the eyes to meet it.
             case 4700 -> {
                 command(minecraft, "bleach tier @s quincy 0");
                 command(minecraft, "bleach visored @s reset");
@@ -1133,7 +1136,43 @@ public final class ClientSmokeTest {
             // 5080. The let-go comes only after the bolt's window has closed, so the bolt cannot be the let-go's.
             case 5060 -> KidoKeys.CAST.setDown(true);
             case 5106 -> KidoKeys.CAST.setDown(false);
+            // Sai, then Hainawa, by the key at a villager: each trace must stop at it. Raikōhō's bolt may have killed the
+            // last villager, and any left are killed, so a fresh one stands alone four blocks south; the reiryoku is
+            // filled again.
             case 5120 -> {
+                command(minecraft, "kill @e[type=minecraft:villager,distance=..8]");
+                command(minecraft, "bleach reiryoku @s 800 800");
+            }
+            case 5122 -> command(minecraft, "summon minecraft:villager ~ ~ ~4 {NoAI:1b,Silent:1b}");
+            // Sneaking, the real key chooses Sai, the first Bakudō, after Raikōhō, the last Hadō: choosing waits for no
+            // cooldown.
+            case 5130 -> minecraft.options.keyShift.setDown(true);
+            case 5133 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5135 -> KidoKeys.CAST.setDown(false);
+            case 5137 -> minecraft.options.keyShift.setDown(false);
+            // Raikōhō's cooldown lets the hands go about 5180. The key alone casts Sai at once, at full strength, as it has
+            // no incantation, and its let-go finds nothing gathering. A villager's 20 binds for the whole 3 seconds.
+            case 5190 -> KidoKeys.CAST.setDown(true);
+            case 5192 -> KidoKeys.CAST.setDown(false);
+            // The motes at the bound villager's wrists, for a person to look at: a mob's effects never reach a client.
+            case 5199 -> shot(minecraft, "kido_sai_bound");
+            // Sneaking, the key chooses Hainawa, the next Bakudō.
+            case 5202 -> minecraft.options.keyShift.setDown(true);
+            case 5205 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5207 -> KidoKeys.CAST.setDown(false);
+            case 5209 -> minecraft.options.keyShift.setDown(false);
+            // Sai's cooldown let the hands go about 5221. The villager is wary of Sai now, but not of Hainawa.
+            case 5228 -> KidoKeys.CAST.setDown(true);
+            case 5230 -> KidoKeys.CAST.setDown(false);
+            // The yellow ring at the held villager's waist.
+            case 5240 -> shot(minecraft, "kido_hainawa_held");
+            case 5270 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1553,6 +1592,22 @@ public final class ClientSmokeTest {
                         + " (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_raikoho");
         }
+        expectWithin(minecraft, 5138, 5150, () -> chosenIs(soul, KidoSpell.SAI), "Sneak and the Kidō key never chose Sai");
+        // A mob's effects never reach a client, so the trace is what a client can be asked about a bind: one that met the
+        // villager four blocks south runs about 3 blocks from the hand, and a miss runs on to the ray's end, about 7½
+        // blocks for Sai and 11½ for Hainawa.
+        if (expectWithin(minecraft, 5191, 5210, () -> ownBind(minecraft, player, KidoSpell.SAI, 2.0, 5.0) != null,
+                "the Kidō key never cast Sai at the villager, or its trace never reached the client or did not stop at"
+                        + " the villager (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_sai");
+        }
+        expectWithin(minecraft, 5210, 5222, () -> chosenIs(soul, KidoSpell.HAINAWA),
+                "Sneak and the Kidō key never chose Hainawa");
+        if (expectWithin(minecraft, 5229, 5250, () -> ownBind(minecraft, player, KidoSpell.HAINAWA, 2.0, 5.0) != null,
+                "the Kidō key never cast Hainawa at the villager, or its trace never reached the client or did not stop"
+                        + " at the villager (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_hainawa");
+        }
     }
 
     /** Whether the soul's chosen spell, as the client's copy of it has it, is this one. */
@@ -1577,6 +1632,21 @@ public final class ClientSmokeTest {
     private static CeroBeam ownTrace(Minecraft minecraft, LocalPlayer player, ResourceKey<KidoSpell> key) {
         int colour = colourOf(minecraft, key);
         return ownCero(minecraft, player, beam -> beam.isFired() && beam.colour() == colour && beam.firedAge(0.0F) >= 1.0F);
+    }
+
+    /**
+     * The player's own trace of a bind, as {@link #ownTrace}, if it runs between these lengths from the hand (so it stopped
+     * at what it bound, or ran on), or null.
+     */
+    @Nullable
+    private static CeroBeam ownBind(Minecraft minecraft, LocalPlayer player, ResourceKey<KidoSpell> key, double min,
+                                    double max) {
+        CeroBeam trace = ownTrace(minecraft, player, key);
+        if (trace == null) {
+            return null;
+        }
+        double length = trace.reach().length();
+        return length >= min && length <= max ? trace : null;
     }
 
     /** The spell's incantation at this place in its list, as this client's copy of it has it, or null without one. */
