@@ -1,6 +1,8 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -16,6 +18,7 @@ import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -27,6 +30,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.EffectCure;
 import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.EntityMountEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEntityUseItemEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
@@ -122,6 +126,18 @@ public final class BakudoEffect extends MobEffect {
     @Override
     public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
         return true;
+    }
+
+    /**
+     * A body held while it rides is pulled off at once, on the server, rather than at its next tick, so it is never
+     * saved riding a mount it could not get back on ({@link #onMount}), which a player's login would then throw away.
+     * One Negación already holds is left where it is: the light ends the hold.
+     */
+    @Override
+    public void onEffectStarted(LivingEntity entity, int amplifier) {
+        if (held && !entity.level().isClientSide() && entity.isPassenger() && !Negacion.held(entity)) {
+            entity.stopRiding();
+        }
     }
 
     /**
@@ -227,20 +243,23 @@ public final class BakudoEffect extends MobEffect {
     // ---- Listeners ----
 
     /**
-     * The blows of the bound are cancelled first of all, before any other rule weighs them; the cancels of a bound
-     * player's doings, its item use and its missiles, and the held jump at the usual priority.
+     * The blows of the bound are cancelled first of all, before any other rule weighs them, and a bound player's
+     * doings before any listener at the usual priority acts on them (Konsō's offer, the lending of power), so a bound
+     * click does nothing at all; its item use and its missiles, the held jump and the held mount at the usual priority.
      */
     public static void register(IEventBus bus) {
         bus.addListener(EventPriority.HIGHEST, BakudoEffect::onIncomingDamage);
-        bus.addListener(BakudoEffect::onAttack);
-        bus.addListener(BakudoEffect::onRightClickItem);
-        bus.addListener(BakudoEffect::onRightClickBlock);
-        bus.addListener(BakudoEffect::onEntityInteract);
-        bus.addListener(BakudoEffect::onEntityInteractAt);
-        bus.addListener(BakudoEffect::onBreakBlock);
+        bus.addListener(EventPriority.HIGH, BakudoEffect::onAttack);
+        bus.addListener(EventPriority.HIGH, BakudoEffect::onRightClickItem);
+        bus.addListener(EventPriority.HIGH, BakudoEffect::onRightClickBlock);
+        bus.addListener(EventPriority.HIGH, BakudoEffect::onEntityInteract);
+        bus.addListener(EventPriority.HIGH, BakudoEffect::onEntityInteractAt);
+        bus.addListener(EventPriority.HIGH, BakudoEffect::onBreakBlock);
         bus.addListener(BakudoEffect::onUseItem);
+        bus.addListener(BakudoEffect::onReleaseItem);
         bus.addListener(BakudoEffect::onJoinLevel);
         bus.addListener(BakudoEffect::onJump);
+        bus.addListener(BakudoEffect::onMount);
     }
 
     /**
@@ -279,25 +298,35 @@ public final class BakudoEffect extends MobEffect {
         }
     }
 
-    /** Nor deals with a creature: no Konsō, and no lending of power. Both sides. */
+    /**
+     * Nor deals with a creature: no Konsō, and no lending of power. Both sides. But it may step into a Negación light
+     * offered to it ({@link #boarding}), so a Gillian's rescue frees a bound player as it frees a bound mob.
+     */
     private static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
-        if (refused(event.getEntity())) {
+        if (!boarding(event.getEntity(), event.getTarget()) && refused(event.getEntity())) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
         }
     }
 
-    /** Nor with a spot on one, such as an armour stand's gear, which would swap for what it holds. Both sides. */
+    /**
+     * Nor with a spot on one, such as an armour stand's gear, which would swap for what it holds. Both sides. The
+     * spot of a light offered to it is let be, as the light itself is, so boarding it is not told it was refused.
+     */
     private static void onEntityInteractAt(PlayerInteractEvent.EntityInteractSpecific event) {
-        if (refused(event.getEntity())) {
+        if (!boarding(event.getEntity(), event.getTarget()) && refused(event.getEntity())) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
         }
     }
 
-    /** Nor breaks a block. Fired on the server only: a break the client foresaw is put back by the server's answer. */
+    /**
+     * Nor breaks a block. Fired on the server only: a break the client foresaw is put back by the server's answer. The
+     * ask whether a beam or a blast it shot may break one ({@link GetsugaTensho#asking}) is not its hands' doing, so a
+     * bound Hollow's Cero still carves the wall it strikes, and its owner is not told otherwise.
+     */
     private static void onBreakBlock(BlockEvent.BreakEvent event) {
-        if (refused(event.getPlayer())) {
+        if (!GetsugaTensho.asking() && refused(event.getPlayer())) {
             event.setCanceled(true);
         }
     }
@@ -308,6 +337,17 @@ public final class BakudoEffect extends MobEffect {
      * that counts.
      */
     private static void onUseItem(LivingEntityUseItemEvent.Start event) {
+        if (bound(event.getEntity())) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
+     * Nor lets fly what it drew before its arms were bound: a bow or a trident let go before the bind's next tick has
+     * made it let go fires nothing, so neither the arrow nor the trident is spent on a missile that never joins the
+     * world. Both sides, as the start.
+     */
+    private static void onReleaseItem(LivingEntityUseItemEvent.Stop event) {
         if (bound(event.getEntity())) {
             event.setCanceled(true);
         }
@@ -335,7 +375,29 @@ public final class BakudoEffect extends MobEffect {
         }
     }
 
+    /**
+     * A held body mounts nothing, a horse, a boat or a minecart that would carry it off, as it is pulled off what it
+     * rode; but Negación's light and a Caja, which take it up, still may. Getting off is never refused. Server only,
+     * where a mount is decided: a client mounts as its server tells it.
+     */
+    private static void onMount(EntityMountEvent event) {
+        if (event.isMounting() && !event.getLevel().isClientSide()
+                && event.getEntityMounting() instanceof LivingEntity entity && held(entity)
+                && !(event.getEntityBeingMounted() instanceof Negacion.HoldingVehicle)) {
+            event.setCanceled(true);
+        }
+    }
+
     // ---- Helpers ----
+
+    /**
+     * Whether this player is using the Negación light offered to it, to step in: the rescue a bind gives way to, which
+     * asks nothing of the hands. Both sides, which both know the light's offer.
+     */
+    private static boolean boarding(Player player, Entity target) {
+        return target instanceof NegacionLight light && light.phase() == NegacionLight.Phase.OFFERED
+                && player.getUUID().equals(light.offeredTo());
+    }
 
     /**
      * Whether this player's arms are bound, so its doing is refused; on the server it is told so, on the action bar.

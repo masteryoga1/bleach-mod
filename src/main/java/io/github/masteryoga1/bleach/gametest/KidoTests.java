@@ -5,6 +5,7 @@ import com.mojang.serialization.JsonOps;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
@@ -15,6 +16,7 @@ import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
@@ -2290,6 +2292,7 @@ public final class KidoTests {
         PlusSpirit plus = null;
         IronGolem second = null;
         IronGolem behind = null;
+        IronGolem close = null;
         try {
             // Sai's 420.16 against the golem's 100: its arms bound for the whole three seconds, hidden, and unhurt.
             assertRefusal(helper, KidoEvents.cast(player, sai, KidoLogic.Form.NAME, now), null, "Sai at the golem");
@@ -2357,8 +2360,15 @@ public final class KidoTests {
                     + data.level(Stat.KIDO) + " with " + data.xp(Stat.KIDO) + " xp, not 4 with 9");
             helper.assertFalse(KidoLogic.ready(data, now + 139L), "the hands were free a tick before Hainawa's cooldown");
             assertWallStands(helper);
+
+            // A creature so close that the caster's eyes are within it is met at once, where the ray leaves it.
+            close = golem(helper, 2, 8);
+            close.moveTo(player.getX(), player.getY(), player.getZ());
+            aim = KidoEvents.bindAim(player, sai);
+            helper.assertTrue(aim.target() == close, "Sai's ray from within the golem met " + aim.target());
+            assertNear(helper, aim.end().x - player.getX(), 0.9, "where Sai's ray left the golem it began in");
         } finally {
-            discard(golem, plus, second, behind);
+            discard(golem, plus, second, behind, close);
             discardBeams(helper);
         }
         helper.succeed();
@@ -2386,6 +2396,7 @@ public final class KidoTests {
         SoulData zangetsuData = SoulLogic.get(zangetsu);
         Player held = victim(helper, GameType.SURVIVAL, 400.0F);
         Arrow loosed = null;
+        NegacionLight offered = null;
         try {
             helper.assertTrue(ShikaiEvents.release(zangetsu) == ShikaiEvents.Result.RELEASED, "Zangetsu would not release");
 
@@ -2437,6 +2448,29 @@ public final class KidoTests {
                     32)).isCanceled(), "a bound soul began to eat");
             helper.assertTrue(NeoForge.EVENT_BUS.post(new BlockEvent.BreakEvent(level, floor, level.getBlockState(floor),
                     bound)).isCanceled(), "a bound soul broke a block");
+            helper.assertTrue(NeoForge.EVENT_BUS.post(new LivingEntityUseItemEvent.Stop(bound, new ItemStack(Items.BOW),
+                    60)).isCanceled(), "a bound soul loosed the bow it had drawn");
+            // But what it shot, a Cero from the mouth among them, still breaks what it may: the ask is not the hands'.
+            helper.assertTrue(GetsugaTensho.permitted(level, floor, level.getBlockState(floor), bound, bound, true),
+                    "a bound soul's shot may not break the floor");
+
+            // Its blade held out to a player is refused before Konsō's offer weighs it, so nothing is offered.
+            bound.setShiftKeyDown(true);
+            bound.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.ASAUCHI.get()));
+            PlayerInteractEvent.EntityInteract offer = NeoForge.EVENT_BUS.post(
+                    new PlayerInteractEvent.EntityInteract(bound, InteractionHand.MAIN_HAND, struck));
+            bound.setShiftKeyDown(false);
+            bound.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            helper.assertTrue(offer.isCanceled() && offer.getCancellationResult() == InteractionResult.FAIL,
+                    "a bound soul held its blade out to a player: " + offer.getCancellationResult());
+
+            // A Negación light offered to it may still be stepped into, which frees it, as it frees a mob.
+            offered = NegacionLight.place(level, bound, bound);
+            helper.assertTrue(offered != null, "no light was offered to the bound soul");
+            helper.assertFalse(NeoForge.EVENT_BUS.post(new PlayerInteractEvent.EntityInteract(bound,
+                    InteractionHand.MAIN_HAND, offered)).isCanceled(), "a bound soul could not step into its light");
+            helper.assertFalse(NeoForge.EVENT_BUS.post(new PlayerInteractEvent.EntityInteractSpecific(bound,
+                    InteractionHand.MAIN_HAND, offered, Vec3.ZERO)).isCanceled(), "a bound soul could not touch its light");
 
             // A bound golem's blow lands nothing, and its arrow never joins the world; a free one's do.
             assertBind(helper, KidoEvents.bindOne(caster, golem, sai, 1.0F, now), KidoLogic.BindResult.BOUND,
@@ -2478,7 +2512,7 @@ public final class KidoTests {
             KidoEvents.dropGather(gatherer, gathererData);
             ShikaiEvents.cancelGather(zangetsu, zangetsuData);
             unbind(bound, gatherer, zangetsu, held);
-            discard(golem, free, loosed);
+            discard(golem, free, loosed, offered);
             discardBeams(helper);
         }
         helper.succeed();
@@ -2524,12 +2558,20 @@ public final class KidoTests {
             NeoForge.EVENT_BUS.post(new LivingEvent.LivingJumpEvent(golem));
             assertMotion(helper, golem, 0.0, 0.0, 0.0, "the held golem's motion after a jump");
 
-            // A held rider is pulled off its mount, and the mount is left free.
+            // A held rider is pulled off its mount as the hold lands, and the mount is left free.
             assertBind(helper, KidoEvents.bindOne(caster, zombie, hainawa, 1.0F, now), KidoLogic.BindResult.BOUND,
                     "Hainawa on the riding zombie");
-            ModEffects.BAKUDO_HELD.value().applyEffectTick(zombie, 0);
             helper.assertFalse(zombie.isPassenger(), "the held zombie still rides " + zombie.getVehicle());
             helper.assertTrue(unbound(pig), "Hainawa on its rider bound the pig");
+            // Nor does it mount again, even forced; once let go, it may.
+            helper.assertFalse(zombie.startRiding(pig, true), "the held zombie mounted the pig again");
+            zombie.removeEffect(ModEffects.BAKUDO_HELD);
+            helper.assertTrue(zombie.startRiding(pig, true), "the zombie let go could not mount the pig");
+            // A hold laid on with no start, as one read from a save is, still pulls its rider off at its tick.
+            zombie.forceAddEffect(new MobEffectInstance(ModEffects.BAKUDO_HELD, 60, 0, false, false, false), null);
+            helper.assertTrue(zombie.isPassenger(), "the hold with no start pulled the zombie off at once");
+            ModEffects.BAKUDO_HELD.value().applyEffectTick(zombie, 0);
+            helper.assertFalse(zombie.isPassenger(), "the hold's tick left the zombie riding " + zombie.getVehicle());
 
             // A held player flies no more than it walks, and the server roots it as its own client would.
             assertBind(helper, KidoEvents.bindOne(caster, held, hainawa, 1.0F, now), KidoLogic.BindResult.BOUND,
@@ -2723,19 +2765,27 @@ public final class KidoTests {
                     "Sai on a woven Quincy");
             helper.assertTrue(unbound(quincy), "Sai bound a woven Quincy");
 
-            // Negación's light lifts a bind away: the tick refuses it, and the instance's tick then removes it.
+            // Negación's light lifts a bind away: the tick refuses it, and the instance's tick then removes it. A held
+            // body, which mounts nothing else, may still be taken up by the light.
             assertBind(helper, KidoEvents.bindOne(caster, lifted, sai, 1.0F, now), KidoLogic.BindResult.BOUND,
                     "Sai on the golem Negación will lift");
+            assertBind(helper, KidoEvents.bindOne(caster, lifted, hainawa, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Hainawa on the golem Negación will lift");
             light = NegacionLight.place(level, lifted, null);
             helper.assertTrue(light != null && lifted.startRiding(light, true) && Negacion.held(lifted),
-                    "the bound golem could not be held");
+                    "the bound and held golem could not be held");
             helper.assertFalse(ModEffects.BAKUDO_BOUND.value().applyEffectTick(lifted, 0),
                     "the bind kept its hold on a golem Negación holds");
+            helper.assertFalse(ModEffects.BAKUDO_HELD.value().applyEffectTick(lifted, 0),
+                    "the hold kept the golem Negación holds");
             MobEffectInstance bind = lifted.getEffect(ModEffects.BAKUDO_BOUND);
-            helper.assertTrue(bind != null, "the bind went before its tick");
-            // Its own return is the time it had left, so it is not asked.
+            MobEffectInstance hold = lifted.getEffect(ModEffects.BAKUDO_HELD);
+            helper.assertTrue(bind != null && hold != null, "the bind or the hold went before its tick");
+            // Their own returns are the time they had left, so they are not asked.
             bind.tick(lifted, () -> { });
-            helper.assertTrue(boundTicks(lifted) == 0, "Negación's light left the bind for " + boundTicks(lifted) + " ticks");
+            hold.tick(lifted, () -> { });
+            helper.assertTrue(boundTicks(lifted) == 0 && heldTicks(lifted) == 0, "Negación's light left the bind for "
+                    + boundTicks(lifted) + " ticks and the hold for " + heldTicks(lifted));
             assertNear(helper, speed(lifted), 0.25, 0.001, "the speed of the golem Negación lifted the bind from");
             helper.assertFalse(KidoLogic.mayBind(caster, lifted), "the caster may bind a golem Negación holds");
 

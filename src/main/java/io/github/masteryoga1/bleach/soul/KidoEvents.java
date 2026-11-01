@@ -38,10 +38,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Marker;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -776,8 +774,9 @@ public final class KidoEvents {
      * spell's range and short of the first block in the way, the spell's radius to either side counting. Spectators,
      * lights and Cajas, and every creature the caster may not bind ({@link KidoLogic#mayBind}: a Plus, a team-mate, a
      * creative player, one Negación holds) are passed by, so the ray goes on to what stands behind them, as a Hadō's
-     * beam would; a part of a great creature stands for the whole. On a creature, the ray ends where it meets it.
-     * Changes nothing. Public for tests.
+     * beam would; a part of a great creature stands for the whole. On a creature, the ray ends where it meets it. One
+     * so close that the caster's eyes are within its widened box, which a projectile's search passes over, is met first
+     * of all, where the ray leaves it. Changes nothing. Public for tests.
      */
     public static BindAim bindAim(Player caster, KidoSpell spell) {
         float margin = spell.effect().radius();
@@ -785,20 +784,27 @@ public final class KidoEvents {
         Vec3 end = eye.add(caster.getViewVector(1.0F).scale(spell.effect().range()));
         end = caster.level().clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster))
                 .getLocation();
+        Entity met = null;
+        Vec3 at = end;
+        double nearest = Double.MAX_VALUE;
         // Searched a margin wider than the ray, or a data pack's wide one would miss a creature it should meet.
-        EntityHitResult hit = ProjectileUtil.getEntityHitResult(caster.level(), caster, eye, end,
-                new AABB(eye, end).inflate(1.0 + margin), entity -> {
-                    LivingEntity body = SpiritProjectiles.bodyOf(entity);
-                    return entity.isPickable() && !entity.isSpectator() && !(entity instanceof Negacion.HoldingVehicle)
-                            && body != null && KidoLogic.mayBind(caster, body);
-                }, margin);
-        if (hit == null) {
-            return new BindAim(null, end);
+        for (Entity entity : caster.level().getEntities(caster, new AABB(eye, end).inflate(1.0 + margin), candidate -> {
+            LivingEntity body = SpiritProjectiles.bodyOf(candidate);
+            return candidate.isPickable() && !candidate.isSpectator() && !(candidate instanceof Negacion.HoldingVehicle)
+                    && body != null && KidoLogic.mayBind(caster, body);
+        })) {
+            // The box it met (a part's, for a great creature), widened by the margin.
+            AABB box = entity.getBoundingBox().inflate(margin);
+            boolean inside = box.contains(eye);
+            Optional<Vec3> meets = inside ? Optional.of(box.clip(end, eye).orElse(end)) : box.clip(eye, end);
+            double distance = inside ? 0.0 : meets.map(eye::distanceToSqr).orElse(Double.MAX_VALUE);
+            if (distance < nearest) {
+                nearest = distance;
+                met = entity;
+                at = meets.get();
+            }
         }
-        // Where the ray enters the box it met (a part's, for a great creature), widened by the margin as it was.
-        Entity met = hit.getEntity();
-        Vec3 at = met.getBoundingBox().inflate(margin).clip(eye, end).orElse(hit.getLocation());
-        return new BindAim(SpiritProjectiles.bodyOf(met), at);
+        return met == null ? new BindAim(null, end) : new BindAim(SpiritProjectiles.bodyOf(met), at);
     }
 
     /**
