@@ -1893,7 +1893,7 @@ public final class BleachConfig {
                 .comment("Share of maximum reiryoku a soul needs to weave the threads.")
                 .defineInRange("min_reiryoku_fraction", 0.2, 0.0, 1.0);
         RANSOTENGAI_FAILING_HEALTH = builder
-                .comment("Share of maximum health at which a body counts as failing, so sneak and the Quincy Form key weave the threads. Slowness, mining fatigue and weakness count as failing too.")
+                .comment("Share of maximum health at which a body counts as failing, so sneak and the Quincy Form key weave the threads. Slowness, mining fatigue, weakness and a Bakudō's bind or hold count as failing too.")
                 .defineInRange("failing_health_fraction", 0.25, 0.0, 1.0);
         RANSOTENGAI_COOLDOWN_SECONDS = builder
                 .comment("Seconds after the threads let go before they will hold again: after every collapse, and after logging out while woven (not after death, a change of game mode, the trial or a command).")
