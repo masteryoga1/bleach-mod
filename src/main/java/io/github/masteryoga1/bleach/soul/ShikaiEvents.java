@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.registry.ModComponents;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
@@ -82,9 +83,13 @@ public final class ShikaiEvents {
         }
     }
 
-    /** What came of starting to gather a Getsuga Tenshō. Every one but {@link #GATHERING} is told to the player. */
+    /**
+     * What came of starting to gather a Getsuga Tenshō. Every one but {@link #GATHERING} is told to the player.
+     * {@link #BOUND}, for arms a Bakudō binds, is checked first but appended last, as every later value is.
+     */
     public enum GatherResult {
-        GATHERING, NO_BLADE, NOT_YOURS, NO_TECHNIQUE, NOT_RELEASED, LENT, SILENT, COOLDOWN, TOO_WEAK, ALREADY_GATHERING;
+        GATHERING, NO_BLADE, NOT_YOURS, NO_TECHNIQUE, NOT_RELEASED, LENT, SILENT, COOLDOWN, TOO_WEAK, ALREADY_GATHERING,
+        BOUND;
 
         public String messageKey() {
             return "message.bleach.getsuga." + name().toLowerCase(Locale.ROOT);
@@ -105,13 +110,21 @@ public final class ShikaiEvents {
      * A zanpakutō key pressed on the client. Refusals are shown above the hotbar. A Hollow's and an
      * Arrancar's keys go to {@link ArrancarEvents#onKey} instead, which has no Shikai for them: there,
      * release and seal tear at a Menos's mask, or call out and end an Arrancar's Resurrección. M, the
-     * Hollow mask, goes to {@link VisoredEvents#onMaskKey}, with no blade needed in hand.
+     * Hollow mask, goes to {@link VisoredEvents#onMaskKey}, with no blade needed in hand. An Arrancar
+     * whose arms a Bakudō binds fires no Bala; a Hollow so bound still calls down Negación, which is
+     * no art of the hands.
      */
     public static void onKey(ServerPlayer player, ZanpakutoKey key) {
         if (!player.isAlive() || player.isSpectator()) {
             return;
         }
         SoulData data = SoulLogic.get(player);
+        // A Bala is thrown from the hand; the Shikai route meets the bind in gather instead.
+        if (key == ZanpakutoKey.TECHNIQUE_PRESS && ArrancarLogic.isArrancar(data)
+                && player.hasEffect(ModEffects.BAKUDO_BOUND)) {
+            tell(player, "message.bleach.bakudo.bound");
+            return;
+        }
         if (HollowPlayerLogic.isHollowOrArrancar(data)) {
             ArrancarEvents.onKey(player, data, key, player.level().getGameTime());
             return;
@@ -297,11 +310,17 @@ public final class ShikaiEvents {
 
     // ---- Getsuga Tenshō ----
 
-    /** Starts gathering reiatsu into the released blade for a Getsuga Tenshō. The first check that fails wins. */
+    /**
+     * Starts gathering reiatsu into the released blade for a Getsuga Tenshō. The first check that fails wins, and
+     * the first of all is arms a Bakudō binds, which swing no blade.
+     */
     public static GatherResult gather(Player player) {
         SoulData data = SoulLogic.get(player);
         ItemStack stack = player.getMainHandItem();
         long now = player.level().getGameTime();
+        if (player.hasEffect(ModEffects.BAKUDO_BOUND)) {
+            return GatherResult.BOUND;
+        }
         if (!(stack.getItem() instanceof ZanpakutoItem)) {
             return GatherResult.NO_BLADE;
         }
@@ -421,11 +440,13 @@ public final class ShikaiEvents {
 
     /**
      * Whether the held blade can still loose a Getsuga Tenshō: the soul's own, released, with the technique, power in
-     * hand, and not while its Hollow holds the body.
+     * hand, and not while its Hollow holds the body, and not while its arms are bound. Asked as it fires and at each
+     * tick of a gather, which a bind made since then cancels.
      */
     private static boolean mayGetsuga(Player player, SoulData data, ItemStack stack, long now) {
         if (!ZanpakutoLogic.isOwnBlade(stack, player) || ShinigamiLogic.isPowerLent(data, now)
-                || !ZanpakutoLogic.canWield(data) || data.jinzen != null || VisoredLogic.takenOver(data)) {
+                || !ZanpakutoLogic.canWield(data) || data.jinzen != null || VisoredLogic.takenOver(data)
+                || player.hasEffect(ModEffects.BAKUDO_BOUND)) {
             return false;
         }
         ZanpakutoBlade blade = ZanpakutoItem.blade(stack);

@@ -2,8 +2,10 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.registry.BleachTags;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
@@ -12,6 +14,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
@@ -22,11 +25,12 @@ import net.minecraft.world.entity.player.Player;
  * The rules of Kidō: who may cast, the spells a soul knows by its Kidō level and the one it has chosen, the gate
  * on casting by name alone, a spell's strength, cost and training, how a line said in chat is heard as an
  * incantation, the misfire of a cast by name, the gather of a spell held in the palm on the key, the hand (a spell
- * may be weaker cast with no zanpakutō at hand) and the reiatsu gap that cuts what a spell does besides its blow.
+ * may be weaker cast with no zanpakutō at hand), the reiatsu gap that cuts what a spell does besides its blow, and
+ * the bind's contest and who may be bound.
  * Like {@link ShinigamiLogic}, these only read and change a {@link SoulData}, a spell and the config
- * ({@link #mayCast} also asks the player whether it lives, watches or is held, and the hand and the gap look at the
- * caster and the creature), so game tests can call them directly. Casting itself is {@link KidoEvents#cast}.
- * {@code now} is the level's game time.
+ * ({@link #mayCast} also asks the player whether it lives, watches, is held or is bound, the hand and the gap look at
+ * the caster and the creature, and the bind's rules at the creature, whose wary mark they keep), so game tests can
+ * call them directly. Casting itself is {@link KidoEvents#cast}. {@code now} is the level's game time.
  *
  * <p>There is no list of learned spells: the Kidō level alone unlocks a spell, at its {@code level}. A spell
  * with an incantation needs its higher {@code by_name_level} to be cast by name alone (Eishōhaki), and is weaker
@@ -39,6 +43,10 @@ public final class KidoLogic {
     /** The least health a misfire leaves its caster: one heart. */
     public static final float MISFIRE_FLOOR = 2.0F;
     private static final float TICKS_PER_SECOND = 20.0F;
+    /** Where a creature's wariness of each Bakudō is kept, in its own saved data: a game time for each spell. */
+    private static final String WARY_TAG = "bleach:bakudo_wary";
+    /** How many times as long as a bind held a creature stays wary of that spell, from the cast. */
+    private static final int WARY_FACTOR = 2;
 
     /** Every combining mark, such as a macron or an accent, once a line is decomposed. */
     private static final Pattern MARKS = Pattern.compile("\\p{M}+");
@@ -76,7 +84,9 @@ public final class KidoLogic {
         /** Cast by name alone, the spell burst in the caster's hand: paid for, and nothing cast. */
         MISFIRED("message.bleach.kido.misfire"),
         /** Let go before it had gathered: nothing was spent, and nothing is cast. */
-        SCATTERED("message.bleach.kido.gather_scattered");
+        SCATTERED("message.bleach.kido.gather_scattered"),
+        /** Its arms are bound by a Bakudō: no spell is cast with the hands tied, by name or by its incantation. */
+        BOUND("message.bleach.bakudo.bound");
 
         @Nullable
         private final String messageKey;
@@ -90,6 +100,16 @@ public final class KidoLogic {
         public String messageKey() {
             return messageKey;
         }
+    }
+
+    /** What came of one bind on one creature. */
+    public enum BindResult {
+        /** It took: the arms are bound, the body held, or both. */
+        BOUND,
+        /** It was shrugged off: the creature was too strong, wary of the spell, an inner Hollow, or took no effect. */
+        SHRUGGED,
+        /** The creature may not be bound at all, so nothing was tried. */
+        REFUSED
     }
 
     /**
@@ -120,9 +140,10 @@ public final class KidoLogic {
     /**
      * Null when this soul may cast now in this form, else why not, the first that fails winning: unable (dead, a
      * spectator, or held by Negación or a Caja), untrained (no Shinigami's power and not an Academy student, or an
-     * awakened Quincy where hybrids are not allowed), its Hollow holding its body, and its power lent, which refuses
-     * only a cast by name: a lender still chants, as Rukia does after lending hers. Server side: on a client the
-     * taken-over row is always clear, since {@link VisoredLogic#takenOver} reads a time that is not saved or sent.
+     * awakened Quincy where hybrids are not allowed), its Hollow holding its body, its arms bound by a Bakudō, and its
+     * power lent, which refuses only a cast by name: a lender still chants, as Rukia does after lending hers. Server
+     * side: on a client the taken-over row is always clear, since {@link VisoredLogic#takenOver} reads a time that is
+     * not saved or sent (a player's own effects are sent to it, so the bound row holds there too).
      * (6f's page, to grey spells out while taken over, reads {@code ClientSouls.appearance(player).hollowLook()} and
      * {@link HollowPlayerLogic#LOOK_TAKEN_OVER}, as the soul screen does.)
      */
@@ -137,6 +158,9 @@ public final class KidoLogic {
         if (VisoredLogic.takenOver(data)) {
             return Refusal.TAKEN;
         }
+        if (player.hasEffect(ModEffects.BAKUDO_BOUND)) {
+            return Refusal.BOUND;
+        }
         if (form == Form.NAME && ShinigamiLogic.isPowerLent(data, now)) {
             return Refusal.LENT;
         }
@@ -145,10 +169,10 @@ public final class KidoLogic {
 
     /**
      * Whether a soul refused so may still choose its spell: one that may cast, or one kept from casting only for a
-     * while, by its Hollow or its lent power (a lender picks the spell it will chant).
+     * while, by its Hollow, its lent power (a lender picks the spell it will chant) or its bound arms.
      */
     public static boolean mayChoose(@Nullable Refusal refusal) {
-        return refusal == null || refusal == Refusal.TAKEN || refusal == Refusal.LENT;
+        return refusal == null || refusal == Refusal.TAKEN || refusal == Refusal.LENT || refusal == Refusal.BOUND;
     }
 
     // ---- Knowing and choosing ----
@@ -421,7 +445,101 @@ public final class KidoLogic {
         return VisoredLogic.clampedBlow(burst, health, absorption, MISFIRE_FLOOR);
     }
 
+    // ---- The bind ----
+
+    /**
+     * Whether this caster may bind this creature at all. Never itself, the dead, a spectator, or one held by Negación
+     * or a Caja; while the caster or a player it aims at fights its inner Hollow, only that Hollow (nothing reaches into
+     * the duel or out of it); never a creative player. A body seized by its Hollow may always be bound, whatever the
+     * PvP and team rules; anything else as a Hadō may strike it ({@link CeroBeam#mayStrike}), so never the caster's
+     * mount or pets, a Plus, a Shinigami or Quincy NPC, or a player the caster may not harm. Server side.
+     */
+    public static boolean mayBind(Player caster, LivingEntity target) {
+        if (target == caster || !target.isAlive() || target.isSpectator() || Negacion.held(target)) {
+            return false;
+        }
+        if (VisoredEvents.isDuelling(caster) || target instanceof Player host && VisoredEvents.isDuelling(host)) {
+            return target instanceof InnerHollow;
+        }
+        if (target instanceof Player player && player.isCreative()) {
+            return false;
+        }
+        if (takenBody(target)) {
+            return true;
+        }
+        return CeroBeam.mayStrike(caster, target);
+    }
+
+    /**
+     * Whether this is a player's body held by its Hollow. Server side: false on a client, which is never sent the time
+     * the takeover ends.
+     */
+    public static boolean takenBody(LivingEntity target) {
+        return target instanceof Player player && !player.level().isClientSide() && SoulLogic.hasSoul(player)
+                && VisoredLogic.takenOver(SoulLogic.get(player));
+    }
+
+    /**
+     * A bind's strength: the caster's reiatsu as {@link #gap} weighs it (Blut Arterie counted), a little more for each
+     * number of its spell ({@code grade_per_number}) and each Kidō level ({@code skill_per_level}), and the form's
+     * share of that. Armour, Hierro and size play no part.
+     */
+    public static float bindStrength(KidoSpell spell, Player caster, SoulData data, float share) {
+        float grade = (float) BleachConfig.get(BleachConfig.KIDO_BAKUDO_GRADE_PER_NUMBER);
+        float skill = (float) BleachConfig.get(BleachConfig.KIDO_BAKUDO_SKILL_PER_LEVEL);
+        return SoulLogic.reiatsu(caster) * QuincyLogic.reiatsuFactor(caster) * (1.0F + spell.number() * grade)
+                * (1.0F + data.level(Stat.KIDO) * skill) * share;
+    }
+
+    /**
+     * The strength over the creature's reiatsu (a mask's and a soulless creature's health already in it), counted
+     * {@code taken_over_strength} times for a body seized by its Hollow, and at least 1.
+     */
+    public static float bindRatio(float strength, LivingEntity target) {
+        float resistance = SoulLogic.reiatsu(target);
+        if (takenBody(target)) {
+            resistance *= (float) BleachConfig.get(BleachConfig.KIDO_BAKUDO_TAKEN_OVER_STRENGTH);
+        }
+        return strength / Math.max(1.0F, resistance);
+    }
+
+    /**
+     * Ticks a bind of this many seconds holds at this ratio: none below {@code break_below} (the creature shrugs it
+     * off at once) or for no seconds, else the seconds at the ratio, never more than all of them, rounded.
+     */
+    public static int bindTicks(float seconds, float ratio) {
+        if (seconds <= 0.0F || ratio < BleachConfig.get(BleachConfig.KIDO_BAKUDO_BREAK_BELOW)) {
+            return 0;
+        }
+        return Math.round(seconds * TICKS_PER_SECOND * Math.min(1.0F, ratio));
+    }
+
+    /**
+     * Whether this creature is still wary of this spell at this time: bound by it lately, it shrugs the same spell off
+     * until the mark runs out. The mark is kept with the creature, so it lasts through a logout.
+     */
+    public static boolean wary(LivingEntity target, KidoSpell spell, long now) {
+        return now < target.getPersistentData().getCompound(WARY_TAG).getLong(waryKey(spell));
+    }
+
+    /**
+     * Marks this creature wary of this spell until twice these ticks from {@code now}, so one spell cannot hold one
+     * creature more than half the time, whoever casts it. Only that spell: another bind still takes.
+     */
+    public static void markWary(LivingEntity target, KidoSpell spell, long now, int ticks) {
+        CompoundTag saved = target.getPersistentData();
+        // A fresh tag when there is none yet, so it is put back either way.
+        CompoundTag marks = saved.getCompound(WARY_TAG);
+        marks.putLong(waryKey(spell), now + (long) WARY_FACTOR * ticks);
+        saved.put(WARY_TAG, marks);
+    }
+
     // ---- Helpers ----
+
+    /** The wary mark's key for this spell, such as {@code bakudo_1}: one for each spell number of a kind, overwritten. */
+    private static String waryKey(KidoSpell spell) {
+        return spell.kind().name().toLowerCase(Locale.ROOT) + "_" + spell.number();
+    }
 
     /** {@link #hears} for a line already folded. */
     private static boolean hearsFolded(KidoSpell spell, ResourceLocation id, String folded) {

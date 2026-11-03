@@ -70,6 +70,9 @@ public class GetsugaTensho extends Projectile {
     /** Drawn out to the distance it is tracked at: eight chunks. */
     private static final double RENDER_DISTANCE = 128.0;
 
+    /** How deep the asks of {@link #permitted} go: a break event posted to ask, not a player breaking a block. */
+    private static int asking;
+
     private float damage;
     private int pierceLeft;
     private int blocksLeft;
@@ -166,7 +169,8 @@ public class GetsugaTensho extends Projectile {
     /**
      * Whether the crescent may break this block here: block breaking is on in the server config, mob
      * griefing allows it, the block lets the breaker destroy it, and a player owner could break it
-     * themselves (outside spawn protection, allowed to build, and no protection mod objects).
+     * themselves (outside spawn protection, allowed to build, and no protection mod objects). The last is asked by
+     * posting the break event a player's own break would; see {@link #asking}.
      */
     public static boolean permitted(Level level, BlockPos pos, BlockState state, @Nullable Entity breaker,
                                     @Nullable Entity owner, boolean breaksBlocks) {
@@ -181,10 +185,24 @@ public class GetsugaTensho extends Projectile {
                 return false;
             }
             BlockEvent.BreakEvent event = new BlockEvent.BreakEvent(level, pos, state, player);
-            NeoForge.EVENT_BUS.post(event);
+            asking++;
+            try {
+                NeoForge.EVENT_BUS.post(event);
+            } finally {
+                asking--;
+            }
             return !event.isCanceled();
         }
         return true;
+    }
+
+    /**
+     * Whether the break event being posted is {@link #permitted}'s ask, whether a crescent, a blast or a beam its owner
+     * shot may break a block, rather than the owner breaking one by hand: a rule about the hands, such as a bind's,
+     * leaves the ask alone. Server side, where both are posted.
+     */
+    public static boolean asking() {
+        return asking > 0;
     }
 
     /**

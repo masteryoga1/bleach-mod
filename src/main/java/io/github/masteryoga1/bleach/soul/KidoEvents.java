@@ -4,8 +4,11 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.Hollow;
+import io.github.masteryoga1.bleach.entity.InnerHollow;
+import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.network.KidoKeyPayload;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,11 +33,13 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Marker;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -63,9 +68,12 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * with a quiet {@link CeroBeam.Kind} of {@link #HADO}), so it keeps every rule a Cero keeps on PvP, teams, pets,
  * shields and the reiatsu gap, and it breaks no blocks. A Hadō of {@link KidoSpell.Shape#GUST} strikes at once every
  * creature in a cone widening from the hand ({@link CeroBeam#inCone}) under the same rules, pushing it away and
- * blinding a player. Its trace, sound and particles are seen and heard only by those who see spirits; what it does to
- * a creature anyone can see. Creative pays nothing, waits for nothing, never misfires and trains nothing. One art at a
- * time: no Kidō while a Getsuga Tenshō or a Cero gathers, and one that begins to gather breaks a chant or a gather.
+ * blinding a player. A Bakudō of {@link KidoSpell.Shape#BIND} is a bind to the first creature in sight that the caster
+ * may bind ({@link #bindAim}), a wall stopping it: its arms bound, its body held where it stands, or both, for a time
+ * weighed against its reiatsu, and shrugged off by a soul far stronger than the caster ({@link #bindOne}). Its trace,
+ * sound and particles are seen and heard only by those who see spirits; what it does to a creature anyone can see.
+ * Creative pays nothing, waits for nothing, never misfires and trains nothing. One art at a time: no Kidō while a
+ * Getsuga Tenshō or a Cero gathers, and one that begins to gather breaks a chant or a gather.
  *
  * <p>The keys come from {@link KidoKeyPayload} and the chant from chat ({@link #register}); the cooldown, the pending
  * chant, the key gather and the spacing between spoken chants are transients in the soul, so a respawn or a relog
@@ -105,6 +113,12 @@ public final class KidoEvents {
      * but never sounds like one.
      */
     private static final CeroBeam.Kind ORB = new CeroBeam.Kind(HADO, true, 1);
+    /** What a caster reads in place of its call when its bind is shrugged off: the spell's title, not the creature's. */
+    private static final String SHRUGGED_KEY = "message.bleach.bakudo.shrugged";
+    /** The glyphs that flare about a creature as it shrugs a bind off, how far they spread, and the chain's pitch. */
+    private static final int SHRUG_MOTES = 8;
+    private static final double SHRUG_SPREAD = 0.3;
+    private static final float SHRUG_PITCH = 1.2F;
 
     private KidoEvents() {
     }
@@ -141,14 +155,23 @@ public final class KidoEvents {
     }
 
     /**
+     * Where a bind cast now goes: the first creature it may bind, or null, and where the ray ends, where it meets that
+     * creature or else at the first block in the way or the spell's reach.
+     */
+    public record BindAim(@Nullable LivingEntity target, Vec3 end) {
+    }
+
+    /**
      * The chat listener, the tick of a pending chant or gather, the blow that breaks either and the dimension change
-     * that drops either.
+     * that drops either; and the listeners that refuse what a Bakudō's bind keeps a creature from
+     * ({@link BakudoEffect#register}).
      */
     public static void register(IEventBus bus) {
         bus.addListener(KidoEvents::onChat);
         bus.addListener(KidoEvents::onPlayerTick);
         bus.addListener(KidoEvents::onDamageTaken);
         bus.addListener(KidoEvents::onChangedDimension);
+        BakudoEffect.register(bus);
     }
 
     // ---- The key ----
@@ -208,7 +231,7 @@ public final class KidoEvents {
     /**
      * Sneak and the key: the next known spell is chosen and named, with the level it can be cast by name from when
      * that is still to come, and its incantation, if it has one, is shown in the player's own chat. A soul kept from
-     * casting only by its Hollow or its lent power may still choose, and so may one that is chanting.
+     * casting only by its Hollow, its lent power or its bound arms may still choose, and so may one that is chanting.
      */
     @Nullable
     private static KidoLogic.Refusal next(Player player, SoulData data, ServerLevel level, long now) {
@@ -291,7 +314,8 @@ public final class KidoEvents {
 
     /**
      * A chanting soul's tick. The chant is dropped silently once the soul may not chant (it died, watches as a
-     * spectator, is held, can no longer cast Kidō, or its Hollow has taken its body: the cause is plain enough), and
+     * spectator, is held, can no longer cast Kidō, its Hollow has taken its body, or its arms are bound and the bind
+     * did not break it first: the cause is plain enough), and
      * broken, with a word, once a Getsuga Tenshō or a Cero begins to gather or the soul sits in Jinzen. When
      * its time comes it goes off at full strength, every rule checked again, and a refusal then is told, with nothing
      * spent. A spell gathering on the key is dropped, broken and let go alike, by the rules of a cast by name, and
@@ -370,8 +394,9 @@ public final class KidoEvents {
 
     /**
      * A gathering soul's tick, as a chanting soul's: the gather is dropped silently once the soul may not cast by name
-     * (it died, watches as a spectator, is held, can no longer cast Kidō, its Hollow has taken its body or its power
-     * is lent), and broken, with a word, once a Getsuga Tenshō or a Cero begins to gather or the soul sits in Jinzen.
+     * (it died, watches as a spectator, is held, can no longer cast Kidō, its Hollow has taken its body, its arms are
+     * bound and the bind did not break it first, or its power is lent), and broken, with a word, once a Getsuga Tenshō
+     * or a Cero begins to gather or the soul sits in Jinzen.
      * Until its time comes the palm sparks; then it is let go ({@link #loose}).
      */
     private static void tickGather(Player player, SoulData data, long now) {
@@ -496,9 +521,10 @@ public final class KidoEvents {
      * less for a spell that wants a zanpakutō at hand when there is none ({@link KidoLogic#handShare}). Then it is paid
      * for and the hands are busy for the spell's cooldown. Cast by name, a spell with an incantation misfires when the
      * roll falls below {@link KidoLogic#misfireChance}: it bursts in the hand, hurting its caster, and nothing more
-     * happens. Otherwise its shape strikes (a beam, or a gust), the call goes on the caster's action bar, and Kidō
-     * trains, with the strike bonus when a creature was struck and twice over for a chant; when a Hollow was among
-     * those struck, an unbound Asauchi leans to kidō. Creative pays, waits, misfires, trains and leans nothing.
+     * happens. Otherwise its shape strikes (a beam, a gust, or a bind), the call goes on the caster's action bar (for a
+     * bind shrugged off, that it was), and Kidō trains, with the strike bonus when a creature was struck or bound and
+     * twice over for a chant; when a Hollow was among those struck or bound, an unbound Asauchi leans to kidō. Creative
+     * pays, waits, misfires, trains and leans nothing.
      *
      * <p>The one entry for every way of casting. Tells nothing; the caller does. Returns the refusal (a misfire is
      * {@link KidoLogic.Refusal#MISFIRED}), or null when cast. Takes the spell itself, not its holder, so a game test can
@@ -525,13 +551,25 @@ public final class KidoEvents {
                 return KidoLogic.Refusal.MISFIRED;
             }
         }
+        Component said = spell.call();
         List<LivingEntity> struck = switch (spell.shape()) {
             case BEAM -> beam(level, player, data, spell, share).struck();
             case GUST -> gust(level, player, data, spell, share);
+            case BIND -> {
+                BindAim aim = bindAim(player, spell);
+                drawBind(level, player, spell, aim.end());
+                KidoLogic.BindResult result = aim.target() == null ? null
+                        : bindOne(player, aim.target(), spell, share, now);
+                if (result == KidoLogic.BindResult.SHRUGGED) {
+                    // In the call's place: the spell is named, not the creature, so a long name tag cannot overrun.
+                    said = Component.translatable(SHRUGGED_KEY, spell.title());
+                }
+                yield result == KidoLogic.BindResult.BOUND ? List.of(aim.target()) : List.of();
+            }
             // Never reached: a spell of no shape is not castable, and was refused above.
             case NONE -> List.of();
         };
-        player.displayClientMessage(spell.call().copy().withStyle(ChatFormatting.GRAY), true);
+        player.displayClientMessage(said.copy().withStyle(ChatFormatting.GRAY), true);
         if (!creative) {
             // After the call, so a level-up line takes its place on the action bar.
             SoulLogic.addStatXp(player, data, Stat.KIDO, KidoLogic.xp(spell, form, !struck.isEmpty()));
@@ -729,6 +767,155 @@ public final class KidoEvents {
             }
         }
         return landed;
+    }
+
+    /**
+     * The ray a bind follows, as Negación's aim does ({@link Negacion#aimed}): from the eyes along the look, out to the
+     * spell's range and short of the first block in the way, the spell's radius to either side counting. Spectators,
+     * lights and Cajas, and every creature the caster may not bind ({@link KidoLogic#mayBind}: a Plus, a team-mate, a
+     * creative player, one Negación holds) are passed by, so the ray goes on to what stands behind them, as a Hadō's
+     * beam would; a part of a great creature stands for the whole. On a creature, the ray ends where it meets it. One
+     * so close that the caster's eyes are within its widened box, which a projectile's search passes over, is met first
+     * of all, where the ray leaves it, if any of it stands ahead of the eyes ({@link #ahead}): one pressed to the
+     * caster's back is behind the ray. Of two the eyes are within, the one reaching further ahead is met. Changes
+     * nothing. Public for tests.
+     */
+    public static BindAim bindAim(Player caster, KidoSpell spell) {
+        float margin = spell.effect().radius();
+        Vec3 eye = caster.getEyePosition();
+        Vec3 look = caster.getViewVector(1.0F);
+        Vec3 end = eye.add(look.scale(spell.effect().range()));
+        end = caster.level().clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster))
+                .getLocation();
+        Entity met = null;
+        Vec3 at = end;
+        double nearest = Double.MAX_VALUE;
+        double farthest = 0.0;
+        // Searched a margin wider than the ray, or a data pack's wide one would miss a creature it should meet.
+        for (Entity entity : caster.level().getEntities(caster, new AABB(eye, end).inflate(1.0 + margin), candidate -> {
+            LivingEntity body = SpiritProjectiles.bodyOf(candidate);
+            return candidate.isPickable() && !candidate.isSpectator() && !(candidate instanceof Negacion.HoldingVehicle)
+                    && body != null && KidoLogic.mayBind(caster, body);
+        })) {
+            // The box it met (a part's, for a great creature), widened by the margin.
+            AABB box = entity.getBoundingBox().inflate(margin);
+            double distance;
+            double reach = 0.0;
+            Vec3 meets;
+            if (box.contains(eye)) {
+                reach = ahead(entity.getBoundingBox(), eye, look);
+                if (reach <= 0.0) {
+                    continue;
+                }
+                distance = 0.0;
+                meets = box.clip(end, eye).orElse(end);
+            } else {
+                Optional<Vec3> entry = box.clip(eye, end);
+                if (entry.isEmpty()) {
+                    continue;
+                }
+                distance = eye.distanceToSqr(entry.get());
+                meets = entry.get();
+            }
+            if (distance < nearest || distance == 0.0 && nearest == 0.0 && reach > farthest) {
+                nearest = distance;
+                farthest = reach;
+                met = entity;
+                at = meets;
+            }
+        }
+        return met == null ? new BindAim(null, end) : new BindAim(SpiritProjectiles.bodyOf(met), at);
+    }
+
+    /** How far ahead of the eyes, along the look, this box reaches at its furthest corner: below 0 when wholly behind. */
+    private static double ahead(AABB box, Vec3 eye, Vec3 look) {
+        return Math.max((box.minX - eye.x) * look.x, (box.maxX - eye.x) * look.x)
+                + Math.max((box.minY - eye.y) * look.y, (box.maxY - eye.y) * look.y)
+                + Math.max((box.minZ - eye.z) * look.z, (box.maxZ - eye.z) * look.z);
+    }
+
+    /**
+     * Binds this one creature with this spell at this share, as a cast's bind does once its ray has found it, without
+     * the cast, its cost or its trace, so a game test can bind a mock player, which no ray can find. Server side.
+     *
+     * <p>Refused, doing nothing, for a creature the caster may not bind ({@link KidoLogic#mayBind}). An inner Hollow,
+     * which is beaten by instinct and never by Kidō, and a creature still wary of this spell from its last bind
+     * ({@link KidoLogic#wary}) shrug it off. Anything else is weighed against the caster's strength
+     * ({@link KidoLogic#bindRatio}): its arms are bound and its body held for each of the spell's times that its
+     * strength allows ({@link KidoLogic#bindTicks}), hidden but for the look drawn on it, with the caster as the
+     * source. When neither lands (too strong a soul, a Quincy woven in Ransōtengai, or a creature no effect touches),
+     * it is shrugged off, heard and seen by those who see spirits. A bind that lands leaves the creature wary of the
+     * spell for twice its time from now, and arms bound break the chant a soul was saying and the spell it was
+     * gathering, as a blow would, so it is told why they stopped.
+     */
+    public static KidoLogic.BindResult bindOne(Player caster, LivingEntity target, KidoSpell spell, float share,
+                                               long now) {
+        if (!KidoLogic.mayBind(caster, target)) {
+            return KidoLogic.BindResult.REFUSED;
+        }
+        int bound = 0;
+        int held = 0;
+        if (!(target instanceof InnerHollow) && !KidoLogic.wary(target, spell, now)) {
+            float ratio = KidoLogic.bindRatio(KidoLogic.bindStrength(spell, caster, SoulLogic.get(caster), share),
+                    target);
+            bound = KidoLogic.bindTicks(spell.effect().boundSeconds(), ratio);
+            held = KidoLogic.bindTicks(spell.effect().heldSeconds(), ratio);
+        }
+        // Not ambient, no swirl and no icon: the effect draws its own look on the creature.
+        boolean arms = bound > 0 && target.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, bound, 0, false,
+                false, false), caster);
+        boolean body = held > 0 && target.addEffect(new MobEffectInstance(ModEffects.BAKUDO_HELD, held, 0, false,
+                false, false), caster);
+        if (!arms && !body) {
+            shrug(target);
+            return KidoLogic.BindResult.SHRUGGED;
+        }
+        // Weighed by what landed, so a hold the creature refused does not lengthen the wariness.
+        KidoLogic.markWary(target, spell, now, Math.max(arms ? bound : 0, body ? held : 0));
+        if (arms && target instanceof Player player && SoulLogic.hasSoul(player)) {
+            SoulData data = SoulLogic.get(player);
+            if (data.kidoChant != null) {
+                breakChant(player, data);
+            }
+            if (data.kidoGather != null) {
+                breakGather(player, data);
+            }
+        }
+        return KidoLogic.BindResult.BOUND;
+    }
+
+    /**
+     * A bind's cast, seen and heard by those who see spirits: a thin trace from the hand to where its ray ended, in the
+     * spell's colour and as wide as its margin, the main hand thrown out, and the spell's particle and sound at the
+     * hand.
+     */
+    private static void drawBind(ServerLevel level, Player player, KidoSpell spell, Vec3 end) {
+        KidoSpell.Look look = spell.look();
+        Vec3 muzzle = CeroBeam.muzzleOf(player, 1.0F);
+        // The trace draws only its two ends, so whether the ray met a wall is not its concern.
+        CeroBeam.trace(level, player, new CeroBeam.Shot(muzzle, end, false, false, List.of(), 0), spell.effect().radius(),
+                look.colour(), TRACE_TICKS);
+        player.swing(InteractionHand.MAIN_HAND, true);
+        SimpleParticleType particle = particleOf(look);
+        if (particle != null) {
+            SpiritSenses.particles(level, particle, muzzle.x, muzzle.y, muzzle.z, HAND_PARTICLES, HAND_SPREAD,
+                    HAND_SPREAD, HAND_SPREAD, PARTICLE_SPEED);
+        }
+        look.sound().flatMap(BuiltInRegistries.SOUND_EVENT::getOptional).ifPresent(sound -> SpiritSenses.play(level,
+                muzzle.x, muzzle.y, muzzle.z, sound, SoundSource.PLAYERS, 1.0F, look.pitch(), false));
+    }
+
+    /**
+     * A bind shrugged off, for those who see spirits: the crack of breaking chain at the creature, and glyphs flaring
+     * about its chest, as canon's Sai glows as it breaks. Nothing on a client.
+     */
+    private static void shrug(LivingEntity target) {
+        if (!(target.level() instanceof ServerLevel level)) {
+            return;
+        }
+        SpiritSenses.play(target, SoundEvents.CHAIN_BREAK, SoundSource.PLAYERS, 1.0F, SHRUG_PITCH, false);
+        SpiritSenses.particles(level, ParticleTypes.ENCHANT, target.getX(), target.getY(0.6), target.getZ(), SHRUG_MOTES,
+                SHRUG_SPREAD, SHRUG_SPREAD, SHRUG_SPREAD, PARTICLE_SPEED);
     }
 
     /**

@@ -1,0 +1,25 @@
+{
+  "kind": "bakudo",
+  "number": 1,
+  "name": {"translate": "kido.bleach.sai"},
+  "shape": "bind",
+  "level": 1,
+  "by_name_level": 1,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.03,
+  "min_cost": 2.0,
+  "cooldown_ticks": 30,
+  "xp": 1,
+  "look": {
+    "colour": "#E6D7A3",
+    "sound": "minecraft:block.chain.place",
+    "pitch": 1.6,
+    "particle": "minecraft:enchant"
+  },
+  "effect": {
+    "range": 8.0,
+    "radius": 0.2,
+    "bound_seconds": 3.0
+  }
+}
