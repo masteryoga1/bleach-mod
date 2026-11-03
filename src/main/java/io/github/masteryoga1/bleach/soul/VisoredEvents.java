@@ -79,9 +79,10 @@ import org.joml.Vector3f;
  * <p>Before the win, a blow that brings its host near death may let the Hollow seize the body for a few seconds
  * ({@link #startTakeover}), and a Visored who looses the black Getsuga Tenshō at low health loses control the same way:
  * it hits harder and heals, no blow takes it below {@code loss_health}, and the host's Shinigami arts do not answer it
- * until the Hollow Mask key tears the mask off or the time runs out. Every end goes through {@link #endTakeover}. With
- * a server's leave, a fight lost once too often makes the soul a Hollow ({@link #fall}). A takeover is held only in
- * transient fields of the soul, so nothing of it is saved or sent but its look.
+ * until the Hollow Mask key tears the mask off, a Bakudō holds the body long enough to pin it
+ * ({@link TakeoverEnd#PINNED}) or the time runs out. Every end goes through {@link #endTakeover}. With a server's
+ * leave, a fight lost once too often makes the soul a Hollow ({@link #fall}). A takeover is held only in transient
+ * fields of the soul, so nothing of it is saved or sent but its look.
  */
 public final class VisoredEvents {
     private static final String PREFIX = "message.bleach.visored.";
@@ -1004,7 +1005,9 @@ public final class VisoredEvents {
         /** Its time ran out: wearied. */
         RAN_OUT,
         /** Every way that is not the takeover's own doing: silent, and no weariness. */
-        REMOVED
+        REMOVED,
+        /** Held by a Bakudō long enough to pin it: wearied, as a torn-off mask. */
+        PINNED
     }
 
     /**
@@ -1050,9 +1053,10 @@ public final class VisoredEvents {
     /**
      * The single exit: every way the Hollow lets go of the body goes through here. Nothing when it holds none.
      *
-     * <p>The boost comes off. REMOVED stops there, silent. A mask torn off or a time run out leaves the host slow and
-     * weak for {@code weariness_seconds}, and the half mask falls away in bone and white dust; a tear-off is told, and a
-     * Hollow whose time ran out has the last word.
+     * <p>The boost comes off. REMOVED stops there, silent. A mask torn off, a time run out or a body pinned by a Bakudō
+     * leaves the host slow and weak for {@code weariness_seconds}, and the half mask falls away in bone and white dust; a
+     * tear-off and a pin are told, and a Hollow whose time ran out has the last word. A pin leaves a Visored's own mask
+     * on, as a time run out does.
      */
     public static void endTakeover(Player player, SoulData data, TakeoverEnd end, long now) {
         if (!VisoredLogic.takenOver(data)) {
@@ -1068,7 +1072,12 @@ public final class VisoredEvents {
             player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, weariness));
             player.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, weariness));
         }
-        maskFalls(player, 0.8F, 1.1F, MASK_OFF_DUST, end == TakeoverEnd.TORN_OFF ? "takeover.torn_off" : null);
+        String line = switch (end) {
+            case TORN_OFF -> "takeover.torn_off";
+            case PINNED -> "takeover.pinned";
+            default -> null;
+        };
+        maskFalls(player, 0.8F, 1.1F, MASK_OFF_DUST, line);
         if (end == TakeoverEnd.RAN_OUT) {
             speak(player, "takeover.ended");
         }

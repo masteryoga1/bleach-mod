@@ -515,6 +515,16 @@ public final class KidoLogic {
     }
 
     /**
+     * Whether a hold this long pins a body its Hollow has seized (see {@link VisoredEvents.TakeoverEnd#PINNED}): at
+     * least {@code pin_seconds} of it, and never when that is 0, which turns the pin off. Only the held time counts,
+     * since a bind of the arms alone leaves the Hollow the body.
+     */
+    public static boolean pins(int heldTicks) {
+        int seconds = BleachConfig.get(BleachConfig.KIDO_BAKUDO_PIN_SECONDS);
+        return seconds > 0 && heldTicks >= seconds * TICKS_PER_SECOND;
+    }
+
+    /**
      * Whether this creature is still wary of this spell at this time: bound by it lately, it shrugs the same spell off
      * until the mark runs out. The mark is kept with the creature, so it lasts through a logout.
      */

@@ -1,0 +1,30 @@
+{
+  "kind": "bakudo",
+  "number": 9,
+  "name": {"translate": "kido.bleach.geki"},
+  "shape": "bind",
+  "level": 7,
+  "by_name_level": 12,
+  "chant_ticks": 30,
+  "incantations": [
+    "Jikai seyo, Rondanini no kokken! Ichidoku shi, yakiharai, mizukara nodo o kakikiru ga ii!",
+    "Undo yourself, black hound of Rondanini! Read it once, burn it to ash, then cut your own throat!"
+  ],
+  "cost_share": 0.06,
+  "min_cost": 3.0,
+  "cooldown_ticks": 60,
+  "xp": 3,
+  "look": {
+    "colour": "#D6303C",
+    "sound": "minecraft:entity.evoker.cast_spell",
+    "pitch": 1.2,
+    "particle": "minecraft:crimson_spore",
+    "bind": "glow"
+  },
+  "effect": {
+    "range": 10.0,
+    "radius": 0.3,
+    "bound_seconds": 2.0,
+    "held_seconds": 2.0
+  }
+}

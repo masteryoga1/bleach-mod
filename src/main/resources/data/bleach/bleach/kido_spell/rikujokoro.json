@@ -1,0 +1,30 @@
+{
+  "kind": "bakudo",
+  "number": 61,
+  "name": {"translate": "kido.bleach.rikujokoro"},
+  "shape": "bind",
+  "level": 22,
+  "by_name_level": 28,
+  "chant_ticks": 40,
+  "incantations": [
+    "Raimei no basha, itoguruma no kangeki! Hikari mote kore o mutsu ni wakatsu!",
+    "Thundering carriage, the gap within the spinning wheel! By light, part this into six!"
+  ],
+  "cost_share": 0.15,
+  "min_cost": 10.0,
+  "cooldown_ticks": 120,
+  "xp": 5,
+  "look": {
+    "colour": "#FFF1A8",
+    "sound": "minecraft:block.beacon.power_select",
+    "pitch": 1.4,
+    "particle": "minecraft:end_rod",
+    "bind": "rods"
+  },
+  "effect": {
+    "range": 16.0,
+    "radius": 0.35,
+    "bound_seconds": 5.0,
+    "held_seconds": 5.0
+  }
+}

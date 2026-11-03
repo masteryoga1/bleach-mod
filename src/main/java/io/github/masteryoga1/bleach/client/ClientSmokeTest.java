@@ -187,7 +187,11 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * must gather its yellow orb at the palm, which must reach the client with no bolt before it; then the bolt must go off
  * by itself, the key still held, and its yellow trace reach the client. Then sneaking with the key must choose Bakudō #1
  * Sai, which comes after every Hadō, and the key alone must cast it at a fresh villager, whose pale gold trace must
- * reach the client and stop at the villager; and the same for #4 Hainawa and its yellow trace, before the run quits.
+ * reach the client and stop at the villager; and the same for #4 Hainawa and its yellow trace. Last, with a fresh
+ * villager, sneaking with the key must choose #9 Geki and print its incantation in the chat; its romaji, sent through the
+ * real chat, must be spoken back and must not cast it before the chant is said; then it must go off at the villager,
+ * binding its arms and holding its body at once, and its red trace must reach the client and stop at it. The same for
+ * #61 Rikujōkōrō, chosen next, and its pale yellow trace, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -1057,9 +1061,9 @@ public final class ClientSmokeTest {
             // Kidō by name, and Shakkahō and Sōkatsui by incantation, seen from behind and facing south. The run's Quincy
             // power is taken away first, since an awakened Quincy cannot use Kidō (by its tier alone: a reset would leave
             // the bloodline open, and the steps wait for it), and the Hollow too, so its voice never takes the action
-            // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and Sai and Hainawa, which come after
-            // every Hadō; having never chosen, it casts Shō first. The villager stands tall enough for a level beam from
-            // the eyes to meet it.
+            // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and Sai, Hainawa and Geki, which
+            // come after every Hadō; having never chosen, it casts Shō first. The villager stands tall enough for a level
+            // beam from the eyes to meet it.
             case 4700 -> {
                 command(minecraft, "bleach tier @s quincy 0");
                 command(minecraft, "bleach visored @s reset");
@@ -1172,7 +1176,41 @@ public final class ClientSmokeTest {
             case 5230 -> KidoKeys.CAST.setDown(false);
             // The yellow ring at the held villager's waist.
             case 5240 -> shot(minecraft, "kido_hainawa_held");
-            case 5270 -> {
+            // Geki, then Rikujōkōrō, by incantation at a villager: each binds the arms and holds the body at once, and its
+            // trace must stop at it. The held villager is killed, as Hainawa's longer hold would keep Geki's shorter one
+            // from landing, and a fresh one stands alone four blocks south; the reiryoku is filled again.
+            case 5262 -> {
+                command(minecraft, "kill @e[type=minecraft:villager,distance=..8]");
+                command(minecraft, "bleach reiryoku @s 800 800");
+            }
+            case 5264 -> command(minecraft, "summon minecraft:villager ~ ~ ~4 {NoAI:1b,Silent:1b}");
+            // Sneaking, the key chooses Geki, the Bakudō after Hainawa, and the server prints its incantation in the chat.
+            case 5270 -> minecraft.options.keyShift.setDown(true);
+            case 5273 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5275 -> KidoKeys.CAST.setDown(false);
+            case 5277 -> minecraft.options.keyShift.setDown(false);
+            // Its romaji, sent whole through the real chat. Hainawa's cooldown let the hands go about 5270, so it goes off
+            // 30 ticks after it is heard, about 5321, at full strength, where the player then looks.
+            case 5290 -> chant(minecraft, KidoSpell.GEKI, 0);
+            // The red glow about the bound and held villager, for a person to look at.
+            case 5326 -> shot(minecraft, "kido_geki_bound");
+            // Sneaking, the key chooses Rikujōkōrō, the Bakudō after Geki: choosing waits for no cooldown.
+            case 5335 -> minecraft.options.keyShift.setDown(true);
+            case 5338 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5340 -> KidoKeys.CAST.setDown(false);
+            case 5342 -> minecraft.options.keyShift.setDown(false);
+            // Its romaji too. Geki's cooldown lets the hands go about 5381, before the chant's 40 ticks are said, so it
+            // goes off about 5396. Geki's hold has ended by then, and the villager is wary of Geki but not of Rikujōkōrō.
+            case 5355 -> chant(minecraft, KidoSpell.RIKUJOKORO, 0);
+            // The six rods of light at the held villager's waist.
+            case 5405 -> shot(minecraft, "kido_rikujokoro_held");
+            case 5450 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1607,6 +1645,41 @@ public final class ClientSmokeTest {
                 "the Kidō key never cast Hainawa at the villager, or its trace never reached the client or did not stop"
                         + " at the villager (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_hainawa");
+        }
+        expectWithin(minecraft, 5278, 5289,
+                () -> chosenIs(soul, KidoSpell.GEKI) && chatShows(incantation(minecraft, KidoSpell.GEKI, 0)),
+                "Sneak and the Kidō key never chose Geki after Hainawa, or its incantation never reached the chat");
+        // The chant sent at 5290 takes 30 ticks to say, so a trace this soon would be a cast that never waited for it.
+        if (ticksInWorld >= 5291 && ticksInWorld <= 5315) {
+            int red = colourOf(minecraft, KidoSpell.GEKI);
+            expect(minecraft, ownCero(minecraft, player, beam -> beam.colour() == red) == null,
+                    "Geki went off before its chant was done");
+        }
+        expectWithin(minecraft, 5291, 5315, () -> spokenBack(player, incantation(minecraft, KidoSpell.GEKI, 0)),
+                "the chant of Geki was never spoken back to its caster");
+        // A bind that holds as well as binds shows the client nothing more than one that binds: its trace stops at the
+        // villager, about 3 blocks from the hand, where a miss runs on to about 9½ blocks for Geki and 15½ for Rikujōkōrō.
+        if (expectWithin(minecraft, 5320, 5360, () -> ownBind(minecraft, player, KidoSpell.GEKI, 2.0, 5.0) != null,
+                "the chant of Geki never cast it, or its red trace never reached the client or did not stop at the"
+                        + " villager (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_geki");
+        }
+        // Rikujōkōrō after Geki, the last spell known: so the order of the Bakudō holds on a real client too.
+        expectWithin(minecraft, 5343, 5352,
+                () -> chosenIs(soul, KidoSpell.RIKUJOKORO) && chatShows(incantation(minecraft, KidoSpell.RIKUJOKORO, 0)),
+                "Sneak and the Kidō key never chose Rikujōkōrō after Geki, or its incantation never reached the chat");
+        // The chant sent at 5355 goes off about 5396, so a trace this soon would be a cast that never waited for it.
+        if (ticksInWorld >= 5356 && ticksInWorld <= 5390) {
+            int pale = colourOf(minecraft, KidoSpell.RIKUJOKORO);
+            expect(minecraft, ownCero(minecraft, player, beam -> beam.colour() == pale) == null,
+                    "Rikujōkōrō went off before its chant was done");
+        }
+        expectWithin(minecraft, 5356, 5380, () -> spokenBack(player, incantation(minecraft, KidoSpell.RIKUJOKORO, 0)),
+                "the chant of Rikujōkōrō was never spoken back to its caster");
+        if (expectWithin(minecraft, 5395, 5440, () -> ownBind(minecraft, player, KidoSpell.RIKUJOKORO, 2.0, 5.0) != null,
+                "the chant of Rikujōkōrō never cast it, or its pale yellow trace never reached the client or did not stop"
+                        + " at the villager (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_rikujokoro");
         }
     }
 

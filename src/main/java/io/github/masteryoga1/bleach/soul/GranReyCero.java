@@ -42,7 +42,8 @@ import org.joml.Vector3f;
  * rule a Cero keeps on PvP, teams, pets, shields and griefing, and Hierro and the reiatsu difference cut it as
  * they cut any blow. Only one beam gathers at a time: a Cero does not begin while a Gran Rey Cero gathers, nor
  * this while a Cero does, and no Bala can be thrown meanwhile. The gather fizzles, for free, when the soul stops
- * being an Arrancar, watches as a spectator, is held in a Negación light, opens a screen or dies.
+ * being an Arrancar, watches as a spectator, is held in a Negación light, opens a screen or dies. Arms a Bakudō has
+ * bound draw no blood: the gather is refused to them, and one already gathering fizzles once they are bound.
  *
  * <p>The keys reach here through {@link DevourEvents#onKey}, and {@link ArrancarEvents#tick} keeps it going.
  * The numbers read only the server's settings and the synced soul, so the soul screen can show them; everything
@@ -60,6 +61,8 @@ public final class GranReyCero {
     public enum Refusal {
         /** Held in a Negación light, which lets the soul touch nothing (see {@link Negacion#held}). */
         HELD,
+        /** Its arms bound by a Bakudō, so no blood is drawn (see {@link BakudoEffect#bound}). */
+        BOUND,
         /** Not an Espada, or a Privaron Espada the server does not let fire: see {@link ArrancarRank#firesGranReyCero}. */
         LOCKED,
         /** The last one fired too short a while ago. */
@@ -194,6 +197,9 @@ public final class GranReyCero {
         if (Negacion.held(player)) {
             return Refusal.HELD;
         }
+        if (BakudoEffect.bound(player)) {
+            return Refusal.BOUND;
+        }
         if (!eligible(data)) {
             return Refusal.LOCKED;
         }
@@ -262,7 +268,8 @@ public final class GranReyCero {
     /**
      * The Cero key came up. A Gran Rey Cero fully gathered fires now and is paid for; one let go sooner scatters,
      * with no reiryoku spent and no wait, the blood already spilt, and the player is told. One that already fired
-     * by itself is only paid for.
+     * by itself is only paid for. One let go with the arms bound fizzles the same way, however long it gathered, and
+     * the player is told why.
      */
     public static void release(Player player, SoulData data, long now) {
         if (!charging(data)) {
@@ -276,6 +283,11 @@ public final class GranReyCero {
         }
         if (!player.isAlive()) {
             cancel(player, data);
+            return;
+        }
+        if (BakudoEffect.bound(player)) {
+            cancel(player, data);
+            player.displayClientMessage(message(Refusal.BOUND, data, now), true);
             return;
         }
         // A half-gathered one would only be a Cero, so there is no weaker shot: full or nothing.
@@ -324,8 +336,8 @@ public final class GranReyCero {
     /**
      * Each body tick of an Arrancar, from {@link ArrancarEvents#tick}: one that fired is paid for if its own fire
      * did not settle it already; one that has gone without firing is forgotten; and one still gathering fizzles if the soul
-     * is no longer an Arrancar, watches as a spectator or is held in a Negación light, or else turns its ring and
-     * drips its blood while the game runs.
+     * is no longer an Arrancar, watches as a spectator or is held in a Negación light, or with a word when its arms are
+     * bound, or else turns its ring and drips its blood while the game runs.
      */
     public static void tick(Player player, SoulData data, long now) {
         if (!charging(data)) {
@@ -344,6 +356,13 @@ public final class GranReyCero {
         if (!ArrancarLogic.isArrancar(data) || player.isSpectator() || Negacion.held(player)) {
             beam.cancel();
             clear(data);
+            return;
+        }
+        if (BakudoEffect.bound(player)) {
+            // Cleared, it gathers no more, so the line is told once.
+            beam.cancel();
+            clear(data);
+            player.displayClientMessage(message(Refusal.BOUND, data, now), true);
             return;
         }
         gathering(player, data, beam, now);

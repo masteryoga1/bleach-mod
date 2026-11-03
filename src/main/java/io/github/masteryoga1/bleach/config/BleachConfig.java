@@ -236,6 +236,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_SKILL_PER_LEVEL;
     public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_BREAK_BELOW;
     public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_TAKEN_OVER_STRENGTH;
+    public static final ModConfigSpec.IntValue KIDO_BAKUDO_PIN_SECONDS;
 
     public static final ModConfigSpec.EnumValue<BloodlineMode> QUINCY_BLOODLINE_MODE;
     public static final ModConfigSpec.DoubleValue QUINCY_CHANCE;
@@ -1406,6 +1407,10 @@ public final class BleachConfig {
                 .comment("How many times its own reiatsu a body seized by its Hollow counts against a bind. Anyone may"
                         + " bind such a body, whatever the PvP and team rules.")
                 .defineInRange("taken_over_strength", 2.0, 1.0, 100.0);
+        KIDO_BAKUDO_PIN_SECONDS = builder
+                .comment("Seconds a Bakudō must hold a body its Hollow has seized to pin it, which ends the seizure at"
+                        + " once and wearies the host as a torn-off mask does. 0 turns the pin off.")
+                .defineInRange("pin_seconds", 3, 0, 60);
         builder.pop();
         builder.pop();
 
