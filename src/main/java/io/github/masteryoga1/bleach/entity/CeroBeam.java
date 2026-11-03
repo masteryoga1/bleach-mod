@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.ArrancarNpcLogic;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
+import io.github.masteryoga1.bleach.soul.KidoWard;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
@@ -468,13 +469,14 @@ public class CeroBeam extends Entity {
      * would stop a creature (fluids pass) and of ground that is not loaded. It strikes every creature the
      * shooter may strike ({@link #mayStrike}) whose box, or one of whose parts' boxes, it passes within
      * its half-width of with nothing solid between, nearest first and each once, with the kind's damage
-     * type; one whose shield, raised towards the muzzle, takes the hit ends the beam there, and so does the
-     * last creature the kind may strike ({@link Kind#pierce}), hurt or not. Those it hurts are also pushed
-     * along it. If it then meets a block, it bursts: what it may strike within the blast radius and in the
-     * open from there takes the blast's share of the damage, and soft blocks about the struck one are blasted
-     * away, nearest first, where the spec, the server config, mob griefing and the shooter's rights allow (see
-     * {@link GetsugaTensho#cuttable} and {@link GetsugaTensho#permitted}). A quiet kind makes no Cero sound,
-     * and leaves only a puff of smoke where a wall or a shield stops it. {@code direct} is what fired it,
+     * type; one whose shield, raised towards the muzzle, or a Kidō shield (see {@link KidoWard#covers}) takes
+     * the hit ends the beam there, and so does the last creature the kind may strike ({@link Kind#pierce}),
+     * hurt or not. Those it hurts are also pushed along it. If it then meets a block, it bursts: what it may
+     * strike within the blast radius and in the open from there takes the blast's share of the damage, and
+     * soft blocks about the struck one are blasted away, nearest first, where the spec, the server config,
+     * mob griefing and the shooter's rights allow (see {@link GetsugaTensho#cuttable} and
+     * {@link GetsugaTensho#permitted}). A quiet kind makes no Cero sound, and leaves only a puff of smoke
+     * where a wall or a shield stops it. {@code direct} is what fired it,
      * which a shield faces: the Cero, or the shooter itself when null. A shot with no beam of its own should
      * pass a stand-in rather than null, as a living direct entity makes a blocked hit a blow from its hand.
      */
@@ -514,7 +516,7 @@ public class CeroBeam extends Entity {
         for (Entry entry : entries) {
             LivingEntity target = entry.target();
             // Asked before the hit, which may break the shield.
-            boolean shielded = target.isDamageSourceBlocked(source);
+            boolean shielded = target.isDamageSourceBlocked(source) || KidoWard.covers(target, source);
             if (target.hurt(source, spec.damage())) {
                 struck.add(target);
                 // As a blow or an arrow does, so a pledged Fracción joins what its Espada's Cero or Bala struck.

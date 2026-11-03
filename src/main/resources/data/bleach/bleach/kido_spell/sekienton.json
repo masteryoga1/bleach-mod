@@ -1,0 +1,30 @@
+{
+  "kind": "bakudo",
+  "number": 21,
+  "name": {"translate": "kido.bleach.sekienton"},
+  "shape": "smoke",
+  "level": 8,
+  "by_name_level": 8,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.06,
+  "min_cost": 3.0,
+  "cooldown_ticks": 200,
+  "xp": 3,
+  "look": {
+    "colour": "#B8262E",
+    "sound": "minecraft:entity.firework_rocket.blast",
+    "pitch": 0.5,
+    "particle": "minecraft:large_smoke"
+  },
+  "effect": {
+    "radius": 4.0,
+    "blind_seconds": 3.0,
+    "ward": {
+      "seconds": 4.0,
+      "lost_seconds": 3.0,
+      "speed_seconds": 2.0,
+      "speed_level": 2
+    }
+  }
+}

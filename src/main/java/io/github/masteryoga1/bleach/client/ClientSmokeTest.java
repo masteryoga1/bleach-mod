@@ -79,6 +79,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -190,15 +191,19 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * reach the client and stop at the villager; and the same for #4 Hainawa and its yellow trace. Last, with a fresh
  * villager, sneaking with the key must choose #9 Geki and print its incantation in the chat; its romaji, sent through the
  * real chat, must be spoken back and must not cast it before the chant is said; then it must go off at the villager,
- * binding its arms and holding its body at once, and its red trace must reach the client and stop at it. The same for
- * #61 Rikujōkōrō, chosen next, and its pale yellow trace, before the run quits.
+ * binding its arms and holding its body at once, and its red trace must reach the client and stop at it. The spell
+ * chosen after Geki is #21 Sekienton, which the action bar must name and which has no incantation, and #61 Rikujōkōrō is
+ * chanted all the same: its romaji must be spoken back and must not cast it before the chant is said, and its pale
+ * yellow trace must reach the client and stop at the villager. The key alone raises Sekienton's red smoke, which must
+ * quicken the player and not blind it; sneaking with the key chooses #39 Enkōsen, which the key raises before the
+ * player: a blow of 4 from two blocks ahead must not land, and one from two blocks behind must, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces and orb, and HUD are drawn, and screenshots of the
- * main moments are saved for review. Any crash in the mod's client code fails the run, and so does anything that did
- * not reach the client as expected.
+ * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke and shield, and HUD are drawn, and
+ * screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and so does
+ * anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -259,7 +264,7 @@ public final class ClientSmokeTest {
     private static Entity subject;
     /** How high the player stood when Vollständig's flight began. */
     private static double flightFrom;
-    /** The player's health just before Vollständig was let go in the air. */
+    /** The player's health just before Vollständig was let go in the air, and before the blows on Enkōsen. */
     private static float healthBefore;
     /** The tick the player landed after Vollständig, or -1 before then. */
     private static int landedAt = -1;
@@ -1061,9 +1066,9 @@ public final class ClientSmokeTest {
             // Kidō by name, and Shakkahō and Sōkatsui by incantation, seen from behind and facing south. The run's Quincy
             // power is taken away first, since an awakened Quincy cannot use Kidō (by its tier alone: a reset would leave
             // the bloodline open, and the steps wait for it), and the Hollow too, so its voice never takes the action
-            // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and Sai, Hainawa and Geki, which
-            // come after every Hadō; having never chosen, it casts Shō first. The villager stands tall enough for a level
-            // beam from the eyes to meet it.
+            // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and Sai, Hainawa, Geki and Sekienton,
+            // which come after every Hadō; having never chosen, it casts Shō first. The villager stands tall enough for a
+            // level beam from the eyes to meet it.
             case 4700 -> {
                 command(minecraft, "bleach tier @s quincy 0");
                 command(minecraft, "bleach visored @s reset");
@@ -1197,7 +1202,8 @@ public final class ClientSmokeTest {
             case 5290 -> chant(minecraft, KidoSpell.GEKI, 0);
             // The red glow about the bound and held villager, for a person to look at.
             case 5326 -> shot(minecraft, "kido_geki_bound");
-            // Sneaking, the key chooses Rikujōkōrō, the Bakudō after Geki: choosing waits for no cooldown.
+            // Sneaking, the key chooses Sekienton, the Bakudō after Geki, and prints nothing: it has none to print.
+            // Choosing waits for no cooldown.
             case 5335 -> minecraft.options.keyShift.setDown(true);
             case 5338 -> {
                 expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
@@ -1205,12 +1211,38 @@ public final class ClientSmokeTest {
             }
             case 5340 -> KidoKeys.CAST.setDown(false);
             case 5342 -> minecraft.options.keyShift.setDown(false);
-            // Its romaji too. Geki's cooldown lets the hands go about 5381, before the chant's 40 ticks are said, so it
-            // goes off about 5396. Geki's hold has ended by then, and the villager is wary of Geki but not of Rikujōkōrō.
+            // Rikujōkōrō's romaji, heard though Sekienton is chosen: a chant is heard as the spell whose words it is.
+            // Geki's cooldown lets the hands go about 5381, before the chant's 40 ticks are said, so it goes off about
+            // 5396. Geki's hold has ended by then, and the villager is wary of Geki but not of Rikujōkōrō.
             case 5355 -> chant(minecraft, KidoSpell.RIKUJOKORO, 0);
             // The six rods of light at the held villager's waist.
             case 5405 -> shot(minecraft, "kido_rikujokoro_held");
-            case 5450 -> {
+            // Sekienton by the key, still chosen, as a chant chooses nothing. Rikujōkōrō's cooldown lets the hands go
+            // about 5516. Its red smoke stands where the player stands for 4 seconds, about 5611, and quickens the player
+            // for 2, about 5571, but never blinds its own caster; the villager in it loses the player, which no client is
+            // told.
+            case 5530 -> KidoKeys.CAST.setDown(true);
+            case 5532 -> KidoKeys.CAST.setDown(false);
+            // Sneaking, the key chooses Enkōsen, the Bakudō after Sekienton: choosing waits for no cooldown.
+            case 5570 -> minecraft.options.keyShift.setDown(true);
+            case 5573 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5575 -> KidoKeys.CAST.setDown(false);
+            case 5577 -> minecraft.options.keyShift.setDown(false);
+            // Sekienton's cooldown lets the hands go about 5731. The key alone raises Enkōsen before the player for 3
+            // seconds, about 5806, nearly 23 strong at 800 reiryoku and Kidō 42.
+            case 5745 -> KidoKeys.CAST.setDown(true);
+            case 5747 -> KidoKeys.CAST.setDown(false);
+            // A blow of 4 from two blocks ahead, to the south the player has faced since 4700, which nothing has turned:
+            // the shield takes it whole, so the hurt is refused, and the command says so in the chat. Coming from no
+            // creature, it is not scaled by the difficulty, and the garb is cloth, so nothing else weighs it.
+            case 5760 -> healthBefore = player.getHealth() + player.getAbsorptionAmount();
+            case 5761 -> command(minecraft, "damage @s 4 minecraft:mob_attack at ^ ^ ^2");
+            // The same from two blocks behind, where the shield does not face: it lands.
+            case 5776 -> command(minecraft, "damage @s 4 minecraft:mob_attack at ^ ^ ^-2");
+            case 5800 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1552,7 +1584,7 @@ public final class ClientSmokeTest {
                         != null,
                 "Shō never struck the villager");
         if (expectWithin(minecraft, 4741, 4757,
-                () -> chosenIs(soul, KidoSpell.BYAKURAI) && byakuraiChosenShown(minecraft),
+                () -> chosenIs(soul, KidoSpell.BYAKURAI) && chosenShown(minecraft, KidoSpell.BYAKURAI),
                 "Sneak and the Kidō key never chose Byakurai, or the action bar never named it")) {
             shot(minecraft, "kido_chosen");
         }
@@ -1664,10 +1696,11 @@ public final class ClientSmokeTest {
                         + " villager (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_geki");
         }
-        // Rikujōkōrō after Geki, the last spell known: so the order of the Bakudō holds on a real client too.
+        // Sekienton after Geki: so the order of the Bakudō holds on a real client too. With no incantation, nothing is
+        // printed, so the action bar is what names it.
         expectWithin(minecraft, 5343, 5352,
-                () -> chosenIs(soul, KidoSpell.RIKUJOKORO) && chatShows(incantation(minecraft, KidoSpell.RIKUJOKORO, 0)),
-                "Sneak and the Kidō key never chose Rikujōkōrō after Geki, or its incantation never reached the chat");
+                () -> chosenIs(soul, KidoSpell.SEKIENTON) && chosenShown(minecraft, KidoSpell.SEKIENTON),
+                "Sneak and the Kidō key never chose Sekienton after Geki, or the action bar never named it");
         // The chant sent at 5355 goes off about 5396, so a trace this soon would be a cast that never waited for it.
         if (ticksInWorld >= 5356 && ticksInWorld <= 5390) {
             int pale = colourOf(minecraft, KidoSpell.RIKUJOKORO);
@@ -1681,6 +1714,32 @@ public final class ClientSmokeTest {
                         + " at the villager (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_rikujokoro");
         }
+        // The smoke itself is seen only by those who see spirits, and what it does to a mob never reaches a client; the
+        // caster's own effects do, and the call.
+        if (expectWithin(minecraft, 5533, 5560, () -> {
+            MobEffectInstance speed = player.getEffect(MobEffects.MOVEMENT_SPEED);
+            return speed != null && speed.getAmplifier() == 1 && !player.hasEffect(MobEffects.BLINDNESS)
+                    && callShown(minecraft, KidoSpell.SEKIENTON);
+        }, "the Kidō key never raised Sekienton, or its Speed II never reached the client, or it blinded its own caster"
+                + " (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_sekienton");
+        }
+        expectWithin(minecraft, 5578, 5595,
+                () -> chosenIs(soul, KidoSpell.ENKOSEN) && chosenShown(minecraft, KidoSpell.ENKOSEN),
+                "Sneak and the Kidō key never chose Enkōsen after Sekienton, or the action bar never named it");
+        // The ring before the eyes is drawn for those who see spirits only, so the call is what a client can be asked.
+        if (expectWithin(minecraft, 5748, 5759, () -> callShown(minecraft, KidoSpell.ENKOSEN),
+                "the Kidō key never raised Enkōsen (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_enkosen");
+        }
+        // A hurt refused fails the command, whose failure comes to the player as a system line in the chat.
+        expectWithin(minecraft, 5762, 5775,
+                () -> chatShows(Component.translatable("commands.damage.invulnerable").getString())
+                        && player.getHealth() + player.getAbsorptionAmount() >= healthBefore,
+                "Enkōsen never took a blow of 4 from two blocks ahead, or the blow landed");
+        expectWithin(minecraft, 5777, 5795,
+                () -> player.getHealth() + player.getAbsorptionAmount() < healthBefore - 0.5F,
+                "a blow of 4 from two blocks behind never landed past Enkōsen");
     }
 
     /** Whether the soul's chosen spell, as the client's copy of it has it, is this one. */
@@ -1729,10 +1788,19 @@ public final class ClientSmokeTest {
         return spell != null && index < spell.incantations().size() ? spell.incantations().get(index) : null;
     }
 
-    /** Whether the action bar names Byakurai as the chosen spell, in the line built from this client's copy of it. */
-    private static boolean byakuraiChosenShown(Minecraft minecraft) {
-        KidoSpell spell = synced(minecraft, KidoSpell.BYAKURAI);
+    /** Whether the action bar names this spell as the chosen one, in the line built from this client's copy of it. */
+    private static boolean chosenShown(Minecraft minecraft, ResourceKey<KidoSpell> key) {
+        KidoSpell spell = synced(minecraft, key);
         return spell != null && actionBarShows(Component.translatable("message.bleach.kido.chosen", spell.title()));
+    }
+
+    /**
+     * Whether the action bar shows this spell's call, as its caster calls it out, in the line built from this client's
+     * copy of it; false while the client has no copy.
+     */
+    private static boolean callShown(Minecraft minecraft, ResourceKey<KidoSpell> key) {
+        KidoSpell spell = synced(minecraft, key);
+        return spell != null && actionBarShows(spell.call());
     }
 
     /** Whether one of the server's last chat lines reads as this one, give or take the spaces about it. */

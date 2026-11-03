@@ -111,6 +111,10 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public static final ResourceKey<KidoSpell> HAINAWA = ResourceKey.create(REGISTRY, BleachMod.id("hainawa"));
     /** Bakudō #9 Geki, a red glow that binds the arms and holds the body at once. */
     public static final ResourceKey<KidoSpell> GEKI = ResourceKey.create(REGISTRY, BleachMod.id("geki"));
+    /** Bakudō #21 Sekienton, a cloud of red smoke to slip away in. */
+    public static final ResourceKey<KidoSpell> SEKIENTON = ResourceKey.create(REGISTRY, BleachMod.id("sekienton"));
+    /** Bakudō #39 Enkōsen, a round shield held before the caster. */
+    public static final ResourceKey<KidoSpell> ENKOSEN = ResourceKey.create(REGISTRY, BleachMod.id("enkosen"));
     /** Bakudō #61 Rikujōkōrō, six rods of light struck into the waist, which bind the arms and hold the body at once. */
     public static final ResourceKey<KidoSpell> RIKUJOKORO = ResourceKey.create(REGISTRY, BleachMod.id("rikujokoro"));
 
@@ -252,7 +256,14 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
          * A bind: the first creature it may bind in the caster's sight, its arms bound, its body held, or both, for a
          * time weighed against its reiatsu.
          */
-        BIND;
+        BIND,
+        /**
+         * A cloud of smoke where the caster stands, which stays there: the creatures in it lose the caster, the
+         * players in it are blinded, and the caster is quickened (see KidoSmoke).
+         */
+        SMOKE,
+        /** A round shield before the caster, which takes the blows from the front up to its strength (see KidoWard). */
+        SHIELD;
 
         public static final Codec<Shape> CODEC = StringRepresentable.fromEnum(Shape::values);
 
@@ -326,25 +337,30 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     /**
      * A spell's numbers: one bag shared by every shape, each shape reading the ones it needs.
      *
-     * @param damage        damage before reiryoku is added
-     * @param damagePerRoot damage added per square root of the caster's maximum reiryoku
-     * @param maxDamage     the most damage once the Kidō level has grown it, before the form's share is taken
+     * @param damage        damage before reiryoku is added (for a shield, strength)
+     * @param damagePerRoot damage added per square root of the caster's maximum reiryoku (for a shield, strength)
+     * @param maxDamage     the most damage once the Kidō level has grown it, before the form's share is taken (for a
+     *                      shield, the most strength)
      * @param range         how far it reaches, in blocks (a gust at most {@link KidoSpell#GUST_MAX_RANGE})
-     * @param radius        its half-width, in blocks (for a gust, only its streak's; for a bind, its ray's margin)
+     * @param radius        its half-width, in blocks (for a gust, only its streak's; for a bind, its ray's margin; for
+     *                      a smoke, its cloud's; for a shield, the ring it is drawn as)
      * @param pierce        how many creatures it may strike that it meets before it stops
      * @param blastRadius   how far about where it bursts the blast reaches, in blocks (0 for none)
      * @param blastShare    the blast's share of the damage
      * @param knockback     push along it (a gust's, away from the caster), on top of the blow's own
      * @param burnSeconds   seconds a creature it strikes burns
-     * @param angle         a gust's whole width, in degrees, from 1 to 180
-     * @param blindSeconds  seconds a player it reaches is blinded, from 0 to 30
+     * @param angle         a gust's whole width, or the arc a shield covers before its caster, in degrees, from 1
+     *                      to 180
+     * @param blindSeconds  seconds a player it reaches, or one in a smoke's cloud, is blinded, from 0 to 30
      * @param bareShare     the share of its strength left to a caster with no zanpakutō at hand, from 0 to 1
      * @param boundSeconds  seconds a bind ties the arms of the creature it reaches, at its full strength, from 0 to 60
      * @param heldSeconds   seconds a bind holds that creature where it stands, at its full strength, from 0 to 60
+     * @param ward          for a smoke or a shield, its own numbers ({@link Ward}); {@link Ward#NONE} when left out
+     *                      or not read
      */
     public record Effect(float damage, float damagePerRoot, float maxDamage, double range, float radius, int pierce,
                          float blastRadius, float blastShare, float knockback, float burnSeconds, float angle,
-                         float blindSeconds, float bareShare, float boundSeconds, float heldSeconds) {
+                         float blindSeconds, float bareShare, float boundSeconds, float heldSeconds, Ward ward) {
         // Built before NONE, with plain defaults: making NONE calls the spell's clamp, which may set the spell up,
         // and the spell's codec reads this one.
         public static final Codec<Effect> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -362,12 +378,13 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
                 Codec.FLOAT.lenientOptionalFieldOf("blind_seconds", 0.0F).forGetter(Effect::blindSeconds),
                 Codec.FLOAT.lenientOptionalFieldOf("bare_share", 1.0F).forGetter(Effect::bareShare),
                 Codec.FLOAT.lenientOptionalFieldOf("bound_seconds", 0.0F).forGetter(Effect::boundSeconds),
-                Codec.FLOAT.lenientOptionalFieldOf("held_seconds", 0.0F).forGetter(Effect::heldSeconds)
+                Codec.FLOAT.lenientOptionalFieldOf("held_seconds", 0.0F).forGetter(Effect::heldSeconds),
+                Ward.CODEC.lenientOptionalFieldOf("ward", Ward.NONE).forGetter(Effect::ward)
         ).apply(instance, Effect::new));
 
         /**
          * No damage, a reach of 16 blocks, a fifth of a block either side of its line, stopping at the first creature;
-         * a sixty-degree gust that blinds no one, no loss without a blade, and no bind.
+         * a sixty-degree gust that blinds no one, no loss without a blade, no bind and no ward.
          */
         public static final Effect NONE = new Effect(0.0F, 0.0F, 1_000.0F, 16.0, 0.2F, 1, 0.0F, 0.5F, 0.0F, 0.0F, 60.0F,
                 0.0F, 1.0F, 0.0F, 0.0F);
@@ -388,6 +405,59 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
             bareShare = within(bareShare, 0.0F, 1.0F);
             boundSeconds = within(boundSeconds, 0.0F, MAX_BIND_SECONDS);
             heldSeconds = within(heldSeconds, 0.0F, MAX_BIND_SECONDS);
+            ward = ward == null ? Ward.NONE : ward;
+        }
+
+        /** An effect with no ward. */
+        public Effect(float damage, float damagePerRoot, float maxDamage, double range, float radius, int pierce,
+                      float blastRadius, float blastShare, float knockback, float burnSeconds, float angle,
+                      float blindSeconds, float bareShare, float boundSeconds, float heldSeconds) {
+            this(damage, damagePerRoot, maxDamage, range, radius, pierce, blastRadius, blastShare, knockback,
+                    burnSeconds, angle, blindSeconds, bareShare, boundSeconds, heldSeconds, Ward.NONE);
+        }
+    }
+
+    /**
+     * A ward's own numbers, read only by the shapes that stand a while: a {@link Shape#SMOKE} and a
+     * {@link Shape#SHIELD}. Every other spell leaves it out, as {@link #NONE}. What a ward shares with a strike, such
+     * as a smoke's radius or a shield's strength, stays in {@link Effect}.
+     *
+     * @param seconds      how long it stands, from 0 to {@link #MAX_SECONDS}: a smoke's cloud and a shield alike
+     * @param lostSeconds  for a smoke, seconds a creature in it loses the caster, at its full strength, from 0 to 30
+     * @param speedSeconds for a smoke, seconds its caster is quickened, at its full strength, from 0 to 30
+     * @param speedLevel   for a smoke, the level of its caster's Speed, from 0 (none) to 5
+     */
+    public record Ward(float seconds, float lostSeconds, float speedSeconds, int speedLevel) {
+        /** The longest a ward stands, whatever its file says: a minute. */
+        public static final float MAX_SECONDS = 60.0F;
+        private static final float MAX_LOST_SECONDS = 30.0F;
+        private static final float MAX_SPEED_SECONDS = 30.0F;
+        private static final int MAX_SPEED_LEVEL = 5;
+
+        // Built before NONE, with plain defaults, as Look's and Effect's are.
+        public static final Codec<Ward> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.FLOAT.lenientOptionalFieldOf("seconds", 0.0F).forGetter(Ward::seconds),
+                Codec.FLOAT.lenientOptionalFieldOf("lost_seconds", 0.0F).forGetter(Ward::lostSeconds),
+                Codec.FLOAT.lenientOptionalFieldOf("speed_seconds", 0.0F).forGetter(Ward::speedSeconds),
+                Codec.INT.lenientOptionalFieldOf("speed_level", 0).forGetter(Ward::speedLevel)
+        ).apply(instance, Ward::new));
+
+        /** No ward: it stands no time, loses no one and quickens no one. */
+        public static final Ward NONE = new Ward(0.0F, 0.0F, 0.0F, 0);
+
+        public Ward {
+            seconds = clamped(seconds, 0.0F, MAX_SECONDS);
+            lostSeconds = clamped(lostSeconds, 0.0F, MAX_LOST_SECONDS);
+            speedSeconds = clamped(speedSeconds, 0.0F, MAX_SPEED_SECONDS);
+            speedLevel = Mth.clamp(speedLevel, 0, MAX_SPEED_LEVEL);
+        }
+
+        /**
+         * A value kept between the two, with not a number read as the low end. The spell's own clamp would set the
+         * spell up whenever a ward is made first, and {@link Effect#NONE} would then be built with no ward yet.
+         */
+        private static float clamped(float value, float min, float max) {
+            return Float.isNaN(value) ? min : Mth.clamp(value, min, max);
         }
     }
 }

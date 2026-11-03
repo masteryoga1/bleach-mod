@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.soul.KidoWard;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.Comparator;
@@ -281,8 +282,9 @@ public class GetsugaTensho extends Projectile {
      * Sweeps this tick's path, as wide and tall as the crescent: knocks every projectile that is not
      * the owner's (nor another crescent) out of the air, then cuts the creatures in it, nearest first,
      * each costing one of its pierces. It never touches what is at the back of the one who fired it
-     * (see {@link #clearOfWielder}), yet still cuts what is pressed against their front. A shield that
-     * stops it, or the last pierce, ends it. Returns whether the crescent is still flying.
+     * (see {@link #clearOfWielder}), yet still cuts what is pressed against their front. A shield or a
+     * Kidō shield that stops it ({@link KidoWard#covers}), or the last pierce, ends it. Returns whether the
+     * crescent is still flying.
      */
     private boolean sweep(Entity owner, Vec3 from, Vec3 motion) {
         float charge = charge();
@@ -315,9 +317,11 @@ public class GetsugaTensho extends Projectile {
                 .getHolderOrThrow(DAMAGE_TYPE), this, owner);
         for (LivingEntity target : targets) {
             struck.add(target.getId());
+            // Asked before the blow, which may break a Kidō shield.
+            boolean warded = KidoWard.covers(target, source);
             boolean hurt = target.hurt(source, damage);
             pierceLeft--;
-            if ((!hurt && target.isBlocking()) || pierceLeft <= 0) {
+            if ((!hurt && (target.isBlocking() || warded)) || pierceLeft <= 0) {
                 discard();
                 return false;
             }

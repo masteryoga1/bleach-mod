@@ -1,0 +1,30 @@
+{
+  "kind": "bakudo",
+  "number": 39,
+  "name": {"translate": "kido.bleach.enkosen"},
+  "shape": "shield",
+  "level": 12,
+  "by_name_level": 12,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.08,
+  "min_cost": 4.0,
+  "cooldown_ticks": 160,
+  "xp": 4,
+  "look": {
+    "colour": "#D8C46A",
+    "sound": "minecraft:block.amethyst_block.chime",
+    "pitch": 1.2,
+    "particle": "minecraft:end_rod"
+  },
+  "effect": {
+    "damage": 4.0,
+    "damage_per_root": 0.3,
+    "max_damage": 30.0,
+    "angle": 120.0,
+    "radius": 0.8,
+    "ward": {
+      "seconds": 3.0
+    }
+  }
+}
