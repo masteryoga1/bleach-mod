@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
@@ -39,6 +40,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageScaling;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ExperienceOrb;
@@ -57,14 +59,15 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 
 /**
  * Tests for the Gran Rey Cero: its numbers by origin, release and setting, the seat among the Espada it needs, the
- * order of its refusals, the blood it spills, the full gather it needs before it fires and what firing costs, the
- * Cero rules it keeps on pets and griefing, and the wait it saves. Mock players are plain {@link Player}s that are not
- * in the world and never tick, so every test calls the rules directly ({@link GranReyCero} and {@link CeroBeam#fire}),
- * no test can see a milestone, which only a real player earns, and no mock reaches the server's roster of ranks: a
- * seat is written into the record ({@link ArrancarRankTests#seat}). The game time stands still within a test, and a
- * gathering beam does not tick between calls, so a later time passed in stands for a later tick. Players stand at
- * {@link #ROOM} in the {@code empty} template and at {@link #SPOT} in the {@code field}, facing south. A setting
- * changed for a test is put back before the test's tick ends.
+ * order of its refusals, the arms a Bakudō binds, which draw no blood and let a gather fizzle, the blood it spills,
+ * the full gather it needs before it fires and what firing costs, the Cero rules it keeps on pets and griefing, and
+ * the wait it saves. Mock players are plain {@link Player}s that are not in the world and never tick, so every test
+ * calls the rules directly ({@link GranReyCero} and {@link CeroBeam#fire}), no test can see a milestone, which only a
+ * real player earns, and no mock reaches the server's roster of ranks: a seat is written into the record
+ * ({@link ArrancarRankTests#seat}). The game time stands still within a test, and a gathering beam does not tick
+ * between calls, so a later time passed in stands for a later tick. Players stand at {@link #ROOM} in the
+ * {@code empty} template and at {@link #SPOT} in the {@code field}, facing south. A setting changed for a test is put
+ * back before the test's tick ends.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -299,6 +302,76 @@ public final class GranReyCeroTests {
             helper.assertTrue(hollowStart == null && !GranReyCero.charging(hollowData),
                     "a Hollow's Gran Rey Cero gave " + hollowStart + ", gathering " + GranReyCero.charging(hollowData));
         } finally {
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void aBoundEspadaDrawsNoBlood(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        ServerLevel level = helper.getLevel();
+        Player player = ArrancarTests.arrancar(helper, HollowTier.VASTO_LORDE, STRONG, ROOM);
+        SoulData data = SoulLogic.get(player);
+        ArrancarRankTests.seat(data, 1);
+        player.setHealth(20.0F);
+        // Nothing here should fire, but a shot that did would break nothing outside the structure.
+        boolean breaks = BleachConfig.get(BleachConfig.GRAN_REY_CERO_BREAKS_BLOCKS);
+        BleachConfig.GRAN_REY_CERO_BREAKS_BLOCKS.set(false);
+        try {
+            assertRefusal(helper, player, data, now, null, "by a seated Espada, ready");
+            // The blood is drawn from a cut hand, and bound arms cut nothing.
+            player.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 60));
+            assertRefusal(helper, player, data, now, GranReyCero.Refusal.BOUND, "with the arms bound");
+            Component bound = GranReyCero.message(GranReyCero.Refusal.BOUND, data, now);
+            helper.assertTrue(bound.getContents() instanceof TranslatableContents contents
+                    && contents.getKey().equals("message.bleach.gran_rey_cero.bound"), "the bound message is " + bound);
+            // Held by Negación as well, the hold is told first.
+            NegacionLight light = NegacionLight.place(level, player, null);
+            helper.assertTrue(light != null && player.startRiding(light, true), "the mock could not mount a light");
+            try {
+                assertRefusal(helper, player, data, now, GranReyCero.Refusal.HELD, "bound and held");
+            } finally {
+                player.stopRiding();
+                discard(light);
+            }
+            GranReyCero.Refusal start = GranReyCero.start(player, data, now);
+            helper.assertTrue(start == GranReyCero.Refusal.BOUND && !GranReyCero.charging(data),
+                    "a Gran Rey Cero begun with the arms bound gave " + start);
+            helper.assertTrue(level.getEntitiesOfClass(CeroBeam.class, helper.getBounds()).isEmpty(),
+                    "a Gran Rey Cero gathered in bound hands");
+            HollowPlayerTests.assertClose(helper, player.getHealth(), 20.0, "the health after a start with the arms bound");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), STRONG, "the reiryoku after a start with the arms bound");
+
+            // Bound as it gathers: its next tick lets it fizzle, the blood spilt but nothing else.
+            player.removeEffect(ModEffects.BAKUDO_BOUND);
+            GranReyCero.Refusal first = GranReyCero.start(player, data, now);
+            helper.assertTrue(first == null && GranReyCero.charging(data), "the Gran Rey Cero did not gather: " + first);
+            HollowPlayerTests.assertClose(helper, player.getHealth(), 16.0, "the health after the blood");
+            CeroBeam gathering = onlyBeam(helper);
+            player.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 60));
+            GranReyCero.tick(player, data, now + 1L);
+            helper.assertTrue(!GranReyCero.charging(data) && gathering.isRemoved() && !gathering.isFired(),
+                    "a Gran Rey Cero gathering in hands bound since was not let go");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), STRONG, "the reiryoku after a bound gather");
+            helper.assertTrue(readyAt(data) == HollowProgress.NEVER, "a bound gather started a wait until " + readyAt(data));
+
+            // Bound as it gathers and let go once it is full: it fizzles all the same.
+            player.removeEffect(ModEffects.BAKUDO_BOUND);
+            GranReyCero.Refusal second = GranReyCero.start(player, data, now + 2L);
+            helper.assertTrue(second == null && GranReyCero.charging(data), "the second Gran Rey Cero gave " + second);
+            HollowPlayerTests.assertClose(helper, player.getHealth(), 12.0, "the health after the second blood");
+            CeroBeam full = onlyBeam(helper);
+            player.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 60));
+            GranReyCero.release(player, data, now + 2L + full.chargeTicks());
+            helper.assertTrue(!GranReyCero.charging(data) && full.isRemoved() && !full.isFired(),
+                    "a full Gran Rey Cero let go with the arms bound fired");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), STRONG, "the reiryoku after a bound release");
+            helper.assertTrue(readyAt(data) == HollowProgress.NEVER, "a bound release started a wait until " + readyAt(data));
+        } finally {
+            player.removeEffect(ModEffects.BAKUDO_BOUND);
+            GranReyCero.cancel(player, data);
+            BleachConfig.GRAN_REY_CERO_BREAKS_BLOCKS.set(breaks);
             discardBeams(helper);
         }
         helper.succeed();

@@ -847,12 +847,19 @@ public final class KidoEvents {
      * it is shrugged off, heard and seen by those who see spirits. A bind that lands leaves the creature wary of the
      * spell for twice its time from now, and arms bound break the chant a soul was saying and the spell it was
      * gathering, as a blow would, so it is told why they stopped.
+     *
+     * <p>Each effect that lands remembers the spell's look on the creature ({@link BakudoEffect#markLook}), so it is
+     * drawn in that spell's style and colour while it lasts. A body its Hollow had seized before the bind, held for at
+     * least {@code pin_seconds} ({@link KidoLogic#pins}), is pinned at once: the seizure ends
+     * ({@link VisoredEvents.TakeoverEnd#PINNED}), and the bind goes on.
      */
     public static KidoLogic.BindResult bindOne(Player caster, LivingEntity target, KidoSpell spell, float share,
                                                long now) {
         if (!KidoLogic.mayBind(caster, target)) {
             return KidoLogic.BindResult.REFUSED;
         }
+        // Before the effects, as the contest weighed it: the Hollow's grip is what the hold must pin.
+        boolean taken = KidoLogic.takenBody(target);
         int bound = 0;
         int held = 0;
         if (!(target instanceof InnerHollow) && !KidoLogic.wary(target, spell, now)) {
@@ -872,6 +879,13 @@ public final class KidoEvents {
         }
         // Weighed by what landed, so a hold the creature refused does not lengthen the wariness.
         KidoLogic.markWary(target, spell, now, Math.max(arms ? bound : 0, body ? held : 0));
+        // Only for what landed: an effect refused keeps the look of the bind that holds it still.
+        if (arms) {
+            BakudoEffect.markLook(target, false, spell.look());
+        }
+        if (body) {
+            BakudoEffect.markLook(target, true, spell.look());
+        }
         if (arms && target instanceof Player player && SoulLogic.hasSoul(player)) {
             SoulData data = SoulLogic.get(player);
             if (data.kidoChant != null) {
@@ -880,6 +894,9 @@ public final class KidoEvents {
             if (data.kidoGather != null) {
                 breakGather(player, data);
             }
+        }
+        if (taken && body && KidoLogic.pins(held) && target instanceof Player host) {
+            VisoredEvents.endTakeover(host, SoulLogic.get(host), VisoredEvents.TakeoverEnd.PINNED, now);
         }
         return KidoLogic.BindResult.BOUND;
     }

@@ -11,6 +11,7 @@ import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.quincy.QuincyStage;
+import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
@@ -71,11 +72,12 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * Tests for the Quincy arts past the third tier: their saved form and the look other players see,
  * the numbers each form gives the bow, the Sanrei Glove and its training, Letzt Stil and the seal,
- * the rite and the arrow that bring the power back, Ginrei Kojaku's stream and Licht Regen, the
- * Seele Schneider, and Vollständig with its halo and Sklaverei. The rules in {@link QuincyArtsLogic}
- * are called directly, and {@link QuincyArtsEvents} runs on mock players from {@link ZanpakutoTests},
- * which are not in the world, so the time is passed in wherever a method takes it. Arrows and blades
- * fly for real on the {@code field} template, a 16 by 16 stone floor with creatures at relative y 2.
+ * the rite and the arrow that bring the power back, Ginrei Kojaku's stream and Licht Regen (which
+ * arms a Bakudō binds may not call), the Seele Schneider, and Vollständig with its halo and
+ * Sklaverei. The rules in {@link QuincyArtsLogic} are called directly, and {@link QuincyArtsEvents}
+ * runs on mock players from {@link ZanpakutoTests}, which are not in the world, so the time is
+ * passed in wherever a method takes it. Arrows and blades fly for real on the {@code field}
+ * template, a 16 by 16 stone floor with creatures at relative y 2.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -840,6 +842,59 @@ public final class QuincyArtsTests {
         QuincyArtsEvents.tick(player, data, now + 96L);
         helper.assertTrue(volleyNear(helper, player).size() == 20, "Licht Regen fell again before its cooldown ended");
         discardAll(volleyNear(helper, player));
+        helper.succeed();
+    }
+
+    /**
+     * Arms a Bakudō binds call no Licht Regen and spend nothing on it, and a gather or a volley under way when they are
+     * bound ends at the next tick, with no wait after it.
+     */
+    @GameTest(template = "field", batch = "quincy_arts", timeoutTicks = 60)
+    public static void aBoundQuincyCallsNoLichtRegen(GameTestHelper helper) {
+        SoulData data = restored(thirdTier());
+        QuincyLogic.setReishi(data, 100.0F);
+        Player player = QuincyTests.archer(helper, data, 8.5, 8.5);
+        drawCross(player);
+        long now = helper.getLevel().getGameTime();
+        try {
+            player.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 60));
+            helper.assertFalse(QuincyArtsEvents.startLichtRegen(player, data, now), "bound arms began to gather Licht Regen");
+            helper.assertTrue(QuincyArtsLogic.streamAllowed(player, data), "bound arms are gathering Licht Regen");
+            assertNear(helper, QuincyLogic.reishi(data), 100.0, "the reishi after Licht Regen called with the arms bound");
+
+            // Bound as it gathers: the next tick ends the gather, before it can pay, and the bow stays drawn.
+            player.removeEffect(ModEffects.BAKUDO_BOUND);
+            helper.assertTrue(QuincyArtsEvents.startLichtRegen(player, data, now), "free arms did not gather Licht Regen");
+            helper.assertFalse(QuincyArtsLogic.streamAllowed(player, data), "Licht Regen began but is not gathering");
+            player.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 60));
+            QuincyArtsEvents.tick(player, data, now + QuincyArtsLogic.LICHT_GATHER_TICKS);
+            helper.assertTrue(QuincyArtsLogic.streamAllowed(player, data), "a gather in arms bound since went on");
+            assertNear(helper, QuincyLogic.reishi(data), 100.0, "the reishi after a gather the bind ended");
+            helper.assertTrue(player.isUsingItem() && volleyNear(helper, player).isEmpty(),
+                    "a gather the bind ended let the bow go or loosed a volley");
+
+            // Free again, with no wait to sit out: gathered, called and begun, until the arms are bound once more.
+            player.removeEffect(ModEffects.BAKUDO_BOUND);
+            long again = now + 40L;
+            helper.assertTrue(QuincyArtsEvents.startLichtRegen(player, data, again),
+                    "Licht Regen could not be gathered after a gather the bind ended");
+            QuincyArtsEvents.tick(player, data, again + QuincyArtsLogic.LICHT_GATHER_TICKS);
+            helper.assertFalse(player.isUsingItem(), "the bow was still drawn when Licht Regen was called");
+            assertNear(helper, QuincyLogic.reishi(data), 75.0, "the reishi left after Licht Regen");
+            QuincyArtsEvents.tick(player, data, again + QuincyArtsLogic.LICHT_GATHER_TICKS + 1L);
+            helper.assertTrue(volleyNear(helper, player).size() == QuincyArtsLogic.LICHT_PER_TICK,
+                    "the volley's first tick loosed " + volleyNear(helper, player).size() + " arrows");
+            player.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 60));
+            for (long tick = 2L; tick <= 6L; tick++) {
+                QuincyArtsEvents.tick(player, data, again + QuincyArtsLogic.LICHT_GATHER_TICKS + tick);
+            }
+            helper.assertTrue(volleyNear(helper, player).size() == QuincyArtsLogic.LICHT_PER_TICK,
+                    "a volley called before the bind loosed " + volleyNear(helper, player).size() + " arrows in all");
+            assertNear(helper, QuincyLogic.reishi(data), 75.0, "the reishi after a volley the bind ended");
+        } finally {
+            player.removeEffect(ModEffects.BAKUDO_BOUND);
+            discardAll(volleyNear(helper, player));
+        }
         helper.succeed();
     }
 

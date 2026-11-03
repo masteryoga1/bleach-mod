@@ -44,6 +44,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
@@ -93,6 +94,7 @@ public final class BleachClient {
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onClientTickPre);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onPlayerTickPre);
         NeoForge.EVENT_BUS.addListener(BleachClient::onRenderLiving);
+        NeoForge.EVENT_BUS.addListener(BleachClient::onInteractionKey);
         if (ClientSmokeTest.isEnabled()) {
             NeoForge.EVENT_BUS.addListener(ClientSmokeTest::onClientTick);
             NeoForge.EVENT_BUS.addListener(ClientSmokeTest::onSystemChat);
@@ -311,6 +313,20 @@ public final class BleachClient {
      */
     private static void onRenderLiving(RenderLivingEvent.Pre<?, ?> event) {
         if (ClientSouls.isHiddenFromViewer(event.getEntity())) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
+     * Arms a Bakudō binds swing at nothing: a bound player's attack click is dropped before it strikes, digs or swings
+     * the arm, as the server refuses the blow and the break anyway. Only the attack: a use click is left to the bind's
+     * own refusals, which let a bound player step into a Negación light offered to it, and pick-block is no act of the
+     * hands. The client knows its own player's effects.
+     */
+    private static void onInteractionKey(InputEvent.InteractionKeyMappingTriggered event) {
+        Player player = Minecraft.getInstance().player;
+        if (event.isAttack() && player != null && player.hasEffect(ModEffects.BAKUDO_BOUND)) {
+            event.setSwingHand(false);
             event.setCanceled(true);
         }
     }

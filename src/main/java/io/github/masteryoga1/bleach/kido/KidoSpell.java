@@ -109,6 +109,10 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public static final ResourceKey<KidoSpell> SAI = ResourceKey.create(REGISTRY, BleachMod.id("sai"));
     /** Bakudō #4 Hainawa, a rope that holds a creature where it stands. */
     public static final ResourceKey<KidoSpell> HAINAWA = ResourceKey.create(REGISTRY, BleachMod.id("hainawa"));
+    /** Bakudō #9 Geki, a red glow that binds the arms and holds the body at once. */
+    public static final ResourceKey<KidoSpell> GEKI = ResourceKey.create(REGISTRY, BleachMod.id("geki"));
+    /** Bakudō #61 Rikujōkōrō, six rods of light struck into the waist, which bind the arms and hold the body at once. */
+    public static final ResourceKey<KidoSpell> RIKUJOKORO = ResourceKey.create(REGISTRY, BleachMod.id("rikujokoro"));
 
     /** Kind, then number, then id: the order spells are listed and chosen in. */
     public static final Comparator<Holder.Reference<KidoSpell>> ORDER =
@@ -259,25 +263,50 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     }
 
     /**
+     * How a bind is drawn on the creature it binds or holds, for those who see spirits, in its spell's colour. Only a
+     * {@link Shape#BIND} reads it. Later styles are appended; written by name, so their order is free, and an unknown
+     * one reads as {@link #DEFAULT}.
+     */
+    public enum BindStyle implements StringRepresentable {
+        /** The binds' own look: pale motes at the bound wrists, and a ring with a crackling spark at the held waist. */
+        DEFAULT,
+        /** A glow about the whole body, darkening as it fades: Geki's. */
+        GLOW,
+        /** Six rods of light struck into the waist: Rikujōkōrō's. */
+        RODS;
+
+        public static final Codec<BindStyle> CODEC = StringRepresentable.fromEnum(BindStyle::values);
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /**
      * How a spell is seen and heard. The sound and the particle are looked up by id when it is cast, and left out
      * when there is none by that id (or the particle needs options of its own).
      *
-     * @param colour   the colour of its trace, written as {@code "#RRGGBB"}
+     * @param colour   the colour of its trace, written as {@code "#RRGGBB"}, and of a bind's look on the creature
      * @param sound    the sound played at the hand, for those who see spirits
      * @param pitch    that sound's pitch, from 0.5 to 2
      * @param particle the simple particle puffed at the hand and where it strikes, for those who see spirits
+     * @param bind     for a bind, how it is drawn on the creature it binds or holds; {@link BindStyle#DEFAULT} when
+     *                 left out or not known
      */
-    public record Look(int colour, Optional<ResourceLocation> sound, float pitch, Optional<ResourceLocation> particle) {
+    public record Look(int colour, Optional<ResourceLocation> sound, float pitch, Optional<ResourceLocation> particle,
+                       BindStyle bind) {
         // Built before NONE, with plain defaults: making NONE calls the spell's clamp, which may set the spell up,
         // and the spell's codec reads this one.
         public static final Codec<Look> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 ZanpakutoSpirit.COLOUR_CODEC.lenientOptionalFieldOf("colour", 0xFFFFFF).forGetter(Look::colour),
                 ResourceLocation.CODEC.lenientOptionalFieldOf("sound").forGetter(Look::sound),
                 Codec.FLOAT.lenientOptionalFieldOf("pitch", 1.0F).forGetter(Look::pitch),
-                ResourceLocation.CODEC.lenientOptionalFieldOf("particle").forGetter(Look::particle)
+                ResourceLocation.CODEC.lenientOptionalFieldOf("particle").forGetter(Look::particle),
+                BindStyle.CODEC.lenientOptionalFieldOf("bind", BindStyle.DEFAULT).forGetter(Look::bind)
         ).apply(instance, Look::new));
 
-        /** White, silent and with no particle. */
+        /** White, silent, with no particle, and the binds' own look. */
         public static final Look NONE = new Look(0xFFFFFF, Optional.empty(), 1.0F, Optional.empty());
 
         public Look {
@@ -285,6 +314,12 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
             sound = sound == null ? Optional.empty() : sound;
             pitch = within(pitch, 0.5F, 2.0F);
             particle = particle == null ? Optional.empty() : particle;
+            bind = bind == null ? BindStyle.DEFAULT : bind;
+        }
+
+        /** A look whose bind, if it is one, is drawn in the binds' own way ({@link BindStyle#DEFAULT}). */
+        public Look(int colour, Optional<ResourceLocation> sound, float pitch, Optional<ResourceLocation> particle) {
+            this(colour, sound, pitch, particle, BindStyle.DEFAULT);
         }
     }
 

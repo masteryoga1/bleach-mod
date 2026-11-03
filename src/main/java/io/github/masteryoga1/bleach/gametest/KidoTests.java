@@ -17,6 +17,7 @@ import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.BakudoEffect;
 import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
@@ -49,6 +50,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -112,17 +115,19 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, and the first two Bakudō, their
- * order, and a broken or empty file read leniently and clamped, and each spell sent as the sync sends it), who may cast
- * and who may only choose, the spells a Kidō level knows and the one chosen, the gate and the share of casting by name
- * alone, a spell's power and cost, what a Hadō strikes and what it spares, Kidō training up to the Academy's exam, how
- * a line said in chat is heard as an incantation, the chant's time and what breaks it, the misfire of a cast by name,
- * the burst, burn and blast of Shakkahō and Sōkatsui, Tenran's widening gust (what it reaches and what a wall keeps
- * from it, its push away from the caster, the players it blinds and what spares them, and its loss without a zanpakutō
- * at hand), Raikōhō gathered in the palm on the Kidō key (nothing spent until it goes off, the misfire drawn only then,
- * and what lets it go, scatters, breaks or drops it), and the binds of Sai and Hainawa (the contest of strength that
- * weighs each, what the ray reaches, what bound arms and a held body are kept from and what they still do, who may be
- * bound, and what shrugs a bind off or lifts it). The by-name gate and share are also tested on a spell built in code
+ * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, and the four Bakudō, two of them
+ * chanted, their order and their looks, a broken or empty file read leniently and clamped, and each spell sent as the
+ * sync sends it), who may cast and who may only choose, the spells a Kidō level knows and the one chosen, the gate and
+ * the share of casting by name alone, a spell's power and cost, what a Hadō strikes and what it spares, Kidō training
+ * up to the Academy's exam, how a line said in chat is heard as an incantation, the chant's time and what breaks it,
+ * the misfire of a cast by name, the burst, burn and blast of Shakkahō and Sōkatsui, Tenran's widening gust (what it
+ * reaches and what a wall keeps from it, its push away from the caster, the players it blinds and what spares them, and
+ * its loss without a zanpakutō at hand), Raikōhō gathered in the palm on the Kidō key (nothing spent until it goes off,
+ * the misfire drawn only then, and what lets it go, scatters, breaks or drops it), and the binds of Sai and Hainawa
+ * (the contest of strength that weighs each, what the ray reaches, what bound arms and a held body are kept from and
+ * what they still do, who may be bound, and what shrugs a bind off or lifts it), Geki and Rikujōkōrō chanted (how each
+ * is heard, gated and shared, and a bind that binds and holds at once, drawn in its spell's look), and the pin of a
+ * body its Hollow has seized by a hold long enough. The by-name gate and share are also tested on a spell built in code
  * ({@link #chantSpell}). Mock players are not in the world and never tick, so the Kidō key is pressed and let go by
  * calling {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a
  * later time passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
@@ -134,7 +139,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * act would fire. Raikōhō's heavy bolt is taken by an iron golem, whose 100 health outlasts it. Casters stand at
  * {@link #LANE} in the {@code field} template, facing east: every beam and bind goes east down the lane into a creature
  * or the dirt wall, and every gust east along it, ending within the field; every creature, trace, orb, light, takeover,
- * mask, gathering, team, bind and wary mark a test makes is put away within its first tick.
+ * mask, gathering, team, bind, look and wary mark a test makes is put away within its first tick.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -157,6 +162,8 @@ public final class KidoTests {
     private static final int RAIKOHO_COLOUR = 0xFFE23A;
     private static final int SAI_COLOUR = 0xE6D7A3;
     private static final int HAINAWA_COLOUR = 0xF2C230;
+    private static final int GEKI_COLOUR = 0xD6303C;
+    private static final int RIKUJOKORO_COLOUR = 0xFFF1A8;
     /** Where a creature keeps its wariness of each Bakudō ({@link KidoLogic#markWary}), so a test can clear it. */
     private static final String WARY_TAG = "bleach:bakudo_wary";
     /** The held body's modifier on the walk, which takes the whole of it. */
@@ -335,6 +342,17 @@ public final class KidoTests {
         }
     }
 
+    /** The same for a whole number, such as a time in seconds. */
+    private static void withConfig(ModConfigSpec.IntValue value, int set, Runnable body) {
+        int before = BleachConfig.get(value);
+        value.set(set);
+        try {
+            body.run();
+        } finally {
+            value.set(before);
+        }
+    }
+
     /** Turns the caster level and east, down the lane, so a beam that meets no creature stops at the wall. */
     private static void downTheLane(Player player) {
         player.setYRot(EAST);
@@ -360,13 +378,14 @@ public final class KidoTests {
     }
 
     /**
-     * Starts a chant of Shakkahō, puts the soul in this state, and ticks it: the chant must go, with nothing spent or
+     * Starts a chant of this spell, puts the soul in this state, and ticks it: the chant must go, with nothing spent or
      * trained.
      */
-    private static void assertChantEnds(GameTestHelper helper, Player player, long now, Runnable state, String what) {
+    private static void assertChantEnds(GameTestHelper helper, Player player, ResourceKey<KidoSpell> spell, long now,
+                                        Runnable state, String what) {
         SoulData data = SoulLogic.get(player);
-        heardAs(helper, KidoEvents.chant(player, romaji(helper, KidoSpell.SHAKKAHO), now), KidoEvents.Heard.Outcome.STARTED,
-                KidoSpell.SHAKKAHO, null, "the chant of " + what);
+        heardAs(helper, KidoEvents.chant(player, romaji(helper, spell), now), KidoEvents.Heard.Outcome.STARTED, spell,
+                null, "the chant of " + what);
         helper.assertTrue(pending(data) != null, "the chant of " + what + " did not begin");
         state.run();
         float before = data.reiryoku();
@@ -467,19 +486,20 @@ public final class KidoTests {
     }
 
     /**
-     * What a shipped spell with an incantation is: a Hadō beam known from its level and cast by name alone from a higher
-     * one, said for its chant time, with this many incantations (the chosen romaji reading, then the mod's own English,
-     * then any other romaji reading) that still fit chat with the spell's call after them, and each heard whole, alone
-     * and with that call. {@code what} is the spell's name as a player types it in the call ("Hadō #31, Shakkahō!").
+     * What a shipped spell with an incantation is: a spell of this kind and shape known from its level and cast by name
+     * alone from a higher one, said for its chant time, with this many incantations (the chosen romaji reading, then the
+     * mod's own English, then any other romaji reading) that still fit chat with the spell's call after them, and each
+     * heard whole, alone and with that call. {@code what} is the spell's name as a player types it in the call
+     * ("Hadō #31, Shakkahō!", "Bakudō #9, Geki!").
      */
     private static void assertChanted(GameTestHelper helper, KidoSpell spell, ResourceLocation id, String what,
                                       String nameKey, int number, int level, int byName, int chantTicks, int colour,
-                                      int incantations) {
-        helper.assertTrue(spell.kind() == KidoSpell.Kind.HADO && spell.number() == number,
+                                      int incantations, KidoSpell.Kind kind, KidoSpell.Shape shape) {
+        helper.assertTrue(spell.kind() == kind && spell.number() == number,
                 what + " is " + spell.kind() + " #" + spell.number());
         helper.assertTrue(spell.name().getContents() instanceof TranslatableContents name && nameKey.equals(name.getKey()),
                 what + " is named " + spell.name());
-        helper.assertTrue(spell.shape() == KidoSpell.Shape.BEAM && spell.castable(), what + " is of shape " + spell.shape());
+        helper.assertTrue(spell.shape() == shape && spell.castable(), what + " is of shape " + spell.shape());
         helper.assertTrue(spell.level() == level && spell.byNameLevel() == byName,
                 what + " needs Kidō " + spell.level() + ", and " + spell.byNameLevel() + " by name");
         helper.assertTrue(spell.chantTicks() == chantTicks, what + " is chanted for " + spell.chantTicks() + " ticks");
@@ -487,13 +507,22 @@ public final class KidoTests {
                 what + "'s colour is " + Integer.toHexString(spell.look().colour()));
         helper.assertTrue(spell.chantable() && spell.incantations().size() == incantations,
                 what + " has incantations " + spell.incantations());
-        String call = " Hadō #" + number + ", " + what + "!";
+        String call = " " + kindName(kind) + " #" + number + ", " + what + "!";
         for (String line : spell.incantations()) {
             helper.assertTrue((line + call).length() <= KidoSpell.MAX_INCANTATION_LENGTH,
                     what + "'s incantation with its call is " + (line + call).length() + " characters: " + line);
             helper.assertTrue(KidoLogic.hears(spell, id, line) && KidoLogic.hears(spell, id, line + call),
                     what + " does not hear its own incantation, alone or with its call: " + line);
         }
+    }
+
+    /** A kind's name as a player types it in a spell's call, such as "Bakudō". */
+    private static String kindName(KidoSpell.Kind kind) {
+        return switch (kind) {
+            case HADO -> "Hadō";
+            case BAKUDO -> "Bakudō";
+            case KAIDO -> "Kaidō";
+        };
     }
 
     /**
@@ -563,15 +592,24 @@ public final class KidoTests {
     }
 
     /**
-     * Lifts both binds and every wary mark off these: a mock player is not in the world, so nothing else clears what a
-     * test laid on it.
+     * Lifts both binds, every wary mark and every look a bind left off these: a mock player is not in the world, so
+     * nothing else clears what a test laid on it.
      */
     private static void unbind(LivingEntity... creatures) {
         for (LivingEntity creature : creatures) {
             creature.removeEffect(ModEffects.BAKUDO_BOUND);
             creature.removeEffect(ModEffects.BAKUDO_HELD);
             creature.getPersistentData().remove(WARY_TAG);
+            creature.getPersistentData().remove(BakudoEffect.LOOK_TAG);
         }
+    }
+
+    /** How a bind of this kind on this creature is drawn, which must be this style in this colour. */
+    private static void assertDrawn(GameTestHelper helper, LivingEntity creature, boolean held, KidoSpell.BindStyle style,
+                                    int colour, String what) {
+        BakudoEffect.Drawn drawn = BakudoEffect.drawn(creature, held);
+        helper.assertTrue(drawn.equals(new BakudoEffect.Drawn(style, colour)), what + " is drawn as " + drawn.style() + " in "
+                + Integer.toHexString(drawn.colour()) + ", not " + style + " in " + Integer.toHexString(colour));
     }
 
     // ---- The spells as data ----
@@ -582,7 +620,8 @@ public final class KidoTests {
         helper.assertTrue(spells.containsKey(KidoSpell.SHO) && spells.containsKey(KidoSpell.BYAKURAI)
                 && spells.containsKey(KidoSpell.SHAKKAHO) && spells.containsKey(KidoSpell.SOKATSUI)
                 && spells.containsKey(KidoSpell.TENRAN) && spells.containsKey(KidoSpell.RAIKOHO)
-                && spells.containsKey(KidoSpell.SAI) && spells.containsKey(KidoSpell.HAINAWA),
+                && spells.containsKey(KidoSpell.SAI) && spells.containsKey(KidoSpell.HAINAWA)
+                && spells.containsKey(KidoSpell.GEKI) && spells.containsKey(KidoSpell.RIKUJOKORO),
                 "the shipped spells did not load: " + spells.keySet());
         // A data pack may add its own, so only the mod's are held to their order.
         List<ResourceKey<KidoSpell>> shipped = ids(KidoSpell.sorted(spells)).stream()
@@ -590,8 +629,8 @@ public final class KidoTests {
                 .toList();
         // Every Hadō before every Bakudō, each kind by its number.
         helper.assertTrue(shipped.equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI, KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI,
-                KidoSpell.TENRAN, KidoSpell.RAIKOHO, KidoSpell.SAI, KidoSpell.HAINAWA)),
-                "the mod's spells sort as " + shipped);
+                KidoSpell.TENRAN, KidoSpell.RAIKOHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI,
+                KidoSpell.RIKUJOKORO)), "the mod's spells sort as " + shipped);
 
         KidoSpell sho = spell(helper, KidoSpell.SHO).value();
         assertShipped(helper, sho, "Shō", "kido.bleach.sho", 1, 0, 0xCFE6FF, KidoSpell.Kind.HADO, KidoSpell.Shape.BEAM);
@@ -615,7 +654,7 @@ public final class KidoTests {
         // The two with incantations: chanted from their level, and cast by name alone only from a higher one.
         KidoSpell shakkaho = spell(helper, KidoSpell.SHAKKAHO).value();
         assertChanted(helper, shakkaho, KidoSpell.SHAKKAHO.location(), "Shakkahō", "kido.bleach.shakkaho", 31, 5, 10, 30,
-                0xE0301E, 2);
+                0xE0301E, 2, KidoSpell.Kind.HADO, KidoSpell.Shape.BEAM);
         assertNear(helper, shakkaho.costShare(), 0.06, "Shakkahō's share of reiryoku");
         assertNear(helper, shakkaho.minCost(), 3.0, "Shakkahō's least cost");
         helper.assertTrue(shakkaho.cooldownTicks() == 30 && shakkaho.xp() == 3,
@@ -629,7 +668,7 @@ public final class KidoTests {
 
         KidoSpell sokatsui = spell(helper, KidoSpell.SOKATSUI).value();
         assertChanted(helper, sokatsui, KidoSpell.SOKATSUI.location(), "Sōkatsui", "kido.bleach.sokatsui", 33, 8, 14, 40,
-                0x3A7BFF, 2);
+                0x3A7BFF, 2, KidoSpell.Kind.HADO, KidoSpell.Shape.BEAM);
         assertNear(helper, sokatsui.costShare(), 0.08, "Sōkatsui's share of reiryoku");
         assertNear(helper, sokatsui.minCost(), 4.0, "Sōkatsui's least cost");
         helper.assertTrue(sokatsui.cooldownTicks() == 40 && sokatsui.xp() == 4,
@@ -660,7 +699,7 @@ public final class KidoTests {
         // Raikōhō is chanted from its level, or cast by name from a higher one after gathering a second in the palm.
         KidoSpell raikoho = spell(helper, KidoSpell.RAIKOHO).value();
         assertChanted(helper, raikoho, KidoSpell.RAIKOHO.location(), "Raikōhō", "kido.bleach.raikoho", 63, 25, 32, 50,
-                RAIKOHO_COLOUR, 3);
+                RAIKOHO_COLOUR, 3, KidoSpell.Kind.HADO, KidoSpell.Shape.BEAM);
         assertNear(helper, raikoho.costShare(), 0.18, "Raikōhō's share of reiryoku");
         assertNear(helper, raikoho.minCost(), 12.0, "Raikōhō's least cost");
         helper.assertTrue(raikoho.cooldownTicks() == 100 && raikoho.xp() == 6,
@@ -679,6 +718,60 @@ public final class KidoTests {
         // Sai and Hainawa are tested as they ship in bakudoSpellsShipAndTheContestWeighs; here they load, sort and travel.
         KidoSpell sai = spell(helper, KidoSpell.SAI).value();
         KidoSpell hainawa = spell(helper, KidoSpell.HAINAWA).value();
+
+        // Geki and Rikujōkōrō are chanted from their level and cast by name only from a higher one, and bind the arms
+        // and hold the body at once; neither does any damage, so a misfire of either hurts no one.
+        KidoSpell geki = spell(helper, KidoSpell.GEKI).value();
+        assertChanted(helper, geki, KidoSpell.GEKI.location(), "Geki", "kido.bleach.geki", 9, 7, 12, 30, GEKI_COLOUR, 2,
+                KidoSpell.Kind.BAKUDO, KidoSpell.Shape.BIND);
+        assertNear(helper, geki.costShare(), 0.06, "Geki's share of reiryoku");
+        assertNear(helper, geki.minCost(), 3.0, "Geki's least cost");
+        helper.assertTrue(geki.cooldownTicks() == 60 && geki.xp() == 3,
+                "Geki waits " + geki.cooldownTicks() + " ticks and trains " + geki.xp() + " xp");
+        assertNear(helper, geki.effect().range(), 10.0, "Geki's reach");
+        assertNear(helper, geki.effect().radius(), 0.3, "Geki's half-width");
+        assertNear(helper, geki.effect().boundSeconds(), 2.0, "Geki's bound arms");
+        assertNear(helper, geki.effect().heldSeconds(), 2.0, "Geki's held body");
+        KidoSpell rikujokoro = spell(helper, KidoSpell.RIKUJOKORO).value();
+        assertChanted(helper, rikujokoro, KidoSpell.RIKUJOKORO.location(), "Rikujōkōrō", "kido.bleach.rikujokoro", 61, 22,
+                28, 40, RIKUJOKORO_COLOUR, 2, KidoSpell.Kind.BAKUDO, KidoSpell.Shape.BIND);
+        assertNear(helper, rikujokoro.costShare(), 0.15, "Rikujōkōrō's share of reiryoku");
+        assertNear(helper, rikujokoro.minCost(), 10.0, "Rikujōkōrō's least cost");
+        helper.assertTrue(rikujokoro.cooldownTicks() == 120 && rikujokoro.xp() == 5,
+                "Rikujōkōrō waits " + rikujokoro.cooldownTicks() + " ticks and trains " + rikujokoro.xp() + " xp");
+        assertNear(helper, rikujokoro.effect().range(), 16.0, "Rikujōkōrō's reach");
+        assertNear(helper, rikujokoro.effect().radius(), 0.35, "Rikujōkōrō's half-width");
+        assertNear(helper, rikujokoro.effect().boundSeconds(), 5.0, "Rikujōkōrō's bound arms");
+        assertNear(helper, rikujokoro.effect().heldSeconds(), 5.0, "Rikujōkōrō's held body");
+        SoulData master = shinigami(1_000.0F, 60);
+        for (KidoSpell chanted : List.of(geki, rikujokoro)) {
+            String what = "Bakudō #" + chanted.number();
+            helper.assertTrue(chanted.gatherTicks() == 0 && !chanted.gathers(), what + " gathers for "
+                    + chanted.gatherTicks() + " ticks");
+            assertNear(helper, KidoLogic.power(chanted, master, 1.0F), 0.0, what + "'s damage");
+            // A sound or particle that is not there is left out without a word, so each is looked up here.
+            KidoSpell.Look look = chanted.look();
+            helper.assertTrue(look.sound().isPresent() && BuiltInRegistries.SOUND_EVENT.containsKey(look.sound().get()),
+                    what + " sounds as " + look.sound());
+            helper.assertTrue(look.particle().flatMap(BuiltInRegistries.PARTICLE_TYPE::getOptional).orElse(null)
+                    instanceof SimpleParticleType, what + " puffs " + look.particle());
+        }
+
+        // Each bind is drawn in its own way; Sai, Hainawa and every Hadō name none, and read the binds' own.
+        helper.assertTrue(geki.look().bind() == KidoSpell.BindStyle.GLOW
+                && rikujokoro.look().bind() == KidoSpell.BindStyle.RODS,
+                "Geki is drawn as " + geki.look().bind() + " and Rikujōkōrō as " + rikujokoro.look().bind());
+        for (KidoSpell plain : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa)) {
+            helper.assertTrue(plain.look().bind() == KidoSpell.BindStyle.DEFAULT,
+                    plain.kind() + " #" + plain.number() + " is drawn as " + plain.look().bind());
+        }
+        // A style that is not known, or none at all, reads as the binds' own, and the rest of the look stays.
+        for (String written : List.of("{\"colour\": \"#123456\", \"pitch\": 1.5, \"bind\": \"nonsense\"}",
+                "{\"colour\": \"#123456\", \"pitch\": 1.5}")) {
+            KidoSpell.Look look = KidoSpell.Look.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(written)).getOrThrow();
+            helper.assertTrue(look.bind() == KidoSpell.BindStyle.DEFAULT && look.colour() == 0x123456
+                    && Math.abs(look.pitch() - 1.5F) < 1.0E-6F, "the look " + written + " read as " + look);
+        }
 
         // The spells written before gusts and gathers read the defaults, which change nothing for them.
         for (KidoSpell older : List.of(sho, byakurai, shakkaho, sokatsui)) {
@@ -708,6 +801,10 @@ public final class KidoTests {
         helper.assertTrue(firstBakudo.equals(List.of(KidoSpell.SAI)), "Bakudō #1 is " + firstBakudo);
         List<ResourceKey<KidoSpell>> fourthBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 4));
         helper.assertTrue(fourthBakudo.equals(List.of(KidoSpell.HAINAWA)), "Bakudō #4 is " + fourthBakudo);
+        List<ResourceKey<KidoSpell>> ninthBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 9));
+        helper.assertTrue(ninthBakudo.equals(List.of(KidoSpell.GEKI)), "Bakudō #9 is " + ninthBakudo);
+        List<ResourceKey<KidoSpell>> sixtyFirstBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 61));
+        helper.assertTrue(sixtyFirstBakudo.equals(List.of(KidoSpell.RIKUJOKORO)), "Bakudō #61 is " + sixtyFirstBakudo);
 
         // Every value wrong in its own way: each falls back or is clamped alone, and the rest of the spell stays.
         String broken = "{\"number\": -5, \"shape\": \"spiral\", \"level\": 7, \"by_name_level\": 2, \"cost_share\": 9,"
@@ -746,7 +843,8 @@ public final class KidoTests {
 
         // Sent to a client as the sync sends it: encoded with the world's registries to NBT, and read back.
         RegistryOps<Tag> ops = helper.getLevel().registryAccess().createSerializationContext(NbtOps.INSTANCE);
-        for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, parsed)) {
+        for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki, rikujokoro,
+                parsed)) {
             Tag sent = KidoSpell.CODEC.encodeStart(ops, spell).getOrThrow();
             KidoSpell read = KidoSpell.CODEC.parse(ops, sent).getOrThrow();
             helper.assertTrue(read.equals(spell), "sent " + spell + " but read " + read);
@@ -908,6 +1006,28 @@ public final class KidoTests {
                 "Byakurai at Kidō 2 is cast as " + id(KidoLogic.chosen(data, spells)));
         helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.BYAKURAI)),
                 "falling below Byakurai rewrote the choice as " + stored(data));
+
+        // Geki is known from Kidō 7 and comes after Hainawa, so the choice wraps round after it; from Kidō 22 Rikujōkōrō
+        // comes after Geki. A soul of its own, so the choice saved below is left as it is.
+        SoulData chooser = shinigami(400.0F, 7);
+        helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
+                KidoSpell.SHAKKAHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI)),
+                "Kidō 7 knows " + ids(KidoLogic.known(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.HAINAWA.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.GEKI)),
+                "after Hainawa at Kidō 7, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.GEKI.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+                "after Geki at Kidō 7, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        chooser.setLevel(Stat.KIDO, 22);
+        helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
+                KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI, KidoSpell.TENRAN, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI,
+                KidoSpell.RIKUJOKORO)), "Kidō 22 knows " + ids(KidoLogic.known(chooser, spells)));
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.RIKUJOKORO)),
+                "after Geki at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.RIKUJOKORO.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+                "after Rikujōkōrō at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
 
         // The level, and for a spell with an incantation the higher level by name, are asked before any cost.
         data.setLevel(Stat.KIDO, 4);
@@ -1388,17 +1508,18 @@ public final class KidoTests {
             helper.assertTrue(pending(data) == null, "the chant went through the portal: " + pending(data));
 
             // Each begun first, so its end is not for want of beginning: death, a hold, a takeover and another art.
-            assertChantEnds(helper, dead, now, () -> dead.setHealth(0.0F), "a Shinigami who died");
+            assertChantEnds(helper, dead, KidoSpell.SHAKKAHO, now, () -> dead.setHealth(0.0F), "a Shinigami who died");
             NegacionLight placed = NegacionLight.place(level, held, null);
             light = placed;
-            assertChantEnds(helper, held, now, () -> helper.assertTrue(placed != null && held.startRiding(placed, true)
-                    && Negacion.held(held), "the mock Shinigami could not be held"), "a Shinigami held by Negación");
-            assertChantEnds(helper, taken, now, () -> helper.assertTrue(VisoredEvents.startTakeover(taken, takenData,
-                    false, now) && VisoredLogic.takenOver(takenData), "the rooted Hollow did not seize its host"),
-                    "a soul whose Hollow took its body");
+            assertChantEnds(helper, held, KidoSpell.SHAKKAHO, now, () -> helper.assertTrue(placed != null
+                    && held.startRiding(placed, true) && Negacion.held(held), "the mock Shinigami could not be held"),
+                    "a Shinigami held by Negación");
+            assertChantEnds(helper, taken, KidoSpell.SHAKKAHO, now, () -> helper.assertTrue(
+                    VisoredEvents.startTakeover(taken, takenData, false, now) && VisoredLogic.takenOver(takenData),
+                    "the rooted Hollow did not seize its host"), "a soul whose Hollow took its body");
             helper.assertTrue(ShikaiEvents.release(gatherer) == ShikaiEvents.Result.RELEASED, "Zangetsu would not release");
-            assertChantEnds(helper, gatherer, now, () -> helper.assertTrue(ShikaiEvents.gather(gatherer)
-                    == ShikaiEvents.GatherResult.GATHERING, "released Zangetsu did not gather"),
+            assertChantEnds(helper, gatherer, KidoSpell.SHAKKAHO, now, () -> helper.assertTrue(
+                    ShikaiEvents.gather(gatherer) == ShikaiEvents.GatherResult.GATHERING, "released Zangetsu did not gather"),
                     "a Shinigami gathering a Getsuga Tenshō");
         } finally {
             ShikaiEvents.cancelGather(gatherer, gathererData);
@@ -2826,6 +2947,293 @@ public final class KidoTests {
             unbind(soul, quincy);
             discard(light, golem, lifted, cured);
             discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    // ---- The chanted binds and the pin ----
+
+    @GameTest(template = "empty")
+    public static void gekiAndRikujokoroAreChantedBinds(GameTestHelper helper) {
+        Registry<KidoSpell> spells = spells(helper);
+        KidoSpell geki = spell(helper, KidoSpell.GEKI).value();
+        KidoSpell rikujokoro = spell(helper, KidoSpell.RIKUJOKORO).value();
+        ResourceLocation gekiId = KidoSpell.GEKI.location();
+        ResourceLocation rikujokoroId = KidoSpell.RIKUJOKORO.location();
+        String gekiCall = "Bakudō #9, Geki!";
+        String rikujokoroCall = "Bakudō #61, Rikujōkōrō!";
+
+        // Each is heard in either tongue, alone or with its call; never by its call alone, nor by the other's words.
+        for (String line : geki.incantations()) {
+            helper.assertTrue(KidoLogic.hears(geki, gekiId, line) && KidoLogic.hears(geki, gekiId, line + " " + gekiCall),
+                    "Geki does not hear its own incantation, alone or with its call: " + line);
+            helper.assertFalse(KidoLogic.hears(rikujokoro, rikujokoroId, line)
+                    || KidoLogic.hears(rikujokoro, rikujokoroId, line + " " + rikujokoroCall),
+                    "Rikujōkōrō hears Geki's incantation: " + line);
+        }
+        for (String line : rikujokoro.incantations()) {
+            helper.assertTrue(KidoLogic.hears(rikujokoro, rikujokoroId, line)
+                    && KidoLogic.hears(rikujokoro, rikujokoroId, line + " " + rikujokoroCall),
+                    "Rikujōkōrō does not hear its own incantation, alone or with its call: " + line);
+            helper.assertFalse(KidoLogic.hears(geki, gekiId, line) || KidoLogic.hears(geki, gekiId, line + " " + gekiCall),
+                    "Geki hears Rikujōkōrō's incantation: " + line);
+        }
+        helper.assertFalse(KidoLogic.hears(geki, gekiId, gekiCall), "Geki hears its call alone");
+        helper.assertFalse(KidoLogic.hears(rikujokoro, rikujokoroId, rikujokoroCall), "Rikujōkōrō hears its call alone");
+
+        // Canon gives Geki's chant to Hōrin too, which the mod does not ship: of the mod's spells, only Geki hears it.
+        String gekiRomaji = romaji(helper, KidoSpell.GEKI);
+        for (Holder.Reference<KidoSpell> other : KidoSpell.sorted(spells)) {
+            if (BleachMod.MODID.equals(other.key().location().getNamespace())) {
+                boolean hears = KidoLogic.hears(other.value(), other.key().location(), gekiRomaji);
+                helper.assertTrue(hears == other.key().equals(KidoSpell.GEKI),
+                        other.key().location() + (hears ? " hears" : " does not hear") + " Geki's romaji");
+            }
+        }
+        SoulData soul = shinigami(400.0F, 28);
+        helper.assertTrue(id(KidoLogic.heard(soul, spells, gekiRomaji)).equals(Optional.of(KidoSpell.GEKI)),
+                "Geki's romaji was heard as " + id(KidoLogic.heard(soul, spells, gekiRomaji)));
+        String rikujokoroEnglish = english(helper, KidoSpell.RIKUJOKORO);
+        helper.assertTrue(id(KidoLogic.heard(soul, spells, rikujokoroEnglish)).equals(Optional.of(KidoSpell.RIKUJOKORO)),
+                "Rikujōkōrō's English was heard as " + id(KidoLogic.heard(soul, spells, rikujokoroEnglish)));
+
+        // Chanted from Kidō 7 and 22, by name alone only from 12 and 28.
+        assertRefusal(helper, KidoLogic.gate(geki, KidoLogic.Form.CHANT, 6), KidoLogic.Refusal.NEEDS_LEVEL,
+                "Geki chanted at Kidō 6");
+        assertRefusal(helper, KidoLogic.gate(geki, KidoLogic.Form.CHANT, 7), null, "Geki chanted at Kidō 7");
+        assertRefusal(helper, KidoLogic.gate(geki, KidoLogic.Form.NAME, 11), KidoLogic.Refusal.NEEDS_NAME_LEVEL,
+                "Geki by name at Kidō 11");
+        assertRefusal(helper, KidoLogic.gate(geki, KidoLogic.Form.NAME, 12), null, "Geki by name at Kidō 12");
+        assertRefusal(helper, KidoLogic.gate(rikujokoro, KidoLogic.Form.CHANT, 21), KidoLogic.Refusal.NEEDS_LEVEL,
+                "Rikujōkōrō chanted at Kidō 21");
+        assertRefusal(helper, KidoLogic.gate(rikujokoro, KidoLogic.Form.CHANT, 22), null, "Rikujōkōrō chanted at Kidō 22");
+        assertRefusal(helper, KidoLogic.gate(rikujokoro, KidoLogic.Form.NAME, 27), KidoLogic.Refusal.NEEDS_NAME_LEVEL,
+                "Rikujōkōrō by name at Kidō 27");
+        assertRefusal(helper, KidoLogic.gate(rikujokoro, KidoLogic.Form.NAME, 28), null, "Rikujōkōrō by name at Kidō 28");
+
+        // By name each keeps half its strength at its by-name level, 2% more a level up to 80%; chanted, all of it.
+        assertNear(helper, KidoLogic.share(geki, KidoLogic.Form.NAME, 12), 0.5, "the share of Geki by name at Kidō 12");
+        assertNear(helper, KidoLogic.share(geki, KidoLogic.Form.NAME, 26), 0.78, "the share of Geki by name at Kidō 26");
+        assertNear(helper, KidoLogic.share(geki, KidoLogic.Form.NAME, 27), 0.8, "the share of Geki by name at Kidō 27");
+        assertNear(helper, KidoLogic.share(geki, KidoLogic.Form.NAME, 40), 0.8, "the share of Geki by name at Kidō 40");
+        assertNear(helper, KidoLogic.share(rikujokoro, KidoLogic.Form.NAME, 28), 0.5,
+                "the share of Rikujōkōrō by name at Kidō 28");
+        assertNear(helper, KidoLogic.share(rikujokoro, KidoLogic.Form.NAME, 43), 0.8,
+                "the share of Rikujōkōrō by name at Kidō 43");
+        assertNear(helper, KidoLogic.share(geki, KidoLogic.Form.CHANT, 7), 1.0, "the share of Geki chanted");
+        assertNear(helper, KidoLogic.share(rikujokoro, KidoLogic.Form.CHANT, 22), 1.0, "the share of Rikujōkōrō chanted");
+
+        // Cast by name, each may burst in the hand: 30% at its by-name level, and nothing ten levels on.
+        assertNear(helper, KidoLogic.misfireChance(geki, 12), 0.3, "Geki's misfire chance at Kidō 12");
+        assertNear(helper, KidoLogic.misfireChance(geki, 22), 0.0, "Geki's misfire chance at Kidō 22");
+        assertNear(helper, KidoLogic.misfireChance(rikujokoro, 28), 0.3, "Rikujōkōrō's misfire chance at Kidō 28");
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void aChantedBindBindsAndHoldsAtOnce(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell sai = spell(helper, KidoSpell.SAI).value();
+        KidoSpell geki = spell(helper, KidoSpell.GEKI).value();
+        KidoSpell rikujokoro = spell(helper, KidoSpell.RIKUJOKORO).value();
+        // Kidō 12 chants Geki, and is just able to cast it by name.
+        Player player = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 12));
+        SoulData data = SoulLogic.get(player);
+        downTheLane(player);
+        IronGolem golem = golem(helper, 5, 8);
+        IronGolem fresh = null;
+        IronGolem marked = golem(helper, 6, 12);
+        IronGolem rods = golem(helper, 6, 4);
+        Player soul = victim(helper, GameType.SURVIVAL, 400.0F);
+        Player chanter = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 12));
+        try {
+            // Heard and begun: it goes off a chant's time later, and nothing is spent or bound until then.
+            heardAs(helper, KidoEvents.chant(player, romaji(helper, KidoSpell.GEKI), now), KidoEvents.Heard.Outcome.STARTED,
+                    KidoSpell.GEKI, null, "Geki's romaji at Kidō 12");
+            KidoLogic.Chant chant = pending(data);
+            helper.assertTrue(chant != null && chant.firesAt() == now + 30L,
+                    "the chant goes off as " + chant + ", not at " + (now + 30L));
+            KidoEvents.tick(player, data, now + 29L);
+            helper.assertTrue(pending(data) == chant && unbound(golem), "a tick short of its time, the chant is "
+                    + pending(data) + " and the golem bound " + boundTicks(golem) + " and held " + heldTicks(golem));
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 400.0, "the reiryoku a tick short of the chant's time");
+
+            // On time, at full strength: 400 at Kidō 12 makes 488.32 against the golem's 100, so both whole, at once.
+            KidoEvents.tick(player, data, now + 30L);
+            helper.assertTrue(pending(data) == null, "the chant was still pending once it went off: " + pending(data));
+            helper.assertTrue(boundTicks(golem) == 40 && heldTicks(golem) == 40,
+                    "the chanted Geki bound the golem " + boundTicks(golem) + " ticks and held it " + heldTicks(golem));
+            // Wary for twice the longer of the two from the tick it went off, and of Geki alone.
+            helper.assertTrue(KidoLogic.wary(golem, geki, now + 109L) && !KidoLogic.wary(golem, geki, now + 110L),
+                    "the golem is not wary of Geki for twice its 40 ticks");
+            helper.assertFalse(KidoLogic.wary(golem, sai, now + 31L), "the golem Geki bound is wary of Sai too");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 376.0, "the reiryoku after the chanted Geki");
+            helper.assertFalse(KidoLogic.ready(data, now + 89L), "the hands were free a tick before Geki's cooldown");
+            helper.assertTrue(KidoLogic.ready(data, now + 90L), "the hands were not free after Geki's cooldown");
+            helper.assertTrue(data.xp(Stat.KIDO) == 8, "the chanted Geki on the golem trained " + data.xp(Stat.KIDO)
+                    + " Kidō xp, not twice 3 and 1");
+            List<CeroBeam> traces = level.getEntitiesOfClass(CeroBeam.class, helper.getBounds(),
+                    beam -> beam.isFired() && beam.colour() == GEKI_COLOUR);
+            helper.assertTrue(traces.size() == 1 && traces.get(0).reach().length() > 1.5
+                    && traces.get(0).reach().length() < 4.0, "Geki drew " + traces.stream()
+                    .map(trace -> trace.reach().length()).toList() + " blocks of trace");
+            // One spell, one look: the bound arms and the held body both glow in Geki's red.
+            assertDrawn(helper, golem, false, KidoSpell.BindStyle.GLOW, GEKI_COLOUR, "Geki's bind of the golem's arms");
+            assertDrawn(helper, golem, true, KidoSpell.BindStyle.GLOW, GEKI_COLOUR, "Geki's hold of the golem's body");
+
+            // Sai leaves its own look on the arms, and the body it never held keeps the hold's own default.
+            assertBind(helper, KidoEvents.bindOne(player, marked, sai, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Sai on a fresh golem");
+            assertDrawn(helper, marked, false, KidoSpell.BindStyle.DEFAULT, SAI_COLOUR, "Sai's bind of the golem's arms");
+            assertDrawn(helper, marked, true, KidoSpell.BindStyle.DEFAULT, BakudoEffect.HELD_COLOUR,
+                    "the hold of a golem only Sai bound");
+
+            // By name it keeps half its strength: 244.16 over a soul of 400, so both times fall to the same 0.61.
+            float share = KidoLogic.share(geki, KidoLogic.Form.NAME, 12);
+            assertNear(helper, share, 0.5, "the share of Geki by name at Kidō 12");
+            float ratio = KidoLogic.bindRatio(KidoLogic.bindStrength(geki, player, data, share), soul);
+            assertNear(helper, ratio, 0.6104, 0.001, "Geki's strength by name over a soul of 400");
+            assertBind(helper, KidoEvents.bindOne(player, soul, geki, share, now + 30L), KidoLogic.BindResult.BOUND,
+                    "Geki by name on a soul");
+            helper.assertTrue(boundTicks(soul) == 24 && heldTicks(soul) == 24,
+                    "Geki by name bound the soul " + boundTicks(soul) + " ticks and held it " + heldTicks(soul));
+
+            // A misfire by name is paid for and waited out, and binds nothing; a bind has no damage to hurt with.
+            discard(golem);
+            fresh = golem(helper, 5, 8);
+            assertRefusal(helper, KidoEvents.cast(player, geki, KidoLogic.Form.NAME, now + 90L, 0.0),
+                    KidoLogic.Refusal.MISFIRED, "Geki by name at Kidō 12 with a roll of 0");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 352.0, "the reiryoku after a misfired Geki");
+            helper.assertFalse(KidoLogic.ready(data, now + 149L), "the hands were free a tick before a misfire's cooldown");
+            helper.assertTrue(KidoLogic.ready(data, now + 150L), "the hands were not free after a misfire's cooldown");
+            helper.assertTrue(unbound(fresh), "a misfired Geki bound the golem " + boundTicks(fresh) + " ticks and held it "
+                    + heldTicks(fresh));
+            HollowPlayerTests.assertClose(helper, player.getHealth(), 20.0, "the health after a misfired Geki");
+            helper.assertTrue(data.xp(Stat.KIDO) == 8, "a misfired Geki trained Kidō to " + data.xp(Stat.KIDO) + " xp");
+
+            // Arms bound by another's Sai in the middle of the chant break it, with nothing spent.
+            assertChantEnds(helper, chanter, KidoSpell.GEKI, now, () -> assertBind(helper,
+                    KidoEvents.bindOne(player, chanter, sai, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Sai on a soul chanting Geki"), "a soul bound as it chants Geki");
+
+            // Rikujōkōrō's 721.28 binds and holds a golem for the whole five seconds, drawn once as six rods.
+            assertBind(helper, KidoEvents.bindOne(player, rods, rikujokoro, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Rikujōkōrō on a fresh golem");
+            helper.assertTrue(boundTicks(rods) == 100 && heldTicks(rods) == 100,
+                    "Rikujōkōrō bound the golem " + boundTicks(rods) + " ticks and held it " + heldTicks(rods));
+            helper.assertTrue(KidoLogic.wary(rods, rikujokoro, now + 199L) && !KidoLogic.wary(rods, rikujokoro, now + 200L),
+                    "the golem is not wary of Rikujōkōrō for twice its 100 ticks");
+            assertDrawn(helper, rods, false, KidoSpell.BindStyle.RODS, RIKUJOKORO_COLOUR,
+                    "Rikujōkōrō's bind of the golem's arms");
+            assertDrawn(helper, rods, true, KidoSpell.BindStyle.RODS, RIKUJOKORO_COLOUR,
+                    "Rikujōkōrō's hold of the golem's body");
+            assertWallStands(helper);
+        } finally {
+            unbind(soul, chanter);
+            discard(golem, fresh, marked, rods);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void rikujokoroPinsATakenBody(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        KidoSpell sai = spell(helper, KidoSpell.SAI).value();
+        KidoSpell hainawa = spell(helper, KidoSpell.HAINAWA).value();
+        KidoSpell geki = spell(helper, KidoSpell.GEKI).value();
+        KidoSpell rikujokoro = spell(helper, KidoSpell.RIKUJOKORO).value();
+        // The first soul that may chant Rikujōkōrō, against seized bodies of its own reiryoku, each counted twice.
+        Player caster = caster(helper, GameType.SURVIVAL, shinigami(150.0F, 22));
+        SoulData casterData = SoulLogic.get(caster);
+        Player strong = caster(helper, GameType.SURVIVAL, shinigami(1_500.0F, 40));
+        Player weak = caster(helper, GameType.SURVIVAL, shinigami(60.0F, 5));
+        Player pinned = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player bySai = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player byHainawa = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player byGeki = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player byStrong = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player byWeak = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player unpinned = victim(helper, GameType.SURVIVAL, 150.0F);
+        List<Player> seized = List.of(pinned, bySai, byHainawa, byGeki, byStrong, byWeak, unpinned);
+        try {
+            for (Player host : seized) {
+                SoulData hostData = SoulLogic.get(host);
+                VisoredLogic.setRecord(hostData, VisoredLogic.record(hostData).withRootedAt(now - DAY));
+                helper.assertTrue(VisoredEvents.startTakeover(host, hostData, false, now) && KidoLogic.takenBody(host),
+                        "a rooted Hollow did not seize its host");
+            }
+
+            // 150 at Kidō 22 makes 294.63 against twice the seized 150: 0.982 of five seconds held, and pinned at once.
+            float ratio = KidoLogic.bindRatio(KidoLogic.bindStrength(rikujokoro, caster, casterData, 1.0F), pinned);
+            assertNear(helper, ratio, 0.982, 0.005, "Rikujōkōrō's strength from 150 at Kidō 22 over a seized 150");
+            assertBind(helper, KidoEvents.bindOne(caster, pinned, rikujokoro, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Rikujōkōrō on a seized body");
+            helper.assertTrue(Math.abs(boundTicks(pinned) - 98) <= 1 && Math.abs(heldTicks(pinned) - 98) <= 1,
+                    "Rikujōkōrō bound the seized body " + boundTicks(pinned) + " ticks and held it " + heldTicks(pinned));
+            helper.assertFalse(VisoredLogic.takenOver(SoulLogic.get(pinned)) || KidoLogic.takenBody(pinned),
+                    "the pinned body is still its Hollow's");
+            // Wearied as a torn-off mask leaves it, and still bound and held: the pin lifts nothing.
+            int weariness = BleachConfig.get(BleachConfig.VISORED_TAKEOVER_WEARINESS_SECONDS) * 20;
+            for (Holder<MobEffect> wearied : List.of(MobEffects.MOVEMENT_SLOWDOWN, MobEffects.WEAKNESS)) {
+                MobEffectInstance effect = pinned.getEffect(wearied);
+                helper.assertTrue(effect != null && effect.getAmplifier() == 0 && effect.getDuration() == weariness,
+                        "the pin left the host " + effect + ", not " + weariness + " ticks of "
+                                + wearied.getRegisteredName());
+            }
+            helper.assertTrue(heldTicks(pinned) > 0 && boundTicks(pinned) > 0, "the pin lifted the bind");
+
+            // Arms alone leave the Hollow its body, and a shorter hold does not pin it: each lands, and the Hollow stays.
+            assertBind(helper, KidoEvents.bindOne(caster, bySai, sai, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Sai on a seized body");
+            helper.assertTrue(boundTicks(bySai) == 37 && heldTicks(bySai) == 0,
+                    "Sai bound the seized body " + boundTicks(bySai) + " ticks and held it " + heldTicks(bySai));
+            assertBind(helper, KidoEvents.bindOne(caster, byHainawa, hainawa, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Hainawa on a seized body");
+            helper.assertTrue(heldTicks(byHainawa) == 38,
+                    "Hainawa held the seized body " + heldTicks(byHainawa) + " ticks, not 38");
+            assertBind(helper, KidoEvents.bindOne(caster, byGeki, geki, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "Geki on a seized body");
+            helper.assertTrue(boundTicks(byGeki) == 27 && heldTicks(byGeki) == 27,
+                    "Geki bound the seized body " + boundTicks(byGeki) + " ticks and held it " + heldTicks(byGeki));
+            // However strong, Sai binds only the arms: 2121 ties them the whole three seconds, and pins nothing.
+            assertBind(helper, KidoEvents.bindOne(strong, byStrong, sai, 1.0F, now), KidoLogic.BindResult.BOUND,
+                    "a strong Sai on a seized body");
+            helper.assertTrue(boundTicks(byStrong) == 60 && heldTicks(byStrong) == 0,
+                    "the strong Sai bound the seized body " + boundTicks(byStrong) + " ticks and held it "
+                            + heldTicks(byStrong));
+            for (Player host : List.of(bySai, byHainawa, byGeki, byStrong)) {
+                helper.assertTrue(KidoLogic.takenBody(host) && host.getEffect(MobEffects.WEAKNESS) == null
+                        && heldTicks(host) < 60, "a bind that holds less than three seconds pinned a seized body");
+            }
+
+            // 60 at Kidō 5 makes 101.43 against 300, under half: shrugged off, and the Hollow keeps the body.
+            assertBind(helper, KidoEvents.bindOne(weak, byWeak, rikujokoro, 1.0F, now), KidoLogic.BindResult.SHRUGGED,
+                    "a weak Rikujōkōrō on a seized body");
+            helper.assertTrue(unbound(byWeak) && KidoLogic.takenBody(byWeak), "a shrugged bind freed or held the body");
+
+            // With the pin off, the same hold lands and the takeover goes on.
+            withConfig(BleachConfig.KIDO_BAKUDO_PIN_SECONDS, 0, () -> {
+                assertBind(helper, KidoEvents.bindOne(caster, unpinned, rikujokoro, 1.0F, now), KidoLogic.BindResult.BOUND,
+                        "Rikujōkōrō on a seized body with the pin off");
+                helper.assertTrue(Math.abs(heldTicks(unpinned) - 98) <= 1 && KidoLogic.takenBody(unpinned),
+                        "with the pin off, Rikujōkōrō held the seized body " + heldTicks(unpinned) + " ticks and freed it "
+                                + !KidoLogic.takenBody(unpinned));
+                helper.assertFalse(KidoLogic.pins(1_200), "a minute's hold pins with the pin off");
+            });
+            // Three seconds of hold, and not a tick less; never no hold at all.
+            helper.assertFalse(KidoLogic.pins(59), "a hold of 59 ticks pins");
+            helper.assertTrue(KidoLogic.pins(60), "a hold of 60 ticks does not pin");
+            helper.assertFalse(KidoLogic.pins(0), "no hold pins");
+        } finally {
+            for (Player host : seized) {
+                VisoredEvents.endTakeover(host, SoulLogic.get(host), VisoredEvents.TakeoverEnd.REMOVED, now);
+                host.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                host.removeEffect(MobEffects.WEAKNESS);
+            }
+            unbind(pinned, bySai, byHainawa, byGeki, byStrong, byWeak, unpinned);
         }
         helper.succeed();
     }

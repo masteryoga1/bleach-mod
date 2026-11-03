@@ -201,7 +201,8 @@ public final class QuincyArtsEvents {
     /**
      * Licht Regen: this tick's arrows of a volley already called, then the gather, which ends in the
      * volley once it has gathered long enough, or scatters when the Cross is no longer drawn. A
-     * spectator, or a soul that cannot use its power, loses both.
+     * spectator, or a soul that cannot use its power, loses both; so do arms a Bakudō has bound,
+     * told once, before a gather can pay.
      */
     private static void tickLicht(Player p, SoulData d, long now) {
         if (d.lichtVolley == null && !d.lichtGathering()) {
@@ -209,6 +210,12 @@ public final class QuincyArtsEvents {
         }
         if (p.isSpectator() || !QuincyLogic.canUsePowers(d)) {
             clearLicht(d);
+            return;
+        }
+        if (BakudoEffect.bound(p)) {
+            // Cleared, there is nothing left to drop, so the line is told once.
+            clearLicht(d);
+            tell(p, Component.translatable("message.bleach.bakudo.bound"));
             return;
         }
         if (d.lichtVolley != null) {
@@ -776,12 +783,17 @@ public final class QuincyArtsEvents {
     // ---- Licht Regen ----
 
     /**
-     * H while drawing a restored Cross: starts gathering Licht Regen, unless a gather already runs,
-     * the last volley is not long enough ago, or the reishi is short.
+     * H while drawing a restored Cross: starts gathering Licht Regen, unless the arms are bound by a
+     * Bakudō (told so), a gather already runs, the last volley is not long enough ago, or the reishi
+     * is short.
      *
      * @return whether the gather started
      */
     public static boolean startLichtRegen(Player p, SoulData d, long now) {
+        if (BakudoEffect.bound(p)) {
+            tell(p, Component.translatable("message.bleach.bakudo.bound"));
+            return false;
+        }
         if (d.lichtGathering()) {
             return false;
         }

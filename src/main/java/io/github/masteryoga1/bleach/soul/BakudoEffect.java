@@ -3,12 +3,16 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
+import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.particles.DustColorTransitionOptions;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -46,17 +50,25 @@ import org.joml.Vector3f;
  * stands (no step, jump, swim, glide, ride or flash step, but the arms free). A spell that does both gives both.
  *
  * <p>Both are hidden: no swirl, no icon on the HUD or in the inventory. Those who see spirits see the bind on the
- * creature instead, a pair of pale gold motes at the wrists or a crackling yellow ring at the waist. Nothing cures
- * them but their time, {@code /effect clear}, death and Negación, whose light lifts a bind away; milk and a totem do
- * not. The listeners here refuse what a bound creature would do with its hands, on both sides for a player, whose own
- * client knows its effects and so predicts nothing, and tell a bound player why on the server alone. The arts the
- * binds stop elsewhere (Kidō, the Getsuga Tenshō, a Bala, the flash steps) ask for the effect in their own checks.
+ * creature instead, in its spell's colour: a pair of motes at the wrists (Sai's pale gold) or a crackling ring at the
+ * waist (Hainawa's yellow), or the spell's own look ({@link KidoSpell.Look#bind()}), such as Geki's red glow about the
+ * body or Rikujōkōrō's six rods of light at the waist, kept on the creature as each bind lands ({@link #markLook}).
+ * Nothing cures them but their time, {@code /effect clear}, death and Negación, whose light lifts a bind away; milk and
+ * a totem do not. The listeners here refuse what a bound creature would do with its hands, on both sides for a player,
+ * whose own client knows its effects and so predicts nothing, and tell a bound player why on the server alone. The arts
+ * the binds stop elsewhere (Kidō, the Getsuga Tenshō, a Bala, the flash steps) ask for the effect in their own checks.
  */
 public final class BakudoEffect extends MobEffect {
     /** The bound arms' colour: the pale gold Sai glows as it breaks. */
     public static final int BOUND_COLOUR = 0xE6D7A3;
     /** The held body's colour: Hainawa's yellow rope. */
     public static final int HELD_COLOUR = 0xF2C230;
+    /**
+     * Where in a creature's persistent data the looks of the binds that last landed on it are kept, beside the wary mark:
+     * a compound with a {@code "bound"} and a {@code "held"} entry, each the style's name and the colour. Saved with the
+     * creature, never sent: the looks are drawn on the server.
+     */
+    public static final String LOOK_TAG = "bleach:bakudo_look";
 
     /** How much slower the bound walk and swim: 30% of the total. */
     private static final double BOUND_SLOW = -0.3;
@@ -70,10 +82,35 @@ public final class BakudoEffect extends MobEffect {
     private static final double WRISTS_APART = 0.15;
     /** How far out from the body's edge the held ring is. */
     private static final double RING_OUT = 0.15;
-    private static final DustParticleOptions BOUND_DUST = dust(BOUND_COLOUR);
-    private static final DustParticleOptions HELD_DUST = dust(HELD_COLOUR);
+    /** The default looks' motes in the binds' own colours, kept, as Sai's and Hainawa's are drawn in them. */
+    private static final DustParticleOptions BOUND_DUST = dust(BOUND_COLOUR, DUST_SIZE);
+    private static final DustParticleOptions HELD_DUST = dust(HELD_COLOUR, DUST_SIZE);
+    /** Ticks between the looks of a glow, how many motes it puts out each time, and their size. */
+    private static final int GLOW_LOOK_TICKS = 4;
+    private static final int GLOW_MOTES = 6;
+    private static final float GLOW_SIZE = 0.9F;
+    /** How far over the body a glow's motes spread: shares of its width either way across, and of its height. */
+    private static final double GLOW_ACROSS = 0.4;
+    private static final double GLOW_UP = 0.3;
+    /** Ticks between the looks of rods, how many stand evenly round the waist, and how many motes draw each. */
+    private static final int RODS_LOOK_TICKS = 4;
+    private static final int RODS = 6;
+    private static final int ROD_MOTES = 3;
+    /** How far beyond the body's edge, and how far above the waist, a rod's outer end is, and its motes' size. */
+    private static final double ROD_OUT = 0.9;
+    private static final double ROD_RISE = 0.45;
+    private static final float ROD_SIZE = 0.7F;
+    /** The two entries of {@link #LOOK_TAG}, the bound arms' and the held body's, and what each keeps. */
+    private static final String BOUND_ENTRY = "bound";
+    private static final String HELD_ENTRY = "held";
+    private static final String STYLE_KEY = "style";
+    private static final String COLOUR_KEY = "colour";
     /** What a bound player is told when an act of its hands is refused. */
     private static final String REFUSED_KEY = "message.bleach.bakudo.bound";
+
+    /** How a bind is drawn on a creature: in which style, and in which colour. */
+    public record Drawn(KidoSpell.BindStyle style, int colour) {
+    }
 
     private final boolean held;
 
@@ -117,6 +154,41 @@ public final class BakudoEffect extends MobEffect {
     /** Whether this creature is held where it stands. Both sides, as {@link #bound}. */
     public static boolean held(LivingEntity entity) {
         return entity.hasEffect(ModEffects.BAKUDO_HELD);
+    }
+
+    /**
+     * Keeps on this creature how the bind of this kind that has just landed on it, the held body's or the bound arms',
+     * is drawn: in its spell's style and colour, over whatever bind of that kind landed before. The entry is never
+     * cleared, as it is read only while an effect of its kind is on, and the next bind to land overwrites it. Server
+     * only, where the look is drawn: nothing on a client.
+     */
+    public static void markLook(LivingEntity target, boolean held, KidoSpell.Look look) {
+        if (target.level().isClientSide()) {
+            return;
+        }
+        CompoundTag saved = target.getPersistentData();
+        // A fresh tag when there is none yet, so it is put back either way.
+        CompoundTag looks = saved.getCompound(LOOK_TAG);
+        CompoundTag entry = new CompoundTag();
+        entry.putString(STYLE_KEY, look.bind().getSerializedName());
+        entry.putInt(COLOUR_KEY, look.colour());
+        looks.put(held ? HELD_ENTRY : BOUND_ENTRY, entry);
+        saved.put(LOOK_TAG, looks);
+    }
+
+    /**
+     * How the bind of this kind on this creature is drawn: as the bind that last landed it asked ({@link #markLook}),
+     * or with no entry (an effect given by command, or a creature bound before the looks were kept) in the binds' own
+     * look and the effect's own colour. An entry in a style this version does not know reads as no entry. Meaningful
+     * on the server, where the entries are written.
+     */
+    public static Drawn drawn(LivingEntity entity, boolean held) {
+        CompoundTag entry = entity.getPersistentData().getCompound(LOOK_TAG).getCompound(held ? HELD_ENTRY : BOUND_ENTRY);
+        KidoSpell.BindStyle style = styleNamed(entry.getString(STYLE_KEY));
+        if (style == null || !entry.contains(COLOUR_KEY, Tag.TAG_ANY_NUMERIC)) {
+            return new Drawn(KidoSpell.BindStyle.DEFAULT, held ? HELD_COLOUR : BOUND_COLOUR);
+        }
+        return new Drawn(style, entry.getInt(COLOUR_KEY) & 0xFFFFFF);
     }
 
     /** A bind is reiatsu, not a poison or a sickness: neither milk nor a totem lifts it. */
@@ -207,29 +279,56 @@ public final class BakudoEffect extends MobEffect {
     }
 
     /**
-     * The bind as those who see spirits see it: two pale gold motes at the small of the back, one at each wrist, or a
-     * ring of yellow motes at the waist with a spark crackling round it.
+     * The bind as those who see spirits see it, now and then, in the style and colour of the bind of its kind that last
+     * landed ({@link #drawn}). One spell that binds the arms and holds the body at once in a look of its own is drawn
+     * once, by the held body: the arms draw theirs only when it differs. The binds' own looks of the arms and the body
+     * are not alike, so both show, as for a Sai and a Hainawa together.
      */
     private void look(ServerLevel level, LivingEntity entity) {
-        if (!held) {
-            if (entity.tickCount % BOUND_LOOK_TICKS != 0) {
-                return;
-            }
-            float yaw = entity.yBodyRot * Mth.DEG_TO_RAD;
-            double behind = entity.getBbWidth() * 0.5 + WRISTS_BEHIND;
-            // Facing (-sin, cos), so behind is (sin, -cos) and the side across the back (cos, sin).
-            double x = entity.getX() + Mth.sin(yaw) * behind;
-            double z = entity.getZ() - Mth.cos(yaw) * behind;
-            double y = entity.getY(0.45);
-            for (int side = -1; side <= 1; side += 2) {
-                SpiritSenses.particles(level, BOUND_DUST, x + Mth.cos(yaw) * WRISTS_APART * side, y,
-                        z + Mth.sin(yaw) * WRISTS_APART * side, 1, 0.0, 0.0, 0.0, 0.0);
-            }
+        Drawn drawn = drawn(entity, held);
+        KidoSpell.BindStyle style = drawn.style();
+        int every = switch (style) {
+            case DEFAULT -> held ? HELD_LOOK_TICKS : BOUND_LOOK_TICKS;
+            case GLOW -> GLOW_LOOK_TICKS;
+            case RODS -> RODS_LOOK_TICKS;
+        };
+        if (entity.tickCount % every != 0) {
             return;
         }
-        if (entity.tickCount % HELD_LOOK_TICKS != 0) {
+        if (!held && style != KidoSpell.BindStyle.DEFAULT && held(entity) && drawn.equals(drawn(entity, true))) {
             return;
         }
+        switch (style) {
+            case DEFAULT -> {
+                if (held) {
+                    ring(level, entity, drawn.colour());
+                } else {
+                    wrists(level, entity, drawn.colour());
+                }
+            }
+            case GLOW -> glow(level, entity, drawn.colour());
+            case RODS -> rods(level, entity, drawn.colour());
+        }
+    }
+
+    /** The bound arms' own look: two motes at the small of the back, one at each wrist. */
+    private static void wrists(ServerLevel level, LivingEntity entity, int colour) {
+        DustParticleOptions dust = colour == BOUND_COLOUR ? BOUND_DUST : dust(colour, DUST_SIZE);
+        float yaw = entity.yBodyRot * Mth.DEG_TO_RAD;
+        double behind = entity.getBbWidth() * 0.5 + WRISTS_BEHIND;
+        // Facing (-sin, cos), so behind is (sin, -cos) and the side across the back (cos, sin).
+        double x = entity.getX() + Mth.sin(yaw) * behind;
+        double z = entity.getZ() - Mth.cos(yaw) * behind;
+        double y = entity.getY(0.45);
+        for (int side = -1; side <= 1; side += 2) {
+            SpiritSenses.particles(level, dust, x + Mth.cos(yaw) * WRISTS_APART * side, y,
+                    z + Mth.sin(yaw) * WRISTS_APART * side, 1, 0.0, 0.0, 0.0, 0.0);
+        }
+    }
+
+    /** The held body's own look: a ring of motes at the waist with a spark crackling round it. */
+    private static void ring(ServerLevel level, LivingEntity entity, int colour) {
+        DustParticleOptions dust = colour == HELD_COLOUR ? HELD_DUST : dust(colour, DUST_SIZE);
         double radius = entity.getBbWidth() * 0.5 + RING_OUT;
         double y = entity.getY(0.5);
         // The spark goes round the ring, a point further each time.
@@ -238,9 +337,47 @@ public final class BakudoEffect extends MobEffect {
             double angle = Math.PI * 2.0 * i / HELD_RING_POINTS;
             double x = entity.getX() + Math.cos(angle) * radius;
             double z = entity.getZ() + Math.sin(angle) * radius;
-            SpiritSenses.particles(level, HELD_DUST, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+            SpiritSenses.particles(level, dust, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
             if (i == spark) {
                 SpiritSenses.particles(level, ParticleTypes.ELECTRIC_SPARK, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+            }
+        }
+    }
+
+    /** Geki's look: a cloud of motes about the whole body, each fading to half its colour. */
+    private static void glow(ServerLevel level, LivingEntity entity, int colour) {
+        DustColorTransitionOptions mote = new DustColorTransitionOptions(rgb(colour), rgb(half(colour)), GLOW_SIZE);
+        double across = entity.getBbWidth() * GLOW_ACROSS;
+        SpiritSenses.particles(level, mote, entity.getX(), entity.getY(0.5), entity.getZ(), GLOW_MOTES, across,
+                entity.getBbHeight() * GLOW_UP, across, 0.0);
+    }
+
+    /**
+     * Rikujōkōrō's look: six rods of light, turned with the body, each struck down from beyond its edge and above the
+     * waist in to the edge at the waist, with a brighter light at the outer end of one, a rod further round each time.
+     */
+    private static void rods(ServerLevel level, LivingEntity entity, int colour) {
+        DustParticleOptions dust = dust(colour, ROD_SIZE);
+        float yaw = entity.yBodyRot * Mth.DEG_TO_RAD;
+        double edge = entity.getBbWidth() * 0.5;
+        double waist = entity.getY(0.5);
+        int lit = (entity.tickCount / RODS_LOOK_TICKS) % RODS;
+        for (int i = 0; i < RODS; i++) {
+            // Facing (-sin, cos), so the first rod comes in from straight ahead.
+            double angle = yaw + Math.PI * 2.0 * i / RODS;
+            double outX = -Math.sin(angle);
+            double outZ = Math.cos(angle);
+            // From the outer end, the whole rod left, in to the body's edge at the waist, none of it left.
+            for (int mote = 0; mote < ROD_MOTES; mote++) {
+                double left = 1.0 - (double) mote / (ROD_MOTES - 1);
+                double out = edge + ROD_OUT * left;
+                SpiritSenses.particles(level, dust, entity.getX() + outX * out, waist + ROD_RISE * left,
+                        entity.getZ() + outZ * out, 1, 0.0, 0.0, 0.0, 0.0);
+            }
+            if (i == lit) {
+                double out = edge + ROD_OUT;
+                SpiritSenses.particles(level, ParticleTypes.END_ROD, entity.getX() + outX * out, waist + ROD_RISE,
+                        entity.getZ() + outZ * out, 1, 0.0, 0.0, 0.0, 0.0);
             }
         }
     }
@@ -280,7 +417,7 @@ public final class BakudoEffect extends MobEffect {
         }
     }
 
-    /** A bound player strikes nothing, though its arm may still swing. Both sides. */
+    /** A bound player strikes nothing. Both sides; its own client does not even swing the arm at the click. */
     private static void onAttack(AttackEntityEvent event) {
         if (refused(event.getEntity())) {
             event.setCanceled(true);
@@ -417,9 +554,29 @@ public final class BakudoEffect extends MobEffect {
         return true;
     }
 
-    /** A dust mote of this colour, in the size of every bind's. */
-    private static DustParticleOptions dust(int colour) {
-        return new DustParticleOptions(new Vector3f(((colour >> 16) & 0xFF) / 255.0F, ((colour >> 8) & 0xFF) / 255.0F,
-                (colour & 0xFF) / 255.0F), DUST_SIZE);
+    /** The style of this name, or null for none this version knows. */
+    @Nullable
+    private static KidoSpell.BindStyle styleNamed(String name) {
+        for (KidoSpell.BindStyle style : KidoSpell.BindStyle.values()) {
+            if (style.getSerializedName().equals(name)) {
+                return style;
+            }
+        }
+        return null;
+    }
+
+    /** A dust mote of this colour and size. */
+    private static DustParticleOptions dust(int colour, float size) {
+        return new DustParticleOptions(rgb(colour), size);
+    }
+
+    /** This colour's red, green and blue, each from 0 to 1, as a particle takes them. */
+    private static Vector3f rgb(int colour) {
+        return new Vector3f(((colour >> 16) & 0xFF) / 255.0F, ((colour >> 8) & 0xFF) / 255.0F, (colour & 0xFF) / 255.0F);
+    }
+
+    /** This colour at half its brightness: what a glow's motes fade to. */
+    private static int half(int colour) {
+        return (colour >> 1) & 0x7F7F7F;
     }
 }
