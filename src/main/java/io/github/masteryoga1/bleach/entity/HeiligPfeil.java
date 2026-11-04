@@ -368,7 +368,8 @@ public class HeiligPfeil extends AbstractArrow {
         // Searched wider than the hit, so a wide Dankū whose middle stands in another section is found (see
         // DankuWall#LOOKUP_MARGIN).
         List<Entity> inside = new ArrayList<>(level().getEntities(this, around.inflate(DankuWall.LOOKUP_MARGIN),
-                other -> startsAt(other.getBoundingBox(), at, heading) && canHitEntity(other)));
+                other -> (other instanceof DankuWall ? entersWall(other.getBoundingBox(), at, heading)
+                        : startsAt(other.getBoundingBox(), at, heading)) && canHitEntity(other)));
         inside.sort(Comparator.comparingDouble(entity -> entity.getBoundingBox().getCenter().distanceToSqr(at)));
         for (Entity entity : inside) {
             if (isRemoved()) {
@@ -438,6 +439,14 @@ public class HeiligPfeil extends AbstractArrow {
             }
         }
         return to;
+    }
+
+    /**
+     * Whether a shot from {@code at} along {@code heading}, starting just short of a Dankū or inside it, is in it or
+     * enters it this tick: a wall is long and flat, so its middle says nothing of where it is met.
+     */
+    private static boolean entersWall(AABB box, Vec3 at, Vec3 heading) {
+        return box.contains(at) || box.inflate(POINT_BLANK_INFLATE).contains(at) && box.clip(at, at.add(heading)).isPresent();
     }
 
     /** Whether a shot from {@code at} along {@code heading} starts inside this box, or just short of it. */

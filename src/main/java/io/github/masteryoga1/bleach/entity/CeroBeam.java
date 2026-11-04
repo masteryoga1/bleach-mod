@@ -532,7 +532,7 @@ public class CeroBeam extends Entity {
             }
             // A wall before where this creature's own box begins: one that holds ends the beam there, one it outweighs
             // shatters.
-            DankuWall.Meeting ward = wards.upTo(entry.at().distanceTo(from) + radius, shooter, art);
+            DankuWall.Meeting ward = wards.upTo(nearSide(entry.box(), from, heading), shooter, art);
             if (ward != null) {
                 blocked = true;
                 to = ward.at();
@@ -958,6 +958,17 @@ public class CeroBeam extends Entity {
             }
         }
         return nearest;
+    }
+
+    /**
+     * How far along the heading from {@code from} this box begins: where its nearest corner lies along the line, or 0
+     * for a box that begins behind it. A beam that has passed that far reaches it, however wide the beam.
+     */
+    private static double nearSide(AABB box, Vec3 from, Vec3 heading) {
+        double x = heading.x >= 0.0 ? box.minX : box.maxX;
+        double y = heading.y >= 0.0 ? box.minY : box.maxY;
+        double z = heading.z >= 0.0 ? box.minZ : box.maxZ;
+        return Math.max(0.0, (x - from.x) * heading.x + (y - from.y) * heading.y + (z - from.z) * heading.z);
     }
 
     @Nullable

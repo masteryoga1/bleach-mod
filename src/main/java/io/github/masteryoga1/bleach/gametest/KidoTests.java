@@ -4063,6 +4063,17 @@ public final class KidoTests {
                     Bala.KIND);
             helper.assertTrue(spent.struck().equals(List.of(pig)) && !spent.blocked() && third.standing() && unhurt(golem),
                     "a Bala from 1,600 with a pig before Dankū gave " + spent + ", the wall standing " + third.standing());
+
+            // A Cero 2 wide either side, fired from x 1.5, has the wall within its width of the muzzle, yet a pig whose
+            // box begins 0.55 on stands before the near face, 1.875 on: the pig is struck, and the wall holds the rest.
+            discard(pig);
+            pig = HollowPlayerTests.placed(helper, EntityType.PIG, 2, 8);
+            mend(golem);
+            CeroBeam.Spec wide = new CeroBeam.Spec(10.0F, 12.0, 2.0F, 0.0F, 0.0F, 0, 0.0F, 0xFFFFFF, 0, 0, false);
+            CeroBeam.Shot broad = CeroBeam.fire(level, caster(helper, GameType.SURVIVAL, shinigami(500.0F, 0)), null,
+                    helper.absoluteVec(new Vec3(1.5, 2.5, 8.5)), new Vec3(1.0, 0.0, 0.0), wide, CeroBeam.Kind.CERO);
+            helper.assertTrue(broad.struck().equals(List.of(pig)) && broad.blocked() && third.standing() && unhurt(golem),
+                    "a wide Cero with a pig just before Dankū gave " + broad + ", the wall standing " + third.standing());
         } finally {
             discard(golem, pig, wallCaster);
             dropWalls(helper);
