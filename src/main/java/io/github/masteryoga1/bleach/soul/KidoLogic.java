@@ -86,7 +86,11 @@ public final class KidoLogic {
         /** Let go before it had gathered: nothing was spent, and nothing is cast. */
         SCATTERED("message.bleach.kido.gather_scattered"),
         /** Its arms are bound by a Bakudō: no spell is cast with the hands tied, by name or by its incantation. */
-        BOUND("message.bleach.bakudo.bound");
+        BOUND("message.bleach.bakudo.bound"),
+        /** Kaidō with no one in reach to heal, and below the level to heal oneself. */
+        NO_PATIENT("message.bleach.kaido.no_patient"),
+        /** Kaidō is being channelled: the key and a chant wait for it. */
+        HEALING("message.bleach.kaido.healing");
 
         @Nullable
         private final String messageKey;

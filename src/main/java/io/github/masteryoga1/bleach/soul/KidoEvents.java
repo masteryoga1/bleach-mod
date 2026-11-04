@@ -14,6 +14,7 @@ import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Holder;
@@ -76,14 +77,16 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * the players it may harm are blinded, and quickens the caster ({@link KidoSmoke}). A Bakudō of
  * {@link KidoSpell.Shape#SHIELD} raises a round shield before the caster, which takes the blows from the front up to its
  * strength and breaks under a bigger one ({@link KidoWard}). A Bakudō of {@link KidoSpell.Shape#WALL} raises a Dankū
- * before the caster, an entity that stops what is shot at it ({@link DankuWall}). A spell's trace, sound and particles
- * are seen and heard only by those who see spirits; what it does to a creature anyone can see.
+ * before the caster, an entity that stops what is shot at it ({@link DankuWall}). A Kaidō of
+ * {@link KidoSpell.Shape#HEAL} is channelled while the key is held, a pulse a second, on the first creature in reach or
+ * from Kidō 40 on the healer itself ({@link KidoHeal}). A spell's trace, sound and particles are seen and heard only by
+ * those who see spirits; what it does to a creature anyone can see.
  * Creative pays nothing, waits for nothing, never misfires and trains nothing. One art at a time: no Kidō while a
- * Getsuga Tenshō or a Cero gathers, and one that begins to gather breaks a chant or a gather.
+ * Getsuga Tenshō or a Cero gathers, and one that begins to gather breaks a chant, a gather or a heal.
  *
  * <p>The keys come from {@link KidoKeyPayload} and the chant from chat ({@link #register}); the cooldown, the pending
- * chant, the key gather, a standing smoke or shield and the spacing between spoken chants are transients in the soul,
- * so a respawn or a relog starts them over. Everything takes a {@link Player}, so game tests can use mock players.
+ * chant, the key gather, a heal, a standing smoke or shield and the spacing between spoken chants are transients in the
+ * soul, so a respawn or a relog starts them over. Everything takes a {@link Player}, so game tests can use mock players.
  */
 public final class KidoEvents {
     public static final ResourceKey<DamageType> HADO = ResourceKey.create(Registries.DAMAGE_TYPE, BleachMod.id("hado"));
@@ -168,10 +171,10 @@ public final class KidoEvents {
     }
 
     /**
-     * The chat listener, the tick of a pending chant or gather and of a standing smoke or shield, the blow that breaks a
-     * chant or a gather and the dimension change that drops them all; the listeners that refuse what a Bakudō's bind
-     * keeps a creature from ({@link BakudoEffect#register}); and the shield's, which takes the blows it covers
-     * ({@link KidoWard#register}).
+     * The chat listener, the tick of a pending chant, gather or heal and of a standing smoke or shield, the blow that
+     * breaks a chant, a gather or a heal and the dimension change that drops them all; the listeners that refuse what a
+     * Bakudō's bind keeps a creature from ({@link BakudoEffect#register}); and the shield's, which takes the blows it
+     * covers ({@link KidoWard#register}).
      */
     public static void register(IEventBus bus) {
         bus.addListener(KidoEvents::onChat);
@@ -186,9 +189,10 @@ public final class KidoEvents {
 
     /**
      * The Kidō key, as sent by {@link KidoKeyPayload} (and called directly by game tests): PRESS casts the chosen
-     * spell by name, or begins to gather one that gathers, NEXT chooses the next known one; RELEASE looses or scatters
-     * a gathering spell and CANCEL scatters it; SELECT does nothing yet. A held soul is told so by its holder and does
-     * nothing more. Tells the player why on the action bar. Returns the refusal, or null when done or ignored.
+     * spell by name, begins to gather one that gathers, or begins a heal; NEXT chooses the next known one; RELEASE
+     * looses or scatters a gathering spell or ends a heal, and CANCEL scatters it or ends the heal; SELECT does nothing
+     * yet. A held soul is told so by its holder and does nothing more. Tells the player why on the action bar. Returns
+     * the refusal, or null when done or ignored.
      */
     @Nullable
     public static KidoLogic.Refusal onKey(Player player, KidoKeyPayload.KidoKey key, Optional<ResourceLocation> spell,
@@ -203,15 +207,19 @@ public final class KidoEvents {
         return switch (key) {
             case PRESS -> press(player, data, level, now);
             case NEXT -> next(player, data, level, now);
-            // Every key-up sends RELEASE, and a screen opening CANCEL: without a gather both mean nothing.
+            // Every key-up sends RELEASE, and a screen opening CANCEL: each ends a heal, and without a gather or a heal
+            // both mean nothing.
             case RELEASE -> release(player, data, now);
-            case CANCEL -> data.kidoGather == null ? null : scatter(player, data);
-            // SELECT waits for the Kidō page (6f).
+            case CANCEL -> {
+                KidoHeal.stop(player, data, null);
+                yield data.kidoGather == null ? null : scatter(player, data);
+            }
+            // SELECT waits for the Kidō page (6i).
             default -> null;
         };
     }
 
-    /** The key alone: the chosen spell, cast by name or begun to gather, or why not, told. */
+    /** The key alone: the chosen spell, cast by name, begun to gather or begun to heal, or why not, told. */
     @Nullable
     private static KidoLogic.Refusal press(Player player, SoulData data, ServerLevel level, long now) {
         KidoLogic.Refusal refusal = KidoLogic.mayCast(player, data, now);
@@ -229,7 +237,9 @@ public final class KidoEvents {
         if (spell.gathers()) {
             return gather(player, data, level, chosen.get(), now);
         }
-        refusal = cast(player, spell, KidoLogic.Form.NAME, now);
+        refusal = spell.shape() == KidoSpell.Shape.HEAL
+                ? KidoHeal.begin(player, KidoHeal.patientFor(player, spell), spell, now)
+                : cast(player, spell, KidoLogic.Form.NAME, now);
         if (refusal != null) {
             tell(player, refusal, spell);
         }
@@ -327,15 +337,17 @@ public final class KidoEvents {
      * broken, with a word, once a Getsuga Tenshō or a Cero begins to gather or the soul sits in Jinzen. When
      * its time comes it goes off at full strength, every rule checked again, and a refusal then is told, with nothing
      * spent. A spell gathering on the key is dropped, broken and let go alike, by the rules of a cast by name, and
-     * sparks in the palm meanwhile. Under a frozen tick rate the clock stands still, so it waits. Called by the tick
-     * listener and by tests.
+     * sparks in the palm meanwhile, and a heal on the key pulses or ends ({@link KidoHeal}). Under a frozen tick rate
+     * the clock stands still, so it waits. Called by the tick listener and by tests.
      */
     public static void tick(Player player, SoulData data, long now) {
         KidoLogic.Chant chant = data.kidoChant;
         if (chant == null) {
-            // A chant and a gather never wait together: each refuses the other (check).
+            // A chant, a gather and a heal never wait together: each refuses the others (check).
             if (data.kidoGather != null) {
                 tickGather(player, data, now);
+            } else if (data.kidoHeal != null) {
+                KidoHeal.tick(player, data, now);
             }
             return;
         }
@@ -454,10 +466,11 @@ public final class KidoEvents {
     /**
      * The Kidō key let go: a gathering spell goes off now if it would have at the very next tick, since a key's
      * {@code now} is the tick just ended, and scatters if let go any sooner. Without a gather, nothing happens: a tap
-     * on any spell sends this too.
+     * on any spell sends this too. Ends a heal, without a word.
      */
     @Nullable
     private static KidoLogic.Refusal release(Player player, SoulData data, long now) {
+        KidoHeal.stop(player, data, null);
         KidoLogic.Gather gather = data.kidoGather;
         if (gather == null) {
             return null;
@@ -523,16 +536,17 @@ public final class KidoEvents {
 
     /**
      * Casts this spell in this form now, if it may, the first check that fails winning: whether the soul may cast in
-     * this form ({@link KidoLogic#mayCast}), no chant being said or spell gathering, a server world and a spell that
-     * does something, the Kidō level ({@link KidoLogic#gate}), the cooldown, a Getsuga Tenshō or a Cero gathering
-     * (creative too), and enough reiryoku to leave {@link KidoLogic#MIN_LEFT}. Its strength is the form's share, and
-     * less for a spell that wants a zanpakutō at hand when there is none ({@link KidoLogic#handShare}). Then it is paid
-     * for and the hands are busy for the spell's cooldown. Cast by name, a spell with an incantation misfires when the
-     * roll falls below {@link KidoLogic#misfireChance}: it bursts in the hand, hurting its caster, and nothing more
-     * happens. Otherwise its shape strikes (a beam, a gust, or a bind) or wards (a smoke, a shield or a wall, which strike
-     * nothing), the call goes on the caster's action bar (for a bind shrugged off, that it was), and Kidō trains, with
-     * the strike bonus when a creature was struck or bound and twice over for a chant; when a Hollow was among those
-     * struck or bound, an unbound Asauchi leans to kidō. Creative pays, waits, misfires, trains and leans nothing.
+     * this form ({@link KidoLogic#mayCast}), no chant being said, spell gathering or heal channelled, a server world
+     * and a spell that does something (never a heal, which is channelled on the key: {@link KidoHeal}), the Kidō level
+     * ({@link KidoLogic#gate}), the cooldown, a Getsuga Tenshō or a Cero gathering (creative too), and enough reiryoku
+     * to leave {@link KidoLogic#MIN_LEFT}. Its strength is the form's share, and less for a spell that wants a
+     * zanpakutō at hand when there is none ({@link KidoLogic#handShare}). Then it is paid for and the hands are busy
+     * for the spell's cooldown. Cast by name, a spell with an incantation misfires when the roll falls below
+     * {@link KidoLogic#misfireChance}: it bursts in the hand, hurting its caster, and nothing more happens. Otherwise
+     * its shape strikes (a beam, a gust, or a bind) or wards (a smoke, a shield or a wall, which strike nothing), the
+     * call goes on the caster's action bar (for a bind shrugged off, that it was), and Kidō trains, with the strike
+     * bonus when a creature was struck or bound and twice over for a chant; when a Hollow was among those struck or
+     * bound, an unbound Asauchi leans to kidō. Creative pays, waits, misfires, trains and leans nothing.
      *
      * <p>The one entry for every way of casting. Tells nothing; the caller does. Returns the refusal (a misfire is
      * {@link KidoLogic.Refusal#MISFIRED}), or null when cast. Takes the spell itself, not its holder, so a game test can
@@ -542,8 +556,9 @@ public final class KidoEvents {
     public static KidoLogic.Refusal cast(Player player, KidoSpell spell, KidoLogic.Form form, long now, double roll) {
         SoulData data = SoulLogic.get(player);
         KidoLogic.Refusal refusal = check(player, data, spell, form, now, true);
-        // The check refuses anywhere but a server world, so past it the level is always one.
-        if (refusal != null || !(player.level() instanceof ServerLevel level)) {
+        // The check refuses anywhere but a server world, so past it the level is always one; a heal is channelled on the
+        // key (KidoHeal.begin), never cast in one act.
+        if (refusal != null || spell.shape() == KidoSpell.Shape.HEAL || !(player.level() instanceof ServerLevel level)) {
             return refusal == null ? KidoLogic.Refusal.UNABLE : refusal;
         }
         int kido = data.level(Stat.KIDO);
@@ -587,8 +602,8 @@ public final class KidoEvents {
                 DankuWall.raise(level, player, spell, share, now);
                 yield List.of();
             }
-            // Never reached: a spell of no shape is not castable, and was refused above.
-            case NONE -> List.of();
+            // Never reached: a spell of no shape is not castable, and a heal is refused above.
+            case NONE, HEAL -> List.of();
         };
         player.displayClientMessage(said.copy().withStyle(ChatFormatting.GRAY), true);
         if (!creative) {
@@ -603,11 +618,12 @@ public final class KidoEvents {
 
     /**
      * Why this soul may not cast this spell in this form now, or null, the first that fails winning (see
-     * {@link #cast}). Changes nothing. A chant that begins is checked without the cooldown, which it waits out instead.
+     * {@link #cast}). Changes nothing. A chant that begins is checked without the cooldown, which it waits out instead,
+     * and so is a heal pressed within a pulse of the hands coming free ({@link KidoHeal#begin}).
      */
     @Nullable
-    private static KidoLogic.Refusal check(Player player, SoulData data, KidoSpell spell, KidoLogic.Form form,
-                                           long now, boolean mindCooldown) {
+    static KidoLogic.Refusal check(Player player, SoulData data, KidoSpell spell, KidoLogic.Form form, long now,
+                                   boolean mindCooldown) {
         KidoLogic.Refusal refusal = KidoLogic.mayCast(player, data, now, form);
         if (refusal != null) {
             return refusal;
@@ -619,6 +635,10 @@ public final class KidoEvents {
         // Nor anything over a spell gathering on the key, which is the reiatsu already at work.
         if (data.kidoGather != null) {
             return KidoLogic.Refusal.GATHERING;
+        }
+        // Nor over a heal, which holds the hands.
+        if (data.kidoHeal != null) {
+            return KidoLogic.Refusal.HEALING;
         }
         if (!(player.level() instanceof ServerLevel) || !spell.castable()) {
             return KidoLogic.Refusal.UNABLE;
@@ -807,6 +827,14 @@ public final class KidoEvents {
      * nothing. Public for tests.
      */
     public static BindAim bindAim(Player caster, KidoSpell spell) {
+        return aim(caster, spell, body -> KidoLogic.mayBind(caster, body));
+    }
+
+    /**
+     * The ray a heal or a bind follows (see {@link #bindAim}), passing every creature {@code may} refuses. Changes
+     * nothing. Public for tests.
+     */
+    public static BindAim aim(Player caster, KidoSpell spell, Predicate<LivingEntity> may) {
         float margin = spell.effect().radius();
         Vec3 eye = caster.getEyePosition();
         Vec3 look = caster.getViewVector(1.0F);
@@ -821,7 +849,7 @@ public final class KidoEvents {
         for (Entity entity : caster.level().getEntities(caster, new AABB(eye, end).inflate(1.0 + margin), candidate -> {
             LivingEntity body = SpiritProjectiles.bodyOf(candidate);
             return candidate.isPickable() && !candidate.isSpectator() && !(candidate instanceof Negacion.HoldingVehicle)
-                    && body != null && KidoLogic.mayBind(caster, body);
+                    && body != null && may.test(body);
         })) {
             // The box it met (a part's, for a great creature), widened by the margin.
             AABB box = entity.getBoundingBox().inflate(margin);
@@ -871,8 +899,8 @@ public final class KidoEvents {
      * strength allows ({@link KidoLogic#bindTicks}), hidden but for the look drawn on it, with the caster as the
      * source. When neither lands (too strong a soul, a Quincy woven in Ransōtengai, or a creature no effect touches),
      * it is shrugged off, heard and seen by those who see spirits. A bind that lands leaves the creature wary of the
-     * spell for twice its time from now, and arms bound break the chant a soul was saying and the spell it was
-     * gathering, as a blow would, so it is told why they stopped.
+     * spell for twice its time from now, and arms bound break the chant a soul was saying, the spell it was gathering
+     * and the heal it was channelling, as a blow would, so it is told why they stopped.
      *
      * <p>Each effect that lands remembers the spell's look on the creature ({@link BakudoEffect#markLook}), so it is
      * drawn in that spell's style and colour while it lasts. A body its Hollow had seized before the bind, held for at
@@ -920,6 +948,7 @@ public final class KidoEvents {
             if (data.kidoGather != null) {
                 breakGather(player, data);
             }
+            KidoHeal.stop(player, data, KidoHeal.BROKEN_KEY);
         }
         if (taken && body && KidoLogic.pins(held) && target instanceof Player host) {
             VisoredEvents.endTakeover(host, SoulLogic.get(host), VisoredEvents.TakeoverEnd.PINNED, now);
@@ -1016,10 +1045,10 @@ public final class KidoEvents {
     }
 
     /**
-     * A chanting, gathering or warding player's tick, before it moves, so a chant or a gather goes off from where a key
-     * press would; then its smoke and its shield ({@link KidoSmoke#tick}, {@link KidoWard#tick}). A fault drops the
-     * chant and the gather, or the smoke and the shield, and is logged once, as a throw here would kick the player or
-     * stop a single-player world; a fault in one pair never drops the other.
+     * A chanting, gathering, healing or warding player's tick, before it moves, so a chant or a gather goes off from
+     * where a key press would; then its smoke and its shield ({@link KidoSmoke#tick}, {@link KidoWard#tick}). A fault
+     * drops the chant, the gather and the heal, or the smoke and the shield, and is logged once, as a throw here would
+     * kick the player or stop a single-player world; a fault in one pair never drops the other.
      */
     private static void onPlayerTick(PlayerTickEvent.Pre event) {
         Player player = event.getEntity();
@@ -1027,7 +1056,7 @@ public final class KidoEvents {
             return;
         }
         SoulData data = SoulLogic.get(player);
-        boolean casting = data.kidoChant != null || data.kidoGather != null;
+        boolean casting = data.kidoChant != null || data.kidoGather != null || data.kidoHeal != null;
         boolean warding = data.kidoSmoke != null || data.kidoShield != null;
         if (!casting && !warding) {
             return;
@@ -1039,7 +1068,8 @@ public final class KidoEvents {
             } catch (RuntimeException e) {
                 data.kidoChant = null;
                 dropGather(player, data);
-                BleachMod.LOGGER.warn("Kidō: {}'s chant or gather failed, and is dropped",
+                data.kidoHeal = null;
+                BleachMod.LOGGER.warn("Kidō: {}'s chant, gather or heal failed, and is dropped",
                         player.getName().getString(), e);
             }
         }
@@ -1057,7 +1087,7 @@ public final class KidoEvents {
     }
 
     /**
-     * A creature's blow that lands breaks a chant or a gather: one from a living attacker other than the soul itself,
+     * A creature's blow that lands breaks a chant, a gather or a heal: one from a living attacker other than the soul,
      * that took health or absorption hearts. Fire, falls, poison, magic and the soul's own misfire come from no
      * creature, and a blow a shield stopped took nothing, so none of those break either.
      */
@@ -1077,12 +1107,13 @@ public final class KidoEvents {
             if (data.kidoGather != null) {
                 breakGather(player, data);
             }
+            KidoHeal.stop(player, data, KidoHeal.BROKEN_KEY);
         }
     }
 
     /**
-     * A chant or a gather does not follow its soul into another world, nor a smoke or a shield: a portal keeps the same
-     * soul, so all are dropped here, the gather's orb with them.
+     * A chant or a gather does not follow its soul into another world, nor a heal, a smoke or a shield: a portal keeps
+     * the same soul, so all are dropped here, the gather's orb with them.
      */
     private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         Player player = event.getEntity();
@@ -1090,6 +1121,7 @@ public final class KidoEvents {
             SoulData data = SoulLogic.get(player);
             data.kidoChant = null;
             dropGather(player, data);
+            data.kidoHeal = null;
             data.kidoSmoke = null;
             data.kidoShield = null;
         }
@@ -1127,7 +1159,7 @@ public final class KidoEvents {
      * Tells the player a refusal on the action bar, in grey, unless it is a silent one: the spell's title and the level
      * it needs for a level, and its title for reiryoku, for a misfire and for a gather scattered.
      */
-    private static void tell(Player player, KidoLogic.Refusal refusal, @Nullable KidoSpell spell) {
+    static void tell(Player player, KidoLogic.Refusal refusal, @Nullable KidoSpell spell) {
         String key = refusal.messageKey();
         if (key == null) {
             return;

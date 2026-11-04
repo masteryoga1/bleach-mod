@@ -41,6 +41,7 @@ import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
 import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.KidoHeal;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
@@ -201,7 +202,10 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * player: a blow of 4 from two blocks ahead must not land, and one from two blocks behind must. Sneaking with the key
  * twice more must choose #81 Dankū, which the action bar must name, and the key alone must raise its wall of light,
  * which must reach the client two blocks south of the player, facing it, 5 wide and 4 tall, and be gone 6 seconds
- * later, before the run quits.
+ * later. Sneaking with the key once more must choose Kaidō, which the action bar must name alone, and the key held must
+ * heal a hurt villager two blocks south of the player, which must reach the client whole within three seconds, and
+ * then, with no one in reach and natural regeneration off, the player's own wounds, by a heart a second, before the run
+ * quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -269,7 +273,10 @@ public final class ClientSmokeTest {
     private static Entity subject;
     /** How high the player stood when Vollständig's flight began. */
     private static double flightFrom;
-    /** The player's health just before Vollständig was let go in the air, and before the blows on Enkōsen. */
+    /**
+     * The player's health just before Vollständig was let go in the air, before the blows on Enkōsen, and after the
+     * blow that Kaidō then heals.
+     */
     private static float healthBefore;
     /** The tick the player landed after Vollständig, or -1 before then. */
     private static int landedAt = -1;
@@ -1072,8 +1079,8 @@ public final class ClientSmokeTest {
             // power is taken away first, since an awakened Quincy cannot use Kidō (by its tier alone: a reset would leave
             // the bloodline open, and the steps wait for it), and the Hollow too, so its voice never takes the action
             // bar. At Kidō 10 the soul knows Shō, Byakurai, Shakkahō and Sōkatsui, and Sai, Hainawa, Geki and Sekienton,
-            // which come after every Hadō; having never chosen, it casts Shō first. The villager stands tall enough for a
-            // level beam from the eyes to meet it.
+            // which come after every Hadō, and Kaidō after every Bakudō; having never chosen, it casts Shō first. The
+            // villager stands tall enough for a level beam from the eyes to meet it.
             case 4700 -> {
                 command(minecraft, "bleach tier @s quincy 0");
                 command(minecraft, "bleach visored @s reset");
@@ -1267,7 +1274,37 @@ public final class ClientSmokeTest {
             // for 6 seconds, about 6041, for 160 of the 520 or more reiryoku left.
             case 5920 -> KidoKeys.CAST.setDown(true);
             case 5922 -> KidoKeys.CAST.setDown(false);
-            case 6080 -> {
+            // Sneaking, the key chooses Kaidō, which comes after Dankū, the last Bakudō.
+            case 6090 -> minecraft.options.keyShift.setDown(true);
+            case 6093 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 6095 -> KidoKeys.CAST.setDown(false);
+            case 6097 -> minecraft.options.keyShift.setDown(false);
+            // A fresh villager two blocks south, within Kaidō's reach of 3 from the eyes, hurt by half its health; any left
+            // from before are killed first, so it stands alone.
+            case 6100 -> command(minecraft, "kill @e[type=minecraft:villager,distance=..8]");
+            case 6102 -> command(minecraft, "summon minecraft:villager ~ ~ ~2 {NoAI:1b,Silent:1b}");
+            case 6110 -> command(minecraft, "damage @e[type=minecraft:villager,limit=1,sort=nearest] 10 minecraft:generic");
+            // Dankū's cooldown frees the hands about 6221. The key held heals the villager two hearts a second (Kidō 42):
+            // about 6241, 6261 and 6281, whole by the third, which comes 24 ticks before the key is let go.
+            case 6240 -> KidoKeys.CAST.setDown(true);
+            case 6305 -> KidoKeys.CAST.setDown(false);
+            // With no one in reach, Kaidō from Kidō 40 heals the player's own wounds at half the rate, one heart a second,
+            // about 6351, 6371 and 6391, the third 24 ticks before the key is let go; natural regeneration is off
+            // meanwhile, so only Kaidō heals. A generic blow with no attacker ignores armour and difficulty.
+            case 6320 -> {
+                command(minecraft, "kill @e[type=minecraft:villager,distance=..8]");
+                command(minecraft, "gamerule naturalRegeneration false");
+            }
+            case 6325 -> command(minecraft, "damage @s 8 minecraft:generic");
+            case 6335 -> healthBefore = player.getHealth();
+            case 6350 -> KidoKeys.CAST.setDown(true);
+            case 6415 -> KidoKeys.CAST.setDown(false);
+            // Natural regeneration back, once the last window has closed.
+            case 6425 -> command(minecraft, "gamerule naturalRegeneration true");
+            case 6450 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1780,6 +1817,31 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, 6045, 6070, () -> count(minecraft, DankuWall.class, 8.0) == 0,
                 "Dankū's wall still stood long after its 6 seconds");
+        // Kaidō after Dankū: so it comes last of all on a real client too, named alone.
+        expectWithin(minecraft, 6098, 6125,
+                () -> chosenIs(soul, KidoSpell.KAIDO) && chosenShown(minecraft, KidoSpell.KAIDO),
+                "Sneak and the Kidō key never chose Kaidō after Dankū, or the action bar never named it");
+        expectWithin(minecraft, 6112, 6140,
+                () -> nearest(minecraft, Villager.class, 4.0,
+                        villager -> villager.isAlive() && villager.getHealth() <= 10.5F) != null,
+                "the villager two blocks south never took a blow of 10");
+        // Health is sent to every client, so the villager's rise is what a client can be asked; the motes are the shot's.
+        if (expectWithin(minecraft, 6243, 6270, () -> healShown(minecraft, false)
+                        && nearest(minecraft, Villager.class, 4.0, villager -> villager.getHealth() >= 13.5F) != null,
+                "the Kidō key held never began Kaidō on the villager, or never healed it (the action bar last read: "
+                        + lastActionBar() + ")")) {
+            shot(minecraft, "kido_kaido");
+        }
+        expectWithin(minecraft, 6285, 6315,
+                () -> nearest(minecraft, Villager.class, 4.0, villager -> villager.getHealth() >= 19.5F) != null,
+                "three seconds of Kaidō never healed the villager whole");
+        expectWithin(minecraft, 6327, 6345, () -> player.getHealth() <= player.getMaxHealth() - 6.0F,
+                "a blow of 8 with no attacker never landed on the player");
+        expectWithin(minecraft, 6353, 6380, () -> healShown(minecraft, true) && player.getHealth() >= healthBefore + 1.5F,
+                "with no one in reach, the Kidō key held never healed the player's own wounds (the action bar last read: "
+                        + lastActionBar() + ")");
+        expectWithin(minecraft, 6392, 6420, () -> player.getHealth() >= healthBefore + 5.5F,
+                "three seconds of Kaidō never healed the player's own wounds by three hearts");
     }
 
     /**
@@ -1853,6 +1915,16 @@ public final class ClientSmokeTest {
     private static boolean callShown(Minecraft minecraft, ResourceKey<KidoSpell> key) {
         KidoSpell spell = synced(minecraft, key);
         return spell != null && actionBarShows(spell.call());
+    }
+
+    /**
+     * Whether the action bar shows Kaidō begun, on another or on oneself, in the line built from this client's copy of
+     * it; false while the client has no copy.
+     */
+    private static boolean healShown(Minecraft minecraft, boolean self) {
+        KidoSpell spell = synced(minecraft, KidoSpell.KAIDO);
+        return spell != null && actionBarShows(
+                Component.translatable(self ? KidoHeal.BEGUN_SELF_KEY : KidoHeal.BEGUN_KEY, spell.title()));
     }
 
     /** Whether one of the server's last chat lines reads as this one, give or take the spaces about it. */

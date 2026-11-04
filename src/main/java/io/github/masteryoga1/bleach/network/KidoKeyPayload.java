@@ -33,7 +33,7 @@ public record KidoKeyPayload(KidoKey key, Optional<ResourceLocation> spell) impl
     public enum KidoKey {
         /** The key went down: cast the chosen spell by name. */
         PRESS,
-        /** The key came up (to loose a gathered Raikōhō, or end a channel, once those spells come). */
+        /** The key came up: loose or scatter a gathering spell such as Raikōhō, or end a heal. */
         RELEASE,
         /** A screen opened while it was held: let go without casting. */
         CANCEL,

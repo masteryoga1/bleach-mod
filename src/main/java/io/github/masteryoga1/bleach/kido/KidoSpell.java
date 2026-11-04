@@ -44,10 +44,10 @@ import net.neoforged.neoforge.registries.DataPackRegistryEvent;
  * @param incantations  the whole chants that cast it in chat, at most {@link #MAX_INCANTATIONS}, each at most
  *                      {@link #MAX_INCANTATION_LENGTH} characters (chat's limit); none means it has no known
  *                      incantation and loses nothing cast by name
- * @param costShare     the share of maximum reiryoku a cast costs, from 0 to 1
- * @param minCost       the least reiryoku a cast costs
- * @param cooldownTicks ticks before the caster's hands can cast again, at least 1
- * @param xp            the Kidō xp a cast trains
+ * @param costShare     the share of maximum reiryoku a cast costs, from 0 to 1; for a heal, each pulse's
+ * @param minCost       the least reiryoku a cast costs; for a heal, each pulse's
+ * @param cooldownTicks ticks before the caster's hands can cast again, at least 1; for a heal, each pulse's
+ * @param xp            the Kidō xp a cast trains; for a heal, each pulse's
  * @param gatherTicks   ticks a cast by name gathers in the palm, the Kidō key held, before it goes off (0 for at
  *                      once), at most five seconds
  */
@@ -119,6 +119,8 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public static final ResourceKey<KidoSpell> RIKUJOKORO = ResourceKey.create(REGISTRY, BleachMod.id("rikujokoro"));
     /** Bakudō #81 Dankū, a wall of light before the caster that stops what is shot at it. */
     public static final ResourceKey<KidoSpell> DANKU = ResourceKey.create(REGISTRY, BleachMod.id("danku"));
+    /** Kaidō, the healing way: a heal channelled while the Kidō key is held. */
+    public static final ResourceKey<KidoSpell> KAIDO = ResourceKey.create(REGISTRY, BleachMod.id("kaido"));
 
     /** Kind, then number, then id: the order spells are listed and chosen in. */
     public static final Comparator<Holder.Reference<KidoSpell>> ORDER =
@@ -135,14 +137,15 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         level = Mth.clamp(level, 0, MAX_LEVEL);
         byNameLevel = Mth.clamp(byNameLevel, level, MAX_LEVEL);
         chantTicks = Mth.clamp(chantTicks, 0, MAX_CHANT_TICKS);
-        incantations = cleaned(incantations);
+        // A heal is channelled on the key: never chanted, never gathered.
+        incantations = shape == Shape.HEAL ? List.of() : cleaned(incantations);
         costShare = within(costShare, 0.0F, 1.0F);
         minCost = within(minCost, 0.0F, MAX_MIN_COST);
         cooldownTicks = Mth.clamp(cooldownTicks, 1, MAX_COOLDOWN_TICKS);
         xp = Mth.clamp(xp, 0, MAX_XP);
         look = look == null ? Look.NONE : look;
         effect = effect == null ? Effect.NONE : effect;
-        gatherTicks = Mth.clamp(gatherTicks, 0, MAX_GATHER_TICKS);
+        gatherTicks = shape == Shape.HEAL ? 0 : Mth.clamp(gatherTicks, 0, MAX_GATHER_TICKS);
     }
 
     /**
@@ -193,14 +196,26 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         return gatherTicks > 0;
     }
 
-    /** Its title, such as "Hadō #4 Byakurai": its kind's name, its number and its name. */
-    public Component title() {
-        return Component.translatable("kido.bleach.title", Component.translatable(kind.translationKey()), number, name);
+    /** Whether it has a number: Kaidō has none, and is named alone. */
+    public boolean numbered() {
+        return number > 0;
     }
 
-    /** What its caster calls out by name, such as "Hadō #4, Byakurai!". */
+    /**
+     * Its title, such as "Hadō #4 Byakurai": its kind's name, its number and its name, or its name alone if it has no
+     * number.
+     */
+    public Component title() {
+        return numbered()
+                ? Component.translatable("kido.bleach.title", Component.translatable(kind.translationKey()), number, name)
+                : name.copy();
+    }
+
+    /** What its caster calls out by name, such as "Hadō #4, Byakurai!", or its name alone if it has no number. */
     public Component call() {
-        return Component.translatable("kido.bleach.call", Component.translatable(kind.translationKey()), number, name);
+        return numbered()
+                ? Component.translatable("kido.bleach.call", Component.translatable(kind.translationKey()), number, name)
+                : name.copy();
     }
 
     // ---- Helpers ----
@@ -270,7 +285,12 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
          * A wall of light before the caster, which stands a while and stops the Hadō and projectiles shot at it, and
          * weighs the rest (see DankuWall).
          */
-        WALL;
+        WALL,
+        /**
+         * A heal channelled while the Kidō key is held: the first creature in reach and sight, or from Kidō 40 the
+         * healer itself, a pulse a second (see KidoHeal).
+         */
+        HEAL;
 
         public static final Codec<Shape> CODEC = StringRepresentable.fromEnum(Shape::values);
 
@@ -349,10 +369,11 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      * @param maxDamage     the most damage once the Kidō level has grown it, before the form's share is taken (for a
      *                      shield, the most strength)
      * @param range         how far it reaches, in blocks (a gust at most {@link KidoSpell#GUST_MAX_RANGE}); for a wall,
-     *                      how far before the caster it rises (the wall keeps 1 to 8)
+     *                      how far before the caster it rises (the wall keeps 1 to 8); for a heal, its reach from the
+     *                      eyes
      * @param radius        its half-width, in blocks (for a gust, only its streak's; for a bind, its ray's margin; for
      *                      a smoke, its cloud's; for a shield, the ring it is drawn as; for a wall, its half-width, which
-     *                      the wall keeps 0.25 to 2.75)
+     *                      the wall keeps 0.25 to 2.75; for a heal, its aim's margin, as a bind's)
      * @param pierce        how many creatures it may strike that it meets before it stops
      * @param blastRadius   how far about where it bursts the blast reaches, in blocks (0 for none)
      * @param blastShare    the blast's share of the damage

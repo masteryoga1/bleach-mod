@@ -26,18 +26,21 @@ import io.github.masteryoga1.bleach.soul.GranReyCero;
 import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
+import io.github.masteryoga1.bleach.soul.KidoHeal;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.KidoSmoke;
 import io.github.masteryoga1.bleach.soul.KidoWard;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.QuincyRansotengai;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
@@ -135,40 +138,44 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, and the seven Bakudō, two of them
- * chanted, their order and their looks, a broken or empty file read leniently and clamped, and each spell sent as the
- * sync sends it), who may cast and who may only choose, the spells a Kidō level knows and the one chosen, the gate and
- * the share of casting by name alone, a spell's power and cost, what a Hadō strikes and what it spares, Kidō training
- * up to the Academy's exam, how a line said in chat is heard as an incantation, the chant's time and what breaks it,
- * the misfire of a cast by name, the burst, burn and blast of Shakkahō and Sōkatsui, Tenran's widening gust (what it
- * reaches and what a wall keeps from it, its push away from the caster, the players it blinds and what spares them, and
- * its loss without a zanpakutō at hand), Raikōhō gathered in the palm on the Kidō key (nothing spent until it goes off,
- * the misfire drawn only then, and what lets it go, scatters, breaks or drops it), and the binds of Sai and Hainawa
- * (the contest of strength that weighs each, what the ray reaches, what bound arms and a held body are kept from and
- * what they still do, who may be bound, and what shrugs a bind off or lifts it), Geki and Rikujōkōrō chanted (how each
- * is heard, gated and shared, and a bind that binds and holds at once, drawn in its spell's look), the pin of a body
- * its Hollow has seized by a hold long enough, Sekienton's smoke (the creatures in it left lost to the caster, their
- * hunt and a creeper's swell stopped, at once and at each pulse, the players it blinds and what spares them, and the
- * caster quickened), Enkōsen's shield (the blows it takes from the front and within the moment of another, what passes
- * once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it), and Dankū's wall (the
- * Hadō and arrows it stops, the arts it weighs by their shooters' reiatsu against its caster's, the bodies and binds it
- * lets through, and its end, never saved). The by-name gate and share are also tested on a spell built in code
- * ({@link #chantSpell}). Mock players are not in the world and never tick, so the Kidō key is pressed and let go by
- * calling {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a
- * later time passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
- * {@link KidoEvents#chant}, and a pending chant or gather goes off by calling {@link KidoEvents#tick} with the time it
- * would come at, as a smoke pulses and a shield ends by calling {@link KidoSmoke#tick} and {@link KidoWard#tick}; a
- * misfire's roll is passed to the five-argument {@code KidoEvents.cast}, and for a gather, which draws its own roll as
- * it goes off, the misfire chance is set to 1 or 0 for that one call. No cone can find a mock player, so a gust's blow
- * is given to one directly ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on one directly
- * ({@link KidoEvents#bindOne}), its clamp is called by hand and what it refuses is posted as the event the act would
- * fire; nor can a smoke's pulse, so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}). A wall is mostly
- * raised directly ({@link DankuWall#raise}), and a crescent or an arrow shot at it is ticked by hand within the test's
- * one tick. A still golem has no will of its own, so the revenge goal a blow would start is started by hand. Raikōhō's
- * heavy bolt is taken by an iron golem, whose 100 health outlasts it. Casters stand at {@link #LANE} in the
- * {@code field} template, facing east: every beam, bind, crescent and arrow goes east down the lane into a creature, a
- * wall or the dirt wall, and every gust east along it, ending within the field; every creature, trace, orb, light,
- * takeover, mask, gathering, team, bind, look, wary mark, smoke, shield, wall and lost mark a test makes is put away
- * within its first tick, but for the walls one test leaves to go by themselves.
+ * chanted, and Kaidō, their order and their looks, a broken or empty file read leniently and clamped, and each spell
+ * sent as the sync sends it), who may cast and who may only choose, the spells a Kidō level knows and the one chosen,
+ * the gate and the share of casting by name alone, a spell's power and cost, what a Hadō strikes and what it spares,
+ * Kidō training up to the Academy's exam, how a line said in chat is heard as an incantation, the chant's time and what
+ * breaks it, the misfire of a cast by name, the burst, burn and blast of Shakkahō and Sōkatsui, Tenran's widening gust
+ * (what it reaches and what a wall keeps from it, its push away from the caster, the players it blinds and what spares
+ * them, and its loss without a zanpakutō at hand), Raikōhō gathered in the palm on the Kidō key (nothing spent until it
+ * goes off, the misfire drawn only then, and what lets it go, scatters, breaks or drops it), and the binds of Sai and
+ * Hainawa (the contest of strength that weighs each, what the ray reaches, what bound arms and a held body are kept
+ * from and what they still do, who may be bound, and what shrugs a bind off or lifts it), Geki and Rikujōkōrō chanted
+ * (how each is heard, gated and shared, and a bind that binds and holds at once, drawn in its spell's look), the pin of
+ * a body its Hollow has seized by a hold long enough, Sekienton's smoke (the creatures in it left lost to the caster,
+ * their hunt and a creeper's swell stopped, at once and at each pulse, the players it blinds and what spares them, and
+ * the caster quickened), Enkōsen's shield (the blows it takes from the front and within the moment of another, what
+ * passes once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it), Dankū's wall
+ * (the Hadō and arrows it stops, the arts it weighs by their shooters' reiatsu against its caster's, the bodies and
+ * binds it lets through, and its end, never saved), and Kaidō (its channel, reiryoku before health at the patient's own
+ * rate, the healer's rest, Kubo's tiers and what they lift, oneself from Kidō 40, Ransōtengai's refusal, who may be
+ * healed, and every end). The by-name gate and share are also tested on a spell built in code ({@link #chantSpell}).
+ * Mock players are not in the world and never tick, so the Kidō key is pressed and let go by calling
+ * {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a later time
+ * passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
+ * {@link KidoEvents#chant}, and a pending chant or gather goes off, and a heal pulses, by calling
+ * {@link KidoEvents#tick} with the time it would come at, as a smoke pulses and a shield ends by calling
+ * {@link KidoSmoke#tick} and {@link KidoWard#tick}; a misfire's roll is passed to the five-argument
+ * {@code KidoEvents.cast}, and for a gather, which draws its own roll as it goes off, the misfire chance is set to 1 or
+ * 0 for that one call. No cone can find a mock player, so a gust's blow is given to one directly
+ * ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on one directly ({@link KidoEvents#bindOne}),
+ * its clamp is called by hand and what it refuses is posted as the event the act would fire; nor can a smoke's pulse,
+ * so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}); nor can a heal's aim, so a heal is begun on one
+ * directly ({@link KidoHeal#begin}). A wall is mostly raised directly ({@link DankuWall#raise}), and a crescent or an
+ * arrow shot at it is ticked by hand within the test's one tick. A still golem has no will of its own, so the revenge
+ * goal a blow would start is started by hand. Raikōhō's heavy bolt is taken by an iron golem, whose 100 health outlasts
+ * it. Casters stand at {@link #LANE} in the {@code field} template, facing east: every beam, bind, crescent and arrow
+ * goes east down the lane into a creature, a wall or the dirt wall, and every gust east along it, ending within the
+ * field; every creature, trace, orb, light, takeover, mask, gathering, heal, team, bind, look, wary mark, smoke,
+ * shield, wall and lost mark a test makes is put away within its first tick, but for the walls one test leaves to go by
+ * themselves.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -177,6 +184,8 @@ public final class KidoTests {
     private static final Vec3 LANE = new Vec3(1.5, 2.0, 8.5);
     /** Where a player struck by a gust stands: three blocks down the lane, in the middle of the gust. */
     private static final Vec3 DOWN_THE_LANE = new Vec3(4.5, 2.0, 8.5);
+    /** Where a mock patient lies: two blocks down the lane, well within a healer's reach. */
+    private static final Vec3 BEDSIDE = new Vec3(3.5, 2.0, 8.5);
     /** The yaw that faces east, down the lane. */
     private static final float EAST = -90.0F;
     private static final long DAY = 24_000L;
@@ -196,6 +205,7 @@ public final class KidoTests {
     private static final int SEKIENTON_COLOUR = 0xB8262E;
     private static final int ENKOSEN_COLOUR = 0xD8C46A;
     private static final int DANKU_COLOUR = 0xE4DCFF;
+    private static final int KAIDO_COLOUR = 0x6EE08A;
     /** Where a creature keeps its wariness of each Bakudō ({@link KidoLogic#markWary}), so a test can clear it. */
     private static final String WARY_TAG = "bleach:bakudo_wary";
     /** The held body's modifier on the walk, which takes the whole of it. */
@@ -730,6 +740,35 @@ public final class KidoTests {
         return CeroBeam.fire(helper.getLevel(), shooter, null, from, new Vec3(1.0, 0.0, 0.0), spec, kind);
     }
 
+    /** A survival mock with this soul lying at {@link #BEDSIDE}, for a heal begun on it directly. */
+    private static Player patient(GameTestHelper helper, SoulData data) {
+        Player player = caster(helper, GameType.SURVIVAL, data);
+        Vec3 at = helper.absoluteVec(BEDSIDE);
+        player.moveTo(at.x, at.y, at.z, EAST, 0.0F);
+        return player;
+    }
+
+    /** A Shinigami of 600 at this Kidō level in this game mode at {@link #LANE}, with Kaidō chosen. */
+    private static Player healer(GameTestHelper helper, GameType mode, int kido) {
+        Player player = caster(helper, mode, shinigami(600.0F, kido));
+        KidoLogic.choose(SoulLogic.get(player), KidoSpell.KAIDO.location());
+        return player;
+    }
+
+    /** The heal this soul is channelling, or null. */
+    @Nullable
+    private static KidoHeal.Channel healing(SoulData data) {
+        return KidoHeal.channel(data);
+    }
+
+    /** Whether this soul still heals after a step, and its patient's health then, as worked out by hand. */
+    private static void assertHealing(GameTestHelper helper, SoulData data, boolean standing, LivingEntity patient,
+                                      float health, String what) {
+        helper.assertTrue((healing(data) != null) == standing,
+                what + (standing ? " ended the heal" : " left the heal standing: " + healing(data)));
+        HollowPlayerTests.assertClose(helper, patient.getHealth(), health, "the patient's health after " + what);
+    }
+
     // ---- The spells as data ----
 
     @GameTest(template = "empty")
@@ -741,15 +780,16 @@ public final class KidoTests {
                 && spells.containsKey(KidoSpell.SAI) && spells.containsKey(KidoSpell.HAINAWA)
                 && spells.containsKey(KidoSpell.GEKI) && spells.containsKey(KidoSpell.SEKIENTON)
                 && spells.containsKey(KidoSpell.ENKOSEN) && spells.containsKey(KidoSpell.RIKUJOKORO)
-                && spells.containsKey(KidoSpell.DANKU), "the shipped spells did not load: " + spells.keySet());
+                && spells.containsKey(KidoSpell.DANKU) && spells.containsKey(KidoSpell.KAIDO),
+                "the shipped spells did not load: " + spells.keySet());
         // A data pack may add its own, so only the mod's are held to their order.
         List<ResourceKey<KidoSpell>> shipped = ids(KidoSpell.sorted(spells)).stream()
                 .filter(key -> BleachMod.MODID.equals(key.location().getNamespace()))
                 .toList();
-        // Every Hadō before every Bakudō, each kind by its number.
+        // Every Hadō before every Bakudō, each kind by its number, and Kaidō last.
         helper.assertTrue(shipped.equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI, KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI,
                 KidoSpell.TENRAN, KidoSpell.RAIKOHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI,
-                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO, KidoSpell.DANKU)),
+                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO, KidoSpell.DANKU, KidoSpell.KAIDO)),
                 "the mod's spells sort as " + shipped);
 
         KidoSpell sho = spell(helper, KidoSpell.SHO).value();
@@ -919,32 +959,50 @@ public final class KidoTests {
         helper.assertTrue(wall.seconds() == 6.0F && wall.lostSeconds() == 0.0F && wall.speedSeconds() == 0.0F
                 && wall.speedLevel() == 0 && wall.height() == 4.0F,
                 "Dankū's ward is " + wall + ", not 6 seconds and 4 blocks tall");
-        for (KidoSpell warding : List.of(sekienton, enkosen, danku)) {
-            String what = "Bakudō #" + warding.number();
-            helper.assertTrue(warding.gatherTicks() == 0 && !warding.gathers(), what + " gathers for "
-                    + warding.gatherTicks() + " ticks");
-            KidoSpell.Look look = warding.look();
+        // Kaidō has no number and no incantation: a heal channelled on the key, its cost, cooldown and xp each pulse's.
+        KidoSpell kaido = spell(helper, KidoSpell.KAIDO).value();
+        assertShipped(helper, kaido, "Kaidō", "kido.bleach.kaido", 0, 3, KAIDO_COLOUR, KidoSpell.Kind.KAIDO,
+                KidoSpell.Shape.HEAL);
+        assertNear(helper, kaido.costShare(), 0.02, "Kaidō's share of reiryoku");
+        assertNear(helper, kaido.minCost(), 1.0, "Kaidō's least cost");
+        helper.assertTrue(kaido.cooldownTicks() == 20 && kaido.xp() == 1,
+                "Kaidō waits " + kaido.cooldownTicks() + " ticks and trains " + kaido.xp() + " xp");
+        assertNear(helper, kaido.effect().range(), 3.0, "Kaidō's reach");
+        assertNear(helper, kaido.effect().radius(), 0.2, "the margin of Kaidō's aim");
+        helper.assertTrue(!kaido.numbered() && sho.numbered(), "Kaidō is numbered " + kaido.numbered()
+                + " and Shō " + sho.numbered());
+        // Named alone, its title and its call are its name; contents, so no language is needed.
+        helper.assertTrue(kaido.title().getContents().equals(kaido.name().getContents())
+                && kaido.call().getContents().equals(kaido.name().getContents()),
+                "Kaidō is titled " + kaido.title() + " and called " + kaido.call());
+        // The wards and Kaidō: none gathers, each sounds and puffs a simple particle, and none misfires or weakens by name.
+        for (KidoSpell ungathered : List.of(sekienton, enkosen, danku, kaido)) {
+            String what = ungathered.kind() + " #" + ungathered.number();
+            helper.assertTrue(ungathered.gatherTicks() == 0 && !ungathered.gathers(), what + " gathers for "
+                    + ungathered.gatherTicks() + " ticks");
+            KidoSpell.Look look = ungathered.look();
             helper.assertTrue(look.sound().isPresent() && BuiltInRegistries.SOUND_EVENT.containsKey(look.sound().get()),
                     what + " sounds as " + look.sound());
             helper.assertTrue(look.particle().flatMap(BuiltInRegistries.PARTICLE_TYPE::getOptional).orElse(null)
                     instanceof SimpleParticleType, what + " puffs " + look.particle());
-            assertNear(helper, KidoLogic.misfireChance(warding, warding.level()), 0.0,
-                    what + "'s misfire chance at Kidō " + warding.level());
-            assertNear(helper, KidoLogic.share(warding, KidoLogic.Form.NAME, warding.level()), 1.0,
-                    "the share of " + what + " cast by name at Kidō " + warding.level());
+            assertNear(helper, KidoLogic.misfireChance(ungathered, ungathered.level()), 0.0,
+                    what + "'s misfire chance at Kidō " + ungathered.level());
+            assertNear(helper, KidoLogic.share(ungathered, KidoLogic.Form.NAME, ungathered.level()), 1.0,
+                    "the share of " + what + " cast by name at Kidō " + ungathered.level());
         }
         // Every other spell leaves its ward out, and reads none.
-        for (KidoSpell other : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki, rikujokoro)) {
+        for (KidoSpell other : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki,
+                rikujokoro, kaido)) {
             helper.assertTrue(other.effect().ward().equals(KidoSpell.Ward.NONE),
                     other.kind() + " #" + other.number() + " has the ward " + other.effect().ward());
         }
 
-        // Each bind is drawn in its own way; Sai, Hainawa, the wards and every Hadō name none, and read the binds' own.
+        // Each bind is drawn in its own way; Sai, Hainawa, the wards, Kaidō and the Hadō name none, and read the binds' own.
         helper.assertTrue(geki.look().bind() == KidoSpell.BindStyle.GLOW
                 && rikujokoro.look().bind() == KidoSpell.BindStyle.RODS,
                 "Geki is drawn as " + geki.look().bind() + " and Rikujōkōrō as " + rikujokoro.look().bind());
         for (KidoSpell plain : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, sekienton,
-                enkosen, danku)) {
+                enkosen, danku, kaido)) {
             helper.assertTrue(plain.look().bind() == KidoSpell.BindStyle.DEFAULT,
                     plain.kind() + " #" + plain.number() + " is drawn as " + plain.look().bind());
         }
@@ -994,6 +1052,8 @@ public final class KidoTests {
         helper.assertTrue(sixtyFirstBakudo.equals(List.of(KidoSpell.RIKUJOKORO)), "Bakudō #61 is " + sixtyFirstBakudo);
         List<ResourceKey<KidoSpell>> eightyFirstBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 81));
         helper.assertTrue(eightyFirstBakudo.equals(List.of(KidoSpell.DANKU)), "Bakudō #81 is " + eightyFirstBakudo);
+        List<ResourceKey<KidoSpell>> unnumbered = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.KAIDO, 0));
+        helper.assertTrue(unnumbered.equals(List.of(KidoSpell.KAIDO)), "Kaidō #0 is " + unnumbered);
 
         // Every value wrong in its own way: each falls back or is clamped alone, and the rest of the spell stays.
         String broken = "{\"number\": -5, \"shape\": \"spiral\", \"level\": 7, \"by_name_level\": 2, \"cost_share\": 9,"
@@ -1049,11 +1109,16 @@ public final class KidoTests {
             KidoSpell read = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(written)).getOrThrow();
             helper.assertTrue(read.shape() == standing && read.castable(), written + " read as a " + read.shape());
         }
+        // A heal is channelled on the key: whatever its file says, it is never chanted and never gathers.
+        String chantedHeal = "{\"shape\": \"heal\", \"incantations\": [\"a line\"], \"gather_ticks\": 5}";
+        KidoSpell heal = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(chantedHeal)).getOrThrow();
+        helper.assertTrue(heal.shape() == KidoSpell.Shape.HEAL && heal.castable() && heal.incantations().isEmpty()
+                && heal.gatherTicks() == 0 && !heal.chantable(), chantedHeal + " read as " + heal);
 
         // Sent to a client as the sync sends it: encoded with the world's registries to NBT, and read back.
         RegistryOps<Tag> ops = helper.getLevel().registryAccess().createSerializationContext(NbtOps.INSTANCE);
         for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki, sekienton,
-                enkosen, rikujokoro, danku, parsed)) {
+                enkosen, rikujokoro, danku, kaido, parsed)) {
             Tag sent = KidoSpell.CODEC.encodeStart(ops, spell).getOrThrow();
             KidoSpell read = KidoSpell.CODEC.parse(ops, sent).getOrThrow();
             helper.assertTrue(read.equals(spell), "sent " + spell + " but read " + read);
@@ -1197,7 +1262,7 @@ public final class KidoTests {
                 "Kidō 2 knows " + ids(KidoLogic.known(data, spells)));
         data.setLevel(Stat.KIDO, 3);
         helper.assertTrue(ids(KidoLogic.known(data, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
-                KidoSpell.SAI)), "Kidō 3 knows " + ids(KidoLogic.known(data, spells)));
+                KidoSpell.SAI, KidoSpell.KAIDO)), "Kidō 3 knows " + ids(KidoLogic.known(data, spells)));
         assertRefusal(helper, next(player, now), null, "choosing at Kidō 3");
         helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.BYAKURAI)), "Sneak and the key chose " + stored(data));
         helper.assertTrue(id(KidoLogic.next(data, spells)).equals(Optional.of(KidoSpell.SAI)),
@@ -1216,24 +1281,28 @@ public final class KidoTests {
         helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.BYAKURAI)),
                 "falling below Byakurai rewrote the choice as " + stored(data));
 
-        // Geki is known from Kidō 7 and comes after Hainawa, so the choice wraps round after it; by Kidō 22 Sekienton,
-        // Enkōsen and Rikujōkōrō come after Geki, in their numbers' order. A soul of its own, so the choice saved below
-        // is left as it is.
+        // Geki is known from Kidō 7 and comes after Hainawa, and Kaidō after Geki, the last Bakudō, so the choice wraps
+        // round after Kaidō; by Kidō 22 Sekienton, Enkōsen and Rikujōkōrō come between, in their numbers' order. A soul
+        // of its own, so the choice saved below is left as it is.
         SoulData chooser = shinigami(400.0F, 7);
         helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
-                KidoSpell.SHAKKAHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI)),
+                KidoSpell.SHAKKAHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI, KidoSpell.KAIDO)),
                 "Kidō 7 knows " + ids(KidoLogic.known(chooser, spells)));
         KidoLogic.choose(chooser, KidoSpell.HAINAWA.location());
         helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.GEKI)),
                 "after Hainawa at Kidō 7, the next spell is " + id(KidoLogic.next(chooser, spells)));
         KidoLogic.choose(chooser, KidoSpell.GEKI.location());
-        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.KAIDO)),
                 "after Geki at Kidō 7, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.KAIDO.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+                "after Kaidō at Kidō 7, the next spell is " + id(KidoLogic.next(chooser, spells)));
         chooser.setLevel(Stat.KIDO, 22);
         helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
                 KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI, KidoSpell.TENRAN, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI,
-                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO)),
+                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO, KidoSpell.KAIDO)),
                 "Kidō 22 knows " + ids(KidoLogic.known(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.GEKI.location());
         helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SEKIENTON)),
                 "after Geki at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
         KidoLogic.choose(chooser, KidoSpell.SEKIENTON.location());
@@ -1243,19 +1312,22 @@ public final class KidoTests {
         helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.RIKUJOKORO)),
                 "after Enkōsen at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
         KidoLogic.choose(chooser, KidoSpell.RIKUJOKORO.location());
-        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.KAIDO)),
                 "after Rikujōkōrō at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
-        // By Kidō 36 Dankū comes after Rikujōkōrō, the last Bakudō, and the choice wraps round after it.
+        // By Kidō 36 Dankū comes after Rikujōkōrō, the last Bakudō, and Kaidō after it.
         chooser.setLevel(Stat.KIDO, 36);
         helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
                 KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI, KidoSpell.TENRAN, KidoSpell.RAIKOHO, KidoSpell.SAI,
                 KidoSpell.HAINAWA, KidoSpell.GEKI, KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO,
-                KidoSpell.DANKU)), "Kidō 36 knows " + ids(KidoLogic.known(chooser, spells)));
+                KidoSpell.DANKU, KidoSpell.KAIDO)), "Kidō 36 knows " + ids(KidoLogic.known(chooser, spells)));
         helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.DANKU)),
                 "after Rikujōkōrō at Kidō 36, the next spell is " + id(KidoLogic.next(chooser, spells)));
         KidoLogic.choose(chooser, KidoSpell.DANKU.location());
-        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.KAIDO)),
                 "after Dankū at Kidō 36, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.KAIDO.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+                "after Kaidō at Kidō 36, the next spell is " + id(KidoLogic.next(chooser, spells)));
 
         // The level, and for a spell with an incantation the higher level by name, are asked before any cost.
         data.setLevel(Stat.KIDO, 4);
@@ -4232,5 +4304,521 @@ public final class KidoTests {
             dropWalls(helper);
             throw failed;
         }
+    }
+
+    // ---- Kaidō ----
+
+    @GameTest(template = "field")
+    public static void kaidoRefillsReiryokuFirstThenHeals(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        KidoSpell kaido = spell(helper, KidoSpell.KAIDO).value();
+        // A healer of 600 at Kidō 25, whose pulses cost 12 and heal 3 up to full health, and a soul of 400 to heal.
+        Player healer = healer(helper, GameType.SURVIVAL, 25);
+        SoulData data = SoulLogic.get(healer);
+        Player patient = patient(helper, shinigami(400.0F, 0));
+        SoulData patientData = SoulLogic.get(patient);
+        patientData.setReiryoku(100.0F);
+        patient.setHealth(10.0F);
+
+        // Below half its reiryoku, the patient is refilled first, by twice the cost, and its wounds wait.
+        assertRefusal(helper, KidoHeal.begin(healer, patient, kaido, now), null, "Kaidō on a soul at 100 of 400");
+        HollowPlayerTests.assertClose(helper, patientData.reiryoku(), 124.0, "the patient's reiryoku after the first pulse");
+        HollowPlayerTests.assertClose(helper, patient.getHealth(), 10.0, "the patient's health after the first pulse");
+        HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the healer's reiryoku after the first pulse");
+        helper.assertTrue(data.xp(Stat.KIDO) == 1, "the first pulse trained " + data.xp(Stat.KIDO) + " Kidō xp");
+        helper.assertFalse(KidoLogic.ready(data, now + 19L), "the hands were free a tick before the pulse's second");
+        helper.assertTrue(KidoLogic.ready(data, now + 20L), "the hands were not free a second after the pulse");
+        helper.assertFalse(SoulEvents.mayRegenerate(healer, data), "the healer's reiryoku refills while it heals");
+        KidoHeal.Channel channel = healing(data);
+        helper.assertTrue(channel != null && channel.patient() == patient && channel.nextPulseAt() == now + 20L,
+                "the heal stands as " + channel + ", not on the patient with its next pulse at " + (now + 20L));
+
+        // A tick short of the next second, nothing.
+        KidoEvents.tick(healer, data, now + 19L);
+        HollowPlayerTests.assertClose(helper, patientData.reiryoku(), 124.0, "the patient's reiryoku a tick short");
+        HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the healer's reiryoku a tick short");
+        // Then 24 a second while it is below half, the last refill taking it past half, uncapped.
+        for (int i = 1; i <= 4; i++) {
+            KidoEvents.tick(healer, data, now + 20L * i);
+            String what = "pulse " + (i + 1);
+            HollowPlayerTests.assertClose(helper, patientData.reiryoku(), 100.0 + 24.0 * (i + 1),
+                    "the patient's reiryoku after " + what);
+            HollowPlayerTests.assertClose(helper, patient.getHealth(), 10.0, "the patient's health after " + what);
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 600.0 - 12.0 * (i + 1),
+                    "the healer's reiryoku after " + what);
+            helper.assertTrue(data.xp(Stat.KIDO) == i + 1, what + " left " + data.xp(Stat.KIDO) + " Kidō xp");
+        }
+        // Past half, its wounds.
+        KidoEvents.tick(healer, data, now + 100L);
+        HollowPlayerTests.assertClose(helper, patient.getHealth(), 13.0, "the patient's health after pulse 6");
+        HollowPlayerTests.assertClose(helper, patientData.reiryoku(), 220.0, "the patient's reiryoku after pulse 6");
+        HollowPlayerTests.assertClose(helper, data.reiryoku(), 528.0, "the healer's reiryoku after pulse 6");
+        helper.assertTrue(data.xp(Stat.KIDO) == 6, "pulse 6 left " + data.xp(Stat.KIDO) + " Kidō xp");
+        KidoEvents.tick(healer, data, now + 120L);
+        HollowPlayerTests.assertClose(helper, patient.getHealth(), 16.0, "the patient's health after pulse 7");
+        HollowPlayerTests.assertClose(helper, data.reiryoku(), 516.0, "the healer's reiryoku after pulse 7");
+        helper.assertTrue(data.xp(Stat.KIDO) == 7, "pulse 7 left " + data.xp(Stat.KIDO) + " Kidō xp");
+
+        // Let go, the healer's reiryoku still rests a second after its last pulse, so tapping the key gains nothing.
+        assertRefusal(helper, release(healer, now + 121L), null, "the Kidō key let go");
+        helper.assertTrue(healing(data) == null, "the heal outlived the key: " + healing(data));
+        helper.assertFalse(SoulEvents.mayRegenerate(healer, data, now + 139L),
+                "the healer's reiryoku refills within a second of its last pulse");
+        helper.assertTrue(SoulEvents.mayRegenerate(healer, data, now + 140L),
+                "the healer's reiryoku does not refill a second after its last pulse");
+        // Nor is it refilled by another healer meanwhile, so two healing each other in turn gain little.
+        data.setReiryoku(200.0F);
+        assertNear(helper, KidoHeal.refillFor(healer, 12.0F, now + 139L), 0.0,
+                "the refill of a healer within a second of its own pulse");
+        assertNear(helper, KidoHeal.refillFor(healer, 12.0F, now + 140L), 24.0,
+                "the refill of a healer a second after its own pulse");
+        data.setReiryoku(516.0F);
+
+        // Refilled no faster than its own reiryoku comes back: Hollow poison slows it.
+        patientData.setReiryoku(100.0F);
+        patientData.setQuincy(patientData.quincy().withPoison(QuincyLogic.POISON_SLOW));
+        assertNear(helper, KidoHeal.refillFor(patient, 12.0F, now + 140L),
+                24.0 * QuincyLogic.poisonRegenMultiplier(patientData), "the refill of a soul with Hollow poison");
+        patientData.setQuincy(patientData.quincy().withPoison(0.0F));
+
+        // Released reiatsu pours the reiryoku out as it comes, so none is given and the wounds are healed instead.
+        patientData.setReiatsuReleased(true);
+        patient.setHealth(10.0F);
+        assertRefusal(helper, KidoHeal.begin(healer, patient, kaido, now + 140L), null,
+                "Kaidō on a soul with its reiatsu released");
+        HollowPlayerTests.assertClose(helper, patient.getHealth(), 13.0, "the released soul's health");
+        HollowPlayerTests.assertClose(helper, patientData.reiryoku(), 100.0, "the released soul's reiryoku");
+        HollowPlayerTests.assertClose(helper, data.reiryoku(), 504.0, "the healer's reiryoku after the released soul");
+        helper.assertTrue(data.xp(Stat.KIDO) == 8, "the released soul's heal left " + data.xp(Stat.KIDO) + " Kidō xp");
+        assertRefusal(helper, release(healer, now + 141L), null, "the Kidō key let go from the released soul");
+        patientData.setReiatsuReleased(false);
+        patientData.setReiryoku(400.0F);
+
+        // Creative pays, waits and trains nothing.
+        Player creative = healer(helper, GameType.CREATIVE, 25);
+        SoulData creativeData = SoulLogic.get(creative);
+        patient.setHealth(10.0F);
+        assertRefusal(helper, KidoHeal.begin(creative, patient, kaido, now + 160L), null, "a creative healer's Kaidō");
+        HollowPlayerTests.assertClose(helper, patient.getHealth(), 13.0, "the health a creative healer gave");
+        HollowPlayerTests.assertClose(helper, creativeData.reiryoku(), 600.0, "the creative healer's reiryoku");
+        helper.assertTrue(creativeData.xp(Stat.KIDO) == 0 && KidoLogic.ready(creativeData, now + 160L),
+                "the creative healer trained " + creativeData.xp(Stat.KIDO) + " Kidō xp or kept its hands busy");
+        assertRefusal(helper, release(creative, now + 161L), null, "the creative healer's key let go");
+
+        // An Academy student at Kidō 3 stops bleeding: half a heart, up to half health, for the least cost of 1.
+        SoulData studentData = ShinigamiTests.student(40.0F);
+        studentData.setLevel(Stat.KIDO, 3);
+        Player student = caster(helper, GameType.SURVIVAL, studentData);
+        patient.setHealth(8.0F);
+        assertRefusal(helper, KidoHeal.begin(student, patient, kaido, now + 180L), null, "a student's Kaidō");
+        HollowPlayerTests.assertClose(helper, patient.getHealth(), 9.0, "the health a student gave");
+        HollowPlayerTests.assertClose(helper, studentData.reiryoku(), 39.0, "the student's reiryoku");
+        assertRefusal(helper, release(student, now + 181L), null, "the student's key let go");
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void kaidoTiersCapAndClear(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        // Kubo's four levels, each from its own Kidō level, and the first below them all.
+        int[] levels = {0, 11, 12, 24, 25, 39, 40, 1_000};
+        List<KidoHeal.Tier> reached = List.of(KidoHeal.Tier.STOP_BLEEDING, KidoHeal.Tier.STOP_BLEEDING,
+                KidoHeal.Tier.RELIEVE_PAIN, KidoHeal.Tier.RELIEVE_PAIN, KidoHeal.Tier.HEAL_INJURIES,
+                KidoHeal.Tier.HEAL_INJURIES, KidoHeal.Tier.RESTORE_ORGANS, KidoHeal.Tier.RESTORE_ORGANS);
+        for (int i = 0; i < levels.length; i++) {
+            helper.assertTrue(KidoHeal.tier(levels[i]) == reached.get(i),
+                    "Kidō " + levels[i] + " heals as " + KidoHeal.tier(levels[i]) + ", not " + reached.get(i));
+        }
+        // What each heals a pulse, up to what share of the most health, and what it lifts: venom, then withering.
+        int[] from = {3, 12, 25, 40};
+        float[] perSecond = {1.0F, 2.0F, 3.0F, 4.0F};
+        float[] upTo = {0.5F, 0.75F, 1.0F, 1.0F};
+        List<List<Holder<MobEffect>>> clears = List.of(List.of(), List.of(MobEffects.POISON), List.of(MobEffects.POISON),
+                List.of(MobEffects.POISON, MobEffects.WITHER));
+        KidoHeal.Tier[] tiers = KidoHeal.Tier.values();
+        helper.assertTrue(tiers.length == 4, "Kaidō has " + tiers.length + " tiers");
+        for (int i = 0; i < tiers.length; i++) {
+            KidoHeal.Tier tier = tiers[i];
+            helper.assertTrue(tier.from() == from[i] && tier.perSecond() == perSecond[i] && tier.upTo() == upTo[i]
+                    && tier.clears().equals(clears.get(i)), tier + " is from Kidō " + tier.from() + ", "
+                    + tier.perSecond() + " a pulse up to " + tier.upTo() + " of the most, lifting " + tier.clears());
+        }
+        // Each pulse heals its rate, never past its tier's share of the most health; oneself at half the rate.
+        KidoHeal.Tier stop = KidoHeal.Tier.STOP_BLEEDING;
+        KidoHeal.Tier relieve = KidoHeal.Tier.RELIEVE_PAIN;
+        KidoHeal.Tier injuries = KidoHeal.Tier.HEAL_INJURIES;
+        KidoHeal.Tier organs = KidoHeal.Tier.RESTORE_ORGANS;
+        assertNear(helper, KidoHeal.healFor(stop, false, 9.0F, 20.0F), 1.0, "stopping bleeding at 9 of 20");
+        assertNear(helper, KidoHeal.healFor(stop, false, 9.5F, 20.0F), 0.5, "stopping bleeding at 9.5 of 20");
+        assertNear(helper, KidoHeal.healFor(stop, false, 10.0F, 20.0F), 0.0, "stopping bleeding at 10 of 20");
+        assertNear(helper, KidoHeal.healFor(relieve, false, 14.5F, 20.0F), 0.5, "relieving pain at 14.5 of 20");
+        assertNear(helper, KidoHeal.healFor(relieve, false, 15.0F, 20.0F), 0.0, "relieving pain at 15 of 20");
+        assertNear(helper, KidoHeal.healFor(injuries, false, 18.0F, 20.0F), 2.0, "healing wounds at 18 of 20");
+        assertNear(helper, KidoHeal.healFor(injuries, false, 10.0F, 20.0F), 3.0, "healing wounds at 10 of 20");
+        assertNear(helper, KidoHeal.healFor(organs, false, 10.0F, 20.0F), 4.0, "restoring organs at 10 of 20");
+        assertNear(helper, KidoHeal.healFor(organs, true, 10.0F, 20.0F), 2.0, "restoring one's own organs at 10 of 20");
+        assertNear(helper, KidoHeal.healFor(organs, true, 19.5F, 20.0F), 0.5, "restoring one's own organs at 19.5 of 20");
+
+        // Whole and full of reiryoku, laid with the mod's penalties, a bind, venom and withering: only the last two go.
+        Player marked = patient(helper, shinigami(400.0F, 0));
+        SoulData markedData = SoulLogic.get(marked);
+        List<Holder<MobEffect>> penalties = List.of(MobEffects.MOVEMENT_SLOWDOWN, MobEffects.WEAKNESS,
+                MobEffects.DIG_SLOWDOWN, MobEffects.CONFUSION);
+        for (Holder<MobEffect> effect : List.of(MobEffects.MOVEMENT_SLOWDOWN, MobEffects.WEAKNESS, MobEffects.DIG_SLOWDOWN,
+                MobEffects.CONFUSION, MobEffects.POISON, MobEffects.WITHER)) {
+            marked.addEffect(new MobEffectInstance(effect, 200));
+        }
+        marked.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 40));
+        Runnable kept = () -> {
+            for (Holder<MobEffect> penalty : penalties) {
+                helper.assertTrue(marked.hasEffect(penalty), "Kaidō lifted " + penalty.getRegisteredName());
+            }
+            helper.assertTrue(boundTicks(marked) > 0, "Kaidō lifted the bind");
+            HollowPlayerTests.assertClose(helper, markedData.reiryoku(), 400.0, "the reiryoku of a soul full of it");
+        };
+        IronGolem golem = null;
+        try {
+            helper.assertFalse(KidoHeal.mends(marked, false, 3, 12.0F, now),
+                    "stopping bleeding did something for a whole body");
+            helper.assertTrue(marked.hasEffect(MobEffects.POISON) && marked.hasEffect(MobEffects.WITHER),
+                    "stopping bleeding lifted the Poison or the Wither");
+            kept.run();
+            helper.assertTrue(KidoHeal.mends(marked, false, 12, 12.0F, now) && !marked.hasEffect(MobEffects.POISON)
+                    && marked.hasEffect(MobEffects.WITHER), "relieving pain did not lift the Poison alone");
+            kept.run();
+            helper.assertTrue(KidoHeal.mends(marked, false, 40, 12.0F, now) && !marked.hasEffect(MobEffects.WITHER),
+                    "restoring organs did not lift the Wither");
+            kept.run();
+            helper.assertFalse(KidoHeal.mends(marked, false, 40, 12.0F, now), "restoring organs did something twice");
+            kept.run();
+
+            // End to end at Kidō 3: half a heart up to half the golem's 100, then idle, paying and training nothing.
+            Player healer = healer(helper, GameType.SURVIVAL, 3);
+            SoulData data = SoulLogic.get(healer);
+            golem = golem(helper, 4, 8);
+            golem.setHealth(49.0F);
+            assertRefusal(helper, press(healer, now), null, "Kaidō at Kidō 3 on the golem");
+            HollowPlayerTests.assertClose(helper, golem.getHealth(), 50.0, "the golem's health after the first pulse");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the reiryoku after the first pulse");
+            helper.assertTrue(data.xp(Stat.KIDO) == 1, "the first pulse trained " + data.xp(Stat.KIDO) + " Kidō xp");
+            KidoHeal.Channel channel = healing(data);
+            helper.assertTrue(channel != null && channel.patient() == golem, "the key began the heal as " + channel);
+            KidoEvents.tick(healer, data, now + 20L);
+            HollowPlayerTests.assertClose(helper, golem.getHealth(), 50.0, "the golem's health at half, a second on");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the reiryoku after an idle pulse");
+            helper.assertTrue(data.xp(Stat.KIDO) == 1, "an idle pulse trained Kidō to " + data.xp(Stat.KIDO) + " xp");
+            helper.assertTrue(healing(data) != null && KidoLogic.ready(data, now + 20L),
+                    "an idle pulse ended the heal or kept the hands busy: " + healing(data));
+            assertRefusal(helper, release(healer, now + 21L), null, "the Kidō key let go from the golem");
+        } finally {
+            unbind(marked);
+            marked.removeAllEffects();
+            discard(golem);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void kaidoHealsOneselfOnlyFromForty(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        KidoSpell kaido = spell(helper, KidoSpell.KAIDO).value();
+        Player healer = healer(helper, GameType.SURVIVAL, 39);
+        SoulData data = SoulLogic.get(healer);
+        healer.setHealth(10.0F);
+        IronGolem golem = null;
+        try {
+            // No one in reach, and below Kidō 40 the healer may not heal itself: refused, with nothing spent.
+            assertRefusal(helper, press(healer, now), KidoLogic.Refusal.NO_PATIENT, "Kaidō at Kidō 39 with no one in reach");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 600.0, "the reiryoku with no one to heal");
+            helper.assertTrue(healing(data) == null, "Kaidō with no one to heal began as " + healing(data));
+
+            // From Kidō 40 it heals its own wounds, at half the rate: 2 a pulse.
+            data.setLevel(Stat.KIDO, 40);
+            assertRefusal(helper, press(healer, now + 1L), null, "Kaidō at Kidō 40 with no one in reach");
+            KidoHeal.Channel channel = healing(data);
+            helper.assertTrue(channel != null && channel.patient() == null, "Kaidō on oneself began as " + channel);
+            HollowPlayerTests.assertClose(helper, healer.getHealth(), 12.0, "the health after the first pulse on oneself");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the reiryoku after the first pulse on oneself");
+            helper.assertTrue(data.xp(Stat.KIDO) == 1, "the first pulse on oneself trained " + data.xp(Stat.KIDO) + " xp");
+            // Below half its reiryoku, the healer is never refilled by its own heal.
+            data.setReiryoku(250.0F);
+            KidoEvents.tick(healer, data, now + 21L);
+            HollowPlayerTests.assertClose(helper, healer.getHealth(), 14.0, "the health after the second pulse on oneself");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 238.0, "the reiryoku after the second pulse on oneself");
+            // Fallen below 40, the heal on oneself is dropped at the next tick.
+            data.setLevel(Stat.KIDO, 39);
+            KidoEvents.tick(healer, data, now + 22L);
+            helper.assertTrue(healing(data) == null, "Kaidō on oneself was kept below Kidō 40: " + healing(data));
+            HollowPlayerTests.assertClose(helper, healer.getHealth(), 14.0, "the health once the heal was dropped");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 238.0, "the reiryoku once the heal was dropped");
+            data.setLevel(Stat.KIDO, 40);
+
+            // Anyone in reach comes first, healed at the whole rate.
+            golem = golem(helper, 4, 8);
+            golem.setHealth(50.0F);
+            assertRefusal(helper, press(healer, now + 41L), null, "Kaidō at Kidō 40 with the golem in reach");
+            channel = healing(data);
+            helper.assertTrue(channel != null && channel.patient() == golem, "Kaidō with the golem in reach began as "
+                    + channel);
+            HollowPlayerTests.assertClose(helper, golem.getHealth(), 54.0, "the golem's health after a pulse at Kidō 40");
+            HollowPlayerTests.assertClose(helper, healer.getHealth(), 14.0, "the healer's health while it heals the golem");
+            assertRefusal(helper, release(healer, now + 42L), null, "the Kidō key let go from the golem");
+
+            // At 3.1 blocks from the eyes to its widened box, past the press's reach, the golem is not found.
+            golem.moveTo(helper.absoluteVec(new Vec3(5.5, 2.0, 8.5)));
+            assertRefusal(helper, press(healer, now + 61L), null, "Kaidō with the golem out of reach");
+            channel = healing(data);
+            helper.assertTrue(channel != null && channel.patient() == null,
+                    "Kaidō with the golem out of reach began as " + channel);
+            HollowPlayerTests.assertClose(helper, healer.getHealth(), 16.0, "the health with the golem out of reach");
+            HollowPlayerTests.assertClose(helper, golem.getHealth(), 54.0, "the golem's health out of reach");
+            assertRefusal(helper, release(healer, now + 62L), null, "the Kidō key let go from oneself");
+
+            // Nor one whose eyes are out of sight: the look meets its body under the stone, and passes it by.
+            golem.moveTo(helper.absoluteVec(new Vec3(4.5, 2.0, 8.5)));
+            helper.setBlock(3, 4, 8, Blocks.STONE);
+            helper.assertTrue(KidoEvents.aim(healer, kaido, body -> true).target() == golem,
+                    "the look does not meet the golem under the stone");
+            helper.assertTrue(KidoHeal.patientFor(healer, kaido) == null,
+                    "Kaidō found a golem whose eyes are out of sight: " + KidoHeal.patientFor(healer, kaido));
+            assertRefusal(helper, press(healer, now + 81L), null, "Kaidō with the golem's eyes out of sight");
+            channel = healing(data);
+            helper.assertTrue(channel != null && channel.patient() == null,
+                    "Kaidō with the golem's eyes out of sight began as " + channel);
+            HollowPlayerTests.assertClose(helper, healer.getHealth(), 18.0, "the health with the golem's eyes hidden");
+            HollowPlayerTests.assertClose(helper, golem.getHealth(), 54.0, "the golem's health with its eyes hidden");
+            assertRefusal(helper, release(healer, now + 82L), null, "the Kidō key let go once more");
+        } finally {
+            helper.setBlock(3, 4, 8, Blocks.AIR);
+            discard(golem);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void kaidoHealsAnyoneButAWovenOrHeldBody(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        KidoSpell kaido = spell(helper, KidoSpell.KAIDO).value();
+        Player healer = healer(helper, GameType.SURVIVAL, 25);
+        SoulData data = SoulLogic.get(healer);
+        // A Quincy of 200 woven in Ransōtengai, below half its reiryoku and hurt.
+        SoulData wovenData = QuincyNpcTests.known(QuincyArtsTests.thirdTier());
+        QuincyArtsTests.forms(wovenData, QuincyArtsLogic.arts(wovenData).forms().withRansotengaiSince(now));
+        Player quincy = patient(helper, wovenData);
+        wovenData.setReiryoku(50.0F);
+        quincy.setHealth(10.0F);
+        Player dead = patient(helper, shinigami(400.0F, 0));
+        dead.setHealth(0.0F);
+        Player creative = healer(helper, GameType.CREATIVE, 0);
+        InnerHollow inner = HollowPlayerTests.placed(helper, ModEntities.INNER_HOLLOW.get(), 6, 3);
+        SpiderHollow spider = HollowPlayerTests.placed(helper, ModEntities.SPIDER_HOLLOW.get(), 8, 3);
+        IronGolem golem = null;
+        NegacionLight light = null;
+        try {
+            // The threads refuse the healing and spend the reiryoku as it comes: the heal stands, but does nothing.
+            helper.assertTrue(QuincyRansotengai.woven(quincy) && KidoHeal.mayHeal(healer, quincy),
+                    "the woven Quincy is not woven, or may not be healed");
+            assertRefusal(helper, KidoHeal.begin(healer, quincy, kaido, now), null, "Kaidō on a woven Quincy");
+            HollowPlayerTests.assertClose(helper, quincy.getHealth(), 10.0, "the woven Quincy's health");
+            HollowPlayerTests.assertClose(helper, wovenData.reiryoku(), 50.0, "the woven Quincy's reiryoku");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 600.0, "the reiryoku after a refused pulse");
+            helper.assertTrue(data.xp(Stat.KIDO) == 0, "a refused pulse trained " + data.xp(Stat.KIDO) + " Kidō xp");
+            KidoHeal.Channel channel = healing(data);
+            helper.assertTrue(channel != null && channel.patient() == quincy, "the heal on the woven Quincy is " + channel);
+            // Unwoven, the next pulse refills it, and once it is past half the one after heals it.
+            QuincyArtsTests.forms(wovenData, QuincyArtsLogic.arts(wovenData).forms()
+                    .withRansotengaiSince(ShinigamiProgress.NEVER));
+            KidoEvents.tick(healer, data, now + 20L);
+            HollowPlayerTests.assertClose(helper, wovenData.reiryoku(), 74.0, "the unwoven Quincy's reiryoku");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the reiryoku after the Quincy's refill");
+            helper.assertTrue(data.xp(Stat.KIDO) == 1, "the Quincy's refill left " + data.xp(Stat.KIDO) + " Kidō xp");
+            wovenData.setReiryoku(200.0F);
+            KidoEvents.tick(healer, data, now + 40L);
+            HollowPlayerTests.assertClose(helper, quincy.getHealth(), 13.0, "the unwoven Quincy's health");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 576.0, "the reiryoku after the Quincy's heal");
+            helper.assertTrue(data.xp(Stat.KIDO) == 2, "the Quincy's heal left " + data.xp(Stat.KIDO) + " Kidō xp");
+            assertRefusal(helper, release(healer, now + 41L), null, "the Kidō key let go from the Quincy");
+
+            // Anyone alive may be healed, a Hollow and a creative player too, but not the healer or an inner Hollow.
+            helper.assertFalse(KidoHeal.mayHeal(healer, healer), "the healer may heal itself as a patient");
+            helper.assertFalse(KidoHeal.mayHeal(healer, dead), "the healer may heal the dead");
+            helper.assertFalse(KidoHeal.mayHeal(healer, inner), "the healer may heal an inner Hollow");
+            helper.assertTrue(KidoHeal.mayHeal(healer, spider) && KidoHeal.mayHeal(healer, creative),
+                    "the healer may not heal a Spider Hollow or a creative player");
+
+            // A body Negación holds is lost mid-heal and passed by the aim; let down, it is found again.
+            golem = golem(helper, 4, 8);
+            assertRefusal(helper, press(healer, now + 60L), null, "Kaidō on the whole golem");
+            channel = healing(data);
+            helper.assertTrue(channel != null && channel.patient() == golem, "the heal on the whole golem is " + channel);
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 576.0, "the reiryoku after an idle pulse");
+            light = NegacionLight.place(level, golem, null);
+            helper.assertTrue(light != null && golem.startRiding(light, true) && Negacion.held(golem),
+                    "the golem could not be held");
+            KidoEvents.tick(healer, data, now + 61L);
+            helper.assertTrue(healing(data) == null, "the heal kept a golem Negación holds: " + healing(data));
+            helper.assertFalse(KidoHeal.mayHeal(healer, golem), "the healer may heal a golem Negación holds");
+            helper.assertTrue(KidoHeal.patientFor(healer, kaido) == null,
+                    "Kaidō found the held golem: " + KidoHeal.patientFor(healer, kaido));
+            golem.stopRiding();
+            helper.assertTrue(KidoHeal.mayHeal(healer, golem) && KidoHeal.patientFor(healer, kaido) == golem,
+                    "Kaidō did not find the golem let down: " + KidoHeal.patientFor(healer, kaido));
+        } finally {
+            if (golem != null) {
+                golem.stopRiding();
+            }
+            discard(light, golem, inner, spider);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void whatEndsAKaidoChannel(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        KidoSpell kaido = spell(helper, KidoSpell.KAIDO).value();
+        KidoSpell sai = spell(helper, KidoSpell.SAI).value();
+        Player healer = healer(helper, GameType.SURVIVAL, 25);
+        SoulData data = SoulLogic.get(healer);
+        Player binder = caster(helper, GameType.SURVIVAL, shinigami(1_000.0F, 42));
+        IronGolem golem = golem(helper, 4, 8);
+        golem.setHealth(50.0F);
+        try {
+            // Let go, it ends without a word.
+            assertRefusal(helper, press(healer, now), null, "the first press");
+            assertHealing(helper, data, true, golem, 53.0F, "the first press");
+            assertRefusal(helper, release(healer, now + 5L), null, "the key let go");
+            assertHealing(helper, data, false, golem, 53.0F, "the key let go");
+            // Pressed again within the second, it begins, its first pulse once the hands are free.
+            assertRefusal(helper, press(healer, now + 6L), null, "a press 14 ticks before the hands are free");
+            KidoHeal.Channel waiting = healing(data);
+            helper.assertTrue(waiting != null && waiting.nextPulseAt() == now + 20L,
+                    "the press before the hands were free began as " + waiting + ", not to pulse at " + (now + 20L));
+            assertHealing(helper, data, true, golem, 53.0F, "a press before the hands are free");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the reiryoku after a waiting press");
+            KidoEvents.tick(healer, data, now + 19L);
+            assertHealing(helper, data, true, golem, 53.0F, "a tick before the hands are free");
+            KidoEvents.tick(healer, data, now + 20L);
+            assertHealing(helper, data, true, golem, 56.0F, "the tick the hands are free");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 576.0, "the reiryoku once the waiting heal pulsed");
+            // A screen opened over the key ends it too.
+            assertRefusal(helper, cancel(healer, now + 21L), null, "a screen opened while healing");
+            assertHealing(helper, data, false, golem, 56.0F, "a screen opened while healing");
+
+            // Kept up to 3.5 blocks from the eyes to its widened box, and lost past them.
+            assertRefusal(helper, press(healer, now + 40L), null, "the press before the golem moves");
+            assertHealing(helper, data, true, golem, 59.0F, "the press before the golem moves");
+            golem.moveTo(helper.absoluteVec(new Vec3(5.5, 2.0, 8.5)));
+            KidoEvents.tick(healer, data, now + 41L);
+            assertHealing(helper, data, true, golem, 59.0F, "the golem 3.1 blocks off");
+            golem.moveTo(helper.absoluteVec(new Vec3(6.5, 2.0, 8.5)));
+            KidoEvents.tick(healer, data, now + 42L);
+            assertHealing(helper, data, false, golem, 59.0F, "the golem 4.1 blocks off");
+            golem.moveTo(helper.absoluteVec(new Vec3(4.5, 2.0, 8.5)));
+            // And lost out of sight.
+            assertRefusal(helper, press(healer, now + 60L), null, "the press before the stone");
+            assertHealing(helper, data, true, golem, 62.0F, "the press before the stone");
+            helper.setBlock(2, 3, 8, Blocks.STONE);
+            KidoEvents.tick(healer, data, now + 61L);
+            assertHealing(helper, data, false, golem, 62.0F, "the stone between the eyes");
+            helper.setBlock(2, 3, 8, Blocks.AIR);
+
+            // A creature's blow that lands breaks it, the patient's own too; a fall comes from no creature.
+            assertRefusal(helper, press(healer, now + 80L), null, "the press before the golem's blow");
+            assertHealing(helper, data, true, golem, 65.0F, "the press before the golem's blow");
+            land(helper, healer, healer.damageSources().mobAttack(golem), 2.0F, "the golem's blow");
+            assertHealing(helper, data, false, golem, 65.0F, "the golem's blow");
+            assertRefusal(helper, press(healer, now + 100L), null, "the press before the fall");
+            assertHealing(helper, data, true, golem, 68.0F, "the press before the fall");
+            land(helper, healer, healer.damageSources().fall(), 2.0F, "the fall");
+            assertHealing(helper, data, true, golem, 68.0F, "the fall");
+            // Too little reiryoku for the next pulse to leave half a point ends it, with nothing paid.
+            data.setReiryoku(12.4F);
+            KidoEvents.tick(healer, data, now + 120L);
+            assertHealing(helper, data, false, golem, 68.0F, "a pulse with 12.4 reiryoku");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 12.4, "the reiryoku after a pulse too weak to pay");
+            data.setReiryoku(600.0F);
+
+            // Bound arms drop it at the next tick, and a Bakudō that binds them breaks it at once.
+            assertRefusal(helper, press(healer, now + 140L), null, "the press before the arms are bound");
+            assertHealing(helper, data, true, golem, 71.0F, "the press before the arms are bound");
+            healer.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 40));
+            KidoEvents.tick(healer, data, now + 141L);
+            assertHealing(helper, data, false, golem, 71.0F, "the arms bound");
+            unbind(healer);
+            assertRefusal(helper, press(healer, now + 160L), null, "the press before Sai");
+            assertHealing(helper, data, true, golem, 74.0F, "the press before Sai");
+            // Sai from 1,000 at Kidō 42 against the healer's 600: bound the whole time.
+            assertBind(helper, KidoEvents.bindOne(binder, healer, sai, 1.0F, now + 161L), KidoLogic.BindResult.BOUND,
+                    "Sai on the healer");
+            assertHealing(helper, data, false, golem, 74.0F, "Sai on the healer");
+            unbind(healer);
+
+            // While it heals, the key and a chant wait for it, and the heal goes on.
+            assertRefusal(helper, press(healer, now + 180L), null, "the press before the second press");
+            assertHealing(helper, data, true, golem, 77.0F, "the press before the second press");
+            assertRefusal(helper, press(healer, now + 181L), KidoLogic.Refusal.HEALING, "a second press while healing");
+            heardAs(helper, KidoEvents.chant(healer, romaji(helper, KidoSpell.SHAKKAHO), now + 182L),
+                    KidoEvents.Heard.Outcome.REFUSED, KidoSpell.SHAKKAHO, KidoLogic.Refusal.HEALING,
+                    "Shakkahō's romaji while healing");
+            assertHealing(helper, data, true, golem, 77.0F, "a press and a chant while healing");
+            // It does not pass through a portal with its soul.
+            NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerChangedDimensionEvent(healer, Level.OVERWORLD, Level.NETHER));
+            assertHealing(helper, data, false, golem, 77.0F, "the portal");
+
+            // Jinzen breaks it, and refuses the key even while the hands wait out the last pulse's second.
+            assertRefusal(helper, press(healer, now + 200L), null, "the press before Jinzen");
+            assertHealing(helper, data, true, golem, 80.0F, "the press before Jinzen");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 552.0, "the reiryoku before Jinzen");
+            JinzenLogic.begin(healer, data, now + 201L);
+            KidoEvents.tick(healer, data, now + 201L);
+            assertHealing(helper, data, false, golem, 80.0F, "Jinzen");
+            assertRefusal(helper, press(healer, now + 202L), KidoLogic.Refusal.GATHERING, "the Kidō key in Jinzen");
+            assertHealing(helper, data, false, golem, 80.0F, "the Kidō key in Jinzen");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 552.0, "the reiryoku after the key in Jinzen");
+            JinzenLogic.end(healer, data);
+
+            // Never cast in one act: refused, with nothing paid, cooled or trained.
+            int xp = data.xp(Stat.KIDO);
+            assertRefusal(helper, KidoEvents.cast(healer, kaido, KidoLogic.Form.NAME, now + 220L),
+                    KidoLogic.Refusal.UNABLE, "Kaidō cast in one act");
+            assertHealing(helper, data, false, golem, 80.0F, "Kaidō cast in one act");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 552.0, "the reiryoku after Kaidō cast in one act");
+            helper.assertTrue(data.xp(Stat.KIDO) == xp && KidoLogic.ready(data, now + 220L),
+                    "Kaidō cast in one act trained Kidō to " + data.xp(Stat.KIDO) + " xp or kept the hands busy");
+
+            // A patient that is gone is lost.
+            assertRefusal(helper, press(healer, now + 220L), null, "the press before the golem goes");
+            assertHealing(helper, data, true, golem, 83.0F, "the press before the golem goes");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 540.0, "the reiryoku before the golem goes");
+            golem.discard();
+            KidoEvents.tick(healer, data, now + 221L);
+            helper.assertTrue(healing(data) == null, "the heal outlived its patient: " + healing(data));
+
+            // Another spell's longer cooldown refuses the key, as ever: Sai at no one keeps the hands busy 30 ticks.
+            assertRefusal(helper, KidoEvents.cast(healer, sai, KidoLogic.Form.NAME, now + 240L, 1.0), null,
+                    "Sai at no one");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 522.0, "the reiryoku after Sai");
+            helper.assertFalse(KidoLogic.ready(data, now + 269L), "the hands were free a tick before Sai's cooldown");
+            assertRefusal(helper, press(healer, now + 241L), KidoLogic.Refusal.COOLDOWN,
+                    "the Kidō key 29 ticks before the hands are free");
+            helper.assertTrue(healing(data) == null, "the key began a heal 29 ticks early: " + healing(data));
+
+            // A healer that dies drops even its heal on itself, without a word.
+            data.setLevel(Stat.KIDO, 40);
+            assertRefusal(helper, press(healer, now + 270L), null, "Kaidō on oneself before death");
+            KidoHeal.Channel own = healing(data);
+            helper.assertTrue(own != null && own.patient() == null, "Kaidō with no one in reach began as " + own);
+            healer.setHealth(0.0F);
+            KidoEvents.tick(healer, data, now + 271L);
+            helper.assertTrue(healing(data) == null, "a dead healer kept its heal: " + healing(data));
+        } finally {
+            helper.setBlock(2, 3, 8, Blocks.AIR);
+            JinzenLogic.end(healer, data);
+            unbind(healer);
+            discard(golem);
+            discardBeams(helper);
+        }
+        helper.succeed();
     }
 }

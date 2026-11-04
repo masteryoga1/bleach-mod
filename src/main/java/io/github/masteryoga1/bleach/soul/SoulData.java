@@ -297,6 +297,11 @@ public final class SoulData {
     /** The shield this soul holds up, or null (see {@link KidoWard}). Not saved. */
     @Nullable
     KidoWard.Shield kidoShield;
+    /** The heal this soul is channelling on the Kidō key, or null (see {@link KidoHeal}). Not saved. */
+    @Nullable
+    KidoHeal.Channel kidoHeal;
+    /** Game time this soul's reiryoku may refill again after its last Kaidō pulse that did something. Not saved. */
+    long kidoHealRestUntil = NEVER;
     /** The Gran Rey Cero this Arrancar is gathering, by entity id, or -1 (see {@link GranReyCero}). */
     int granReyCeroBeamId = -1;
     /** Game time the Gran Rey Cero being gathered started, or {@link #NEVER}. */
