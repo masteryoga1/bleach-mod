@@ -21,6 +21,7 @@
     "bleach:negacion",
     "bleach:caja_negacion",
     "bleach:arrancar",
-    "bleach:inner_hollow"
+    "bleach:inner_hollow",
+    "bleach:danku_wall"
   ]
 }

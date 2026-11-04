@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -283,8 +284,9 @@ public class GetsugaTensho extends Projectile {
      * the owner's (nor another crescent) out of the air, then cuts the creatures in it, nearest first,
      * each costing one of its pierces. It never touches what is at the back of the one who fired it
      * (see {@link #clearOfWielder}), yet still cuts what is pressed against their front. A shield or a
-     * Kidō shield that stops it ({@link KidoWard#covers}), or the last pierce, ends it. Returns whether the
-     * crescent is still flying.
+     * Kidō shield that stops it ({@link KidoWard#covers}), or the last pierce, ends it. A Dankū that holds ends it,
+     * after what stands before the wall; one it outweighs shatters as it passes. Returns whether the crescent is still
+     * flying.
      */
     private boolean sweep(Entity owner, Vec3 from, Vec3 motion) {
         float charge = charge();
@@ -293,13 +295,19 @@ public class GetsugaTensho extends Projectile {
         AABB path = new AABB(from.x - halfWidth, from.y - halfHeight, from.z - halfWidth,
                 from.x + halfWidth, from.y + halfHeight, from.z + halfWidth).expandTowards(motion);
         Vec3 heading = motion.normalize();
+        // The Dankū on the crescent's middle this tick, from the root on the first sweep so a wielder against a wall does
+        // not cut through it; the first that holds is as far as it reaches (see DankuWall). Nothing shatters yet.
+        Vec3 start = age == 0 && root != null ? root : from;
+        DankuWall.Along wards = DankuWall.along(level(), start, from.add(motion));
+        double reach = wards.holdsAt(owner, DankuWall.Art.GETSUGA);
+        Predicate<Entity> before = other -> other.getBoundingBox().getCenter().subtract(start).dot(heading) < reach;
         Vec3 rear = root != null ? root : from;
         // As far along the path from the root as the first sweep reaches: the swing itself.
         double beside = SWING_REACH + SPEED + halfWidth * (Math.abs(heading.x) + Math.abs(heading.z))
                 + halfHeight * Math.abs(heading.y);
         for (Projectile projectile : level().getEntitiesOfClass(Projectile.class, path,
                 other -> other != this && !(other instanceof GetsugaTensho) && other.getOwner() != owner
-                        && clearOfWielder(other, rear, heading, beside))) {
+                        && clearOfWielder(other, rear, heading, beside) && before.test(other))) {
             // An arrow or trident someone could have picked up is knocked down, not destroyed.
             if (projectile instanceof AbstractArrow arrow && arrow.pickup == AbstractArrow.Pickup.ALLOWED) {
                 arrow.spawnAtLocation(arrow.getPickupItemStackOrigin().copy(), 0.1F);
@@ -308,9 +316,10 @@ public class GetsugaTensho extends Projectile {
         }
         // A giant counts by its parts too, however far below the path it stands.
         List<LivingEntity> targets = SpiritProjectiles.creaturesIn(level(), path,
-                target -> !struck.contains(target.getId()) && affects(target) && clearOfWielder(target, rear, heading, beside));
+                target -> !struck.contains(target.getId()) && affects(target)
+                        && clearOfWielder(target, rear, heading, beside) && before.test(target));
         if (targets.isEmpty()) {
-            return true;
+            return flies(wards, owner);
         }
         targets.sort(Comparator.comparingDouble(target -> target.distanceToSqr(from)));
         DamageSource source = new DamageSource(level().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
@@ -322,11 +331,25 @@ public class GetsugaTensho extends Projectile {
             boolean hurt = target.hurt(source, damage);
             pierceLeft--;
             if ((!hurt && (target.isBlocking() || warded)) || pierceLeft <= 0) {
+                // The walls it passed to reach this creature, each outweighed, shatter; none beyond it does.
+                wards.upTo(target.getBoundingBox().getCenter().subtract(start).dot(heading), owner, DankuWall.Art.GETSUGA);
                 discard();
                 return false;
             }
         }
-        return true;
+        return flies(wards, owner);
+    }
+
+    /**
+     * Whether the crescent flies on past this sweep. Only now are the walls it reached weighed: those it outweighs shatter,
+     * and one that holds ends it as a shield does.
+     */
+    private boolean flies(DankuWall.Along wards, Entity owner) {
+        if (wards.upTo(Double.MAX_VALUE, owner, DankuWall.Art.GETSUGA) == null) {
+            return true;
+        }
+        discard();
+        return false;
     }
 
     /**

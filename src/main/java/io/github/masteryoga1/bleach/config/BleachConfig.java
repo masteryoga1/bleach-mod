@@ -237,6 +237,13 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_BREAK_BELOW;
     public static final ModConfigSpec.DoubleValue KIDO_BAKUDO_TAKEN_OVER_STRENGTH;
     public static final ModConfigSpec.IntValue KIDO_BAKUDO_PIN_SECONDS;
+    public static final ModConfigSpec.DoubleValue KIDO_DANKU_REIATSU_MARGIN;
+    public static final ModConfigSpec.DoubleValue KIDO_DANKU_WEIGHT_BALA;
+    public static final ModConfigSpec.DoubleValue KIDO_DANKU_WEIGHT_CERO;
+    public static final ModConfigSpec.DoubleValue KIDO_DANKU_WEIGHT_GRAN_REY_CERO;
+    public static final ModConfigSpec.DoubleValue KIDO_DANKU_WEIGHT_GETSUGA;
+    public static final ModConfigSpec.DoubleValue KIDO_DANKU_WEIGHT_HEILIG_PFEIL;
+    public static final ModConfigSpec.DoubleValue KIDO_DANKU_WEIGHT_LETZT_PFEIL;
 
     public static final ModConfigSpec.EnumValue<BloodlineMode> QUINCY_BLOODLINE_MODE;
     public static final ModConfigSpec.DoubleValue QUINCY_CHANCE;
@@ -1411,6 +1418,33 @@ public final class BleachConfig {
                 .comment("Seconds a Bakudō must hold a body its Hollow has seized to pin it, which ends the seizure at"
                         + " once and wearies the host as a torn-off mask does. 0 turns the pin off.")
                 .defineInRange("pin_seconds", 3, 0, 60);
+        builder.pop();
+        builder.comment("Wards: what Bakudō #81 Dankū's wall stops. Every Hadō and every other projectile is stopped,"
+                + " and the wall stands; the arts below are weighed.").push("wards");
+        KIDO_DANKU_REIATSU_MARGIN = builder
+                .comment("How many times its caster's reiatsu, taken at the cast, a Dankū withstands: a shot whose shooter's"
+                        + " reiatsu times its art's weight is at most this is stopped, and a heavier one shatters the wall"
+                        + " and goes on.")
+                .defineInRange("danku_reiatsu_margin", 1.25, 0.0, 100.0);
+        KIDO_DANKU_WEIGHT_BALA = builder
+                .comment("How heavily a Bala weighs against a Dankū, times its shooter's reiatsu. 0 lets every wall"
+                        + " stop it.")
+                .defineInRange("danku_weight_bala", 0.5, 0.0, 100.0);
+        KIDO_DANKU_WEIGHT_CERO = builder
+                .comment("The same for a Cero, a Menos's or anyone's.")
+                .defineInRange("danku_weight_cero", 1.0, 0.0, 100.0);
+        KIDO_DANKU_WEIGHT_GRAN_REY_CERO = builder
+                .comment("The same for a Gran Rey Cero.")
+                .defineInRange("danku_weight_gran_rey_cero", 2.0, 0.0, 100.0);
+        KIDO_DANKU_WEIGHT_GETSUGA = builder
+                .comment("The same for a Getsuga Tenshō.")
+                .defineInRange("danku_weight_getsuga", 1.0, 0.0, 100.0);
+        KIDO_DANKU_WEIGHT_HEILIG_PFEIL = builder
+                .comment("The same for a Heilig Pfeil, Seele Schneider's and Licht Regen's arrows too.")
+                .defineInRange("danku_weight_heilig_pfeil", 0.5, 0.0, 100.0);
+        KIDO_DANKU_WEIGHT_LETZT_PFEIL = builder
+                .comment("The same for a Letzt Pfeil.")
+                .defineInRange("danku_weight_letzt_pfeil", 1.0, 0.0, 100.0);
         builder.pop();
         builder.pop();
 

@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.DankuWall;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Gillian;
@@ -94,6 +95,7 @@ import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.ClientChatReceivedEvent;
@@ -196,13 +198,16 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * chanted all the same: its romaji must be spoken back and must not cast it before the chant is said, and its pale
  * yellow trace must reach the client and stop at the villager. The key alone raises Sekienton's red smoke, which must
  * quicken the player and not blind it; sneaking with the key chooses #39 Enkōsen, which the key raises before the
- * player: a blow of 4 from two blocks ahead must not land, and one from two blocks behind must, before the run quits.
+ * player: a blow of 4 from two blocks ahead must not land, and one from two blocks behind must. Sneaking with the key
+ * twice more must choose #81 Dankū, which the action bar must name, and the key alone must raise its wall of light,
+ * which must reach the client two blocks south of the player, facing it, 5 wide and 4 tall, and be gone 6 seconds
+ * later, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke and shield, and HUD are drawn, and
- * screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and so does
+ * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, and HUD are drawn,
+ * and screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and so does
  * anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
@@ -1242,7 +1247,27 @@ public final class ClientSmokeTest {
             case 5761 -> command(minecraft, "damage @s 4 minecraft:mob_attack at ^ ^ ^2");
             // The same from two blocks behind, where the shield does not face: it lands.
             case 5776 -> command(minecraft, "damage @s 4 minecraft:mob_attack at ^ ^ ^-2");
-            case 5800 -> {
+            // Sneaking, the key chooses Rikujōkōrō and then Dankū, the Bakudō after Enkōsen: choosing waits for no
+            // cooldown.
+            case 5810 -> minecraft.options.keyShift.setDown(true);
+            case 5813 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5815 -> KidoKeys.CAST.setDown(false);
+            case 5817 -> minecraft.options.keyShift.setDown(false);
+            case 5830 -> minecraft.options.keyShift.setDown(true);
+            case 5833 -> {
+                expect(minecraft, player.isShiftKeyDown(), "the sneak key never made the player sneak for the Kidō key");
+                KidoKeys.CAST.setDown(true);
+            }
+            case 5835 -> KidoKeys.CAST.setDown(false);
+            case 5837 -> minecraft.options.keyShift.setDown(false);
+            // Enkōsen's cooldown lets the hands go about 5906. The key alone raises Dankū 2 blocks south of the player
+            // for 6 seconds, about 6041, for 160 of the 520 or more reiryoku left.
+            case 5920 -> KidoKeys.CAST.setDown(true);
+            case 5922 -> KidoKeys.CAST.setDown(false);
+            case 6080 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1740,6 +1765,33 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 5777, 5795,
                 () -> player.getHealth() + player.getAbsorptionAmount() < healthBefore - 0.5F,
                 "a blow of 4 from two blocks behind never landed past Enkōsen");
+        // Rikujōkōrō and then Dankū after Enkōsen: so the order of the Bakudō holds on a real client to the last.
+        expectWithin(minecraft, 5818, 5827, () -> chosenIs(soul, KidoSpell.RIKUJOKORO),
+                "Sneak and the Kidō key never chose Rikujōkōrō after Enkōsen");
+        expectWithin(minecraft, 5838, 5855,
+                () -> chosenIs(soul, KidoSpell.DANKU) && chosenShown(minecraft, KidoSpell.DANKU),
+                "Sneak and the Kidō key never chose Dankū after Rikujōkōrō, or the action bar never named it");
+        // The wall is drawn for those who see spirits only, from its synced facing and size, which shape its box too.
+        if (expectWithin(minecraft, 5923, 5940, () -> callShown(minecraft, KidoSpell.DANKU)
+                        && nearest(minecraft, DankuWall.class, 6.0, wall -> standsAhead(player, wall)) != null,
+                "the Kidō key never raised Dankū, or its wall never reached the client 2 blocks south of the player"
+                        + " (the action bar last read: " + lastActionBar() + ")")) {
+            shot(minecraft, "kido_danku");
+        }
+        expectWithin(minecraft, 6045, 6070, () -> count(minecraft, DankuWall.class, 8.0) == 0,
+                "Dankū's wall still stood long after its 6 seconds");
+    }
+
+    /**
+     * Whether this wall stands as the player's Dankū should: seen, facing south as the player does, two blocks ahead at
+     * the feet, 5 wide, 4 tall and a quarter of a block thick.
+     */
+    private static boolean standsAhead(LocalPlayer player, DankuWall wall) {
+        AABB box = wall.getBoundingBox();
+        return !ClientSouls.isHiddenFromViewer(wall) && wall.facing() == Direction.SOUTH
+                && Math.abs(wall.getX() - player.getX()) < 0.3 && Math.abs(wall.getZ() - (player.getZ() + 2.0)) < 0.3
+                && Math.abs(wall.getY() - player.getY()) < 0.3 && Math.abs(box.getXsize() - 5.0) < 0.01
+                && Math.abs(box.getYsize() - 4.0) < 0.01 && Math.abs(box.getZsize() - DankuWall.THICKNESS) < 0.01;
     }
 
     /** Whether the soul's chosen spell, as the client's copy of it has it, is this one. */

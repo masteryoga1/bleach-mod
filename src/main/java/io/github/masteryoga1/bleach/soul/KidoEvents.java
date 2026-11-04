@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.DankuWall;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
@@ -74,8 +75,9 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * {@link KidoSpell.Shape#SMOKE} leaves a cloud of smoke where the caster stood, in which creatures lose the caster and
  * the players it may harm are blinded, and quickens the caster ({@link KidoSmoke}). A Bakudō of
  * {@link KidoSpell.Shape#SHIELD} raises a round shield before the caster, which takes the blows from the front up to its
- * strength and breaks under a bigger one ({@link KidoWard}). A spell's trace, sound and particles are seen and heard
- * only by those who see spirits; what it does to a creature anyone can see.
+ * strength and breaks under a bigger one ({@link KidoWard}). A Bakudō of {@link KidoSpell.Shape#WALL} raises a Dankū
+ * before the caster, an entity that stops what is shot at it ({@link DankuWall}). A spell's trace, sound and particles
+ * are seen and heard only by those who see spirits; what it does to a creature anyone can see.
  * Creative pays nothing, waits for nothing, never misfires and trains nothing. One art at a time: no Kidō while a
  * Getsuga Tenshō or a Cero gathers, and one that begins to gather breaks a chant or a gather.
  *
@@ -527,7 +529,7 @@ public final class KidoEvents {
      * less for a spell that wants a zanpakutō at hand when there is none ({@link KidoLogic#handShare}). Then it is paid
      * for and the hands are busy for the spell's cooldown. Cast by name, a spell with an incantation misfires when the
      * roll falls below {@link KidoLogic#misfireChance}: it bursts in the hand, hurting its caster, and nothing more
-     * happens. Otherwise its shape strikes (a beam, a gust, or a bind) or wards (a smoke or a shield, which strike
+     * happens. Otherwise its shape strikes (a beam, a gust, or a bind) or wards (a smoke, a shield or a wall, which strike
      * nothing), the call goes on the caster's action bar (for a bind shrugged off, that it was), and Kidō trains, with
      * the strike bonus when a creature was struck or bound and twice over for a chant; when a Hollow was among those
      * struck or bound, an unbound Asauchi leans to kidō. Creative pays, waits, misfires, trains and leans nothing.
@@ -572,13 +574,17 @@ public final class KidoEvents {
                 }
                 yield result == KidoLogic.BindResult.BOUND ? List.of(aim.target()) : List.of();
             }
-            // A smoke hides and a shield stops: neither strikes, so neither earns the strike bonus or leans the blade.
+            // A smoke hides, and a shield and a wall stop: none strikes, so none earns the strike bonus or leans the blade.
             case SMOKE -> {
                 KidoSmoke.raise(level, player, data, spell, share, now);
                 yield List.of();
             }
             case SHIELD -> {
                 KidoWard.raise(player, data, spell, share, now);
+                yield List.of();
+            }
+            case WALL -> {
+                DankuWall.raise(level, player, spell, share, now);
                 yield List.of();
             }
             // Never reached: a spell of no shape is not castable, and was refused above.
@@ -1112,7 +1118,7 @@ public final class KidoEvents {
 
     /** The spell's particle, or null when it has none or it needs options of its own (only a simple one is named by id). */
     @Nullable
-    static SimpleParticleType particleOf(KidoSpell.Look look) {
+    public static SimpleParticleType particleOf(KidoSpell.Look look) {
         return look.particle().flatMap(BuiltInRegistries.PARTICLE_TYPE::getOptional).orElse(null)
                 instanceof SimpleParticleType particle ? particle : null;
     }
