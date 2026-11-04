@@ -525,18 +525,22 @@ public class CeroBeam extends Entity {
             blocked = true;
             to = from;
         }
+        // The first wall on the line that holds: the beam reaches what begins before it, and nothing beyond.
+        DankuWall.Meeting held = null;
         for (Entry entry : entries) {
             // Held before the muzzle, the beam never went out to strike anything.
             if (near != null) {
                 break;
             }
-            // A wall before where this creature's own box begins: one that holds ends the beam there, one it outweighs
-            // shatters.
-            DankuWall.Meeting ward = wards.upTo(nearSide(entry.box(), from, heading), shooter, art);
-            if (ward != null) {
-                blocked = true;
-                to = ward.at();
-                break;
+            // The walls before where this creature's own box begins: those the shot outweighs shatter, and the first
+            // that holds is as far as the beam goes. The creatures are met in the order the beam's width reaches them,
+            // which on a slant is not quite the order their boxes begin, so each is weighed against that wall itself.
+            double begins = nearSide(entry.box(), from, heading);
+            if (held == null) {
+                held = wards.upTo(begins, shooter, art);
+            }
+            if (held != null && begins >= held.distance()) {
+                continue;
             }
             LivingEntity target = entry.target();
             // Asked before the hit, which may break the shield.
@@ -562,9 +566,9 @@ public class CeroBeam extends Entity {
                 break;
             }
         }
-        // The walls beyond the last creature, up to where the beam ends.
+        // Unless a creature before it ended the beam, the wall that held does, or one beyond the last creature.
         if (!blocked && !stopped) {
-            DankuWall.Meeting ward = wards.upTo(Double.MAX_VALUE, shooter, art);
+            DankuWall.Meeting ward = held != null ? held : wards.upTo(Double.MAX_VALUE, shooter, art);
             if (ward != null) {
                 blocked = true;
                 to = ward.at();
