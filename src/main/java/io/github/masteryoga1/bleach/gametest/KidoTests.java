@@ -5,8 +5,10 @@ import com.mojang.serialization.JsonOps;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.DankuWall;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.GintoCast;
+import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
@@ -19,6 +21,8 @@ import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.BakudoEffect;
+import io.github.masteryoga1.bleach.soul.Bala;
+import io.github.masteryoga1.bleach.soul.GranReyCero;
 import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
@@ -39,6 +43,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.VisoredEvents;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.HashSet;
@@ -83,6 +88,7 @@ import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Marker;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -107,6 +113,7 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.PlayerTeam;
@@ -141,28 +148,27 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * is heard, gated and shared, and a bind that binds and holds at once, drawn in its spell's look), the pin of a body
  * its Hollow has seized by a hold long enough, Sekienton's smoke (the creatures in it left lost to the caster, their
  * hunt and a creeper's swell stopped, at once and at each pulse, the players it blinds and what spares them, and the
- * caster quickened), Enkōsen's shield (the blows it takes from the front and within the moment of another, what
- * passes once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it), and Dankū's
- * wall (the Hadō and arrows it stops, the arts it weighs by their shooters' reiatsu against its caster's, the bodies
- * and binds it lets through, and its end, never saved). The by-name gate and share are also tested on a spell built in
- * code ({@link #chantSpell}). Mock players are not in the world and never tick, so the Kidō key is pressed and let go
- * by calling {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a
+ * caster quickened), Enkōsen's shield (the blows it takes from the front and within the moment of another, what passes
+ * once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it), and Dankū's wall (the
+ * Hadō and arrows it stops, the arts it weighs by their shooters' reiatsu against its caster's, the bodies and binds it
+ * lets through, and its end, never saved). The by-name gate and share are also tested on a spell built in code
+ * ({@link #chantSpell}). Mock players are not in the world and never tick, so the Kidō key is pressed and let go by
+ * calling {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a
  * later time passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
  * {@link KidoEvents#chant}, and a pending chant or gather goes off by calling {@link KidoEvents#tick} with the time it
- * would come at, as a smoke pulses and a shield ends by calling
- * {@link KidoSmoke#tick} and {@link KidoWard#tick}; a misfire's roll is passed to the five-argument
- * {@code KidoEvents.cast}, and for a gather, which draws its own roll as it goes off, the misfire chance is set to 1 or 0
- * for that one call. No cone can find a mock player, so a gust's blow is given to one directly
- * ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on one directly ({@link KidoEvents#bindOne}),
- * its clamp is called by hand and what it refuses is posted as the event the act would fire; nor can a smoke's pulse,
- * so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}). A wall is raised directly
- * ({@link DankuWall#raise}), and a crescent or an arrow shot at it is ticked by hand within the test's one tick. A
- * still golem has no will of its own, so the revenge goal a blow would start is started by hand. Raikōhō's heavy bolt
- * is taken by an iron golem, whose 100 health outlasts it. Casters stand at {@link #LANE} in the {@code field}
- * template, facing east: every beam and bind goes east down the lane into a creature or the dirt wall, and every gust
- * east along it, ending within the field; every creature, trace, orb, light, takeover, mask, gathering, team, bind,
- * look, wary mark, smoke, shield, wall and lost mark a test makes is put away within its first tick, but for the walls
- * one test leaves to go by themselves.
+ * would come at, as a smoke pulses and a shield ends by calling {@link KidoSmoke#tick} and {@link KidoWard#tick}; a
+ * misfire's roll is passed to the five-argument {@code KidoEvents.cast}, and for a gather, which draws its own roll as
+ * it goes off, the misfire chance is set to 1 or 0 for that one call. No cone can find a mock player, so a gust's blow
+ * is given to one directly ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on one directly
+ * ({@link KidoEvents#bindOne}), its clamp is called by hand and what it refuses is posted as the event the act would
+ * fire; nor can a smoke's pulse, so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}). A wall is mostly
+ * raised directly ({@link DankuWall#raise}), and a crescent or an arrow shot at it is ticked by hand within the test's
+ * one tick. A still golem has no will of its own, so the revenge goal a blow would start is started by hand. Raikōhō's
+ * heavy bolt is taken by an iron golem, whose 100 health outlasts it. Casters stand at {@link #LANE} in the
+ * {@code field} template, facing east: every beam, bind, crescent and arrow goes east down the lane into a creature, a
+ * wall or the dirt wall, and every gust east along it, ending within the field; every creature, trace, orb, light,
+ * takeover, mask, gathering, team, bind, look, wary mark, smoke, shield, wall and lost mark a test makes is put away
+ * within its first tick, but for the walls one test leaves to go by themselves.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -688,6 +694,40 @@ public final class KidoTests {
                 creature.removeData(SoulAttachments.LOST);
             }
         }
+    }
+
+    /** Every Dankū wall in this test's structure. */
+    private static List<DankuWall> walls(GameTestHelper helper) {
+        return helper.getLevel().getEntitiesOfClass(DankuWall.class, helper.getBounds());
+    }
+
+    /** Takes down every Dankū wall in this test's structure: a mock caster never goes, so its wall would stand its time. */
+    private static void dropWalls(GameTestHelper helper) {
+        walls(helper).forEach(Entity::discard);
+    }
+
+    /** Raises this caster's Dankū now at a share of 1, as the key would, 2 blocks east of {@link #LANE}; it must stand. */
+    private static DankuWall raiseWall(GameTestHelper helper, Player caster, KidoSpell danku, long now) {
+        DankuWall wall = DankuWall.raise(helper.getLevel(), caster, danku, 1.0F, now);
+        helper.assertTrue(wall != null && wall.standing(), "Dankū raised no wall");
+        return wall;
+    }
+
+    /** Makes this creature whole with its frames over, so a shot that lands shows, even one no bigger than the last. */
+    private static void mend(LivingEntity creature) {
+        creature.setHealth(creature.getMaxHealth());
+        creature.invulnerableTime = 0;
+    }
+
+    /**
+     * A shot of this kind through the Cero's engine, 10 strong, 12 blocks long and 0.5 wide, east from {@code from} by
+     * this shooter, the golem down the lane mended first.
+     */
+    private static CeroBeam.Shot weighed(GameTestHelper helper, IronGolem golem, Player shooter, Vec3 from,
+                                         CeroBeam.Kind kind) {
+        mend(golem);
+        CeroBeam.Spec spec = new CeroBeam.Spec(10.0F, 12.0, 0.5F, 0.0F, 0.0F, 0, 0.0F, 0xFFFFFF, 0, 0, false);
+        return CeroBeam.fire(helper.getLevel(), shooter, null, from, new Vec3(1.0, 0.0, 0.0), spec, kind);
     }
 
     // ---- The spells as data ----
@@ -3866,5 +3906,320 @@ public final class KidoTests {
             discardBeams(helper);
         }
         helper.succeed();
+    }
+
+    // ---- Dankū ----
+
+    @GameTest(template = "field")
+    public static void dankuStopsArrowsAndHado(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell sokatsui = spell(helper, KidoSpell.SOKATSUI).value();
+        Player wallCaster = caster(helper, GameType.SURVIVAL, shinigami(600.0F, 36));
+        SoulData data = SoulLogic.get(wallCaster);
+        KidoLogic.choose(data, KidoSpell.DANKU.location());
+        // Just behind where the wall rises, and further down the lane.
+        Pig pig = HollowPlayerTests.placed(helper, EntityType.PIG, 4, 8);
+        IronGolem golem = golem(helper, 7, 8);
+        Player shooter = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 8));
+        SoulData shooterData = SoulLogic.get(shooter);
+        Arrow arrow = null;
+        try {
+            // By the key, as it always is: a fifth of 600, the hands busy for 15 seconds, and 6 xp, as it strikes nothing.
+            assertRefusal(helper, press(wallCaster, now), null, "Dankū at Kidō 36");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 480.0, "the reiryoku after Dankū");
+            helper.assertTrue(!KidoLogic.ready(data, now + 299L) && KidoLogic.ready(data, now + 300L),
+                    "Dankū did not keep the hands busy for 300 ticks");
+            helper.assertTrue(data.xp(Stat.KIDO) == 6, "Dankū trained " + data.xp(Stat.KIDO) + " Kidō xp, not 6");
+
+            // One wall, its middle 2 blocks east of the caster's feet: 5 wide across the lane, 4 tall and a quarter
+            // thick, for 6 seconds, as strong as 1¼ times the caster's 600. Nothing aims at it, pushes it or bumps into it.
+            List<DankuWall> raised = walls(helper);
+            helper.assertTrue(raised.size() == 1, "Dankū raised " + raised.size() + " walls");
+            DankuWall wall = raised.get(0);
+            helper.assertTrue(wall.facing() == Direction.EAST, "Dankū's wall faces " + wall.facing());
+            helper.assertTrue(wall.position().distanceTo(helper.absoluteVec(new Vec3(3.5, 2.0, 8.5))) < 1.0E-6,
+                    "Dankū's wall stands at " + helper.relativeVec(wall.position()));
+            AABB box = wall.getBoundingBox();
+            AABB slab = new AABB(helper.absoluteVec(new Vec3(3.375, 2.0, 6.0)),
+                    helper.absoluteVec(new Vec3(3.625, 6.0, 11.0)));
+            helper.assertTrue(Math.abs(box.minX - slab.minX) < 1.0E-6 && Math.abs(box.maxX - slab.maxX) < 1.0E-6
+                    && Math.abs(box.minY - slab.minY) < 1.0E-6 && Math.abs(box.maxY - slab.maxY) < 1.0E-6
+                    && Math.abs(box.minZ - slab.minZ) < 1.0E-6 && Math.abs(box.maxZ - slab.maxZ) < 1.0E-6,
+                    "Dankū's wall fills " + box + ", not " + slab);
+            helper.assertTrue(wall.endsAt() == now + 120L, "Dankū's wall ends at " + wall.endsAt() + ", not " + (now + 120L));
+            helper.assertTrue(wall.strength() == 750.0F && wall.caster() == wallCaster,
+                    "Dankū's wall is " + wall.strength() + " strong, raised by " + wall.caster());
+            helper.assertTrue(!wall.isPickable() && !wall.isPushable() && !wall.canBeCollidedWith()
+                    && wall.canBeHitByProjectile(), "Dankū's wall can be aimed at, pushed or bumped into, or meets no arrow");
+
+            // An arrow flying east meets the wall (grown by 0.3, at 3.075) before the pig (at 3.75), and drops before it.
+            arrow = HollowTests.arrow(helper, helper.absoluteVec(new Vec3(2.5, 2.5, 8.5)), new Vec3(3.0, 0.0, 0.0));
+            helper.assertTrue(level.addFreshEntity(arrow), "the arrow could not join the world");
+            arrow.tick();
+            double nearFace = helper.absoluteVec(new Vec3(3.375, 0.0, 0.0)).x;
+            helper.assertTrue(arrow.getDeltaMovement().x < 0.0 && arrow.getX() < nearFace,
+                    "the arrow went on at " + arrow.getDeltaMovement() + " to " + helper.relativeVec(arrow.position()));
+            helper.assertTrue(unhurt(pig) && wall.standing(), "the arrow got past Dankū: the pig is at " + pig.getHealth()
+                    + ", the wall standing " + wall.standing());
+
+            // Sōkatsui, chanted at the golem: its beam from the hand (x 2.1) meets the wall 1.275 on, before the golem
+            // (4.7 on), and stops there; the wall stands, and takes a second one as well.
+            assertRefusal(helper, KidoEvents.cast(shooter, sokatsui, KidoLogic.Form.CHANT, now, 1.0), null,
+                    "Sōkatsui at Dankū");
+            helper.assertTrue(unhurt(golem) && wall.standing(), "Sōkatsui got past Dankū: the golem is at "
+                    + golem.getHealth() + ", the wall standing " + wall.standing());
+            HollowPlayerTests.assertClose(helper, shooterData.reiryoku(), 368.0, "the reiryoku after Sōkatsui");
+            assertRefusal(helper, KidoEvents.cast(shooter, sokatsui, KidoLogic.Form.CHANT, now + 40L, 1.0), null,
+                    "Sōkatsui at Dankū again");
+            helper.assertTrue(unhurt(golem) && wall.standing(), "the second Sōkatsui got past Dankū: the golem is at "
+                    + golem.getHealth() + ", the wall standing " + wall.standing());
+            HollowPlayerTests.assertClose(helper, shooterData.reiryoku(), 336.0, "the reiryoku after two Sōkatsui");
+
+            // Tenran's cone from the same hand finds nothing behind the wall; with the wall gone, it finds the golem.
+            Vec3 hand = CeroBeam.muzzleOf(shooter, 1.0F);
+            Vec3 east = new Vec3(1.0, 0.0, 0.0);
+            List<LivingEntity> sheltered = CeroBeam.inCone(level, shooter, hand, east, 8.0, 70.0F);
+            helper.assertTrue(sheltered.isEmpty(), "Tenran's cone reaches " + sheltered + " behind Dankū");
+            wall.discard();
+            List<LivingEntity> open = CeroBeam.inCone(level, shooter, hand, east, 8.0, 70.0F);
+            helper.assertTrue(open.contains(golem), "with Dankū gone, Tenran's cone holds only " + open);
+        } finally {
+            discard(pig, golem, arrow, wallCaster, shooter);
+            dropWalls(helper);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Each shot goes east from x 1.0 at the height of the golem's chest: it meets the wall's near face 2.375 on, and the
+     * golem (its box grown by the beam's half-width) 5.3 on, its own box beginning 5.8 on. Behind the golem the dirt
+     * wall, 10 on, is within the beam's 12.
+     */
+    @GameTest(template = "field")
+    public static void dankuWeighsTheCeroFamily(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell danku = spell(helper, KidoSpell.DANKU).value();
+        Player wallCaster = caster(helper, GameType.SURVIVAL, shinigami(600.0F, 36));
+        IronGolem golem = golem(helper, 7, 8);
+        Vec3 from = helper.absoluteVec(new Vec3(1.0, 2.5, 8.5));
+        double nearFace = helper.absoluteVec(new Vec3(3.375, 0.0, 0.0)).x;
+        Pig pig = null;
+        try {
+            // A Cero weighs its shooter's reiatsu whole against the wall's 750: from 500, and from 750 (a tie), it stops at
+            // the near face; from 800 the wall shatters, and the beam goes on to the golem and the dirt.
+            DankuWall first = raiseWall(helper, wallCaster, danku, now);
+            for (float reiatsu : new float[] {500.0F, 750.0F}) {
+                CeroBeam.Shot held = weighed(helper, golem, caster(helper, GameType.SURVIVAL, shinigami(reiatsu, 0)), from,
+                        CeroBeam.Kind.CERO);
+                helper.assertTrue(held.blocked() && !held.hitBlock() && held.struck().isEmpty(),
+                        "a Cero from " + reiatsu + " at Dankū gave " + held);
+                assertNear(helper, held.to().x, nearFace, 1.0E-6, "where a Cero from " + reiatsu + " stopped");
+                helper.assertTrue(unhurt(golem) && first.standing(), "a Cero from " + reiatsu + " got past Dankū: the"
+                        + " golem is at " + golem.getHealth() + ", the wall standing " + first.standing());
+            }
+            CeroBeam.Shot heavy = weighed(helper, golem, caster(helper, GameType.SURVIVAL, shinigami(800.0F, 0)), from,
+                    CeroBeam.Kind.CERO);
+            helper.assertTrue(first.isRemoved() && heavy.struck().contains(golem) && !unhurt(golem) && heavy.hitBlock(),
+                    "a Cero from 800 at Dankū gave " + heavy + ", the wall gone " + first.isRemoved());
+
+            // A shooter whose eyes stand 0.175 before the near face, firing from past the far one, meets the wall
+            // between its eyes and its hand, so the beam goes nowhere: it never starts beyond the wall.
+            DankuWall pressed = raiseWall(helper, wallCaster, danku, now);
+            Player against = caster(helper, GameType.SURVIVAL, shinigami(500.0F, 0));
+            Vec3 close = helper.absoluteVec(new Vec3(3.2, 2.0, 8.5));
+            against.moveTo(close.x, close.y, close.z, EAST, 0.0F);
+            CeroBeam.Shot within = weighed(helper, golem, against, helper.absoluteVec(new Vec3(3.8, 2.5, 8.5)),
+                    CeroBeam.Kind.CERO);
+            helper.assertTrue(within.blocked() && within.struck().isEmpty() && unhurt(golem) && pressed.standing(),
+                    "a Cero fired from against Dankū gave " + within + ", the golem at " + golem.getHealth()
+                            + ", the wall standing " + pressed.standing());
+            pressed.discard();
+
+            // A Gran Rey Cero weighs twice its shooter's: from 375 a tie, stopped; from 400 it shatters the wall.
+            DankuWall second = raiseWall(helper, wallCaster, danku, now);
+            CeroBeam.Shot grand = weighed(helper, golem, caster(helper, GameType.SURVIVAL, shinigami(375.0F, 0)), from,
+                    GranReyCero.KIND);
+            helper.assertTrue(grand.blocked() && grand.struck().isEmpty() && unhurt(golem) && second.standing(),
+                    "a Gran Rey Cero from 375 at Dankū gave " + grand + ", the wall standing " + second.standing());
+            CeroBeam.Shot grander = weighed(helper, golem, caster(helper, GameType.SURVIVAL, shinigami(400.0F, 0)), from,
+                    GranReyCero.KIND);
+            helper.assertTrue(second.isRemoved() && grander.struck().contains(golem) && !unhurt(golem),
+                    "a Gran Rey Cero from 400 at Dankū gave " + grander + ", the wall gone " + second.isRemoved());
+
+            // A Bala weighs half: from 1,500 a tie, stopped. One from 1,600 would shatter the wall, but a pig before it
+            // (met 0.55 on, its box beginning 1.05 on) takes the Bala's one pierce, so the wall is never reached.
+            DankuWall third = raiseWall(helper, wallCaster, danku, now);
+            CeroBeam.Shot bala = weighed(helper, golem, caster(helper, GameType.SURVIVAL, shinigami(1_500.0F, 0)), from,
+                    Bala.KIND);
+            helper.assertTrue(bala.blocked() && bala.struck().isEmpty() && unhurt(golem) && third.standing(),
+                    "a Bala from 1,500 at Dankū gave " + bala + ", the wall standing " + third.standing());
+            pig = HollowPlayerTests.placed(helper, EntityType.PIG, 2, 8);
+            CeroBeam.Shot spent = weighed(helper, golem, caster(helper, GameType.SURVIVAL, shinigami(1_600.0F, 0)), from,
+                    Bala.KIND);
+            helper.assertTrue(spent.struck().equals(List.of(pig)) && !spent.blocked() && third.standing() && unhurt(golem),
+                    "a Bala from 1,600 with a pig before Dankū gave " + spent + ", the wall standing " + third.standing());
+        } finally {
+            discard(golem, pig, wallCaster);
+            dropWalls(helper);
+            // What the slain pig dropped.
+            level.getEntitiesOfClass(ItemEntity.class, helper.getBounds()).forEach(Entity::discard);
+            level.getEntitiesOfClass(ExperienceOrb.class, helper.getBounds()).forEach(Entity::discard);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The crescent and the arrows are launched into the world and ticked by hand within this one tick. A crescent flies
+     * from x 1.5, 1.6 a tick, so its second sweep meets the wall's near face at 3.375; an arrow of light from x 1.0, 3 a
+     * tick, meets it at once, grown by 0.3, at 3.075.
+     */
+    @GameTest(template = "field")
+    public static void dankuWeighsTheCrescentAndTheArrowsOfLight(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell danku = spell(helper, KidoSpell.DANKU).value();
+        Player wallCaster = caster(helper, GameType.SURVIVAL, shinigami(600.0F, 36));
+        IronGolem golem = golem(helper, 7, 8);
+        Vec3 root = helper.absoluteVec(new Vec3(0.5, 2.5, 8.5));
+        Vec3 bow = helper.absoluteVec(new Vec3(1.0, 2.5, 8.5));
+        Vec3 east = new Vec3(1.0, 0.0, 0.0);
+        GetsugaTensho held = null;
+        GetsugaTensho cutting = null;
+        HeiligPfeil faded = null;
+        HeiligPfeil piercing = null;
+        try {
+            // A Getsuga Tenshō weighs its wielder's reiatsu whole: from 700 the wall holds it on its second sweep.
+            DankuWall first = raiseWall(helper, wallCaster, danku, now);
+            mend(golem);
+            held = GetsugaTensho.launch(level, caster(helper, GameType.SURVIVAL, shinigami(700.0F, 0)), root, east, 0.0F,
+                    10.0F, 20, ItemStack.EMPTY, ZanpakutoBlade.DEFAULT_COLOUR);
+            for (int tick = 0; tick < 3 && !held.isRemoved(); tick++) {
+                held.tick();
+            }
+            helper.assertTrue(held.isRemoved() && first.standing() && unhurt(golem), "a crescent from 700 at Dankū flies "
+                    + !held.isRemoved() + ", the wall standing " + first.standing() + ", the golem at " + golem.getHealth());
+            // From 800 it shatters the wall on that sweep, and on the next, its path reaching 7.5, cuts the golem.
+            mend(golem);
+            cutting = GetsugaTensho.launch(level, caster(helper, GameType.SURVIVAL, shinigami(800.0F, 0)), root, east,
+                    0.0F, 10.0F, 20, ItemStack.EMPTY, ZanpakutoBlade.DEFAULT_COLOUR);
+            for (int tick = 0; tick < 5 && unhurt(golem) && !cutting.isRemoved(); tick++) {
+                cutting.tick();
+            }
+            helper.assertTrue(first.isRemoved() && !unhurt(golem), "a crescent from 800 left Dankū standing "
+                    + !first.isRemoved() + " and the golem at " + golem.getHealth());
+            discard(cutting);
+
+            // A Heilig Pfeil weighs half: from 1,400 the wall turns it on its first tick, and it fades.
+            DankuWall second = raiseWall(helper, wallCaster, danku, now);
+            mend(golem);
+            faded = QuincyTests.loose(helper, caster(helper, GameType.SURVIVAL, shinigami(1_400.0F, 0)), bow, east, 10.0F,
+                    0, 3.0F);
+            faded.tick();
+            helper.assertTrue(faded.isRemoved() && second.standing() && unhurt(golem), "a Heilig Pfeil from 1,400 at Dankū"
+                    + " flies " + !faded.isRemoved() + ", the wall standing " + second.standing() + ", the golem at "
+                    + golem.getHealth());
+            // From 1,600 it shatters the wall on its first tick, and strikes the golem behind it on its second.
+            mend(golem);
+            piercing = QuincyTests.loose(helper, caster(helper, GameType.SURVIVAL, shinigami(1_600.0F, 0)), bow, east,
+                    10.0F, 0, 3.0F);
+            for (int tick = 0; tick < 3 && unhurt(golem) && !piercing.isRemoved(); tick++) {
+                piercing.tick();
+            }
+            helper.assertTrue(second.isRemoved() && !unhurt(golem), "a Heilig Pfeil from 1,600 left Dankū standing "
+                    + !second.isRemoved() + " and the golem at " + golem.getHealth());
+        } finally {
+            discard(golem, held, cutting, faded, piercing, wallCaster);
+            dropWalls(helper);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void dankuLetsBodiesAndBindsThrough(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell danku = spell(helper, KidoSpell.DANKU).value();
+        KidoSpell sai = spell(helper, KidoSpell.SAI).value();
+        Player wallCaster = caster(helper, GameType.SURVIVAL, shinigami(600.0F, 36));
+        Player binder = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 1));
+        SoulData binderData = SoulLogic.get(binder);
+        downTheLane(binder);
+        Pig pig = HollowPlayerTests.placed(helper, EntityType.PIG, 2, 8);
+        IronGolem golem = null;
+        try {
+            DankuWall wall = raiseWall(helper, wallCaster, danku, now);
+            // Nothing in it to bump into: the pig walks 2 blocks east, through the wall, from 2.5 to 4.5.
+            helper.assertTrue(level.getEntityCollisions(pig, pig.getBoundingBox().expandTowards(2.0, 0.0, 0.0)).isEmpty(),
+                    "the pig would bump into Dankū's wall");
+            pig.move(MoverType.SELF, new Vec3(2.0, 0.0, 0.0));
+            assertNear(helper, pig.getX(), helper.absoluteVec(new Vec3(4.5, 0.0, 0.0)).x, "where the pig walked to");
+            // Out of the way of the bind.
+            discard(pig);
+
+            // Sai's ray passes the wall and binds the golem behind it: 400 at Kidō 1 makes 408.04 against the golem's
+            // 100, so its arms are bound the whole 3 seconds, and the wall stands.
+            golem = golem(helper, 7, 8);
+            assertNear(helper, KidoLogic.bindStrength(sai, binder, binderData, 1.0F), 408.04,
+                    "Sai's strength from 400 at Kidō 1");
+            assertRefusal(helper, KidoEvents.cast(binder, sai, KidoLogic.Form.NAME, now), null, "Sai through Dankū");
+            helper.assertTrue(boundTicks(golem) == 60, "Sai through Dankū bound the golem " + boundTicks(golem)
+                    + " ticks, not 60");
+            HollowPlayerTests.assertClose(helper, binderData.reiryoku(), 388.0, "the reiryoku after Sai");
+            helper.assertTrue(wall.standing(), "Sai's ray took down Dankū's wall");
+        } finally {
+            discard(pig, golem, wallCaster);
+            dropWalls(helper);
+            discardBeams(helper);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Three walls from three casters: the first left to stand its 120 ticks (6 seconds) and go at its tick, the second's
+     * caster gone and the third's dead, so each goes on its first tick.
+     */
+    @GameTest(template = "field", timeoutTicks = 160)
+    public static void dankuGoesAtItsTimeAndIsNeverSaved(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        KidoSpell danku = spell(helper, KidoSpell.DANKU).value();
+        Player kept = caster(helper, GameType.SURVIVAL, shinigami(600.0F, 36));
+        Player gone = caster(helper, GameType.SURVIVAL, shinigami(600.0F, 36));
+        Player slain = caster(helper, GameType.SURVIVAL, shinigami(600.0F, 36));
+        try {
+            DankuWall first = raiseWall(helper, kept, danku, now);
+            DankuWall second = raiseWall(helper, gone, danku, now);
+            DankuWall third = raiseWall(helper, slain, danku, now);
+            // Never written with its chunk, though it goes when the chunk does; hidden from the unaware; never summoned.
+            helper.assertFalse(first.getType().canSerialize(), "Dankū's wall can be saved");
+            helper.assertFalse(first.saveAsPassenger(new CompoundTag()), "Dankū's wall was written with its chunk");
+            helper.assertTrue(first.shouldBeSaved(), "Dankū's wall would stay loaded with no chunk about it");
+            helper.assertTrue(first.getType().is(SoulLogic.SPIRITS), "Dankū's wall is not a spirit");
+            helper.assertFalse(first.getType().canSummon(), "Dankū's wall can be summoned");
+            helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id("danku_wall")) == ModEntities.DANKU_WALL.get(),
+                    "bleach:danku_wall is " + BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id("danku_wall")));
+            gone.discard();
+            slain.setHealth(0.0F);
+
+            helper.runAtTickTime(110, () -> {
+                helper.assertTrue(first.standing() && !first.isRemoved(), "Dankū's wall went before its 6 seconds");
+                helper.assertTrue(second.isRemoved() && third.isRemoved(), "Dankū's wall outlived its caster: gone "
+                        + second.isRemoved() + ", dead " + third.isRemoved());
+            });
+            helper.succeedWhen(() -> {
+                helper.assertTrue(helper.getTick() > 110L && first.isRemoved(), "Dankū's wall still stands at tick "
+                        + helper.getTick());
+                dropWalls(helper);
+            });
+        } catch (RuntimeException failed) {
+            dropWalls(helper);
+            throw failed;
+        }
     }
 }
