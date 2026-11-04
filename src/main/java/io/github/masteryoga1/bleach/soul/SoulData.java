@@ -291,6 +291,12 @@ public final class SoulData {
      */
     @Nullable
     KidoLogic.Gather kidoGather;
+    /** The smoke this soul cast, while it stands, or null (see {@link KidoSmoke}). Not saved. */
+    @Nullable
+    KidoSmoke.Cloud kidoSmoke;
+    /** The shield this soul holds up, or null (see {@link KidoWard}). Not saved. */
+    @Nullable
+    KidoWard.Shield kidoShield;
     /** The Gran Rey Cero this Arrancar is gathering, by entity id, or -1 (see {@link GranReyCero}). */
     int granReyCeroBeamId = -1;
     /** Game time the Gran Rey Cero being gathered started, or {@link #NEVER}. */

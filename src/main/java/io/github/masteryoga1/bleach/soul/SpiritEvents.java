@@ -56,6 +56,11 @@ public final class SpiritEvents {
                 && !creature.getType().is(SoulLogic.SPIRIT_SIGHTED);
     }
 
+    /** Whether this creature cannot pick the target out: blind to spirits, or lost in a Kidō smoke the target cast. */
+    public static boolean cannotPick(LivingEntity looker, @Nullable LivingEntity target) {
+        return blindToSpirit(looker, target) || KidoSmoke.lost(looker, target);
+    }
+
     private static void onAttack(AttackEntityEvent event) {
         if (event.getTarget() instanceof LivingEntity target && passesThrough(event.getEntity(), target)) {
             event.setCanceled(true);
@@ -110,9 +115,11 @@ public final class SpiritEvents {
      * A mundane creature never takes a spirit mob as its target: an iron golem walks straight past a
      * Hollow. Its target goals never find one (see the mixin on TargetingConditions) and a Warden never
      * grows angry at one (see the mixin on Warden); this catches the rest, such as a direct setTarget.
+     * Nor does a creature lost in a Kidō smoke take the one who cast it, while the mark lasts (see
+     * {@link KidoSmoke}).
      */
     private static void onChangeTarget(LivingChangeTargetEvent event) {
-        if (blindToSpirit(event.getEntity(), event.getNewAboutToBeSetTarget())) {
+        if (cannotPick(event.getEntity(), event.getNewAboutToBeSetTarget())) {
             event.setCanceled(true);
         }
     }

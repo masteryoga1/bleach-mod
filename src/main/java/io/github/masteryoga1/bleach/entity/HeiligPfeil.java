@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.KidoWard;
 import io.github.masteryoga1.bleach.soul.QuincyArtsEvents;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
@@ -385,9 +386,9 @@ public class HeiligPfeil extends AbstractArrow {
 
     /**
      * Where a path from {@code from} to {@code to} this tick ends at the latest on a creature: at the
-     * first one on it that will stop the arrow (a shield raised towards it, one that turns arrows
-     * aside, or the one met past its last pierce), or at {@code to} if none will. Server side; it
-     * strikes nothing.
+     * first one on it that will stop the arrow (a shield raised towards it or a Kidō shield, one that
+     * turns arrows aside, or the one met past its last pierce), or at {@code to} if none will. Server
+     * side; it strikes nothing.
      */
     protected Vec3 creatureStop(Vec3 from, Vec3 to) {
         AABB sweep = getBoundingBox().expandTowards(to.subtract(from)).inflate(1.0);
@@ -419,7 +420,7 @@ public class HeiligPfeil extends AbstractArrow {
             boolean shielded;
             hurting = true;
             try {
-                shielded = target.isDamageSourceBlocked(source);
+                shielded = target.isDamageSourceBlocked(source) || KidoWard.covers(target, source);
             } finally {
                 hurting = false;
             }
@@ -533,9 +534,9 @@ public class HeiligPfeil extends AbstractArrow {
         boolean hurt;
         hurting = true;
         try {
-            // Judged as vanilla judges it (a shield raised towards the shot), while the arrow reads as
-            // unpierceable, and before the blow too: a shield the blow breaks is no longer raised.
-            blocking = target.isDamageSourceBlocked(source);
+            // Judged before the blow, as vanilla judges a shield raised towards the shot while the arrow reads as
+            // unpierceable, or a Kidō shield (see KidoWard#covers): a shield the blow breaks is no longer raised.
+            blocking = target.isDamageSourceBlocked(source) || KidoWard.covers(target, source);
             hurt = entity.hurt(source, QuincyLogic.damageAgainst(damage, target));
         } finally {
             hurting = false;

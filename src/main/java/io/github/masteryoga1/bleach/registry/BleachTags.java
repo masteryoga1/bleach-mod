@@ -49,6 +49,12 @@ public final class BleachTags {
      */
     public static final TagKey<DamageType> DESTROYS_SOULS = TagKey.create(Registries.DAMAGE_TYPE, BleachMod.id("destroys_souls"));
 
+    /**
+     * Damage no Kidō ward before its victim stops, as an art that rises about it rather than comes from one side:
+     * Sprenger.
+     */
+    public static final TagKey<DamageType> PASSES_WARDS = TagKey.create(Registries.DAMAGE_TYPE, BleachMod.id("passes_wards"));
+
     /** Biomes where reishi runs rich, so a Quincy gathers it faster: forests, taiga, meadows and the like. */
     public static final TagKey<Biome> REISHI_RICH = TagKey.create(Registries.BIOME, BleachMod.id("reishi_rich"));
     /** Biomes where reishi runs thin, so a Quincy gathers it more slowly: deserts, badlands and the deepest caves. */

@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
@@ -22,6 +23,8 @@ import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
+import io.github.masteryoga1.bleach.soul.KidoSmoke;
+import io.github.masteryoga1.bleach.soul.KidoWard;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
@@ -52,6 +55,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -67,6 +71,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -76,14 +82,20 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Marker;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.SwellGoal;
+import net.minecraft.world.entity.ai.goal.WrappedGoal;
+import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
@@ -115,7 +127,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, and the four Bakudō, two of them
+ * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, and the six Bakudō, two of them
  * chanted, their order and their looks, a broken or empty file read leniently and clamped, and each spell sent as the
  * sync sends it), who may cast and who may only choose, the spells a Kidō level knows and the one chosen, the gate and
  * the share of casting by name alone, a spell's power and cost, what a Hadō strikes and what it spares, Kidō training
@@ -126,20 +138,27 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * the misfire drawn only then, and what lets it go, scatters, breaks or drops it), and the binds of Sai and Hainawa
  * (the contest of strength that weighs each, what the ray reaches, what bound arms and a held body are kept from and
  * what they still do, who may be bound, and what shrugs a bind off or lifts it), Geki and Rikujōkōrō chanted (how each
- * is heard, gated and shared, and a bind that binds and holds at once, drawn in its spell's look), and the pin of a
- * body its Hollow has seized by a hold long enough. The by-name gate and share are also tested on a spell built in code
- * ({@link #chantSpell}). Mock players are not in the world and never tick, so the Kidō key is pressed and let go by
- * calling {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a
- * later time passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
- * {@link KidoEvents#chant}, and a pending chant or gather goes off by calling {@link KidoEvents#tick} with the time it
- * would come at; a misfire's roll is passed to the five-argument {@code KidoEvents.cast}, and for a gather, which draws
- * its own roll as it goes off, the misfire chance is set to 1 or 0 for that one call. No cone can find a mock player,
- * so a gust's blow is given to one directly ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on
- * one directly ({@link KidoEvents#bindOne}), its clamp is called by hand and what it refuses is posted as the event the
- * act would fire. Raikōhō's heavy bolt is taken by an iron golem, whose 100 health outlasts it. Casters stand at
- * {@link #LANE} in the {@code field} template, facing east: every beam and bind goes east down the lane into a creature
- * or the dirt wall, and every gust east along it, ending within the field; every creature, trace, orb, light, takeover,
- * mask, gathering, team, bind, look and wary mark a test makes is put away within its first tick.
+ * is heard, gated and shared, and a bind that binds and holds at once, drawn in its spell's look), the pin of a body
+ * its Hollow has seized by a hold long enough, Sekienton's smoke (the creatures in it left lost to the caster, their
+ * hunt and a creeper's swell stopped, at once and at each pulse, the players it blinds and what spares them, and the
+ * caster quickened), and Enkōsen's shield (the blows it takes from the front and within the moment of another, what
+ * passes once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it). The by-name
+ * gate and share are also tested on a spell built in code ({@link #chantSpell}). Mock players are not in the world and
+ * never tick, so the Kidō key is pressed and let go by calling {@link KidoEvents#onKey} with the time it would come at,
+ * and the game time stands still within a test: a later time passed in stands for a later tick. Chat cannot be sent in
+ * a game test, so a line is heard by calling {@link KidoEvents#chant}, and a pending chant or gather goes off by calling
+ * {@link KidoEvents#tick} with the time it would come at, as a smoke pulses and a shield ends by calling
+ * {@link KidoSmoke#tick} and {@link KidoWard#tick}; a misfire's roll is passed to the five-argument
+ * {@code KidoEvents.cast}, and for a gather, which draws its own roll as it goes off, the misfire chance is set to 1 or 0
+ * for that one call. No cone can find a mock player, so a gust's blow is given to one directly
+ * ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on one directly ({@link KidoEvents#bindOne}),
+ * its clamp is called by hand and what it refuses is posted as the event the act would fire; nor can a smoke's pulse,
+ * so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}). A still golem has no will of its own, so the revenge
+ * goal a blow would start is started by hand. Raikōhō's heavy bolt is taken by an iron golem, whose 100 health outlasts
+ * it. Casters stand at {@link #LANE} in the {@code field} template, facing east: every beam and bind goes east down the
+ * lane into a creature or the dirt wall, and every gust east along it, ending within the field; every creature, trace,
+ * orb, light, takeover, mask, gathering, team, bind, look, wary mark, smoke, shield and lost mark a test makes is put
+ * away within its first tick.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -164,6 +183,8 @@ public final class KidoTests {
     private static final int HAINAWA_COLOUR = 0xF2C230;
     private static final int GEKI_COLOUR = 0xD6303C;
     private static final int RIKUJOKORO_COLOUR = 0xFFF1A8;
+    private static final int SEKIENTON_COLOUR = 0xB8262E;
+    private static final int ENKOSEN_COLOUR = 0xD8C46A;
     /** Where a creature keeps its wariness of each Bakudō ({@link KidoLogic#markWary}), so a test can clear it. */
     private static final String WARY_TAG = "bleach:bakudo_wary";
     /** The held body's modifier on the walk, which takes the whole of it. */
@@ -612,6 +633,58 @@ public final class KidoTests {
                 + Integer.toHexString(drawn.colour()) + ", not " + style + " in " + Integer.toHexString(colour));
     }
 
+    /** This mob's revenge goal, as its target selector holds it: what a blow sets hunting, and a smoke must stop. */
+    private static WrappedGoal hurtBy(Mob mob) {
+        return mob.targetSelector.getAvailableGoals().stream()
+                .filter(goal -> goal.getGoal() instanceof HurtByTargetGoal)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    /** A mob's blow from this place in the world with no creature behind it, as a shield meets one. */
+    private static DamageSource attackAt(GameTestHelper helper, Vec3 at) {
+        return damageOf(helper, DamageTypes.MOB_ATTACK, at);
+    }
+
+    /** A blow of this damage type from this place in the world, or from no place for null, with no creature behind it. */
+    private static DamageSource damageOf(GameTestHelper helper, ResourceKey<DamageType> type, @Nullable Vec3 at) {
+        Holder<DamageType> holder = helper.getLevel().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                .getHolderOrThrow(type);
+        return at == null ? new DamageSource(holder) : new DamageSource(holder, at);
+    }
+
+    /** This golem with this soul, so it may hold up a Kidō shield of its own, which a Hadō beam can meet. */
+    private static IronGolem wearerOf(IronGolem golem, SoulData data) {
+        golem.setData(SoulAttachments.SOUL, data);
+        return golem;
+    }
+
+    /** What is left of this shield: nothing when there is none, as a broken one has nothing left. */
+    private static float left(@Nullable KidoWard.Shield shield) {
+        return shield == null ? 0.0F : shield.left();
+    }
+
+    /**
+     * Drops the smoke and the shield of each of these, as their ticks drop them once their time is up: a mock player
+     * is not in the world, so nothing else ends what a test raised.
+     */
+    private static void dropWards(Player... players) {
+        for (Player player : players) {
+            SoulData data = SoulLogic.get(player);
+            KidoSmoke.tick(player, data, Long.MAX_VALUE);
+            KidoWard.tick(player, data, Long.MAX_VALUE);
+        }
+    }
+
+    /** Clears the mark a smoke left on each of these, so none is lost to a caster when it goes. */
+    private static void unlose(LivingEntity... creatures) {
+        for (LivingEntity creature : creatures) {
+            if (creature != null) {
+                creature.removeData(SoulAttachments.LOST);
+            }
+        }
+    }
+
     // ---- The spells as data ----
 
     @GameTest(template = "empty")
@@ -621,7 +694,8 @@ public final class KidoTests {
                 && spells.containsKey(KidoSpell.SHAKKAHO) && spells.containsKey(KidoSpell.SOKATSUI)
                 && spells.containsKey(KidoSpell.TENRAN) && spells.containsKey(KidoSpell.RAIKOHO)
                 && spells.containsKey(KidoSpell.SAI) && spells.containsKey(KidoSpell.HAINAWA)
-                && spells.containsKey(KidoSpell.GEKI) && spells.containsKey(KidoSpell.RIKUJOKORO),
+                && spells.containsKey(KidoSpell.GEKI) && spells.containsKey(KidoSpell.SEKIENTON)
+                && spells.containsKey(KidoSpell.ENKOSEN) && spells.containsKey(KidoSpell.RIKUJOKORO),
                 "the shipped spells did not load: " + spells.keySet());
         // A data pack may add its own, so only the mod's are held to their order.
         List<ResourceKey<KidoSpell>> shipped = ids(KidoSpell.sorted(spells)).stream()
@@ -630,7 +704,7 @@ public final class KidoTests {
         // Every Hadō before every Bakudō, each kind by its number.
         helper.assertTrue(shipped.equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI, KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI,
                 KidoSpell.TENRAN, KidoSpell.RAIKOHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI,
-                KidoSpell.RIKUJOKORO)), "the mod's spells sort as " + shipped);
+                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO)), "the mod's spells sort as " + shipped);
 
         KidoSpell sho = spell(helper, KidoSpell.SHO).value();
         assertShipped(helper, sho, "Shō", "kido.bleach.sho", 1, 0, 0xCFE6FF, KidoSpell.Kind.HADO, KidoSpell.Shape.BEAM);
@@ -757,11 +831,61 @@ public final class KidoTests {
                     instanceof SimpleParticleType, what + " puffs " + look.particle());
         }
 
-        // Each bind is drawn in its own way; Sai, Hainawa and every Hadō name none, and read the binds' own.
+        // Sekienton and Enkōsen have no incantation and strike nothing: a smoke left where the caster stood, and a
+        // shield held before it, each standing for its ward's time.
+        KidoSpell sekienton = spell(helper, KidoSpell.SEKIENTON).value();
+        assertShipped(helper, sekienton, "Sekienton", "kido.bleach.sekienton", 21, 8, SEKIENTON_COLOUR,
+                KidoSpell.Kind.BAKUDO, KidoSpell.Shape.SMOKE);
+        assertNear(helper, sekienton.costShare(), 0.06, "Sekienton's share of reiryoku");
+        assertNear(helper, sekienton.minCost(), 3.0, "Sekienton's least cost");
+        helper.assertTrue(sekienton.cooldownTicks() == 200 && sekienton.xp() == 3,
+                "Sekienton waits " + sekienton.cooldownTicks() + " ticks and trains " + sekienton.xp() + " xp");
+        assertNear(helper, sekienton.effect().radius(), 4.0, "the radius of Sekienton's cloud");
+        assertNear(helper, sekienton.effect().blindSeconds(), 3.0, "Sekienton's blindness");
+        KidoSpell.Ward smoke = sekienton.effect().ward();
+        helper.assertTrue(smoke.seconds() == 4.0F && smoke.lostSeconds() == 3.0F && smoke.speedSeconds() == 2.0F
+                && smoke.speedLevel() == 2, "Sekienton's ward is " + smoke + ", not 4 seconds, 3 lost and 2 of Speed II");
+        KidoSpell enkosen = spell(helper, KidoSpell.ENKOSEN).value();
+        assertShipped(helper, enkosen, "Enkōsen", "kido.bleach.enkosen", 39, 12, ENKOSEN_COLOUR, KidoSpell.Kind.BAKUDO,
+                KidoSpell.Shape.SHIELD);
+        assertNear(helper, enkosen.costShare(), 0.08, "Enkōsen's share of reiryoku");
+        assertNear(helper, enkosen.minCost(), 4.0, "Enkōsen's least cost");
+        helper.assertTrue(enkosen.cooldownTicks() == 160 && enkosen.xp() == 4,
+                "Enkōsen waits " + enkosen.cooldownTicks() + " ticks and trains " + enkosen.xp() + " xp");
+        assertNear(helper, enkosen.effect().damage(), 4.0, "Enkōsen's strength");
+        assertNear(helper, enkosen.effect().damagePerRoot(), 0.3, "Enkōsen's strength per root of reiryoku");
+        assertNear(helper, enkosen.effect().maxDamage(), 30.0, "Enkōsen's most strength");
+        assertNear(helper, enkosen.effect().angle(), 120.0, "the arc Enkōsen covers");
+        assertNear(helper, enkosen.effect().radius(), 0.8, "the ring Enkōsen is drawn as");
+        KidoSpell.Ward shield = enkosen.effect().ward();
+        helper.assertTrue(shield.seconds() == 3.0F && shield.lostSeconds() == 0.0F && shield.speedSeconds() == 0.0F
+                && shield.speedLevel() == 0, "Enkōsen's ward is " + shield + ", not 3 seconds and nothing else");
+        for (KidoSpell warding : List.of(sekienton, enkosen)) {
+            String what = "Bakudō #" + warding.number();
+            helper.assertTrue(warding.gatherTicks() == 0 && !warding.gathers(), what + " gathers for "
+                    + warding.gatherTicks() + " ticks");
+            KidoSpell.Look look = warding.look();
+            helper.assertTrue(look.sound().isPresent() && BuiltInRegistries.SOUND_EVENT.containsKey(look.sound().get()),
+                    what + " sounds as " + look.sound());
+            helper.assertTrue(look.particle().flatMap(BuiltInRegistries.PARTICLE_TYPE::getOptional).orElse(null)
+                    instanceof SimpleParticleType, what + " puffs " + look.particle());
+            assertNear(helper, KidoLogic.misfireChance(warding, warding.level()), 0.0,
+                    what + "'s misfire chance at Kidō " + warding.level());
+            assertNear(helper, KidoLogic.share(warding, KidoLogic.Form.NAME, warding.level()), 1.0,
+                    "the share of " + what + " cast by name at Kidō " + warding.level());
+        }
+        // Every other spell leaves its ward out, and reads none.
+        for (KidoSpell other : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki, rikujokoro)) {
+            helper.assertTrue(other.effect().ward().equals(KidoSpell.Ward.NONE),
+                    other.kind() + " #" + other.number() + " has the ward " + other.effect().ward());
+        }
+
+        // Each bind is drawn in its own way; Sai, Hainawa, the wards and every Hadō name none, and read the binds' own.
         helper.assertTrue(geki.look().bind() == KidoSpell.BindStyle.GLOW
                 && rikujokoro.look().bind() == KidoSpell.BindStyle.RODS,
                 "Geki is drawn as " + geki.look().bind() + " and Rikujōkōrō as " + rikujokoro.look().bind());
-        for (KidoSpell plain : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa)) {
+        for (KidoSpell plain : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, sekienton,
+                enkosen)) {
             helper.assertTrue(plain.look().bind() == KidoSpell.BindStyle.DEFAULT,
                     plain.kind() + " #" + plain.number() + " is drawn as " + plain.look().bind());
         }
@@ -803,6 +927,10 @@ public final class KidoTests {
         helper.assertTrue(fourthBakudo.equals(List.of(KidoSpell.HAINAWA)), "Bakudō #4 is " + fourthBakudo);
         List<ResourceKey<KidoSpell>> ninthBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 9));
         helper.assertTrue(ninthBakudo.equals(List.of(KidoSpell.GEKI)), "Bakudō #9 is " + ninthBakudo);
+        List<ResourceKey<KidoSpell>> twentyFirstBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 21));
+        helper.assertTrue(twentyFirstBakudo.equals(List.of(KidoSpell.SEKIENTON)), "Bakudō #21 is " + twentyFirstBakudo);
+        List<ResourceKey<KidoSpell>> thirtyNinthBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 39));
+        helper.assertTrue(thirtyNinthBakudo.equals(List.of(KidoSpell.ENKOSEN)), "Bakudō #39 is " + thirtyNinthBakudo);
         List<ResourceKey<KidoSpell>> sixtyFirstBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 61));
         helper.assertTrue(sixtyFirstBakudo.equals(List.of(KidoSpell.RIKUJOKORO)), "Bakudō #61 is " + sixtyFirstBakudo);
 
@@ -811,7 +939,8 @@ public final class KidoTests {
                 + " \"cooldown_ticks\": 0, \"gather_ticks\": 1000,"
                 + " \"incantations\": [\"\", \"" + "x".repeat(300) + "\", \"ok\"],"
                 + " \"effect\": {\"range\": 1000, \"pierce\": 0, \"damage\": \"lots\", \"angle\": 400,"
-                + " \"blind_seconds\": -1, \"bare_share\": 3, \"bound_seconds\": 100, \"held_seconds\": -1}}";
+                + " \"blind_seconds\": -1, \"bare_share\": 3, \"bound_seconds\": 100, \"held_seconds\": -1,"
+                + " \"ward\": {\"seconds\": 100, \"lost_seconds\": -1, \"speed_seconds\": 40, \"speed_level\": 9}}}";
         KidoSpell parsed = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(broken)).getOrThrow();
         helper.assertTrue(parsed.number() == 0, "a number of -5 read as " + parsed.number());
         helper.assertTrue(parsed.shape() == KidoSpell.Shape.NONE && !parsed.castable(),
@@ -832,6 +961,15 @@ public final class KidoTests {
         assertNear(helper, parsed.effect().bareShare(), 1.0, "a share of 3 with no blade at hand");
         assertNear(helper, parsed.effect().boundSeconds(), 60.0, "a bind of 100 seconds");
         assertNear(helper, parsed.effect().heldSeconds(), 0.0, "a hold of -1 seconds");
+        KidoSpell.Ward clamped = parsed.effect().ward();
+        assertNear(helper, clamped.seconds(), 60.0, "a ward of 100 seconds");
+        assertNear(helper, clamped.lostSeconds(), 0.0, "a ward that loses for -1 seconds");
+        assertNear(helper, clamped.speedSeconds(), 30.0, "a ward that quickens for 40 seconds");
+        helper.assertTrue(clamped.speedLevel() == 5, "a Speed of level 9 read as " + clamped.speedLevel());
+        KidoSpell unwarded = KidoSpell.CODEC.parse(JsonOps.INSTANCE,
+                JsonParser.parseString("{\"effect\": {\"ward\": \"nonsense\"}}")).getOrThrow();
+        helper.assertTrue(unwarded.effect().ward().equals(KidoSpell.Ward.NONE),
+                "a ward of \"nonsense\" read as " + unwarded.effect().ward());
         KidoSpell empty = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{}")).getOrThrow();
         helper.assertFalse(empty.castable(), "an empty spell file can be cast, as a " + empty.shape());
         KidoSpell gust = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{\"shape\": \"gust\"}"))
@@ -840,11 +978,16 @@ public final class KidoTests {
         KidoSpell bind = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{\"shape\": \"bind\"}"))
                 .getOrThrow();
         helper.assertTrue(bind.shape() == KidoSpell.Shape.BIND && bind.castable(), "a bind read as a " + bind.shape());
+        for (KidoSpell.Shape standing : List.of(KidoSpell.Shape.SMOKE, KidoSpell.Shape.SHIELD)) {
+            String written = "{\"shape\": \"" + standing.getSerializedName() + "\"}";
+            KidoSpell read = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(written)).getOrThrow();
+            helper.assertTrue(read.shape() == standing && read.castable(), written + " read as a " + read.shape());
+        }
 
         // Sent to a client as the sync sends it: encoded with the world's registries to NBT, and read back.
         RegistryOps<Tag> ops = helper.getLevel().registryAccess().createSerializationContext(NbtOps.INSTANCE);
-        for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki, rikujokoro,
-                parsed)) {
+        for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki, sekienton,
+                enkosen, rikujokoro, parsed)) {
             Tag sent = KidoSpell.CODEC.encodeStart(ops, spell).getOrThrow();
             KidoSpell read = KidoSpell.CODEC.parse(ops, sent).getOrThrow();
             helper.assertTrue(read.equals(spell), "sent " + spell + " but read " + read);
@@ -1007,8 +1150,9 @@ public final class KidoTests {
         helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.BYAKURAI)),
                 "falling below Byakurai rewrote the choice as " + stored(data));
 
-        // Geki is known from Kidō 7 and comes after Hainawa, so the choice wraps round after it; from Kidō 22 Rikujōkōrō
-        // comes after Geki. A soul of its own, so the choice saved below is left as it is.
+        // Geki is known from Kidō 7 and comes after Hainawa, so the choice wraps round after it; by Kidō 22 Sekienton,
+        // Enkōsen and Rikujōkōrō come after Geki, in their numbers' order. A soul of its own, so the choice saved below
+        // is left as it is.
         SoulData chooser = shinigami(400.0F, 7);
         helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
                 KidoSpell.SHAKKAHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI)),
@@ -1022,9 +1166,16 @@ public final class KidoTests {
         chooser.setLevel(Stat.KIDO, 22);
         helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
                 KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI, KidoSpell.TENRAN, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI,
-                KidoSpell.RIKUJOKORO)), "Kidō 22 knows " + ids(KidoLogic.known(chooser, spells)));
-        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.RIKUJOKORO)),
+                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO)),
+                "Kidō 22 knows " + ids(KidoLogic.known(chooser, spells)));
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SEKIENTON)),
                 "after Geki at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.SEKIENTON.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.ENKOSEN)),
+                "after Sekienton at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.ENKOSEN.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.RIKUJOKORO)),
+                "after Enkōsen at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
         KidoLogic.choose(chooser, KidoSpell.RIKUJOKORO.location());
         helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
                 "after Rikujōkōrō at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
@@ -3234,6 +3385,448 @@ public final class KidoTests {
                 host.removeEffect(MobEffects.WEAKNESS);
             }
             unbind(pinned, bySai, byHainawa, byGeki, byStrong, byWeak, unpinned);
+        }
+        helper.succeed();
+    }
+
+    // ---- Sekienton and Enkōsen ----
+
+    @GameTest(template = "field")
+    public static void sekientonLosesTheCasterInItsSmoke(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        Player caster = caster(helper, GameType.SURVIVAL, shinigami(150.0F, 8));
+        SoulData data = SoulLogic.get(caster);
+        KidoLogic.choose(data, KidoSpell.SEKIENTON.location());
+        // Two blocks from the caster, within the smoke's 4; six, beyond them; and a creeper within its swell's 3.
+        IronGolem inside = golem(helper, 3, 8);
+        IronGolem outside = golem(helper, 7, 8);
+        Creeper creeper = HollowPlayerTests.placed(helper, EntityType.CREEPER, 3, 10);
+        IronGolem late = null;
+        try {
+            // Struck by the caster: each still golem's revenge goal, started as a blow would start it, hunts it.
+            for (IronGolem golem : List.of(inside, outside)) {
+                golem.setLastHurtByMob(caster);
+                hurtBy(golem).start();
+                helper.assertTrue(hurtBy(golem).isRunning() && golem.getTarget() == caster,
+                        "the struck golem does not hunt the caster: " + golem.getTarget());
+            }
+            // The still creeper has no goals: its swell, started on the caster, keeps the caster as a target of its own.
+            creeper.setTarget(caster);
+            creeper.setSwellDir(1);
+            creeper.goalSelector.addGoal(2, new SwellGoal(creeper));
+            WrappedGoal swell = creeper.goalSelector.getAvailableGoals().stream()
+                    .filter(goal -> goal.getGoal() instanceof SwellGoal)
+                    .findFirst()
+                    .orElseThrow();
+            swell.start();
+            helper.assertTrue(swell.isRunning() && creeper.getTarget() == caster && creeper.getSwellDir() == 1,
+                    "the creeper does not swell at the caster");
+
+            // Cast by name, as it always is: it has no incantation, so it never misfires.
+            assertRefusal(helper, press(caster, now), null, "Sekienton");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 141.0, "the reiryoku after Sekienton");
+            helper.assertTrue(!KidoLogic.ready(data, now + 199L) && KidoLogic.ready(data, now + 200L),
+                    "Sekienton did not keep the hands busy for 200 ticks");
+            helper.assertTrue(data.xp(Stat.KIDO) == 3, "Sekienton trained " + data.xp(Stat.KIDO) + " Kidō xp, not 3");
+            KidoSmoke.Cloud cloud = KidoSmoke.cloud(data);
+            helper.assertTrue(cloud != null && cloud.centre().equals(caster.position()) && cloud.endsAt() == now + 80L
+                    && cloud.nextPulseAt() == now + 4L, "Sekienton's cloud is " + cloud);
+
+            // In the smoke, the golem's hunt is stopped and its target dropped, and it is lost to the caster for 3 seconds.
+            helper.assertTrue(!hurtBy(inside).isRunning() && inside.getTarget() == null,
+                    "the golem in the smoke still hunts " + inside.getTarget());
+            helper.assertTrue(KidoSmoke.lost(inside, caster), "the golem in the smoke is not lost to the caster");
+            long until = inside.getData(SoulAttachments.LOST).until();
+            helper.assertTrue(until == now + 60L, "the golem in the smoke is lost until " + until + ", not " + (now + 60L));
+            // Meanwhile it cannot pick the caster out: not by a search, nor by a target set, nor by a blow.
+            helper.assertFalse(TargetingConditions.forCombat().ignoreLineOfSight().test(inside, caster),
+                    "the lost golem's search finds the caster");
+            inside.setTarget(caster);
+            helper.assertTrue(inside.getTarget() == null, "the lost golem took the caster as its target");
+            inside.tickCount++;
+            inside.setLastHurtByMob(caster);
+            helper.assertFalse(hurtBy(inside).canUse(), "a blow from the caster sets the lost golem hunting it");
+            // Once the mark has run out, the same blow would.
+            KidoSmoke.markLost(inside, caster, now);
+            helper.assertTrue(hurtBy(inside).canUse(), "a blow from the caster does not set the golem whose mark ran out"
+                    + " hunting it");
+
+            // Beyond the smoke, the other golem hunts on.
+            helper.assertTrue(hurtBy(outside).isRunning() && outside.getTarget() == caster
+                    && !KidoSmoke.lost(outside, caster), "the golem beyond the smoke lost the caster");
+            // The creeper's swell is stopped and its fuse dies down; ticked, the swell does not begin again.
+            helper.assertTrue(creeper.getTarget() == null && creeper.getSwellDir() == -1 && !swell.isRunning(),
+                    "the creeper in the smoke still swells at " + creeper.getTarget() + ": " + creeper.getSwellDir());
+            creeper.goalSelector.tick();
+            helper.assertTrue(creeper.getSwellDir() == -1 && !swell.isRunning(),
+                    "the creeper's swell began again: " + creeper.getSwellDir());
+
+            // One that comes after the cast is caught at the next pulse, 4 ticks on, and not before.
+            late = golem(helper, 1, 6);
+            late.setLastHurtByMob(caster);
+            hurtBy(late).start();
+            KidoSmoke.tick(caster, data, now + 3L);
+            helper.assertTrue(hurtBy(late).isRunning() && late.getTarget() == caster,
+                    "the smoke caught the late golem before its next pulse");
+            KidoSmoke.tick(caster, data, now + 4L);
+            helper.assertTrue(!hurtBy(late).isRunning() && late.getTarget() == null && KidoSmoke.lost(late, caster),
+                    "the smoke's next pulse did not lose the caster to the late golem");
+            long lateUntil = late.getData(SoulAttachments.LOST).until();
+            helper.assertTrue(lateUntil == now + 64L, "the late golem is lost until " + lateUntil + ", not " + (now + 64L));
+            KidoSmoke.Cloud pulsed = KidoSmoke.cloud(data);
+            helper.assertTrue(pulsed != null && pulsed.nextPulseAt() == now + 8L,
+                    "after its second pulse the cloud is " + pulsed);
+
+            // Its 4 seconds up, the cloud is gone.
+            KidoSmoke.tick(caster, data, now + 80L);
+            helper.assertTrue(KidoSmoke.cloud(data) == null,
+                    "Sekienton's cloud outlived its 4 seconds: " + KidoSmoke.cloud(data));
+        } finally {
+            caster.removeEffect(MobEffects.MOVEMENT_SPEED);
+            dropWards(caster);
+            unlose(inside, outside, creeper, late);
+            discard(inside, outside, creeper, late);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void sekientonBlindsAndQuickens(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell sekienton = spell(helper, KidoSpell.SEKIENTON).value();
+        KidoSpell enkosen = spell(helper, KidoSpell.ENKOSEN).value();
+        Player caster = caster(helper, GameType.SURVIVAL, shinigami(150.0F, 8));
+        SoulData data = SoulLogic.get(caster);
+        KidoLogic.choose(data, KidoSpell.SEKIENTON.location());
+        Player even = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player strong = victim(helper, GameType.SURVIVAL, 1_500.0F);
+        Player creative = victim(helper, GameType.CREATIVE, 150.0F);
+        Player negated = victim(helper, GameType.SURVIVAL, 150.0F);
+        Player friend = victim(helper, GameType.SURVIVAL, 150.0F);
+        NegacionLight light = NegacionLight.place(level, negated, null);
+        // Fresh mocks, so neither meets the first caster's cooldown.
+        Player heldCaster = caster(helper, GameType.SURVIVAL, shinigami(150.0F, 8));
+        Player boundCaster = caster(helper, GameType.SURVIVAL, shinigami(150.0F, 8));
+        SoulData boundData = SoulLogic.get(boundCaster);
+        KidoLogic.choose(boundData, KidoSpell.SEKIENTON.location());
+        SoulData lent = shinigami(400.0F, 12);
+        ShinigamiLogic.lend(lent, now);
+        Player lender = caster(helper, GameType.SURVIVAL, lent);
+        Scoreboard scoreboard = level.getScoreboard();
+        Pig pig = null;
+        try {
+            // Below its level it is refused before any cost; at it, the caster is quickened for 2 seconds at Speed II,
+            // with an icon and no swirl.
+            data.setLevel(Stat.KIDO, 7);
+            assertRefusal(helper, KidoEvents.cast(caster, sekienton, KidoLogic.Form.NAME, now), KidoLogic.Refusal.NEEDS_LEVEL,
+                    "Sekienton at Kidō 7");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 150.0, "the reiryoku after Sekienton below its level");
+            helper.assertTrue(KidoLogic.ready(data, now), "Sekienton below its level kept the hands busy");
+            data.setLevel(Stat.KIDO, 8);
+            assertRefusal(helper, press(caster, now), null, "Sekienton at Kidō 8");
+            MobEffectInstance quick = caster.getEffect(MobEffects.MOVEMENT_SPEED);
+            helper.assertTrue(quick != null && quick.getAmplifier() == 1 && quick.getDuration() == 40 && !quick.isVisible()
+                    && quick.showIcon(), "Sekienton quickened its caster with " + quick + ", not Speed II for 40 ticks");
+            KidoSmoke.Cloud cloud = KidoSmoke.cloud(data);
+            helper.assertTrue(cloud != null, "Sekienton raised no cloud");
+
+            // A player as strong as the caster is blinded for the whole 3 seconds, with an icon and no swirl.
+            helper.assertTrue(KidoSmoke.smokeOn(caster, cloud, even, now), "Sekienton's smoke did not take the even soul");
+            MobEffectInstance blind = blindness(even);
+            helper.assertTrue(blind != null && blind.getDuration() == 60 && blind.getAmplifier() == 0 && !blind.isVisible()
+                    && blind.showIcon() && !blind.isAmbient(),
+                    "Sekienton blinded the even soul with " + blind + ", not 60 ticks with an icon and no swirl");
+
+            // Ten times the caster's reiatsu lets 3 parts in 10 of the blindness through.
+            assertNear(helper, KidoLogic.gap(caster, strong), 0.3, "the gap to a soul of ten times the reiatsu");
+            helper.assertTrue(KidoSmoke.smokeOn(caster, cloud, strong, now),
+                    "Sekienton's smoke did not take the strong soul");
+            MobEffectInstance dimmed = blindness(strong);
+            helper.assertTrue(dimmed != null && dimmed.getDuration() == 18,
+                    "Sekienton blinded the strong soul with " + dimmed + ", not 18 ticks");
+
+            // Creative, Negación's hold and the caster itself are spared.
+            helper.assertFalse(KidoSmoke.smokeOn(caster, cloud, creative, now), "Sekienton's smoke took a creative player");
+            helper.assertTrue(blindness(creative) == null, "Sekienton's smoke blinded a creative player");
+            helper.assertTrue(light != null && negated.startRiding(light, true) && Negacion.held(negated),
+                    "the mock Shinigami could not be held");
+            helper.assertFalse(KidoSmoke.smokeOn(caster, cloud, negated, now),
+                    "Sekienton's smoke took a soul Negación holds");
+            helper.assertTrue(blindness(negated) == null, "Sekienton's smoke blinded a soul Negación holds");
+            helper.assertFalse(KidoSmoke.smokeOn(caster, cloud, caster, now), "Sekienton's smoke took its own caster");
+            helper.assertTrue(blindness(caster) == null, "Sekienton's smoke blinded its own caster");
+
+            // A creature without a soul feels it whole, and is lost to the caster; the gap cuts the lost time as it cuts
+            // the blindness.
+            pig = HollowPlayerTests.placed(helper, EntityType.PIG, 4, 10);
+            assertNear(helper, KidoLogic.gap(caster, pig), 1.0, "the gap to a creature without a soul");
+            helper.assertTrue(KidoSmoke.smokeOn(caster, cloud, pig, now) && KidoSmoke.lost(pig, caster),
+                    "Sekienton's smoke did not lose the caster to the pig");
+            helper.assertTrue(KidoSmoke.lostTicks(sekienton, 1.0F, 0.3F) == 18, "through a gap of 0.3 Sekienton leaves a"
+                    + " creature lost for " + KidoSmoke.lostTicks(sekienton, 1.0F, 0.3F) + " ticks");
+            helper.assertTrue(KidoSmoke.lostTicks(sekienton, 1.0F, 1.0F) == 60, "Sekienton leaves a creature lost for "
+                    + KidoSmoke.lostTicks(sekienton, 1.0F, 1.0F) + " ticks");
+
+            // A held body may still raise it, and is quickened, but no Speed moves a body the hold roots.
+            heldCaster.addEffect(new MobEffectInstance(ModEffects.BAKUDO_HELD, 40));
+            assertRefusal(helper, KidoEvents.cast(heldCaster, sekienton, KidoLogic.Form.NAME, now), null,
+                    "Sekienton from a held body");
+            MobEffectInstance heldQuick = heldCaster.getEffect(MobEffects.MOVEMENT_SPEED);
+            helper.assertTrue(heldQuick != null && heldQuick.getAmplifier() == 1,
+                    "Sekienton quickened the held caster with " + heldQuick + ", not Speed II");
+            assertNear(helper, speed(heldCaster), 0.0, 0.001, "the held caster's speed");
+
+            // Bound arms may not, and pay nothing.
+            boundCaster.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 40));
+            assertRefusal(helper, press(boundCaster, now), KidoLogic.Refusal.BOUND, "Sekienton from bound arms");
+            HollowPlayerTests.assertClose(helper, boundData.reiryoku(), 150.0, "the bound caster's reiryoku");
+            helper.assertTrue(KidoSmoke.cloud(boundData) == null, "bound arms raised a cloud");
+
+            // A lender may cast neither by name; neither has an incantation, so neither misfires.
+            KidoLogic.choose(lent, KidoSpell.SEKIENTON.location());
+            assertRefusal(helper, press(lender, now), KidoLogic.Refusal.LENT,
+                    "the Sekienton of a Shinigami whose power is lent");
+            KidoLogic.choose(lent, KidoSpell.ENKOSEN.location());
+            assertRefusal(helper, press(lender, now), KidoLogic.Refusal.LENT,
+                    "the Enkōsen of a Shinigami whose power is lent");
+            helper.assertTrue(KidoLogic.misfireChance(sekienton, 8) == 0.0 && KidoLogic.misfireChance(enkosen, 12) == 0.0,
+                    "Sekienton misfires at " + KidoLogic.misfireChance(sekienton, 8) + " and Enkōsen at "
+                            + KidoLogic.misfireChance(enkosen, 12));
+
+            // A teammate with friendly fire off is spared. Every mock player has the same name, so the team holds them
+            // all: it is made only once every other player has been weighed.
+            PlayerTeam team = scoreboard.addPlayerTeam(TEAM);
+            team.setAllowFriendlyFire(false);
+            scoreboard.addPlayerToTeam(caster.getScoreboardName(), team);
+            helper.assertFalse(KidoSmoke.smokeOn(caster, cloud, friend, now),
+                    "Sekienton's smoke took a teammate with friendly fire off");
+            helper.assertTrue(blindness(friend) == null, "Sekienton's smoke blinded a teammate with friendly fire off");
+        } finally {
+            removeTeam(scoreboard);
+            negated.stopRiding();
+            unbind(heldCaster, boundCaster);
+            for (Player player : List.of(caster, heldCaster, boundCaster, even, strong, creative, negated, friend)) {
+                player.removeEffect(MobEffects.MOVEMENT_SPEED);
+                player.removeEffect(MobEffects.BLINDNESS);
+            }
+            dropWards(caster, heldCaster, boundCaster);
+            unlose(pig);
+            discard(light, pig);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void enkosenTakesBlowsFromTheFront(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell enkosen = spell(helper, KidoSpell.ENKOSEN).value();
+        KidoSpell sekienton = spell(helper, KidoSpell.SEKIENTON).value();
+        KidoSpell tenran = spell(helper, KidoSpell.TENRAN).value();
+        Player wearer = caster(helper, GameType.SURVIVAL, shinigami(150.0F, 12));
+        SoulData data = SoulLogic.get(wearer);
+        KidoLogic.choose(data, KidoSpell.ENKOSEN.location());
+        downTheLane(wearer);
+        wearer.setHealth(20.0F);
+        Vec3 ahead = wearer.position().add(2.0, 0.0, 0.0);
+        Vec3 behind = wearer.position().add(-2.0, 0.0, 0.0);
+        // Three blocks ahead, where the shield faces.
+        InnerHollow inner = HollowPlayerTests.placed(helper, ModEntities.INNER_HOLLOW.get(), 4, 8);
+        // A Tenran caster down the lane, facing the wearer, its gust from a marker at the hand as a gust strikes.
+        Player gusting = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 18));
+        SoulData gustData = SoulLogic.get(gusting);
+        Vec3 down = helper.absoluteVec(DOWN_THE_LANE);
+        gusting.moveTo(down.x, down.y, down.z, 90.0F, 0.0F);
+        gusting.setYHeadRot(90.0F);
+        Marker marker = new Marker(EntityType.MARKER, level);
+        marker.setPos(CeroBeam.muzzleOf(gusting, 1.0F));
+        DamageSource gust = CeroBeam.sourceOf(level, gusting, marker, new CeroBeam.Kind(KidoEvents.HADO, true, 1));
+        try {
+            // Below its level it is refused before any cost; at it, the shield stands before the wearer for 3 seconds,
+            // as strong as the spell's power, with no blow taken yet.
+            data.setLevel(Stat.KIDO, 11);
+            assertRefusal(helper, KidoEvents.cast(wearer, enkosen, KidoLogic.Form.NAME, now), KidoLogic.Refusal.NEEDS_LEVEL,
+                    "Enkōsen at Kidō 11");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 150.0, "the reiryoku after Enkōsen below its level");
+            helper.assertTrue(KidoLogic.ready(data, now), "Enkōsen below its level kept the hands busy");
+            data.setLevel(Stat.KIDO, 12);
+            assertRefusal(helper, press(wearer, now), null, "Enkōsen at Kidō 12");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 138.0, "the reiryoku after Enkōsen");
+            helper.assertTrue(!KidoLogic.ready(data, now + 159L) && KidoLogic.ready(data, now + 160L),
+                    "Enkōsen did not keep the hands busy for 160 ticks");
+            helper.assertTrue(data.xp(Stat.KIDO) == 4, "Enkōsen trained " + data.xp(Stat.KIDO) + " Kidō xp, not 4");
+            KidoWard.Shield shield = KidoWard.shield(data);
+            helper.assertTrue(shield != null && shield.endsAt() == now + 60L && shield.lastBlowAt() == now - 10L
+                    && KidoWard.up(data, now), "Enkōsen's shield is " + shield);
+            assertNear(helper, shield.strength(), 9.516, 0.001, "Enkōsen's strength at 150 and Kidō 12");
+            assertNear(helper, left(shield), 9.516, 0.001, "what is left of a fresh Enkōsen");
+
+            // A blow from the front is taken whole: no harm and no frames.
+            wearer.invulnerableTime = 0;
+            helper.assertFalse(wearer.hurt(attackAt(helper, ahead), 4.0F), "a blow of 4 from the front landed");
+            HollowPlayerTests.assertClose(helper, wearer.getHealth(), 20.0, "the health after a blow the shield took");
+            assertNear(helper, left(KidoWard.shield(data)), 5.516, 0.001, "what is left after a blow of 4");
+            helper.assertTrue(wearer.invulnerableTime == 0, "a blow the shield took left frames of "
+                    + wearer.invulnerableTime);
+            // In the moment of that blow, a smaller one costs nothing.
+            helper.assertFalse(wearer.hurt(attackAt(helper, ahead), 3.0F), "a blow of 3 in the moment of one of 4 landed");
+            assertNear(helper, left(KidoWard.shield(data)), 5.516, 0.001, "what is left after a blow of 3 in the moment");
+
+            // It covers 120 degrees about where the head faces: 59 off is within, 61 off is not, and behind is not.
+            double near = Math.toRadians(59.0);
+            double far = Math.toRadians(61.0);
+            Vec3 within = wearer.position().add(2.0 * Math.cos(near), 0.0, 2.0 * Math.sin(near));
+            Vec3 without = wearer.position().add(2.0 * Math.cos(far), 0.0, 2.0 * Math.sin(far));
+            helper.assertTrue(KidoWard.covers(wearer, attackAt(helper, within)),
+                    "the shield does not cover a blow from 59 degrees off");
+            helper.assertFalse(KidoWard.covers(wearer, attackAt(helper, without)),
+                    "the shield covers a blow from 61 degrees off");
+            helper.assertFalse(KidoWard.covers(wearer, attackAt(helper, behind)), "the shield covers a blow from behind");
+            // Magic passes it, as it passes a shield in hand, and so does a Sprenger; a blow from no place meets nothing;
+            // and the host's own Hollow is its own fight, ahead or not.
+            helper.assertFalse(KidoWard.covers(wearer, damageOf(helper, DamageTypes.MAGIC, ahead)),
+                    "the shield covers magic");
+            helper.assertFalse(KidoWard.covers(wearer, damageOf(helper, GintoCast.SPRENGER, ahead)),
+                    "the shield covers a Sprenger");
+            helper.assertFalse(KidoWard.covers(wearer, damageOf(helper, DamageTypes.MOB_ATTACK, null)),
+                    "the shield covers a blow from no place");
+            helper.assertTrue(KidoWard.faces(wearer, inner.position(), enkosen.effect().angle()),
+                    "the inner Hollow does not stand before the shield");
+            helper.assertFalse(KidoWard.covers(wearer, wearer.damageSources().mobAttack(inner)),
+                    "the shield covers the inner Hollow's blow");
+
+            // From behind, a blow lands whole and the shield is untouched.
+            land(helper, wearer, attackAt(helper, behind), 4.0F, "the blow of 4 from behind");
+            HollowPlayerTests.assertClose(helper, wearer.getHealth(), 16.0, "the health after a blow from behind");
+            assertNear(helper, left(KidoWard.shield(data)), 5.516, 0.001, "what is left after a blow from behind");
+            // A bigger one in the moment costs only what it has over the moment's 4, 6; that is past what is left, so it
+            // breaks the shield and lands its 0.484 over.
+            wearer.invulnerableTime = 0;
+            helper.assertTrue(wearer.hurt(attackAt(helper, ahead), 10.0F), "a blow of 10 from the front did not land");
+            assertNear(helper, wearer.getHealth(), 15.516, "the health after the blow that broke the shield");
+            helper.assertTrue(KidoWard.shield(data) == null, "the shield outlived a blow bigger than what was left");
+
+            // A moment is 10 ticks: within it a smaller blow is free, after it one costs its whole, and so does a
+            // volley's arrow within it. A blow of all that is left breaks the shield with nothing over; a bigger one
+            // lets what it has over by.
+            KidoWard.Shield struck = new KidoWard.Shield(enkosen, 9.516F, 9.516F, now + 60L, now, 4.0F);
+            assertNear(helper, left(KidoWard.absorb(struck, 3.0F, now + 9L, false).shield()), 9.516, 0.001,
+                    "what is left after a blow of 3 nine ticks after one of 4");
+            assertNear(helper, left(KidoWard.absorb(struck, 3.0F, now + 10L, false).shield()), 6.516, 0.001,
+                    "what is left after a blow of 3 ten ticks after one of 4");
+            assertNear(helper, left(KidoWard.absorb(struck, 3.0F, now + 1L, true).shield()), 6.516, 0.001,
+                    "what is left after a volley's arrow of 3 a tick after a blow of 4");
+            KidoWard.Absorbed emptied = KidoWard.absorb(struck, 9.516F, now + 20L, false);
+            helper.assertTrue(emptied.shield() == null && emptied.passes() == 0.0F,
+                    "a blow of all that was left gave " + emptied);
+            KidoWard.Absorbed broken = KidoWard.absorb(struck, 12.0F, now + 20L, false);
+            helper.assertTrue(broken.shield() == null, "a blow of 12 did not break the shield: " + broken);
+            assertNear(helper, broken.passes(), 2.484, 0.001, "what a blow of 12 lets by");
+
+            // A gust it takes whole neither harms nor blinds.
+            KidoWard.raise(wearer, data, enkosen, 1.0F, now);
+            wearer.invulnerableTime = 0;
+            float blow = KidoLogic.power(tenran, gustData, 1.0F);
+            assertNear(helper, blow, 4.216, "Tenran's blow at 400 and Kidō 18");
+            helper.assertFalse(KidoEvents.gustBlow(gusting, wearer, gust, tenran, 1.0F, blow),
+                    "Tenran's gust landed on the shield");
+            helper.assertTrue(blindness(wearer) == null, "Tenran's gust blinded the wearer behind its shield");
+            assertNear(helper, left(KidoWard.shield(data)), 5.3, "what is left after Tenran's gust");
+
+            // Bound arms let it fall: it covers nothing, breaks at the tick, and none is raised.
+            wearer.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 40));
+            helper.assertFalse(KidoWard.covers(wearer, attackAt(helper, ahead)), "the shield of bound arms covers a blow");
+            KidoWard.tick(wearer, data, now);
+            helper.assertTrue(KidoWard.shield(data) == null, "the shield outlived the arms bound");
+            assertRefusal(helper, press(wearer, now), KidoLogic.Refusal.BOUND, "Enkōsen from bound arms");
+            unbind(wearer);
+            // A held body may raise one, once the hands are free.
+            wearer.addEffect(new MobEffectInstance(ModEffects.BAKUDO_HELD, 40));
+            assertRefusal(helper, KidoEvents.cast(wearer, enkosen, KidoLogic.Form.NAME, now + 160L, 1.0), null,
+                    "Enkōsen from a held body");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 126.0, "the reiryoku after Enkōsen twice");
+            unbind(wearer);
+            // It stands its 3 seconds, and goes at its tick.
+            helper.assertTrue(KidoWard.up(data, now + 219L) && !KidoWard.up(data, now + 220L),
+                    "the shield raised at " + (now + 160L) + " does not stand until " + (now + 220L));
+            KidoWard.tick(wearer, data, now + 220L);
+            helper.assertTrue(KidoWard.shield(data) == null, "the shield outlived its 3 seconds");
+
+            // Death leaves no shield on the soul it copies, and a portal drops both the smoke and the shield.
+            KidoWard.raise(wearer, data, enkosen, 1.0F, now);
+            helper.assertTrue(KidoWard.shield(data.copy()) == null, "the shield passed to the copied soul");
+            KidoSmoke.raise(level, wearer, data, sekienton, 1.0F, now);
+            helper.assertTrue(KidoSmoke.cloud(data) != null && KidoWard.shield(data) != null,
+                    "the smoke and the shield were not both raised");
+            NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerChangedDimensionEvent(wearer, Level.OVERWORLD, Level.NETHER));
+            helper.assertTrue(KidoSmoke.cloud(data) == null && KidoWard.shield(data) == null,
+                    "the smoke or the shield went through the portal");
+        } finally {
+            unbind(wearer);
+            wearer.removeEffect(MobEffects.MOVEMENT_SPEED);
+            wearer.removeEffect(MobEffects.BLINDNESS);
+            dropWards(wearer, gusting);
+            discard(inner, marker);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void enkosenStopsAHadoBeam(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        buildWall(helper);
+        KidoSpell enkosen = spell(helper, KidoSpell.ENKOSEN).value();
+        Player caster = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 3));
+        SoulData data = SoulLogic.get(caster);
+        KidoLogic.choose(data, KidoSpell.BYAKURAI.location());
+        // A golem with a soul of its own, its shield raised towards the caster up the lane; another behind it.
+        IronGolem wearer = wearerOf(golem(helper, 4, 8), shinigami(600.0F, 25));
+        SoulData wearerData = SoulLogic.get(wearer);
+        wearer.setYHeadRot(90.0F);
+        IronGolem behind = golem(helper, 7, 8);
+        IronGolem archered = null;
+        // Never added to the world: only its place, which the blow's is, matters.
+        Arrow arrow = new Arrow(EntityType.ARROW, level);
+        try {
+            KidoWard.raise(wearer, wearerData, enkosen, 1.0F, now);
+            KidoWard.Shield raised = KidoWard.shield(wearerData);
+            helper.assertTrue(raised != null, "the golem raised no shield");
+            assertNear(helper, raised.strength(), 17.023, "Enkōsen's strength at 600 and Kidō 25");
+
+            // Byakurai would pierce both; its beam stops at the shield, which pays its 6.36, and neither golem is hurt.
+            caster.lookAt(EntityAnchorArgument.Anchor.EYES, wearer.getBoundingBox().getCenter());
+            assertRefusal(helper, press(caster, now), null, "Byakurai at the shield");
+            helper.assertTrue(unhurt(wearer) && unhurt(behind), "Byakurai's beam got past the shield: the golems are at "
+                    + wearer.getHealth() + " and " + behind.getHealth());
+            assertNear(helper, left(KidoWard.shield(wearerData)), 10.663, "what is left of the shield after Byakurai");
+            HollowPlayerTests.assertClose(helper, data.reiryoku(), 384.0, "the reiryoku after Byakurai");
+
+            // An arrow from the front is taken whole; from behind, the same arrow lands, and the shield is untouched.
+            archered = wearerOf(golem(helper, 4, 4), shinigami(600.0F, 25));
+            SoulData archeredData = SoulLogic.get(archered);
+            archered.setYHeadRot(90.0F);
+            KidoWard.raise(archered, archeredData, enkosen, 1.0F, now);
+            arrow.setPos(archered.position().add(-2.0, 0.0, 0.0));
+            helper.assertFalse(archered.hurt(level.damageSources().arrow(arrow, null), 4.0F),
+                    "an arrow from the front struck the golem");
+            HollowPlayerTests.assertClose(helper, archered.getHealth(), 100.0,
+                    "the golem's health after an arrow from the front");
+            assertNear(helper, left(KidoWard.shield(archeredData)), 13.023, "what is left after an arrow of 4");
+            arrow.setPos(archered.position().add(2.0, 0.0, 0.0));
+            archered.invulnerableTime = 0;
+            helper.assertTrue(archered.hurt(level.damageSources().arrow(arrow, null), 4.0F),
+                    "an arrow from behind did not strike the golem");
+            HollowPlayerTests.assertClose(helper, archered.getHealth(), 96.0,
+                    "the golem's health after an arrow from behind");
+            assertNear(helper, left(KidoWard.shield(archeredData)), 13.023, "what is left after an arrow from behind");
+        } finally {
+            discard(wearer, behind, archered, arrow);
+            discardBeams(helper);
         }
         helper.succeed();
     }

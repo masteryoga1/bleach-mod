@@ -70,14 +70,18 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * creature in a cone widening from the hand ({@link CeroBeam#inCone}) under the same rules, pushing it away and
  * blinding a player. A Bakudō of {@link KidoSpell.Shape#BIND} is a bind to the first creature in sight that the caster
  * may bind ({@link #bindAim}), a wall stopping it: its arms bound, its body held where it stands, or both, for a time
- * weighed against its reiatsu, and shrugged off by a soul far stronger than the caster ({@link #bindOne}). Its trace,
- * sound and particles are seen and heard only by those who see spirits; what it does to a creature anyone can see.
+ * weighed against its reiatsu, and shrugged off by a soul far stronger than the caster ({@link #bindOne}). A Bakudō of
+ * {@link KidoSpell.Shape#SMOKE} leaves a cloud of smoke where the caster stood, in which creatures lose the caster and
+ * the players it may harm are blinded, and quickens the caster ({@link KidoSmoke}). A Bakudō of
+ * {@link KidoSpell.Shape#SHIELD} raises a round shield before the caster, which takes the blows from the front up to its
+ * strength and breaks under a bigger one ({@link KidoWard}). A spell's trace, sound and particles are seen and heard
+ * only by those who see spirits; what it does to a creature anyone can see.
  * Creative pays nothing, waits for nothing, never misfires and trains nothing. One art at a time: no Kidō while a
  * Getsuga Tenshō or a Cero gathers, and one that begins to gather breaks a chant or a gather.
  *
  * <p>The keys come from {@link KidoKeyPayload} and the chant from chat ({@link #register}); the cooldown, the pending
- * chant, the key gather and the spacing between spoken chants are transients in the soul, so a respawn or a relog
- * starts them over. Everything takes a {@link Player}, so game tests can use mock players.
+ * chant, the key gather, a standing smoke or shield and the spacing between spoken chants are transients in the soul,
+ * so a respawn or a relog starts them over. Everything takes a {@link Player}, so game tests can use mock players.
  */
 public final class KidoEvents {
     public static final ResourceKey<DamageType> HADO = ResourceKey.create(Registries.DAMAGE_TYPE, BleachMod.id("hado"));
@@ -162,9 +166,10 @@ public final class KidoEvents {
     }
 
     /**
-     * The chat listener, the tick of a pending chant or gather, the blow that breaks either and the dimension change
-     * that drops either; and the listeners that refuse what a Bakudō's bind keeps a creature from
-     * ({@link BakudoEffect#register}).
+     * The chat listener, the tick of a pending chant or gather and of a standing smoke or shield, the blow that breaks a
+     * chant or a gather and the dimension change that drops them all; the listeners that refuse what a Bakudō's bind
+     * keeps a creature from ({@link BakudoEffect#register}); and the shield's, which takes the blows it covers
+     * ({@link KidoWard#register}).
      */
     public static void register(IEventBus bus) {
         bus.addListener(KidoEvents::onChat);
@@ -172,6 +177,7 @@ public final class KidoEvents {
         bus.addListener(KidoEvents::onDamageTaken);
         bus.addListener(KidoEvents::onChangedDimension);
         BakudoEffect.register(bus);
+        KidoWard.register(bus);
     }
 
     // ---- The key ----
@@ -521,10 +527,10 @@ public final class KidoEvents {
      * less for a spell that wants a zanpakutō at hand when there is none ({@link KidoLogic#handShare}). Then it is paid
      * for and the hands are busy for the spell's cooldown. Cast by name, a spell with an incantation misfires when the
      * roll falls below {@link KidoLogic#misfireChance}: it bursts in the hand, hurting its caster, and nothing more
-     * happens. Otherwise its shape strikes (a beam, a gust, or a bind), the call goes on the caster's action bar (for a
-     * bind shrugged off, that it was), and Kidō trains, with the strike bonus when a creature was struck or bound and
-     * twice over for a chant; when a Hollow was among those struck or bound, an unbound Asauchi leans to kidō. Creative
-     * pays, waits, misfires, trains and leans nothing.
+     * happens. Otherwise its shape strikes (a beam, a gust, or a bind) or wards (a smoke or a shield, which strike
+     * nothing), the call goes on the caster's action bar (for a bind shrugged off, that it was), and Kidō trains, with
+     * the strike bonus when a creature was struck or bound and twice over for a chant; when a Hollow was among those
+     * struck or bound, an unbound Asauchi leans to kidō. Creative pays, waits, misfires, trains and leans nothing.
      *
      * <p>The one entry for every way of casting. Tells nothing; the caller does. Returns the refusal (a misfire is
      * {@link KidoLogic.Refusal#MISFIRED}), or null when cast. Takes the spell itself, not its holder, so a game test can
@@ -565,6 +571,15 @@ public final class KidoEvents {
                     said = Component.translatable(SHRUGGED_KEY, spell.title());
                 }
                 yield result == KidoLogic.BindResult.BOUND ? List.of(aim.target()) : List.of();
+            }
+            // A smoke hides and a shield stops: neither strikes, so neither earns the strike bonus or leans the blade.
+            case SMOKE -> {
+                KidoSmoke.raise(level, player, data, spell, share, now);
+                yield List.of();
+            }
+            case SHIELD -> {
+                KidoWard.raise(player, data, spell, share, now);
+                yield List.of();
             }
             // Never reached: a spell of no shape is not castable, and was refused above.
             case NONE -> List.of();
@@ -733,9 +748,10 @@ public final class KidoEvents {
     /**
      * A gust's blow on one creature (see {@link #gust}): nothing for one the caster may not strike or that Negación
      * holds; else the blow, and the push away from the caster when it lands, and a player's blindness either way, the
-     * push and the blindness cut by the gap ({@link KidoLogic#gap}); none of the blindness through a Visored's duel.
-     * The blow itself is cut as it lands, as every blow is. Returns whether the blow landed. Public for tests, whose
-     * mock players no cone can find.
+     * push and the blindness cut by the gap ({@link KidoLogic#gap}); none of the blindness through a Visored's duel,
+     * nor when a Kidō shield took the whole gust ({@link KidoWard#covers}): a shield that takes the gust screens the
+     * eyes too. The blow itself is cut as it lands, as every blow is. Returns whether the blow landed. Public for
+     * tests, whose mock players no cone can find.
      */
     public static boolean gustBlow(Player caster, LivingEntity target, DamageSource source, KidoSpell spell, float share,
                                    float damage) {
@@ -744,6 +760,8 @@ public final class KidoEvents {
         }
         // Weighed as the blow itself is, before it lands.
         float gap = KidoLogic.gap(caster, target, source);
+        // Asked before the blow, which may break the shield.
+        boolean warded = KidoWard.covers(target, source);
         boolean landed = target.hurt(source, damage);
         if (landed) {
             // As a beam's blow does, so the caster's tamed wolves join in.
@@ -759,8 +777,10 @@ public final class KidoEvents {
                 target.hurtMarked = true;
             }
         }
-        // A gust in the face screens the eyes even when it does no harm; the duel's shield keeps it out, as every blow.
-        if (target instanceof Player player && !VisoredEvents.isDuelling(caster) && !VisoredEvents.isDuelling(player)) {
+        // A gust in the face screens the eyes even when it does no harm; the duel's shield keeps it out, as every blow,
+        // and so does a Kidō shield that took it whole.
+        if ((landed || !warded) && target instanceof Player player && !VisoredEvents.isDuelling(caster)
+                && !VisoredEvents.isDuelling(player)) {
             int ticks = KidoLogic.blindTicks(spell, share, gap);
             if (ticks > 0) {
                 player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, ticks, 0, false, false, true), caster);
@@ -990,9 +1010,10 @@ public final class KidoEvents {
     }
 
     /**
-     * A chanting or gathering player's tick, before it moves, so a chant or a gather goes off from where a key press
-     * would. A fault drops the chant and the gather and is logged once, as a throw here would kick the player or stop
-     * a single-player world.
+     * A chanting, gathering or warding player's tick, before it moves, so a chant or a gather goes off from where a key
+     * press would; then its smoke and its shield ({@link KidoSmoke#tick}, {@link KidoWard#tick}). A fault drops the
+     * chant and the gather, or the smoke and the shield, and is logged once, as a throw here would kick the player or
+     * stop a single-player world; a fault in one pair never drops the other.
      */
     private static void onPlayerTick(PlayerTickEvent.Pre event) {
         Player player = event.getEntity();
@@ -1000,15 +1021,32 @@ public final class KidoEvents {
             return;
         }
         SoulData data = SoulLogic.get(player);
-        if (data.kidoChant == null && data.kidoGather == null) {
+        boolean casting = data.kidoChant != null || data.kidoGather != null;
+        boolean warding = data.kidoSmoke != null || data.kidoShield != null;
+        if (!casting && !warding) {
             return;
         }
-        try {
-            tick(player, data, player.level().getGameTime());
-        } catch (RuntimeException e) {
-            data.kidoChant = null;
-            dropGather(player, data);
-            BleachMod.LOGGER.warn("Kidō: {}'s chant or gather failed, and is dropped", player.getName().getString(), e);
+        long now = player.level().getGameTime();
+        if (casting) {
+            try {
+                tick(player, data, now);
+            } catch (RuntimeException e) {
+                data.kidoChant = null;
+                dropGather(player, data);
+                BleachMod.LOGGER.warn("Kidō: {}'s chant or gather failed, and is dropped",
+                        player.getName().getString(), e);
+            }
+        }
+        if (warding) {
+            try {
+                KidoSmoke.tick(player, data, now);
+                KidoWard.tick(player, data, now);
+            } catch (RuntimeException e) {
+                data.kidoSmoke = null;
+                data.kidoShield = null;
+                BleachMod.LOGGER.warn("Kidō: {}'s smoke or shield failed, and is dropped",
+                        player.getName().getString(), e);
+            }
         }
     }
 
@@ -1037,8 +1075,8 @@ public final class KidoEvents {
     }
 
     /**
-     * A chant or a gather does not follow its soul into another world: a portal keeps the same soul, so both are
-     * dropped here, the gather's orb with them.
+     * A chant or a gather does not follow its soul into another world, nor a smoke or a shield: a portal keeps the same
+     * soul, so all are dropped here, the gather's orb with them.
      */
     private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         Player player = event.getEntity();
@@ -1046,6 +1084,8 @@ public final class KidoEvents {
             SoulData data = SoulLogic.get(player);
             data.kidoChant = null;
             dropGather(player, data);
+            data.kidoSmoke = null;
+            data.kidoShield = null;
         }
     }
 
@@ -1072,7 +1112,7 @@ public final class KidoEvents {
 
     /** The spell's particle, or null when it has none or it needs options of its own (only a simple one is named by id). */
     @Nullable
-    private static SimpleParticleType particleOf(KidoSpell.Look look) {
+    static SimpleParticleType particleOf(KidoSpell.Look look) {
         return look.particle().flatMap(BuiltInRegistries.PARTICLE_TYPE::getOptional).orElse(null)
                 instanceof SimpleParticleType particle ? particle : null;
     }

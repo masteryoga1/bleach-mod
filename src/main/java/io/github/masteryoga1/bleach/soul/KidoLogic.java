@@ -301,6 +301,19 @@ public final class KidoLogic {
     }
 
     /**
+     * How much of a Kidō's hold on the senses this creature feels: as the blow's gap without Hierro, which turns blows,
+     * not smoke. 1 without a soul, else the reiatsu gap alone ({@link SoulLogic#reiatsuDamageMultiplier}), weighed as
+     * {@link #gap(Player, LivingEntity, DamageSource)} weighs it.
+     */
+    public static float gap(Player caster, LivingEntity target) {
+        if (!SoulLogic.hasSoul(target)) {
+            return 1.0F;
+        }
+        float attacker = SoulLogic.reiatsu(caster) * QuincyLogic.reiatsuFactor(caster);
+        return SoulLogic.reiatsuDamageMultiplier(attacker, SoulLogic.reiatsu(target));
+    }
+
+    /**
      * Ticks a gust of this spell blinds a player at this share and gap: its {@code blind_seconds} at the share and cut
      * by the gap, rounded; 0 for none.
      */
