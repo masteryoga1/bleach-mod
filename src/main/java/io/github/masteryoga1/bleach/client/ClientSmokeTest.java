@@ -252,6 +252,8 @@ public final class ClientSmokeTest {
     private static final int BLOODLINE_WAIT_TICKS = 400;
     /** How many of the server's last chat lines are kept for the checks that read them. */
     private static final int CHAT_LINES_KEPT = 16;
+    /** How many of the server's last action bar lines are kept for a failure to name. */
+    private static final int ACTION_BAR_LINES_KEPT = 6;
 
     private static boolean worldRequested;
     private static int ticksWaiting;
@@ -284,6 +286,8 @@ public final class ClientSmokeTest {
     @Nullable
     private static Component actionBar;
     private static int actionBarAt;
+    /** The last lines the server put on the action bar, oldest first, each with its tick, for a failure to name. */
+    private static final Deque<String> actionBarLines = new ArrayDeque<>();
     /** The last lines the server put in the chat, oldest first, as plain text, for the checks that read them. */
     private static final Deque<String> chatLines = new ArrayDeque<>();
 
@@ -302,6 +306,10 @@ public final class ClientSmokeTest {
         if (event.isOverlay()) {
             actionBar = event.getMessage();
             actionBarAt = ticksInWorld;
+            actionBarLines.addLast(ticksInWorld + ": \"" + actionBar.getString() + "\"");
+            while (actionBarLines.size() > ACTION_BAR_LINES_KEPT) {
+                actionBarLines.removeFirst();
+            }
         } else {
             chatLines.addLast(event.getMessage().getString());
             while (chatLines.size() > CHAT_LINES_KEPT) {
@@ -1283,8 +1291,12 @@ public final class ClientSmokeTest {
             case 6095 -> KidoKeys.CAST.setDown(false);
             case 6097 -> minecraft.options.keyShift.setDown(false);
             // A fresh villager two blocks south, within Kaidō's reach of 3 from the eyes, hurt by half its health; any left
-            // from before are killed first, so it stands alone.
-            case 6100 -> command(minecraft, "kill @e[type=minecraft:villager,distance=..8]");
+            // from before are killed first, so it stands alone. The wounded Shinigami from the start goes too: its time
+            // runs out about 6262, and its farewell would take the action bar from Kaidō's.
+            case 6100 -> {
+                command(minecraft, "kill @e[type=minecraft:villager,distance=..8]");
+                command(minecraft, "kill @e[type=bleach:wounded_shinigami]");
+            }
             case 6102 -> command(minecraft, "summon minecraft:villager ~ ~ ~2 {NoAI:1b,Silent:1b}");
             case 6110 -> command(minecraft, "damage @e[type=minecraft:villager,limit=1,sort=nearest] 10 minecraft:generic");
             // Dankū's cooldown frees the hands about 6221. The key held heals the villager two hearts a second (Kidō 42):
@@ -1828,8 +1840,8 @@ public final class ClientSmokeTest {
         // Health is sent to every client, so the villager's rise is what a client can be asked; the motes are the shot's.
         if (expectWithin(minecraft, 6243, 6270, () -> healShown(minecraft, false)
                         && nearest(minecraft, Villager.class, 4.0, villager -> villager.getHealth() >= 13.5F) != null,
-                "the Kidō key held never began Kaidō on the villager, or never healed it (the action bar last read: "
-                        + lastActionBar() + ")")) {
+                "the Kidō key held never began Kaidō on the villager, or never healed it (the villager's health: "
+                        + villagerHealth(minecraft) + "; the action bar's last lines: " + recentActionBar() + ")")) {
             shot(minecraft, "kido_kaido");
         }
         expectWithin(minecraft, 6285, 6315,
@@ -1838,8 +1850,8 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 6327, 6345, () -> player.getHealth() <= player.getMaxHealth() - 6.0F,
                 "a blow of 8 with no attacker never landed on the player");
         expectWithin(minecraft, 6353, 6380, () -> healShown(minecraft, true) && player.getHealth() >= healthBefore + 1.5F,
-                "with no one in reach, the Kidō key held never healed the player's own wounds (the action bar last read: "
-                        + lastActionBar() + ")");
+                "with no one in reach, the Kidō key held never healed the player's own wounds (the action bar's last"
+                        + " lines: " + recentActionBar() + ")");
         expectWithin(minecraft, 6392, 6420, () -> player.getHealth() >= healthBefore + 5.5F,
                 "three seconds of Kaidō never healed the player's own wounds by three hearts");
     }
@@ -1927,6 +1939,12 @@ public final class ClientSmokeTest {
                 Component.translatable(self ? KidoHeal.BEGUN_SELF_KEY : KidoHeal.BEGUN_KEY, spell.title()));
     }
 
+    /** The health of the villager nearest the player within 4 blocks, as this client has it, for a failure to name. */
+    private static String villagerHealth(Minecraft minecraft) {
+        Villager villager = nearest(minecraft, Villager.class, 4.0, Villager::isAlive);
+        return villager == null ? "no villager in 4 blocks" : String.valueOf(villager.getHealth());
+    }
+
     /** Whether one of the server's last chat lines reads as this one, give or take the spaces about it. */
     private static boolean chatShows(@Nullable String line) {
         return line != null && chatLines.stream().anyMatch(seen -> seen.strip().equals(line.strip()));
@@ -1941,6 +1959,11 @@ public final class ClientSmokeTest {
     /** The last line the server put on the action bar, for a failure to name the refusal it may have been. */
     private static String lastActionBar() {
         return actionBar == null ? "nothing" : "\"" + actionBar.getString() + "\"";
+    }
+
+    /** The last few lines the server put on the action bar, each with the tick it came, for a failure to name. */
+    private static String recentActionBar() {
+        return actionBarLines.isEmpty() ? "nothing" : String.join(", ", actionBarLines);
     }
 
     /**

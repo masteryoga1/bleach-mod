@@ -751,6 +751,7 @@ public final class KidoTests {
     /** A Shinigami of 600 at this Kidō level in this game mode at {@link #LANE}, with Kaidō chosen. */
     private static Player healer(GameTestHelper helper, GameType mode, int kido) {
         Player player = caster(helper, mode, shinigami(600.0F, kido));
+        downTheLane(player);
         KidoLogic.choose(SoulLogic.get(player), KidoSpell.KAIDO.location());
         return player;
     }
@@ -4497,16 +4498,6 @@ public final class KidoTests {
             SoulData data = SoulLogic.get(healer);
             golem = golem(helper, 4, 8);
             golem.setHealth(49.0F);
-            KidoSpell diag = spell(helper, KidoSpell.KAIDO).value();
-            IronGolem seen = golem;
-            String found = "aimAll=" + KidoEvents.aim(healer, diag, body -> true).target()
-                    + " aimMay=" + KidoEvents.aim(healer, diag, body -> KidoHeal.mayHeal(healer, body)).target()
-                    + " aimSight=" + KidoEvents.aim(healer, diag, body -> healer.hasLineOfSight(body)).target()
-                    + " mayHeal=" + KidoHeal.mayHeal(healer, seen) + " sight=" + healer.hasLineOfSight(seen)
-                    + " keeps=" + KidoHeal.keeps(healer, seen, diag) + " eye=" + healer.getEyePosition()
-                    + " golemEye=" + seen.getEyePosition() + " box=" + seen.getBoundingBox()
-                    + " patientFor=" + KidoHeal.patientFor(healer, diag);
-            helper.assertTrue(KidoHeal.patientFor(healer, diag) == golem, "DIAG " + found);
             assertRefusal(helper, press(healer, now), null, "Kaidō at Kidō 3 on the golem");
             HollowPlayerTests.assertClose(helper, golem.getHealth(), 50.0, "the golem's health after the first pulse");
             HollowPlayerTests.assertClose(helper, data.reiryoku(), 588.0, "the reiryoku after the first pulse");
