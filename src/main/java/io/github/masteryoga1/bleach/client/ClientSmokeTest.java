@@ -63,6 +63,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
@@ -79,6 +80,8 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -1841,7 +1844,8 @@ public final class ClientSmokeTest {
         if (expectWithin(minecraft, 6243, 6270, () -> healShown(minecraft, false)
                         && nearest(minecraft, Villager.class, 4.0, villager -> villager.getHealth() >= 13.5F) != null,
                 "the Kidō key held never began Kaidō on the villager, or never healed it (the villager's health: "
-                        + villagerHealth(minecraft) + "; the action bar's last lines: " + recentActionBar() + ")")) {
+                        + villagerHealth(minecraft) + "; the action bar's last lines: " + recentActionBar()
+                        + (ticksInWorld == 6270 ? "; on the server: " + serverHeal(minecraft) : "") + ")")) {
             shot(minecraft, "kido_kaido");
         }
         expectWithin(minecraft, 6285, 6315,
@@ -1943,6 +1947,36 @@ public final class ClientSmokeTest {
     private static String villagerHealth(Minecraft minecraft) {
         Villager villager = nearest(minecraft, Villager.class, 4.0, Villager::isAlive);
         return villager == null ? "no villager in 4 blocks" : String.valueOf(villager.getHealth());
+    }
+
+    /**
+     * What the integrated server says of the player's heal, read on its own thread, for a failure to name: the time,
+     * the channel, the eyes and the look, and every creature within 4 blocks with its health.
+     */
+    private static String serverHeal(Minecraft minecraft) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server == null || local == null) {
+            return "no server";
+        }
+        try {
+            return server.submit(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                if (player == null) {
+                    return "no server player";
+                }
+                StringBuilder out = new StringBuilder("time " + player.level().getGameTime() + ", channel "
+                        + KidoHeal.channel(SoulLogic.get(player)) + ", eyes " + player.getEyePosition() + ", look "
+                        + player.getViewVector(1.0F) + ", near:");
+                for (LivingEntity body : player.level().getEntitiesOfClass(LivingEntity.class,
+                        player.getBoundingBox().inflate(4.0), body -> body != player)) {
+                    out.append(' ').append(body).append(" at health ").append(body.getHealth());
+                }
+                return out.toString();
+            }).get(2L, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return "unread (" + e + ")";
+        }
     }
 
     /** Whether one of the server's last chat lines reads as this one, give or take the spaces about it. */
