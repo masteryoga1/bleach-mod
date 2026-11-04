@@ -1294,11 +1294,14 @@ public final class ClientSmokeTest {
             case 6095 -> KidoKeys.CAST.setDown(false);
             case 6097 -> minecraft.options.keyShift.setDown(false);
             // A fresh villager two blocks south, within Kaidō's reach of 3 from the eyes, hurt by half its health. Every
-            // creature within 64 blocks but the player goes first, so the villager is the first one Kaidō meets: the flat
-            // world's animals come with its chunks even without mob spawning and wander, and the wounded Shinigami from
-            // the start would leave about 6262 with a farewell that takes the action bar from Kaidō's line.
+            // creature within 64 blocks but the player goes first, so the villager is the first one Kaidō meets: the
+            // Pluses the earlier villagers left as they died, the flat world's animals (they come with its chunks even
+            // without mob spawning) and the wounded Shinigami from the start, which would leave about 6262 with a
+            // farewell that takes the action bar from Kaidō's line. A villager leaves its Plus a tick after it dies, so the
+            // last one's goes at 6104.
             case 6100 -> command(minecraft, "kill @e[type=!minecraft:player,distance=..64]");
             case 6102 -> command(minecraft, "summon minecraft:villager ~ ~ ~2 {NoAI:1b,Silent:1b}");
+            case 6104 -> command(minecraft, "kill @e[type=bleach:plus,distance=..64]");
             case 6110 -> command(minecraft, "damage @e[type=minecraft:villager,limit=1,sort=nearest] 10 minecraft:generic");
             // Dankū's cooldown frees the hands about 6221. The key held heals the villager two hearts a second (Kidō 42):
             // about 6241, 6261 and 6281, whole by the third, which comes 24 ticks before the key is let go.
@@ -1306,11 +1309,13 @@ public final class ClientSmokeTest {
             case 6305 -> KidoKeys.CAST.setDown(false);
             // With no one in reach, Kaidō from Kidō 40 heals the player's own wounds at half the rate, one heart a second,
             // about 6351, 6371 and 6391, the third 24 ticks before the key is let go; natural regeneration is off
-            // meanwhile, so only Kaidō heals. A generic blow with no attacker ignores armour and difficulty.
+            // meanwhile, so only Kaidō heals. A generic blow with no attacker ignores armour and difficulty. Every creature
+            // goes again first, the villager's Plus at 6324.
             case 6320 -> {
                 command(minecraft, "kill @e[type=!minecraft:player,distance=..64]");
                 command(minecraft, "gamerule naturalRegeneration false");
             }
+            case 6324 -> command(minecraft, "kill @e[type=bleach:plus,distance=..64]");
             case 6325 -> command(minecraft, "damage @s 8 minecraft:generic");
             case 6335 -> healthBefore = player.getHealth();
             case 6350 -> KidoKeys.CAST.setDown(true);
