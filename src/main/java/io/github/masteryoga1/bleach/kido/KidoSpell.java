@@ -117,6 +117,8 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public static final ResourceKey<KidoSpell> ENKOSEN = ResourceKey.create(REGISTRY, BleachMod.id("enkosen"));
     /** Bakudō #61 Rikujōkōrō, six rods of light struck into the waist, which bind the arms and hold the body at once. */
     public static final ResourceKey<KidoSpell> RIKUJOKORO = ResourceKey.create(REGISTRY, BleachMod.id("rikujokoro"));
+    /** Bakudō #81 Dankū, a wall of light before the caster that stops what is shot at it. */
+    public static final ResourceKey<KidoSpell> DANKU = ResourceKey.create(REGISTRY, BleachMod.id("danku"));
 
     /** Kind, then number, then id: the order spells are listed and chosen in. */
     public static final Comparator<Holder.Reference<KidoSpell>> ORDER =
@@ -263,7 +265,12 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
          */
         SMOKE,
         /** A round shield before the caster, which takes the blows from the front up to its strength (see KidoWard). */
-        SHIELD;
+        SHIELD,
+        /**
+         * A wall of light before the caster, which stands a while and stops the Hadō and projectiles shot at it, and
+         * weighs the rest (see DankuWall).
+         */
+        WALL;
 
         public static final Codec<Shape> CODEC = StringRepresentable.fromEnum(Shape::values);
 
@@ -341,9 +348,11 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      * @param damagePerRoot damage added per square root of the caster's maximum reiryoku (for a shield, strength)
      * @param maxDamage     the most damage once the Kidō level has grown it, before the form's share is taken (for a
      *                      shield, the most strength)
-     * @param range         how far it reaches, in blocks (a gust at most {@link KidoSpell#GUST_MAX_RANGE})
+     * @param range         how far it reaches, in blocks (a gust at most {@link KidoSpell#GUST_MAX_RANGE}); for a wall,
+     *                      how far before the caster it rises (the wall keeps 1 to 8)
      * @param radius        its half-width, in blocks (for a gust, only its streak's; for a bind, its ray's margin; for
-     *                      a smoke, its cloud's; for a shield, the ring it is drawn as)
+     *                      a smoke, its cloud's; for a shield, the ring it is drawn as; for a wall, its half-width, which
+     *                      the wall keeps 0.25 to 2.75)
      * @param pierce        how many creatures it may strike that it meets before it stops
      * @param blastRadius   how far about where it bursts the blast reaches, in blocks (0 for none)
      * @param blastShare    the blast's share of the damage
@@ -355,8 +364,8 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      * @param bareShare     the share of its strength left to a caster with no zanpakutō at hand, from 0 to 1
      * @param boundSeconds  seconds a bind ties the arms of the creature it reaches, at its full strength, from 0 to 60
      * @param heldSeconds   seconds a bind holds that creature where it stands, at its full strength, from 0 to 60
-     * @param ward          for a smoke or a shield, its own numbers ({@link Ward}); {@link Ward#NONE} when left out
-     *                      or not read
+     * @param ward          for a smoke, a shield or a wall, its own numbers ({@link Ward}); {@link Ward#NONE} when
+     *                      left out or not read
      */
     public record Effect(float damage, float damagePerRoot, float maxDamage, double range, float radius, int pierce,
                          float blastRadius, float blastShare, float knockback, float burnSeconds, float angle,
@@ -418,18 +427,21 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     }
 
     /**
-     * A ward's own numbers, read only by the shapes that stand a while: a {@link Shape#SMOKE} and a
-     * {@link Shape#SHIELD}. Every other spell leaves it out, as {@link #NONE}. What a ward shares with a strike, such
-     * as a smoke's radius or a shield's strength, stays in {@link Effect}.
+     * A ward's own numbers, read only by the shapes that stand a while: a {@link Shape#SMOKE}, a {@link Shape#SHIELD}
+     * and a {@link Shape#WALL}. Every other spell leaves it out, as {@link #NONE}. What a ward shares with a strike,
+     * such as a smoke's radius or a shield's strength, stays in {@link Effect}.
      *
-     * @param seconds      how long it stands, from 0 to {@link #MAX_SECONDS}: a smoke's cloud and a shield alike
+     * @param seconds      how long it stands, from 0 to {@link #MAX_SECONDS}: a smoke's cloud, a shield and a wall alike
      * @param lostSeconds  for a smoke, seconds a creature in it loses the caster, at its full strength, from 0 to 30
      * @param speedSeconds for a smoke, seconds its caster is quickened, at its full strength, from 0 to 30
      * @param speedLevel   for a smoke, the level of its caster's Speed, from 0 (none) to 5
+     * @param height       for a wall, how tall it stands from the caster's feet, from 0 to {@link #MAX_HEIGHT}
      */
-    public record Ward(float seconds, float lostSeconds, float speedSeconds, int speedLevel) {
+    public record Ward(float seconds, float lostSeconds, float speedSeconds, int speedLevel, float height) {
         /** The longest a ward stands, whatever its file says: a minute. */
         public static final float MAX_SECONDS = 60.0F;
+        /** The tallest a wall stands, whatever its file says. */
+        public static final float MAX_HEIGHT = 4.0F;
         private static final float MAX_LOST_SECONDS = 30.0F;
         private static final float MAX_SPEED_SECONDS = 30.0F;
         private static final int MAX_SPEED_LEVEL = 5;
@@ -439,17 +451,19 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
                 Codec.FLOAT.lenientOptionalFieldOf("seconds", 0.0F).forGetter(Ward::seconds),
                 Codec.FLOAT.lenientOptionalFieldOf("lost_seconds", 0.0F).forGetter(Ward::lostSeconds),
                 Codec.FLOAT.lenientOptionalFieldOf("speed_seconds", 0.0F).forGetter(Ward::speedSeconds),
-                Codec.INT.lenientOptionalFieldOf("speed_level", 0).forGetter(Ward::speedLevel)
+                Codec.INT.lenientOptionalFieldOf("speed_level", 0).forGetter(Ward::speedLevel),
+                Codec.FLOAT.lenientOptionalFieldOf("height", 0.0F).forGetter(Ward::height)
         ).apply(instance, Ward::new));
 
-        /** No ward: it stands no time, loses no one and quickens no one. */
-        public static final Ward NONE = new Ward(0.0F, 0.0F, 0.0F, 0);
+        /** No ward: it stands no time, loses no one, quickens no one and has no height. */
+        public static final Ward NONE = new Ward(0.0F, 0.0F, 0.0F, 0, 0.0F);
 
         public Ward {
             seconds = clamped(seconds, 0.0F, MAX_SECONDS);
             lostSeconds = clamped(lostSeconds, 0.0F, MAX_LOST_SECONDS);
             speedSeconds = clamped(speedSeconds, 0.0F, MAX_SPEED_SECONDS);
             speedLevel = Mth.clamp(speedLevel, 0, MAX_SPEED_LEVEL);
+            height = clamped(height, 0.0F, MAX_HEIGHT);
         }
 
         /**

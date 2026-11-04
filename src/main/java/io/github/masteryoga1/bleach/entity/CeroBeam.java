@@ -223,8 +223,8 @@ public class CeroBeam extends Entity {
     /**
      * What one Cero did: where it started and where it stopped, whether it burst on a block (not when a
      * shield, or the last creature its {@link Kind} may strike, took it first; see {@link #burstAt} to burst
-     * there) and whether a shield stopped it, the creatures the beam struck, nearest first (not those only the
-     * blast caught), and how many blocks the blast broke.
+     * there) and whether it stopped at a shield or a Dankū, the creatures the beam struck, nearest first (not those
+     * only the blast caught), and how many blocks the blast broke.
      */
     public record Shot(Vec3 from, Vec3 to, boolean hitBlock, boolean blocked, List<LivingEntity> struck,
                        int blocksBroken) {
@@ -471,12 +471,13 @@ public class CeroBeam extends Entity {
      * its half-width of with nothing solid between, nearest first and each once, with the kind's damage
      * type; one whose shield, raised towards the muzzle, or a Kidō shield (see {@link KidoWard#covers}) takes
      * the hit ends the beam there, and so does the last creature the kind may strike ({@link Kind#pierce}),
-     * hurt or not. Those it hurts are also pushed along it. If it then meets a block, it bursts: what it may
-     * strike within the blast radius and in the open from there takes the blast's share of the damage, and
-     * soft blocks about the struck one are blasted away, nearest first, where the spec, the server config,
-     * mob griefing and the shooter's rights allow (see {@link GetsugaTensho#cuttable} and
-     * {@link GetsugaTensho#permitted}). A quiet kind makes no Cero sound, and leaves only a puff of smoke
-     * where a wall or a shield stops it. {@code direct} is what fired it,
+     * hurt or not. A Dankū on the way, from the shooter's eyes on, stops the beam as a shield does, unless the shot
+     * outweighs it, when it shatters and the beam goes on (see {@link DankuWall}). Those it hurts are also pushed along
+     * it. If it then meets a block, it bursts: what it may strike within the blast radius and in the open from there
+     * takes the blast's share of the damage, and soft blocks about the struck one are blasted away, nearest first,
+     * where the spec, the server config, mob griefing and the shooter's rights allow (see
+     * {@link GetsugaTensho#cuttable} and {@link GetsugaTensho#permitted}). A quiet kind makes no Cero sound, and leaves
+     * only a puff of smoke where a wall or a shield stops it. {@code direct} is what fired it,
      * which a shield faces: the Cero, or the shooter itself when null. A shot with no beam of its own should
      * pass a stand-in rather than null, as a living direct entity makes a blocked hit a blow from its hand.
      */
@@ -513,7 +514,30 @@ public class CeroBeam extends Entity {
         boolean stopped = false;
         int met = 0;
         Vec3 to = end;
+        // Every standing Dankū on the beam's centre line, met in turn with the creatures (see DankuWall).
+        DankuWall.Along wards = DankuWall.along(level, from, end);
+        DankuWall.Art art = DankuWall.artOf(kind);
+        // One between the shooter's eyes and the muzzle comes first: a shooter pressed against a wall does not fire
+        // through it.
+        DankuWall.Meeting near = shooter == null ? null
+                : DankuWall.meet(level, shooter.getEyePosition(), from, shooter, art);
+        if (near != null) {
+            blocked = true;
+            to = from;
+        }
         for (Entry entry : entries) {
+            // Held before the muzzle, the beam never went out to strike anything.
+            if (near != null) {
+                break;
+            }
+            // A wall before where this creature's own box begins: one that holds ends the beam there, one it outweighs
+            // shatters.
+            DankuWall.Meeting ward = wards.upTo(entry.at().distanceTo(from) + radius, shooter, art);
+            if (ward != null) {
+                blocked = true;
+                to = ward.at();
+                break;
+            }
             LivingEntity target = entry.target();
             // Asked before the hit, which may break the shield.
             boolean shielded = target.isDamageSourceBlocked(source) || KidoWard.covers(target, source);
@@ -538,11 +562,19 @@ public class CeroBeam extends Entity {
                 break;
             }
         }
+        // The walls beyond the last creature, up to where the beam ends.
+        if (!blocked && !stopped) {
+            DankuWall.Meeting ward = wards.upTo(Double.MAX_VALUE, shooter, art);
+            if (ward != null) {
+                blocked = true;
+                to = ward.at();
+            }
+        }
 
         boolean hitBlock = wall && !blocked && !stopped;
         int broken = 0;
         if (hitBlock) {
-            blast(level, shooter, source, end, heading, spec, struck);
+            blast(level, shooter, source, end, heading, spec, struck, kind);
             if (spec.breaksBlocks() && BleachConfig.get(BleachConfig.CERO_BREAKS_BLOCKS)) {
                 broken = carve(level, shooter, clip.getBlockPos(), spec);
             }
@@ -578,7 +610,7 @@ public class CeroBeam extends Entity {
             return;
         }
         Vec3 to = shot.to();
-        blast(level, shooter, sourceOf(level, shooter, direct, kind), to, heading, spec, shot.struck());
+        blast(level, shooter, sourceOf(level, shooter, direct, kind), to, heading, spec, shot.struck(), kind);
         burstLook(level, to, kind, shooter != null ? shooter.getSoundSource() : SoundSource.HOSTILE);
     }
 
@@ -614,8 +646,9 @@ public class CeroBeam extends Entity {
      * and within half the angle (in degrees) of the axis, in the open from the apex: nearest first. A box is weighed at
      * its point nearest the axis point nearest its centre (the axis running from the apex for the range), so a large
      * creature at the edge is caught. A box holding the apex is in, and a block between the apex and the middle of the
-     * box keeps it out, as it keeps a burst off what stands behind it. Strikes nothing: a Hadō's gust asks it, and does
-     * the rest. Empty for no range or no axis; the range is at most the longest beam's.
+     * box keeps it out, as it keeps a burst off what stands behind it; nor is what a Dankū shelters from the shooter's
+     * eyes in. Strikes nothing: a Hadō's gust asks it, and does the rest. Empty for no range or no axis; the range is at
+     * most the longest beam's.
      */
     public static List<LivingEntity> inCone(ServerLevel level, @Nullable LivingEntity shooter, Vec3 apex, Vec3 axis,
                                             double range, float angle) {
@@ -626,6 +659,8 @@ public class CeroBeam extends Entity {
         }
         double reach = Math.min(range, MAX_REACH);
         double edge = Math.cos(Math.toRadians(angle / 2.0));
+        // From the eyes, not the apex, which is the muzzle a little ahead of them.
+        Vec3 eyes = shooter != null ? shooter.getEyePosition() : apex;
         List<Entry> entries = new ArrayList<>();
         for (LivingEntity target : SpiritProjectiles.creaturesIn(level, AABB.ofSize(apex, 2.0 * reach, 2.0 * reach,
                 2.0 * reach), target -> mayStrike(shooter, target))) {
@@ -637,7 +672,8 @@ public class CeroBeam extends Entity {
                     entry = coneEntry(level, target, parts[i].getBoundingBox(), apex, heading, reach, edge);
                 }
             }
-            if (entry != null) {
+            // A creature behind a Dankū, from where the shooter stands, is out of the gust's reach.
+            if (entry != null && !DankuWall.shelters(level, eyes, entry.box().getCenter(), shooter, DankuWall.Art.HADO)) {
                 entries.add(entry);
             }
         }
@@ -994,11 +1030,12 @@ public class CeroBeam extends Entity {
 
     /**
      * The burst where the beam meets a block, or its last creature ({@link #burstAt}): what the shooter may
-     * strike within the blast radius of {@code at}, which the beam itself did not strike and which stands in
-     * the open from just short of that point, takes the blast's share of the damage.
+     * strike within the blast radius of {@code at}, which the beam itself did not strike, which stands in
+     * the open from just short of that point and which no Dankū shelters from a shot of this kind, takes the blast's
+     * share of the damage.
      */
     private static void blast(ServerLevel level, @Nullable LivingEntity shooter, DamageSource source, Vec3 at,
-                              Vec3 heading, Spec spec, List<LivingEntity> struck) {
+                              Vec3 heading, Spec spec, List<LivingEntity> struck, Kind kind) {
         double radius = spec.blastRadius();
         float damage = spec.damage() * spec.blastShare();
         if (radius <= 0.0 || damage <= 0.0F) {
@@ -1006,12 +1043,14 @@ public class CeroBeam extends Entity {
         }
         Vec3 clear = at.subtract(heading.scale(BLAST_CLEARANCE));
         AABB around = AABB.ofSize(at, 2.0 * radius, 2.0 * radius, 2.0 * radius);
+        DankuWall.Art art = DankuWall.artOf(kind);
         for (LivingEntity target : SpiritProjectiles.creaturesIn(level, around,
                 target -> !struck.contains(target) && mayStrike(shooter, target))) {
             AABB box = nearestBox(target, at);
+            // A wall only shelters here: a blast it cannot hold off passes it without shattering it.
             if (box.distanceToSqr(at) <= radius * radius && level.clip(new ClipContext(clear, box.getCenter(),
                     ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty())).getType()
-                    == HitResult.Type.MISS) {
+                    == HitResult.Type.MISS && !DankuWall.shelters(level, clear, box.getCenter(), shooter, art)) {
                 target.hurt(source, damage);
             }
         }

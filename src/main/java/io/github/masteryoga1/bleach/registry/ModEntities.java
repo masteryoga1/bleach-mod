@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.DankuWall;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
@@ -39,7 +40,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Arrancar NPCs, a
  * Shinigami's inner Hollow, Pluses, the Garganta, zanpakutō techniques, the Cero, Negación's light and the
- * Caja Negación, and the Quincy's arrows, blades and Gintō spells.
+ * Caja Negación, Dankū's wall, and the Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -258,6 +259,23 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .updateInterval(20)
                     .build(BleachMod.id("caja_negacion").toString()));
+
+    // ---- Kidō ----
+
+    /**
+     * Bakudō #81 Dankū: a wall of light a caster raises before it, which stops what is shot at it. Never saved, and
+     * never summoned: a wall with no caster would only vanish.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<DankuWall>> DANKU_WALL =
+            ENTITY_TYPES.register("danku_wall", () -> EntityType.Builder
+                    .<DankuWall>of(DankuWall::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(8)
+                    .updateInterval(Integer.MAX_VALUE)
+                    .build(BleachMod.id("danku_wall").toString()));
 
     // ---- Zanpakutō techniques ----
 

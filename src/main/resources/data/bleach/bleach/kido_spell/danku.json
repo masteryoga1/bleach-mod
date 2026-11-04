@@ -1,0 +1,28 @@
+{
+  "kind": "bakudo",
+  "number": 81,
+  "name": {"translate": "kido.bleach.danku"},
+  "shape": "wall",
+  "level": 36,
+  "by_name_level": 36,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.2,
+  "min_cost": 20.0,
+  "cooldown_ticks": 300,
+  "xp": 6,
+  "look": {
+    "colour": "#E4DCFF",
+    "sound": "minecraft:block.beacon.activate",
+    "pitch": 1.2,
+    "particle": "minecraft:end_rod"
+  },
+  "effect": {
+    "range": 2.0,
+    "radius": 2.5,
+    "ward": {
+      "seconds": 6.0,
+      "height": 4.0
+    }
+  }
+}

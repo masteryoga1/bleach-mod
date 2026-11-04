@@ -127,7 +127,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, and the six Bakudō, two of them
+ * Tests for Kidō: the spells as data (the six shipped Hadō, three with incantations, and the seven Bakudō, two of them
  * chanted, their order and their looks, a broken or empty file read leniently and clamped, and each spell sent as the
  * sync sends it), who may cast and who may only choose, the spells a Kidō level knows and the one chosen, the gate and
  * the share of casting by name alone, a spell's power and cost, what a Hadō strikes and what it spares, Kidō training
@@ -141,24 +141,28 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * is heard, gated and shared, and a bind that binds and holds at once, drawn in its spell's look), the pin of a body
  * its Hollow has seized by a hold long enough, Sekienton's smoke (the creatures in it left lost to the caster, their
  * hunt and a creeper's swell stopped, at once and at each pulse, the players it blinds and what spares them, and the
- * caster quickened), and Enkōsen's shield (the blows it takes from the front and within the moment of another, what
- * passes once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it). The by-name
- * gate and share are also tested on a spell built in code ({@link #chantSpell}). Mock players are not in the world and
- * never tick, so the Kidō key is pressed and let go by calling {@link KidoEvents#onKey} with the time it would come at,
- * and the game time stands still within a test: a later time passed in stands for a later tick. Chat cannot be sent in
- * a game test, so a line is heard by calling {@link KidoEvents#chant}, and a pending chant or gather goes off by calling
- * {@link KidoEvents#tick} with the time it would come at, as a smoke pulses and a shield ends by calling
+ * caster quickened), Enkōsen's shield (the blows it takes from the front and within the moment of another, what
+ * passes once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it), and Dankū's
+ * wall (the Hadō and arrows it stops, the arts it weighs by their shooters' reiatsu against its caster's, the bodies
+ * and binds it lets through, and its end, never saved). The by-name gate and share are also tested on a spell built in
+ * code ({@link #chantSpell}). Mock players are not in the world and never tick, so the Kidō key is pressed and let go
+ * by calling {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a
+ * later time passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
+ * {@link KidoEvents#chant}, and a pending chant or gather goes off by calling {@link KidoEvents#tick} with the time it
+ * would come at, as a smoke pulses and a shield ends by calling
  * {@link KidoSmoke#tick} and {@link KidoWard#tick}; a misfire's roll is passed to the five-argument
  * {@code KidoEvents.cast}, and for a gather, which draws its own roll as it goes off, the misfire chance is set to 1 or 0
  * for that one call. No cone can find a mock player, so a gust's blow is given to one directly
  * ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on one directly ({@link KidoEvents#bindOne}),
  * its clamp is called by hand and what it refuses is posted as the event the act would fire; nor can a smoke's pulse,
- * so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}). A still golem has no will of its own, so the revenge
- * goal a blow would start is started by hand. Raikōhō's heavy bolt is taken by an iron golem, whose 100 health outlasts
- * it. Casters stand at {@link #LANE} in the {@code field} template, facing east: every beam and bind goes east down the
- * lane into a creature or the dirt wall, and every gust east along it, ending within the field; every creature, trace,
- * orb, light, takeover, mask, gathering, team, bind, look, wary mark, smoke, shield and lost mark a test makes is put
- * away within its first tick.
+ * so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}). A wall is raised directly
+ * ({@link DankuWall#raise}), and a crescent or an arrow shot at it is ticked by hand within the test's one tick. A
+ * still golem has no will of its own, so the revenge goal a blow would start is started by hand. Raikōhō's heavy bolt
+ * is taken by an iron golem, whose 100 health outlasts it. Casters stand at {@link #LANE} in the {@code field}
+ * template, facing east: every beam and bind goes east down the lane into a creature or the dirt wall, and every gust
+ * east along it, ending within the field; every creature, trace, orb, light, takeover, mask, gathering, team, bind,
+ * look, wary mark, smoke, shield, wall and lost mark a test makes is put away within its first tick, but for the walls
+ * one test leaves to go by themselves.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -185,6 +189,7 @@ public final class KidoTests {
     private static final int RIKUJOKORO_COLOUR = 0xFFF1A8;
     private static final int SEKIENTON_COLOUR = 0xB8262E;
     private static final int ENKOSEN_COLOUR = 0xD8C46A;
+    private static final int DANKU_COLOUR = 0xE4DCFF;
     /** Where a creature keeps its wariness of each Bakudō ({@link KidoLogic#markWary}), so a test can clear it. */
     private static final String WARY_TAG = "bleach:bakudo_wary";
     /** The held body's modifier on the walk, which takes the whole of it. */
@@ -695,8 +700,8 @@ public final class KidoTests {
                 && spells.containsKey(KidoSpell.TENRAN) && spells.containsKey(KidoSpell.RAIKOHO)
                 && spells.containsKey(KidoSpell.SAI) && spells.containsKey(KidoSpell.HAINAWA)
                 && spells.containsKey(KidoSpell.GEKI) && spells.containsKey(KidoSpell.SEKIENTON)
-                && spells.containsKey(KidoSpell.ENKOSEN) && spells.containsKey(KidoSpell.RIKUJOKORO),
-                "the shipped spells did not load: " + spells.keySet());
+                && spells.containsKey(KidoSpell.ENKOSEN) && spells.containsKey(KidoSpell.RIKUJOKORO)
+                && spells.containsKey(KidoSpell.DANKU), "the shipped spells did not load: " + spells.keySet());
         // A data pack may add its own, so only the mod's are held to their order.
         List<ResourceKey<KidoSpell>> shipped = ids(KidoSpell.sorted(spells)).stream()
                 .filter(key -> BleachMod.MODID.equals(key.location().getNamespace()))
@@ -704,7 +709,8 @@ public final class KidoTests {
         // Every Hadō before every Bakudō, each kind by its number.
         helper.assertTrue(shipped.equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI, KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI,
                 KidoSpell.TENRAN, KidoSpell.RAIKOHO, KidoSpell.SAI, KidoSpell.HAINAWA, KidoSpell.GEKI,
-                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO)), "the mod's spells sort as " + shipped);
+                KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO, KidoSpell.DANKU)),
+                "the mod's spells sort as " + shipped);
 
         KidoSpell sho = spell(helper, KidoSpell.SHO).value();
         assertShipped(helper, sho, "Shō", "kido.bleach.sho", 1, 0, 0xCFE6FF, KidoSpell.Kind.HADO, KidoSpell.Shape.BEAM);
@@ -831,8 +837,8 @@ public final class KidoTests {
                     instanceof SimpleParticleType, what + " puffs " + look.particle());
         }
 
-        // Sekienton and Enkōsen have no incantation and strike nothing: a smoke left where the caster stood, and a
-        // shield held before it, each standing for its ward's time.
+        // Sekienton, Enkōsen and Dankū have no incantation and strike nothing: a smoke left where the caster stood, a
+        // shield held before it and a wall raised before it, each standing for its ward's time.
         KidoSpell sekienton = spell(helper, KidoSpell.SEKIENTON).value();
         assertShipped(helper, sekienton, "Sekienton", "kido.bleach.sekienton", 21, 8, SEKIENTON_COLOUR,
                 KidoSpell.Kind.BAKUDO, KidoSpell.Shape.SMOKE);
@@ -860,7 +866,20 @@ public final class KidoTests {
         KidoSpell.Ward shield = enkosen.effect().ward();
         helper.assertTrue(shield.seconds() == 3.0F && shield.lostSeconds() == 0.0F && shield.speedSeconds() == 0.0F
                 && shield.speedLevel() == 0, "Enkōsen's ward is " + shield + ", not 3 seconds and nothing else");
-        for (KidoSpell warding : List.of(sekienton, enkosen)) {
+        KidoSpell danku = spell(helper, KidoSpell.DANKU).value();
+        assertShipped(helper, danku, "Dankū", "kido.bleach.danku", 81, 36, DANKU_COLOUR, KidoSpell.Kind.BAKUDO,
+                KidoSpell.Shape.WALL);
+        assertNear(helper, danku.costShare(), 0.2, "Dankū's share of reiryoku");
+        assertNear(helper, danku.minCost(), 20.0, "Dankū's least cost");
+        helper.assertTrue(danku.cooldownTicks() == 300 && danku.xp() == 6,
+                "Dankū waits " + danku.cooldownTicks() + " ticks and trains " + danku.xp() + " xp");
+        assertNear(helper, danku.effect().range(), 2.0, "how far before its caster Dankū rises");
+        assertNear(helper, danku.effect().radius(), 2.5, "Dankū's half-width");
+        KidoSpell.Ward wall = danku.effect().ward();
+        helper.assertTrue(wall.seconds() == 6.0F && wall.lostSeconds() == 0.0F && wall.speedSeconds() == 0.0F
+                && wall.speedLevel() == 0 && wall.height() == 4.0F,
+                "Dankū's ward is " + wall + ", not 6 seconds and 4 blocks tall");
+        for (KidoSpell warding : List.of(sekienton, enkosen, danku)) {
             String what = "Bakudō #" + warding.number();
             helper.assertTrue(warding.gatherTicks() == 0 && !warding.gathers(), what + " gathers for "
                     + warding.gatherTicks() + " ticks");
@@ -885,7 +904,7 @@ public final class KidoTests {
                 && rikujokoro.look().bind() == KidoSpell.BindStyle.RODS,
                 "Geki is drawn as " + geki.look().bind() + " and Rikujōkōrō as " + rikujokoro.look().bind());
         for (KidoSpell plain : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, sekienton,
-                enkosen)) {
+                enkosen, danku)) {
             helper.assertTrue(plain.look().bind() == KidoSpell.BindStyle.DEFAULT,
                     plain.kind() + " #" + plain.number() + " is drawn as " + plain.look().bind());
         }
@@ -933,6 +952,8 @@ public final class KidoTests {
         helper.assertTrue(thirtyNinthBakudo.equals(List.of(KidoSpell.ENKOSEN)), "Bakudō #39 is " + thirtyNinthBakudo);
         List<ResourceKey<KidoSpell>> sixtyFirstBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 61));
         helper.assertTrue(sixtyFirstBakudo.equals(List.of(KidoSpell.RIKUJOKORO)), "Bakudō #61 is " + sixtyFirstBakudo);
+        List<ResourceKey<KidoSpell>> eightyFirstBakudo = ids(KidoSpell.byNumber(spells, KidoSpell.Kind.BAKUDO, 81));
+        helper.assertTrue(eightyFirstBakudo.equals(List.of(KidoSpell.DANKU)), "Bakudō #81 is " + eightyFirstBakudo);
 
         // Every value wrong in its own way: each falls back or is clamped alone, and the rest of the spell stays.
         String broken = "{\"number\": -5, \"shape\": \"spiral\", \"level\": 7, \"by_name_level\": 2, \"cost_share\": 9,"
@@ -940,7 +961,8 @@ public final class KidoTests {
                 + " \"incantations\": [\"\", \"" + "x".repeat(300) + "\", \"ok\"],"
                 + " \"effect\": {\"range\": 1000, \"pierce\": 0, \"damage\": \"lots\", \"angle\": 400,"
                 + " \"blind_seconds\": -1, \"bare_share\": 3, \"bound_seconds\": 100, \"held_seconds\": -1,"
-                + " \"ward\": {\"seconds\": 100, \"lost_seconds\": -1, \"speed_seconds\": 40, \"speed_level\": 9}}}";
+                + " \"ward\": {\"seconds\": 100, \"lost_seconds\": -1, \"speed_seconds\": 40, \"speed_level\": 9,"
+                + " \"height\": 9}}}";
         KidoSpell parsed = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(broken)).getOrThrow();
         helper.assertTrue(parsed.number() == 0, "a number of -5 read as " + parsed.number());
         helper.assertTrue(parsed.shape() == KidoSpell.Shape.NONE && !parsed.castable(),
@@ -966,6 +988,10 @@ public final class KidoTests {
         assertNear(helper, clamped.lostSeconds(), 0.0, "a ward that loses for -1 seconds");
         assertNear(helper, clamped.speedSeconds(), 30.0, "a ward that quickens for 40 seconds");
         helper.assertTrue(clamped.speedLevel() == 5, "a Speed of level 9 read as " + clamped.speedLevel());
+        assertNear(helper, clamped.height(), 4.0, "a wall 9 blocks tall");
+        KidoSpell.Ward sunk = KidoSpell.Ward.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{\"height\": -1}"))
+                .getOrThrow();
+        assertNear(helper, sunk.height(), 0.0, "a wall -1 blocks tall");
         KidoSpell unwarded = KidoSpell.CODEC.parse(JsonOps.INSTANCE,
                 JsonParser.parseString("{\"effect\": {\"ward\": \"nonsense\"}}")).getOrThrow();
         helper.assertTrue(unwarded.effect().ward().equals(KidoSpell.Ward.NONE),
@@ -978,7 +1004,7 @@ public final class KidoTests {
         KidoSpell bind = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{\"shape\": \"bind\"}"))
                 .getOrThrow();
         helper.assertTrue(bind.shape() == KidoSpell.Shape.BIND && bind.castable(), "a bind read as a " + bind.shape());
-        for (KidoSpell.Shape standing : List.of(KidoSpell.Shape.SMOKE, KidoSpell.Shape.SHIELD)) {
+        for (KidoSpell.Shape standing : List.of(KidoSpell.Shape.SMOKE, KidoSpell.Shape.SHIELD, KidoSpell.Shape.WALL)) {
             String written = "{\"shape\": \"" + standing.getSerializedName() + "\"}";
             KidoSpell read = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(written)).getOrThrow();
             helper.assertTrue(read.shape() == standing && read.castable(), written + " read as a " + read.shape());
@@ -987,7 +1013,7 @@ public final class KidoTests {
         // Sent to a client as the sync sends it: encoded with the world's registries to NBT, and read back.
         RegistryOps<Tag> ops = helper.getLevel().registryAccess().createSerializationContext(NbtOps.INSTANCE);
         for (KidoSpell spell : List.of(sho, byakurai, shakkaho, sokatsui, tenran, raikoho, sai, hainawa, geki, sekienton,
-                enkosen, rikujokoro, parsed)) {
+                enkosen, rikujokoro, danku, parsed)) {
             Tag sent = KidoSpell.CODEC.encodeStart(ops, spell).getOrThrow();
             KidoSpell read = KidoSpell.CODEC.parse(ops, sent).getOrThrow();
             helper.assertTrue(read.equals(spell), "sent " + spell + " but read " + read);
@@ -1179,6 +1205,17 @@ public final class KidoTests {
         KidoLogic.choose(chooser, KidoSpell.RIKUJOKORO.location());
         helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
                 "after Rikujōkōrō at Kidō 22, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        // By Kidō 36 Dankū comes after Rikujōkōrō, the last Bakudō, and the choice wraps round after it.
+        chooser.setLevel(Stat.KIDO, 36);
+        helper.assertTrue(ids(KidoLogic.known(chooser, spells)).equals(List.of(KidoSpell.SHO, KidoSpell.BYAKURAI,
+                KidoSpell.SHAKKAHO, KidoSpell.SOKATSUI, KidoSpell.TENRAN, KidoSpell.RAIKOHO, KidoSpell.SAI,
+                KidoSpell.HAINAWA, KidoSpell.GEKI, KidoSpell.SEKIENTON, KidoSpell.ENKOSEN, KidoSpell.RIKUJOKORO,
+                KidoSpell.DANKU)), "Kidō 36 knows " + ids(KidoLogic.known(chooser, spells)));
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.DANKU)),
+                "after Rikujōkōrō at Kidō 36, the next spell is " + id(KidoLogic.next(chooser, spells)));
+        KidoLogic.choose(chooser, KidoSpell.DANKU.location());
+        helper.assertTrue(id(KidoLogic.next(chooser, spells)).equals(Optional.of(KidoSpell.SHO)),
+                "after Dankū at Kidō 36, the next spell is " + id(KidoLogic.next(chooser, spells)));
 
         // The level, and for a spell with an incantation the higher level by name, are asked before any cost.
         data.setLevel(Stat.KIDO, 4);

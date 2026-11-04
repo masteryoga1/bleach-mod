@@ -67,7 +67,7 @@ public final class KidoWard {
     private static final float BREAK_PITCH = 1.4F;
     private static final float TICKS_PER_SECOND = 20.0F;
     /** What a player wearer reads as its shield breaks: the spell's title. */
-    private static final String BROKEN_KEY = "message.bleach.kido.ward_broken";
+    public static final String BROKEN_KEY = "message.bleach.kido.ward_broken";
 
     private KidoWard() {
     }

@@ -365,7 +365,9 @@ public class HeiligPfeil extends AbstractArrow {
         Vec3 at = position();
         Vec3 heading = getDeltaMovement();
         AABB around = new AABB(at, at).inflate(POINT_BLANK_INFLATE);
-        List<Entity> inside = new ArrayList<>(level().getEntities(this, around,
+        // Searched wider than the hit, so a wide Dankū whose middle stands in another section is found (see
+        // DankuWall#LOOKUP_MARGIN).
+        List<Entity> inside = new ArrayList<>(level().getEntities(this, around.inflate(DankuWall.LOOKUP_MARGIN),
                 other -> startsAt(other.getBoundingBox(), at, heading) && canHitEntity(other)));
         inside.sort(Comparator.comparingDouble(entity -> entity.getBoundingBox().getCenter().distanceToSqr(at)));
         for (Entity entity : inside) {
@@ -387,8 +389,8 @@ public class HeiligPfeil extends AbstractArrow {
     /**
      * Where a path from {@code from} to {@code to} this tick ends at the latest on a creature: at the
      * first one on it that will stop the arrow (a shield raised towards it or a Kidō shield, one that
-     * turns arrows aside, or the one met past its last pierce), or at {@code to} if none will. Server
-     * side; it strikes nothing.
+     * turns arrows aside, a Dankū that holds, or the one met past its last pierce), or at {@code to} if none
+     * will. Server side; it strikes nothing.
      */
     protected Vec3 creatureStop(Vec3 from, Vec3 to) {
         AABB sweep = getBoundingBox().expandTowards(to.subtract(from)).inflate(1.0);
@@ -413,6 +415,13 @@ public class HeiligPfeil extends AbstractArrow {
         int pierce = pierceLeft;
         for (int i : order) {
             Entity entity = met.get(i);
+            if (entity instanceof DankuWall wall) {
+                // One that holds ends the path; one the shot outweighs shatters when the arrow reaches it.
+                if (wall.withstands(getOwner(), DankuWall.artOf(this))) {
+                    return where.get(i);
+                }
+                continue;
+            }
             LivingEntity target = targetOf(entity);
             if (target == null || !bodies.add(target.getId())) {
                 continue;
@@ -485,7 +494,7 @@ public class HeiligPfeil extends AbstractArrow {
     }
 
     /**
-     * Only a creature the owner may harm, through its parts for a many-part body, and never one met
+     * Only a creature the owner may harm, through its parts for a many-part body, or a Dankū, and never one met
      * before. A Quincy who has just won the power back is passed by (see
      * {@link QuincyArtsLogic#justRestored}).
      */
@@ -494,9 +503,26 @@ public class HeiligPfeil extends AbstractArrow {
         if (!super.canHitEntity(entity) || struck.contains(entity.getId())) {
             return false;
         }
+        // A Dankū is met, and weighed where it is (see hitTargetOrDeflectSelf).
+        if (entity instanceof DankuWall) {
+            return true;
+        }
         LivingEntity target = targetOf(entity);
         return target != null && !struck.contains(target.getId()) && SpiritProjectiles.mayStrike(getOwner(), target)
                 && !(target instanceof Player player && QuincyArtsLogic.justRestored(player, level().getGameTime()));
+    }
+
+    /**
+     * A Dankū met is weighed first, on the server: one that holds turns the arrow away (and it fades), one the shot
+     * outweighs shatters, and the arrow flies on to what stands behind it.
+     */
+    @Override
+    protected ProjectileDeflection hitTargetOrDeflectSelf(HitResult hit) {
+        if (!level().isClientSide() && hit instanceof EntityHitResult result
+                && result.getEntity() instanceof DankuWall wall) {
+            wall.meets(getOwner(), DankuWall.artOf(this));
+        }
+        return super.hitTargetOrDeflectSelf(hit);
     }
 
     /**
