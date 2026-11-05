@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.DankuWall;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.network.KidoKeyPayload;
@@ -315,8 +316,10 @@ public final class KidoScreen extends Screen {
             case SMOKE -> Component.translatable("screen.bleach.kido.does.smoke", number(ward.seconds()),
                     number(ward.speedSeconds()));
             case SHIELD -> Component.translatable("screen.bleach.kido.does.shield", hearts, number(ward.seconds()));
-            case WALL -> Component.translatable("screen.bleach.kido.does.wall", number(2.0 * effect.radius()),
-                    number(effect.range()), number(ward.seconds()));
+            // As the wall is raised (DankuWall.raise), so a datapack's oversized wall reads as the one it gets.
+            case WALL -> Component.translatable("screen.bleach.kido.does.wall",
+                    number(2.0 * Mth.clamp(effect.radius(), DankuWall.MIN_SIZE, DankuWall.MAX_HALF_WIDTH)),
+                    number(Mth.clamp(effect.range(), 1.0, DankuWall.MAX_DISTANCE)), number(ward.seconds()));
             case NONE, HEAL -> null;
         };
     }
