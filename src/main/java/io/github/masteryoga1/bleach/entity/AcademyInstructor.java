@@ -21,10 +21,10 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The instructor at the Academy: performs Konsō for a Plus, enrolls souls that have passed on, sits
- * students' exams, hands out Asauchi, and cleanses a Hollow who comes to him instead of to its prey,
- * breaking its mask with his blade. He cannot be hurt or moved, so the Academy always works:
- * whatever pulls, carries or pushes him away from where he first stood, he is back there the next
- * tick. Only a teleport by command moves him for good.
+ * students' exams, gives each student a Kidō lesson once a day, hands out Asauchi, and cleanses a
+ * Hollow who comes to him instead of to its prey, breaking its mask with his blade. He cannot be hurt
+ * or moved, so the Academy always works: whatever pulls, carries or pushes him away from where he first
+ * stood, he is back there the next tick. Only a teleport by command moves him for good.
  */
 public final class AcademyInstructor extends ShinigamiNpc {
     private static final float REIRYOKU = 500.0F;

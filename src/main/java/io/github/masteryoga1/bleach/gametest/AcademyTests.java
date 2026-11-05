@@ -129,7 +129,7 @@ public final class AcademyTests {
             List<NpcAction> expected = switch (view) {
                 case PLUS -> List.of(NpcAction.KONSO);
                 case SOUL -> List.of(NpcAction.ENROLL);
-                case STUDENT -> List.of(NpcAction.GRADUATE, NpcAction.ASAUCHI);
+                case STUDENT -> List.of(NpcAction.GRADUATE, NpcAction.ASAUCHI, NpcAction.LESSON);
                 case SUBSTITUTE, SHINIGAMI -> List.of(NpcAction.ASAUCHI);
                 case OFFER_POWER -> List.of(NpcAction.ACCEPT_POWER);
                 case ELDER_GREETING, ELDER_LESSON -> List.of(NpcAction.LESSON);

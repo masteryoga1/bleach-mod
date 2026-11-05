@@ -23,7 +23,7 @@ import net.minecraft.resources.ResourceLocation;
  * @param academyPos      the nearest Academy this soul was told about, if any
  * @param visored         the Hollow that took root in this soul's wounds, the fights with it and its mask (see
  *                        {@link VisoredLogic}); it belongs to the soul's Shinigami power, so it is kept here
- * @param kido            the Kidō spell this soul chose to cast with the Kidō key (see {@link KidoLogic})
+ * @param kido            the Kidō spell this soul chose and the day of its last lesson (see {@link KidoLogic})
  */
 public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long powerLentUntil, float lentReiryoku,
                                 long gavePowerAt, long woundedMetAt, long konsoDay, int konsoRewards,
@@ -36,7 +36,7 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
 
     // Every field is read leniently, so one bad value falls back to its default on its own, a save from before
     // the Visored has no "visored" at all and reads as having no Hollow inside, and a save from before Kidō has no
-    // "kido" and reads as no spell chosen.
+    // "kido" and reads as no spell chosen and no lesson given.
     public static final Codec<ShinigamiProgress> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.lenientOptionalFieldOf("enrolled", false).forGetter(ShinigamiProgress::enrolled),
             Codec.LONG.lenientOptionalFieldOf("asauchi_issued_at", NEVER).forGetter(ShinigamiProgress::asauchiIssuedAt),
@@ -242,18 +242,20 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
     }
 
     /**
-     * The soul's Kidō: the spell it chose to cast with the Kidō key, if any (see {@link KidoLogic}). Saved with the
-     * rest and read leniently, so a save from before Kidō, or an unreadable choice, reads as {@link #NONE}. A choice
-     * of a spell the world no longer has, or the soul cannot yet cast, is kept, and the first spell it knows is cast
-     * in its place.
+     * The soul's Kidō: the spell it chose to cast with the Kidō key, if any (see {@link KidoLogic}), and the day of
+     * its last lesson from the Academy instructor. Saved with the rest and read leniently, so a save from before Kidō,
+     * or an unreadable field, reads as that field's default. A choice of a spell the world no longer has, or the soul
+     * cannot yet cast, is kept, and the first spell it knows is cast in its place.
      *
-     * @param chosen the id of the chosen spell, or empty before the first choice
+     * @param chosen    the id of the chosen spell, or empty before the first choice
+     * @param lessonDay the day ({@link KidoLogic#lessonDay}) of the last lesson, or -1 before the first
      */
-    public record Kido(Optional<ResourceLocation> chosen) {
-        public static final Kido NONE = new Kido(Optional.empty());
+    public record Kido(Optional<ResourceLocation> chosen, long lessonDay) {
+        public static final Kido NONE = new Kido(Optional.empty(), -1L);
 
         public static final Codec<Kido> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-                ResourceLocation.CODEC.lenientOptionalFieldOf("chosen").forGetter(Kido::chosen)
+                ResourceLocation.CODEC.lenientOptionalFieldOf("chosen").forGetter(Kido::chosen),
+                Codec.LONG.lenientOptionalFieldOf("lesson_day", -1L).forGetter(Kido::lessonDay)
         ).apply(instance, Kido::new));
 
         /** A missing choice is none. */
@@ -262,7 +264,11 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
         }
 
         public Kido withChosen(Optional<ResourceLocation> value) {
-            return new Kido(value);
+            return new Kido(value, lessonDay);
+        }
+
+        public Kido withLessonDay(long value) {
+            return new Kido(chosen, value);
         }
     }
 }

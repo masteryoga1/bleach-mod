@@ -14,7 +14,7 @@ import net.minecraft.util.ByIdMap;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Client to server: the Kidō key, and later the Kidō page. The server decides everything (see
+ * Client to server: the Kidō key and the Kidō page. The server decides everything (see
  * {@link KidoEvents#onKey}). The spell is only for {@link KidoKey#SELECT}, which names the spell to choose; the
  * key itself sends none. It already carries every message the Kidō round needs, so later spells that gather,
  * channel or are chosen from a page need no new payload.

@@ -22,8 +22,8 @@ public enum NpcAction {
     GRADUATE(DialogueView.STUDENT),
     ASAUCHI(DialogueView.SUBSTITUTE, DialogueView.STUDENT, DialogueView.SHINIGAMI),
     ACCEPT_POWER(DialogueView.OFFER_POWER),
-    /** A lesson from the Quincy Elder, once a day. */
-    LESSON(DialogueView.ELDER_GREETING, DialogueView.ELDER_LESSON),
+    /** A lesson once a day: the Quincy Elder's, or the Academy instructor's Kidō lesson for a student. */
+    LESSON(DialogueView.ELDER_GREETING, DialogueView.ELDER_LESSON, DialogueView.STUDENT),
     /** The Elder's Ransōtengai trial. */
     RANSOTENGAI(DialogueView.ELDER_TEACH),
     /** The Elder's arrow beside the heart, which brings a sealed power back. */
