@@ -155,14 +155,20 @@ public final class SoulEvents {
      * Whether reiryoku refills this tick. Releasing reiatsu pours it out, so it does not refill until
      * the release ends and the reiatsu settles; standing on reishi footing paid in reiryoku, holding a
      * Shikai that can seal, an Arrancar's Resurrección or a Visored's mask, or weaving Ransōtengai's
-     * threads spends it as it comes. A Quincy's footing is paid in reishi instead.
+     * threads spends it as it comes; channelling Kaidō pours it out, and each pulse of it that does
+     * something rests it for a second after (see {@link KidoHeal}). A Quincy's footing is paid in
+     * reishi instead.
      */
     public static boolean mayRegenerate(Player player, SoulData data) {
-        boolean footingOnReiryoku = ReishiFooting.isActive(player)
-                && !QuincyLogic.footingOnReishi(data, player.level().getGameTime());
+        return mayRegenerate(player, data, player.level().getGameTime());
+    }
+
+    /** {@link #mayRegenerate(Player, SoulData)} at this game time: Kaidō's refill asks it at the pulse's. */
+    public static boolean mayRegenerate(Player player, SoulData data, long now) {
+        boolean footingOnReiryoku = ReishiFooting.isActive(player) && !QuincyLogic.footingOnReishi(data, now);
         return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !footingOnReiryoku
                 && !data.isShikaiActive() && !QuincyRansotengai.isWoven(data) && !ArrancarLogic.released(data)
-                && !VisoredLogic.isMasked(data);
+                && !VisoredLogic.isMasked(data) && data.kidoHeal == null && now >= data.kidoHealRestUntil;
     }
 
     /**

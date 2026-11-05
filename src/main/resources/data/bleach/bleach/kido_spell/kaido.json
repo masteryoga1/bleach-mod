@@ -1,0 +1,24 @@
+{
+  "kind": "kaido",
+  "number": 0,
+  "name": {"translate": "kido.bleach.kaido"},
+  "shape": "heal",
+  "level": 3,
+  "by_name_level": 3,
+  "chant_ticks": 0,
+  "incantations": [],
+  "cost_share": 0.02,
+  "min_cost": 1.0,
+  "cooldown_ticks": 20,
+  "xp": 1,
+  "look": {
+    "colour": "#6EE08A",
+    "sound": "minecraft:block.amethyst_block.resonate",
+    "pitch": 1.6,
+    "particle": "minecraft:happy_villager"
+  },
+  "effect": {
+    "range": 3.0,
+    "radius": 0.2
+  }
+}
