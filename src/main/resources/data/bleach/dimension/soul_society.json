@@ -1,0 +1,18 @@
+{
+  "type": "bleach:soul_society",
+  "generator": {"type": "minecraft:noise", "settings": "bleach:soul_society", "biome_source": {"type": "minecraft:multi_noise",
+    "biomes": [
+      {"biome": "bleach:sokyoku_hill", "parameters": {"temperature": [0.0, 0.026], "humidity": 0.0, "continentalness": 0.0,
+        "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:seireitei", "parameters": {"temperature": [0.026, 0.252], "humidity": 0.0, "continentalness": 0.0,
+        "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:seireitei_wall", "parameters": {"temperature": [0.252, 0.264], "humidity": 0.0, "continentalness": 0.0,
+        "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:rukongai", "parameters": {"temperature": [0.264, 0.74], "humidity": 0.0, "continentalness": 0.0,
+        "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:rukongai_rough", "parameters": {"temperature": [0.74, 1.508], "humidity": 0.0, "continentalness": 0.0,
+        "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:rukongai_wilds", "parameters": {"temperature": [1.508, 2.0], "humidity": 0.0, "continentalness": 0.0,
+        "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}}
+    ]}}
+}

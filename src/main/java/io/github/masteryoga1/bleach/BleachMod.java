@@ -16,6 +16,7 @@ import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModMenus;
 import io.github.masteryoga1.bleach.registry.ModRecipes;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.registry.ModWorldgen;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
@@ -35,6 +36,8 @@ public final class BleachMod {
     public BleachMod(IEventBus modEventBus, ModContainer modContainer) {
         ModArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
         ModBlocks.BLOCKS.register(modEventBus);
+        ModWorldgen.DENSITY_FUNCTION_TYPES.register(modEventBus);
+        ModWorldgen.FEATURES.register(modEventBus);
         ModComponents.COMPONENTS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);

@@ -22,6 +22,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -427,6 +428,7 @@ public final class QuincyTests {
         assertNear(helper, QuincyLogic.dimensionDensity(Level.OVERWORLD), 1.0, "the Overworld's density");
         assertNear(helper, QuincyLogic.dimensionDensity(Level.NETHER), 0.6, "the Nether's density");
         assertNear(helper, QuincyLogic.dimensionDensity(Level.END), 0.8, "the End's density");
+        assertNear(helper, QuincyLogic.dimensionDensity(BleachWorlds.SOUL_SOCIETY), 1.5, "Soul Society's density");
         assertNear(helper, QuincyLogic.dimensionDensity(ResourceKey.create(Registries.DIMENSION, BleachMod.id("elsewhere"))),
                 1.0, "another world's density");
 

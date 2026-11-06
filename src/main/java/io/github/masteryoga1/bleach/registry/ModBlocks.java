@@ -3,8 +3,11 @@ package io.github.masteryoga1.bleach.registry;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.block.ReishiFootingBlock;
 import io.github.masteryoga1.bleach.block.TailoringTableBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
+import net.minecraft.world.level.material.MapColor;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -16,6 +19,10 @@ public final class ModBlocks {
     /** Hardened reishi under a player's feet. It has no item: only reishi footing places it. */
     public static final DeferredBlock<ReishiFootingBlock> REISHI_FOOTING = BLOCKS.register("reishi_footing",
             () -> new ReishiFootingBlock(ReishiFootingBlock.footingProperties()));
+    /** Sekkiseki, the pale stone of the Seireiheki: no survival tool, blast, Wither or dragon breaks it. */
+    public static final DeferredBlock<Block> SEKKISEKI = BLOCKS.registerSimpleBlock("sekkiseki",
+            BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
+                    .strength(-1.0F, 3600000.0F).isValidSpawn((state, level, pos, type) -> false));
 
     private ModBlocks() {
     }

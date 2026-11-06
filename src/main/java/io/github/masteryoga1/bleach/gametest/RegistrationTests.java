@@ -19,12 +19,15 @@ import io.github.masteryoga1.bleach.registry.ModComponents;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.registry.ModWorldgen;
 import io.github.masteryoga1.bleach.soul.QuincyArtsEvents;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.world.gen.RadialDensity;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -32,6 +35,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageType;
@@ -41,6 +45,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.Tiers;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -91,6 +97,28 @@ public final class RegistrationTests {
         helper.assertTrue(ModBlocks.REISHI_FOOTING.get().asItem() == Items.AIR, "reishi footing can be held as an item");
         helper.assertFalse(ModBlocks.REISHI_FOOTING.get().defaultBlockState().isAir(),
                 "reishi footing counts as air, so the server would think players on it are flying");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void sekkisekiIsRegistered(GameTestHelper helper) {
+        Block sekkiseki = ModBlocks.SEKKISEKI.get();
+        helper.assertTrue(BuiltInRegistries.BLOCK.get(BleachMod.id("sekkiseki")) == sekkiseki
+                && sekkiseki.asItem() == ModItems.SEKKISEKI.get(), "Sekkiseki is not its block, or has no item");
+        helper.assertTrue(sekkiseki.defaultDestroyTime() < 0.0F, "Sekkiseki can be broken in survival");
+        helper.assertTrue(sekkiseki.getExplosionResistance() >= 3_600_000.0F, "a blast can break Sekkiseki");
+        BlockState state = sekkiseki.defaultBlockState();
+        for (TagKey<Block> tag : List.of(BleachTags.NEGATES_REIRYOKU, BlockTags.WITHER_IMMUNE, BlockTags.DRAGON_IMMUNE,
+                BlockTags.FEATURES_CANNOT_REPLACE)) {
+            helper.assertTrue(state.is(tag), "Sekkiseki is not in #" + tag.location());
+        }
+        helper.assertFalse(state.isValidSpawn(helper.getLevel(), BlockPos.ZERO, EntityType.ZOMBIE),
+                "a zombie may spawn on Sekkiseki");
+        LootTable drops = helper.getLevel().getServer().reloadableRegistries().getLootTable(sekkiseki.getLootTable());
+        helper.assertTrue(drops != LootTable.EMPTY, "Sekkiseki has no loot table");
+        helper.assertTrue(BuiltInRegistries.DENSITY_FUNCTION_TYPE.get(BleachMod.id("radial")) == RadialDensity.DATA_CODEC
+                        && BuiltInRegistries.FEATURE.get(BleachMod.id("seireiheki")) == ModWorldgen.SEIREIHEKI.get(),
+                "bleach:radial or bleach:seireiheki is not registered");
         helper.succeed();
     }
 

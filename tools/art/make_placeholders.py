@@ -148,6 +148,10 @@ GLOVE_CUFF = QUINCY_BLUE
 INNER_SKIN = rgb(232, 234, 238)
 INNER_ROBE = rgb(208, 210, 216)
 HOLLOW_IRIS = rgb(236, 200, 40)
+# Sekkiseki, the Seireiheki's stone: pale grey, faintly flecked, with darker joints.
+SEKKISEKI = rgb(222, 222, 214)
+SEKKISEKI_FLECK = rgb(204, 204, 197)
+SEKKISEKI_SEAM = rgb(176, 176, 170)
 
 
 class Canvas:
@@ -1569,6 +1573,18 @@ def hollow_mask_edge_cracked():
     return c
 
 
+def sekkiseki():
+    """Sekkiseki: pale grey cut stone in two courses, the lower one's joint offset half a block, faintly flecked."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, SEKKISEKI)
+    mottle(c, 0, 0, 16, 16, SEKKISEKI_FLECK, 5, seed=3)
+    c.rect(0, 7, 16, 8, SEKKISEKI_SEAM)    # the joint between the courses
+    c.rect(0, 15, 16, 16, SEKKISEKI_SEAM)  # the bottom joint, which meets the next block's top course
+    c.rect(7, 0, 8, 7, SEKKISEKI_SEAM)     # the upper course's upright joint
+    c.rect(15, 8, 16, 15, SEKKISEKI_SEAM)  # the lower course's, half a block along
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -1661,6 +1677,7 @@ TEXTURES = {
     "entity/visored_half_mask.png": visored_half_mask,
     "misc/hollow_mask_edge.png": hollow_mask_edge,
     "misc/hollow_mask_edge_cracked.png": hollow_mask_edge_cracked,
+    "block/sekkiseki.png": sekkiseki,
 }
 
 
