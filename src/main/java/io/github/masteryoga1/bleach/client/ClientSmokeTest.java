@@ -81,12 +81,14 @@ import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -1342,6 +1344,14 @@ public final class ClientSmokeTest {
             case 6415 -> KidoKeys.CAST.setDown(false);
             // Natural regeneration back, once the last window has closed.
             case 6425 -> command(minecraft, "gamerule naturalRegeneration true");
+            // Soul Society's arrival chunks loaded well before the tp: a player sent into ungenerated chunks can fall
+            // through them on the server before they exist, as one CI run did.
+            case 6440 -> {
+                int x = SectionPos.blockToSectionCoord(Mth.floor(SOUL_SOCIETY_X)) * 16;
+                int z = SectionPos.blockToSectionCoord(Mth.floor(SOUL_SOCIETY_Z)) * 16;
+                command(minecraft, String.format(Locale.ROOT, "execute in %s run forceload add %d %d %d %d",
+                        BleachWorlds.SOUL_SOCIETY.location(), x - 16, z - 16, x + 31, z + 31));
+            }
             // The Kidō page, from the soul screen's own button.
             case 6455 -> minecraft.setScreen(new SoulStatsScreen());
             case 6460 -> {
@@ -1380,6 +1390,8 @@ public final class ClientSmokeTest {
             case 6740 -> shot(minecraft, "seireiheki");
             case 6745 -> command(minecraft, String.format(Locale.ROOT,
                     "execute in minecraft:overworld run tp @s %.3f %.3f %.3f", returnTo.x, returnTo.y, returnTo.z));
+            case 6750 -> command(minecraft, String.format(Locale.ROOT, "execute in %s run forceload remove all",
+                    BleachWorlds.SOUL_SOCIETY.location()));
             case 6810 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
