@@ -8,6 +8,7 @@
     "CakeBlockMixin",
     "EntitySectionStorageMixin",
     "FoodDataMixin",
+    "GameTestServerMixin",
     "LivingEntityMixin",
     "PlayerMixin",
     "TargetingConditionsMixin",
