@@ -81,14 +81,14 @@ import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
-import net.minecraft.core.SectionPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -100,6 +100,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomModelData;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -1344,14 +1345,6 @@ public final class ClientSmokeTest {
             case 6415 -> KidoKeys.CAST.setDown(false);
             // Natural regeneration back, once the last window has closed.
             case 6425 -> command(minecraft, "gamerule naturalRegeneration true");
-            // Soul Society's arrival chunks loaded well before the tp: a player sent into ungenerated chunks can fall
-            // through them on the server before they exist, as one CI run did.
-            case 6440 -> {
-                int x = SectionPos.blockToSectionCoord(Mth.floor(SOUL_SOCIETY_X)) * 16;
-                int z = SectionPos.blockToSectionCoord(Mth.floor(SOUL_SOCIETY_Z)) * 16;
-                command(minecraft, String.format(Locale.ROOT, "execute in %s run forceload add %d %d %d %d",
-                        BleachWorlds.SOUL_SOCIETY.location(), x - 16, z - 16, x + 31, z + 31));
-            }
             // The Kidō page, from the soul screen's own button.
             case 6455 -> minecraft.setScreen(new SoulStatsScreen());
             case 6460 -> {
@@ -1371,6 +1364,9 @@ public final class ClientSmokeTest {
             }
             // Sōkatsui marked: the window from 6493 passed by 6520, and the frames since show the synced choice.
             case 6525 -> shot(minecraft, "kido_page_chosen");
+            // Soul Society's arrival chunks asked for well before the tp, without blocking the server (a forceload
+            // generates on its thread): one CI run sent the player into chunks not yet made, and it fell into the void.
+            case 6526 -> holdArrival(minecraft, true);
             // Back to the soul screen, through the page's own Back button.
             case 6530 -> {
                 Button back = minecraft.screen instanceof KidoScreen page ? page.backButton() : null;
@@ -1381,18 +1377,17 @@ public final class ClientSmokeTest {
             }
             case 6550 -> minecraft.setScreen(null);
             // To Soul Society: onto Seireitei's lawn, at y 72 for any seed, facing the south wall 40 blocks off.
-            case 6560 -> {
+            case 6660 -> {
                 returnTo = player.position();
                 command(minecraft, String.format(Locale.ROOT, "execute in %s run tp @s %.1f %d %.1f 0 -20",
                         BleachWorlds.SOUL_SOCIETY.location(), SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
             }
             // The wall's chunks have had a hundred ticks or more to be drawn since they reached the client.
-            case 6740 -> shot(minecraft, "seireiheki");
-            case 6745 -> command(minecraft, String.format(Locale.ROOT,
+            case 6840 -> shot(minecraft, "seireiheki");
+            case 6845 -> command(minecraft, String.format(Locale.ROOT,
                     "execute in minecraft:overworld run tp @s %.3f %.3f %.3f", returnTo.x, returnTo.y, returnTo.z));
-            case 6750 -> command(minecraft, String.format(Locale.ROOT, "execute in %s run forceload remove all",
-                    BleachWorlds.SOUL_SOCIETY.location()));
-            case 6810 -> {
+            case 6850 -> holdArrival(minecraft, false);
+            case 6910 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1952,14 +1947,17 @@ public final class ClientSmokeTest {
 
     /** The checks of Soul Society, each window from the step it follows: there, the wall seen, and home again. */
     private static void checkSoulSociety(Minecraft minecraft, LocalPlayer player) {
-        expectWithin(minecraft, 6562, 6640, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
+        expectWithin(minecraft, 6662, 6740, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
                         && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
                         && horizontalDistance(player.position(), new Vec3(SOUL_SOCIETY_X, 0.0, SOUL_SOCIETY_Z)) < 0.5,
                 "the tp never stood the player on Seireitei's lawn at y 72 (it is in "
-                        + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString() + ")");
-        expectWithin(minecraft, 6600, 6735, () -> wallStands(minecraft.level),
+                        + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString()
+                        + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
+                        + ", the lawn's block " + minecraft.level.getBlockState(BlockPos.containing(SOUL_SOCIETY_X,
+                                SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
+        expectWithin(minecraft, 6700, 6835, () -> wallStands(minecraft.level),
                 "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a 16-block gap");
-        expectWithin(minecraft, 6747, 6800, () -> minecraft.level.dimension() == Level.OVERWORLD
+        expectWithin(minecraft, 6847, 6900, () -> minecraft.level.dimension() == Level.OVERWORLD
                 && player.position().distanceTo(returnTo) < 1.5, "the tp back never brought the player home");
     }
 
@@ -2093,6 +2091,29 @@ public final class ClientSmokeTest {
         } catch (Exception e) {
             return "unread (" + e + ")";
         }
+    }
+
+    /**
+     * Holds (or lets go of) Soul Society's arrival chunks on the integrated server with a forced ticket, which
+     * generates them in the background, as the forceload command would not.
+     */
+    private static void holdArrival(Minecraft minecraft, boolean hold) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        if (server == null) {
+            return;
+        }
+        ChunkPos chunk = new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
+        server.execute(() -> {
+            ServerLevel level = server.getLevel(BleachWorlds.SOUL_SOCIETY);
+            if (level == null) {
+                return;
+            }
+            if (hold) {
+                level.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            } else {
+                level.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            }
+        });
     }
 
     /** Whether the integrated server's own copy of the soul has this spell chosen, read on its thread. */
