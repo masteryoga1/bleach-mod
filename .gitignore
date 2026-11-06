@@ -29,3 +29,6 @@ src/generated/**/.cache
 
 # python
 __pycache__/
+
+# javac argument files left by a local syntax check
+javac.*.args

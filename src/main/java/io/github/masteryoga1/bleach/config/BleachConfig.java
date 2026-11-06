@@ -59,6 +59,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue GRADUATION_HOHO_LEVEL;
     public static final ModConfigSpec.IntValue GRADUATION_KIDO_LEVEL;
     public static final ModConfigSpec.IntValue ASAUCHI_REISSUE_MINUTES;
+    public static final ModConfigSpec.IntValue KIDO_LESSON_XP;
     public static final ModConfigSpec.IntValue ACADEMY_LOCATE_RADIUS_CHUNKS;
     public static final ModConfigSpec.BooleanValue ACADEMY_GUARANTEE;
 
@@ -859,11 +860,16 @@ public final class BleachConfig {
                 .comment("Hohō level a student needs to graduate.")
                 .defineInRange("graduation_hoho_level", 5, 0, 100);
         GRADUATION_KIDO_LEVEL = builder
-                .comment("Kidō level a student needs to graduate. Kidō trains by casting spells (see [kido]).")
+                .comment("Kidō level a student needs to graduate. Kidō trains by casting spells (see [kido]) and"
+                        + " from the instructor's daily lesson.")
                 .defineInRange("graduation_kido_level", 5, 0, 100);
         ASAUCHI_REISSUE_MINUTES = builder
                 .comment("Minutes before the Academy hands the same soul another Asauchi.")
                 .defineInRange("asauchi_reissue_minutes", 10, 0, 1_440);
+        KIDO_LESSON_XP = builder
+                .comment("Kidō xp the Academy instructor's lesson gives a student, once a day (a new day comes each"
+                        + " morning, or every 20 minutes of play). 0 gives the lesson without xp.")
+                .defineInRange("kido_lesson_xp", 40, 0, 1_000);
         ACADEMY_LOCATE_RADIUS_CHUNKS = builder
                 .comment("How far, in chunks, to search for an Academy building. Beyond this, one is built near world spawn if 'guarantee' is on. 0 never searches.")
                 .defineInRange("locate_radius_chunks", 64, 0, 256);

@@ -31,8 +31,9 @@ public final class BleachNetwork {
      * 16: the Visored record in ShinigamiProgress.
      * 17: {@code ZanpakutoKey.MASK} and the mask's four fields in the Visored record.
      * 18: the Kidō key, the synced Kidō spells and the Kidō record in ShinigamiProgress.
+     * 19: the day of the instructor's Kidō lesson in the Kidō record, and the lesson in the student's dialogue.
      */
-    private static final String VERSION = "18";
+    private static final String VERSION = "19";
 
     private BleachNetwork() {
     }

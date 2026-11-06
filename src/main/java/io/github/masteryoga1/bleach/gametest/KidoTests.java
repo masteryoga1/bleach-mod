@@ -2,15 +2,19 @@ package io.github.masteryoga1.bleach.gametest;
 
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.Lifecycle;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.DankuWall;
+import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
+import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
@@ -60,6 +64,7 @@ import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -154,9 +159,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * the caster quickened), Enkōsen's shield (the blows it takes from the front and within the moment of another, what
  * passes once it breaks, what it never covers, what ends it, and a Hadō beam and arrows stopped at it), Dankū's wall
  * (the Hadō and arrows it stops, the arts it weighs by their shooters' reiatsu against its caster's, the bodies and
- * binds it lets through, and its end, never saved), and Kaidō (its channel, reiryoku before health at the patient's own
+ * binds it lets through, and its end, never saved), Kaidō (its channel, reiryoku before health at the patient's own
  * rate, the healer's rest, Kubo's tiers and what they lift, oneself from Kidō 40, Ransōtengai's refusal, who may be
- * healed, and every end). The by-name gate and share are also tested on a spell built in code ({@link #chantSpell}).
+ * healed, and every end), and the Kidō page's choice and the Academy's daily lesson. The by-name gate and share are
+ * also tested on a spell built in code ({@link #chantSpell}).
  * Mock players are not in the world and never tick, so the Kidō key is pressed and let go by calling
  * {@link KidoEvents#onKey} with the time it would come at, and the game time stands still within a test: a later time
  * passed in stands for a later tick. Chat cannot be sent in a game test, so a line is heard by calling
@@ -168,14 +174,15 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * ({@link KidoEvents#gustBlow}); nor can a bind's ray, so a bind is laid on one directly ({@link KidoEvents#bindOne}),
  * its clamp is called by hand and what it refuses is posted as the event the act would fire; nor can a smoke's pulse,
  * so the smoke is laid on one directly ({@link KidoSmoke#smokeOn}); nor can a heal's aim, so a heal is begun on one
- * directly ({@link KidoHeal#begin}). A wall is mostly raised directly ({@link DankuWall#raise}), and a crescent or an
- * arrow shot at it is ticked by hand within the test's one tick. A still golem has no will of its own, so the revenge
- * goal a blow would start is started by hand. Raikōhō's heavy bolt is taken by an iron golem, whose 100 health outlasts
- * it. Casters stand at {@link #LANE} in the {@code field} template, facing east: every beam, bind, crescent and arrow
- * goes east down the lane into a creature, a wall or the dirt wall, and every gust east along it, ending within the
- * field; every creature, trace, orb, light, takeover, mask, gathering, heal, team, bind, look, wary mark, smoke,
- * shield, wall and lost mark a test makes is put away within its first tick, but for the walls one test leaves to go by
- * themselves.
+ * directly ({@link KidoHeal#begin}). A click on the Kidō page is sent as SELECT through {@link KidoEvents#onKey}, and
+ * the Academy's lesson is asked of the instructor or given by {@link KidoEvents#lesson} at a later day's times. A wall
+ * is mostly raised directly ({@link DankuWall#raise}), and a crescent or an arrow shot at it is ticked by hand within
+ * the test's one tick. A still golem has no will of its own, so the revenge goal a blow would start is started by
+ * hand. Raikōhō's heavy bolt is taken by an iron golem, whose 100 health outlasts it. Casters stand at {@link #LANE}
+ * in the {@code field} template, facing east: every beam, bind, crescent and arrow goes east down the lane into a
+ * creature, a wall or the dirt wall, and every gust east along it, ending within the field; every creature, trace,
+ * orb, light, takeover, mask, gathering, heal, team, bind, look, wary mark, smoke, shield, wall and lost mark a test
+ * makes is put away within its first tick, but for the walls one test leaves to go by themselves.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -332,6 +339,12 @@ public final class KidoTests {
     @Nullable
     private static KidoLogic.Refusal cancel(Player player, long now) {
         return KidoEvents.onKey(player, KidoKeyPayload.KidoKey.CANCEL, Optional.empty(), now);
+    }
+
+    /** A click on the Kidō page at this time: the spell of this id chosen (null: no id). */
+    @Nullable
+    private static KidoLogic.Refusal select(Player player, @Nullable ResourceLocation id, long now) {
+        return KidoEvents.onKey(player, KidoKeyPayload.KidoKey.SELECT, Optional.ofNullable(id), now);
     }
 
     /** The spell this soul has stored as its choice, if any. */
@@ -1399,6 +1412,224 @@ public final class KidoTests {
         older.put("kido", unreadable);
         ShinigamiProgress broken = ShinigamiProgress.CODEC.parse(NbtOps.INSTANCE, older).getOrThrow();
         helper.assertTrue(broken.kido().equals(ShinigamiProgress.Kido.NONE), "an unreadable choice read as " + broken.kido());
+        helper.succeed();
+    }
+
+    // ---- The Kidō page and the lesson ----
+
+    @GameTest(template = "field")
+    public static void instructorTeachesKidoOnceADay(GameTestHelper helper) {
+        // Two blocks down the lane, well within talking range of the students at its west end.
+        AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 3, 2, 8);
+        try {
+            withConfig(BleachConfig.KIDO_LESSON_XP, 40, () -> {
+                long now = HollowPlayerTests.now(helper);
+                long dayTime = helper.getLevel().getDayTime();
+                long day = KidoLogic.lessonDay(now, dayTime);
+                SoulData data = ShinigamiTests.student(60.0F);
+                Player student = caster(helper, GameType.SURVIVAL, data);
+                helper.assertTrue(instructor.viewFor(data, now) == DialogueView.STUDENT
+                        && NpcAction.offeredIn(DialogueView.STUDENT).contains(NpcAction.LESSON)
+                        && !instructor.unreadyFor(student, data, now).contains(NpcAction.LESSON),
+                        "a student was not offered today's lesson");
+
+                // Asked through the dialogue: 40 xp make Kidō 1 with 20 over, and the day is saved with nothing chosen.
+                instructor.perform(student, NpcAction.LESSON);
+                helper.assertTrue(data.level(Stat.KIDO) == 1 && data.xp(Stat.KIDO) == 20,
+                        "the lesson left Kidō " + data.level(Stat.KIDO) + " and " + data.xp(Stat.KIDO) + " xp");
+                helper.assertTrue(data.shinigami().kido().equals(new ShinigamiProgress.Kido(Optional.empty(), day)),
+                        "the lesson saved " + data.shinigami().kido() + ", not day " + day);
+                // Asked again that day, nothing more, and the dialogue greys it out.
+                instructor.perform(student, NpcAction.LESSON);
+                helper.assertTrue(data.level(Stat.KIDO) == 1 && data.xp(Stat.KIDO) == 20,
+                        "a second lesson that day left Kidō " + data.level(Stat.KIDO) + " and " + data.xp(Stat.KIDO) + " xp");
+                helper.assertTrue(instructor.unreadyFor(student, data, now).contains(NpcAction.LESSON),
+                        "the lesson given today was not greyed out");
+                helper.assertFalse(KidoEvents.lesson(student, now, dayTime), "a student was taught twice in a day");
+
+                // The next day another: 60 xp make Kidō 2 with none over.
+                helper.assertTrue(KidoEvents.lesson(student, now + DAY, dayTime + DAY), "the next day's lesson was refused");
+                helper.assertTrue(data.level(Stat.KIDO) == 2 && data.xp(Stat.KIDO) == 0
+                        && data.shinigami().kido().lessonDay() == day + 1,
+                        "the next day's lesson left Kidō " + data.level(Stat.KIDO) + " and " + data.xp(Stat.KIDO)
+                                + " xp on day " + data.shinigami().kido().lessonDay());
+                // The day is the later of the two clocks', as the Quincy Elder's.
+                helper.assertTrue(KidoLogic.lessonDay(10L, 50_000L) == 2L && KidoLogic.lessonDay(30_000L, 10L) == 1L,
+                        "the lesson's day does not follow the later clock");
+
+                // Creative trains too, and a lesson of no xp is still the day's lesson.
+                SoulData keen = ShinigamiTests.student(60.0F);
+                helper.assertTrue(KidoEvents.lesson(caster(helper, GameType.CREATIVE, keen), now, dayTime)
+                        && keen.level(Stat.KIDO) == 1, "a creative student's lesson left Kidō " + keen.level(Stat.KIDO));
+                SoulData idle = ShinigamiTests.student(60.0F);
+                Player idler = caster(helper, GameType.SURVIVAL, idle);
+                withConfig(BleachConfig.KIDO_LESSON_XP, 0, () -> helper.assertTrue(KidoEvents.lesson(idler, now, dayTime),
+                        "a lesson of no xp was refused"));
+                helper.assertTrue(idle.level(Stat.KIDO) == 0 && idle.xp(Stat.KIDO) == 0
+                        && idle.shinigami().kido().lessonDay() == day,
+                        "a lesson of no xp left Kidō " + idle.level(Stat.KIDO) + " and " + idle.xp(Stat.KIDO) + " xp on day "
+                                + idle.shinigami().kido().lessonDay());
+
+                // A graduate is offered no lesson, and sending the action anyway does nothing.
+                SoulData graduate = shinigami(400.0F, 0);
+                Player graduated = caster(helper, GameType.SURVIVAL, graduate);
+                instructor.perform(graduated, NpcAction.LESSON);
+                helper.assertTrue(graduate.level(Stat.KIDO) == 0
+                        && graduate.shinigami().kido().equals(ShinigamiProgress.Kido.NONE),
+                        "a graduate was taught to Kidō " + graduate.level(Stat.KIDO) + ": " + graduate.shinigami().kido());
+                helper.assertFalse(KidoEvents.lesson(graduated, now, dayTime), "a graduate was given a student's lesson");
+
+                // A student whose Quincy power bars Kidō is still a student, and its lesson stays live, so the tooltip
+                // never says "no more today"; pressed, it is told why in chat and given nothing.
+                SoulData quincy = ShinigamiTests.student(60.0F);
+                quincy.setQuincy(quincy.quincy().withBloodline(Bloodline.ECHT).withDecided(true));
+                quincy.setTier(PowerPath.QUINCY, 1);
+                Player blocked = caster(helper, GameType.SURVIVAL, quincy);
+                helper.assertTrue(QuincyLogic.blocksShinigamiPower(quincy)
+                        && instructor.viewFor(quincy, now) == DialogueView.STUDENT,
+                        "the Quincy-blocked student was not seen as a student");
+                helper.assertFalse(instructor.unreadyFor(blocked, quincy, now).contains(NpcAction.LESSON),
+                        "the lesson was greyed for a Quincy-blocked student, whose tooltip would say no more today");
+                instructor.perform(blocked, NpcAction.LESSON);
+                helper.assertFalse(KidoEvents.lesson(blocked, now, dayTime), "a Quincy-blocked student was taught Kidō");
+                helper.assertTrue(quincy.level(Stat.KIDO) == 0 && quincy.xp(Stat.KIDO) == 0
+                        && quincy.shinigami().kido().lessonDay() == -1L,
+                        "a Quincy-blocked student's lesson left Kidō " + quincy.level(Stat.KIDO) + " and "
+                                + quincy.xp(Stat.KIDO) + " xp on day " + quincy.shinigami().kido().lessonDay());
+
+                // The spell named next: the castable one of the lowest level above the soul's, Hadō before Kaidō at 3
+                // and before Sekienton at 8, and none from Dankū's 36.
+                Registry<KidoSpell> spells = spells(helper);
+                int[] levels = {0, 1, 4, 7, 35};
+                List<ResourceKey<KidoSpell>> expected = List.of(KidoSpell.SAI, KidoSpell.BYAKURAI, KidoSpell.SHAKKAHO,
+                        KidoSpell.SOKATSUI, KidoSpell.DANKU);
+                for (int i = 0; i < levels.length; i++) {
+                    Optional<ResourceKey<KidoSpell>> next = id(KidoLogic.nextToLearn(shinigami(100.0F, levels[i]), spells));
+                    helper.assertTrue(next.equals(Optional.of(expected.get(i))),
+                            "at Kidō " + levels[i] + " the next spell to learn is " + next);
+                }
+                Optional<ResourceKey<KidoSpell>> past = id(KidoLogic.nextToLearn(shinigami(100.0F, 36), spells));
+                helper.assertTrue(past.isEmpty(), "at Kidō 36 the next spell to learn is " + past);
+
+                // Saved with the choice; a save from before the lesson, or a broken day, reads as none given, and a
+                // soul never taught saves no day at all, as before.
+                KidoLogic.choose(data, KidoSpell.SAI.location());
+                Tag progress = ShinigamiProgress.CODEC.encodeStart(NbtOps.INSTANCE, data.shinigami()).getOrThrow();
+                helper.assertTrue(progress instanceof CompoundTag saved
+                        && saved.getCompound("kido").getLong("lesson_day") == day + 1,
+                        "the lesson's day was saved as " + progress);
+                // The stored child itself, so each change reaches the progress read below.
+                CompoundTag kido = ((CompoundTag) progress).getCompound("kido");
+                ShinigamiProgress.Kido untaught = new ShinigamiProgress.Kido(Optional.of(KidoSpell.SAI.location()), -1L);
+                kido.remove("lesson_day");
+                ShinigamiProgress older = ShinigamiProgress.CODEC.parse(NbtOps.INSTANCE, progress).getOrThrow();
+                helper.assertTrue(older.kido().equals(untaught), "a save from before the lesson read as " + older.kido());
+                kido.putString("lesson_day", "x");
+                ShinigamiProgress broken = ShinigamiProgress.CODEC.parse(NbtOps.INSTANCE, progress).getOrThrow();
+                helper.assertTrue(broken.kido().equals(untaught), "an unreadable lesson day read as " + broken.kido());
+                Tag never = ShinigamiProgress.Kido.CODEC.encodeStart(NbtOps.INSTANCE, untaught).getOrThrow();
+                helper.assertTrue(never instanceof CompoundTag plain && !plain.contains("lesson_day"),
+                        "a soul never taught saved " + never);
+            });
+        } finally {
+            discard(instructor);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "field")
+    public static void theKidoPageChoosesOnlyWhatTheSoulKnows(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        SoulData data = shinigami(400.0F, 10);
+        Player caster = caster(helper, GameType.SURVIVAL, data);
+        // The spell a click names is chosen, and the key then casts it: Sōkatsui only by name from Kidō 14.
+        assertRefusal(helper, select(caster, KidoSpell.SHAKKAHO.location(), now), null, "a click on Shakkahō");
+        helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.SHAKKAHO)), "a click on Shakkahō chose " + stored(data));
+        assertRefusal(helper, select(caster, KidoSpell.SOKATSUI.location(), now), null, "a click on Sōkatsui");
+        helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.SOKATSUI)), "a click on Sōkatsui chose " + stored(data));
+        assertRefusal(helper, press(caster, now), KidoLogic.Refusal.NEEDS_NAME_LEVEL, "the key on Sōkatsui at Kidō 10");
+        HollowPlayerTests.assertClose(helper, data.reiryoku(), 400.0, "the reiryoku after the key on Sōkatsui");
+
+        // No id, an id the world has no spell for, and a spell above the soul's level: refused unsaid, the choice kept.
+        assertRefusal(helper, select(caster, null, now), KidoLogic.Refusal.UNABLE, "a click naming no spell");
+        helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.SOKATSUI)), "a click naming no spell chose "
+                + stored(data));
+        assertRefusal(helper, select(caster, BleachMod.id("missing"), now), KidoLogic.Refusal.UNABLE,
+                "a click on a spell the world lacks");
+        helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.SOKATSUI)), "a click on a spell the world lacks chose "
+                + stored(data));
+        assertRefusal(helper, select(caster, KidoSpell.DANKU.location(), now), KidoLogic.Refusal.UNABLE,
+                "a click on Dankū at Kidō 10");
+        helper.assertTrue(stored(data).equals(Optional.of(KidoSpell.SOKATSUI)), "a click on Dankū at Kidō 10 chose "
+                + stored(data));
+
+        // A spell of no shape is never known, whatever its level: a registry built by hand, left unfrozen, as NeoForge
+        // binds each value as it is registered.
+        KidoSpell formless = KidoSpell.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("{}")).getOrThrow();
+        MappedRegistry<KidoSpell> made = new MappedRegistry<>(KidoSpell.REGISTRY, Lifecycle.stable());
+        Registry.register(made, BleachMod.id("formless"), formless);
+        Registry.register(made, KidoSpell.SHO.location(), spell(helper, KidoSpell.SHO).value());
+        helper.assertTrue(KidoLogic.knownSpell(data, made, Optional.of(BleachMod.id("formless"))).isEmpty(),
+                "a spell of no shape is known at Kidō 10");
+        helper.assertTrue(KidoLogic.knownSpell(data, made, Optional.of(KidoSpell.SHO.location())).isPresent(),
+                "Shō, in the registry built by hand, is not known at Kidō 10");
+
+        // A Hollow may not choose; a soul whose power is lent, or whose arms are bound, may.
+        SoulData hollowData = ShinigamiTests.soul(SoulState.HOLLOW, 400.0F);
+        hollowData.setLevel(Stat.KIDO, 10);
+        Player hollow = caster(helper, GameType.SURVIVAL, hollowData);
+        assertRefusal(helper, select(hollow, KidoSpell.SAI.location(), now), KidoLogic.Refusal.UNTRAINED, "a Hollow's click");
+        helper.assertTrue(hollowData.shinigami().kido().equals(ShinigamiProgress.Kido.NONE),
+                "a Hollow's click stored " + hollowData.shinigami().kido());
+        SoulData lent = shinigami(400.0F, 10);
+        ShinigamiLogic.lend(lent, now);
+        Player lender = caster(helper, GameType.SURVIVAL, lent);
+        assertRefusal(helper, KidoLogic.mayCast(lender, lent, now), KidoLogic.Refusal.LENT, "the lender's key");
+        assertRefusal(helper, select(lender, KidoSpell.SAI.location(), now), null, "a click by a soul whose power is lent");
+        helper.assertTrue(stored(lent).equals(Optional.of(KidoSpell.SAI)), "the lender's click chose " + stored(lent));
+        Player bound = caster(helper, GameType.SURVIVAL, shinigami(400.0F, 10));
+        SoulData boundData = SoulLogic.get(bound);
+        try {
+            bound.addEffect(new MobEffectInstance(ModEffects.BAKUDO_BOUND, 100));
+            assertRefusal(helper, KidoLogic.mayCast(bound, boundData, now), KidoLogic.Refusal.BOUND, "the bound soul's key");
+            assertRefusal(helper, select(bound, KidoSpell.SAI.location(), now), null, "a click with bound arms");
+            helper.assertTrue(stored(boundData).equals(Optional.of(KidoSpell.SAI)),
+                    "the click with bound arms chose " + stored(boundData));
+        } finally {
+            unbind(bound);
+        }
+
+        // The soul screen offers the page by mayCast's own rule of who may use Kidō.
+        helper.assertTrue(KidoLogic.trained(data) && KidoLogic.trained(ShinigamiTests.student(60.0F)),
+                "a Shinigami or a student may not use Kidō");
+        helper.assertFalse(KidoLogic.trained(hollowData)
+                || KidoLogic.trained(QuincyTests.withShinigamiPower(QuincyTests.quincy(Bloodline.ECHT, 1, 400.0F))),
+                "a Hollow, or an awakened Quincy with a Shinigami tier, may use Kidō");
+
+        // A click only chooses: on Kaidō it begins no heal, and a heal begun goes on with its own spell.
+        Player healer = healer(helper, GameType.SURVIVAL, 25);
+        SoulData healerData = SoulLogic.get(healer);
+        KidoSpell kaido = spell(helper, KidoSpell.KAIDO).value();
+        assertRefusal(helper, select(healer, KidoSpell.KAIDO.location(), now), null, "a click on Kaidō");
+        helper.assertTrue(healing(healerData) == null, "a click on Kaidō began a heal: " + healing(healerData));
+        HollowPlayerTests.assertClose(helper, healerData.reiryoku(), 600.0, "the reiryoku after a click on Kaidō");
+        Player patient = patient(helper, shinigami(400.0F, 0));
+        patient.setHealth(10.0F);
+        try {
+            // Kidō 25 heals a heart and a half a pulse.
+            assertRefusal(helper, KidoHeal.begin(healer, patient, kaido, now), null, "Kaidō on the patient");
+            assertHealing(helper, healerData, true, patient, 13.0F, "the first pulse");
+            assertRefusal(helper, select(healer, KidoSpell.SHO.location(), now + 1L), null, "a click on Shō while healing");
+            helper.assertTrue(stored(healerData).equals(Optional.of(KidoSpell.SHO)),
+                    "the click while healing chose " + stored(healerData));
+            KidoHeal.Channel channel = healing(healerData);
+            helper.assertTrue(channel != null && channel.spell() == kaido,
+                    "a click while healing left the heal as " + channel);
+            KidoEvents.tick(healer, healerData, now + 20L);
+            assertHealing(helper, healerData, true, patient, 16.0F, "the pulse after the click");
+        } finally {
+            release(healer, now + 21L);
+        }
         helper.succeed();
     }
 

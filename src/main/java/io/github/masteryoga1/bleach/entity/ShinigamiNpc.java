@@ -3,6 +3,8 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.HollowPlayerEvents;
+import io.github.masteryoga1.bleach.soul.KidoEvents;
+import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -10,6 +12,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -120,10 +123,20 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
         List<Integer> required = EXAMINED_ARTS.stream()
                 .map(art -> ShinigamiLogic.graduationRequirements().get(art))
                 .toList();
-        // A new Asauchi is offered greyed out until the visitor may have one.
-        List<NpcAction> unready = ShinigamiEvents.mayReceiveAsauchi(visitor, data, now)
-                ? List.of() : List.of(NpcAction.ASAUCHI);
+        List<NpcAction> unready = unreadyFor(visitor, data, now);
         BleachNetwork.openDialogue(visitor, this, viewFor(data, now), required, unready, List.of());
+    }
+
+    /** What the dialogue offers greyed out: a new Asauchi until the visitor may have one, and a lesson given today. */
+    public List<NpcAction> unreadyFor(Player visitor, SoulData data, long now) {
+        List<NpcAction> unready = new ArrayList<>();
+        if (!ShinigamiEvents.mayReceiveAsauchi(visitor, data, now)) {
+            unready.add(NpcAction.ASAUCHI);
+        }
+        if (KidoLogic.lessonTaken(data, KidoLogic.lessonDay(now, level().getDayTime()))) {
+            unready.add(NpcAction.LESSON);
+        }
+        return unready;
     }
 
     /**
@@ -149,6 +162,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
                     ShinigamiEvents.acceptPowerFrom(wounded, visitor);
                 }
             }
+            case LESSON -> KidoEvents.lesson(visitor, level().getGameTime(), level().getDayTime());
             case PURIFY -> HollowPlayerEvents.purifyByInstructor(this, visitor);
         }
     }

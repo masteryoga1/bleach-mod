@@ -190,9 +190,9 @@ public final class KidoEvents {
     /**
      * The Kidō key, as sent by {@link KidoKeyPayload} (and called directly by game tests): PRESS casts the chosen
      * spell by name, begins to gather one that gathers, or begins a heal; NEXT chooses the next known one; RELEASE
-     * looses or scatters a gathering spell or ends a heal, and CANCEL scatters it or ends the heal; SELECT does nothing
-     * yet. A held soul is told so by its holder and does nothing more. Tells the player why on the action bar. Returns
-     * the refusal, or null when done or ignored.
+     * looses or scatters a gathering spell or ends a heal, and CANCEL scatters it or ends the heal; SELECT chooses the
+     * spell the Kidō page names, if the soul knows it. A held soul is told so by its holder and does nothing more.
+     * Tells the player why on the action bar. Returns the refusal, or null when done or ignored.
      */
     @Nullable
     public static KidoLogic.Refusal onKey(Player player, KidoKeyPayload.KidoKey key, Optional<ResourceLocation> spell,
@@ -214,8 +214,7 @@ public final class KidoEvents {
                 KidoHeal.stop(player, data, null);
                 yield data.kidoGather == null ? null : scatter(player, data);
             }
-            // SELECT waits for the Kidō page (6i).
-            default -> null;
+            case SELECT -> select(player, data, level, spell, now);
         };
     }
 
@@ -265,7 +264,37 @@ public final class KidoEvents {
             return KidoLogic.Refusal.NONE_KNOWN;
         }
         KidoLogic.choose(data, following.get().key().location());
-        KidoSpell spell = following.get().value();
+        announce(player, data, following.get().value());
+        return null;
+    }
+
+    /**
+     * The Kidō page's click: the spell it names is chosen and announced as Sneak and the key would, if the soul knows
+     * it; any other id is refused unsaid. It only chooses, so a heal or a chant goes on as it was.
+     */
+    @Nullable
+    private static KidoLogic.Refusal select(Player player, SoulData data, ServerLevel level, Optional<ResourceLocation> id,
+                                            long now) {
+        KidoLogic.Refusal refusal = KidoLogic.mayCast(player, data, now);
+        if (!KidoLogic.mayChoose(refusal)) {
+            tell(player, refusal, null);
+            return refusal;
+        }
+        Optional<Holder.Reference<KidoSpell>> found = KidoSpell.registry(level)
+                .flatMap(spells -> KidoLogic.knownSpell(data, spells, id));
+        if (found.isEmpty()) {
+            return KidoLogic.Refusal.UNABLE;
+        }
+        KidoLogic.choose(data, found.get().key().location());
+        announce(player, data, found.get().value());
+        return null;
+    }
+
+    /**
+     * Names the chosen spell on the action bar, with the level it can be cast by name from when that is still to come,
+     * and shows its incantation, if it has one, in the player's own chat.
+     */
+    private static void announce(Player player, SoulData data, KidoSpell spell) {
         MutableComponent line = KidoLogic.gate(spell, KidoLogic.Form.NAME, data.level(Stat.KIDO))
                 == KidoLogic.Refusal.NEEDS_NAME_LEVEL
                 ? Component.translatable("message.bleach.kido.chosen.by_name_later", spell.title(), spell.byNameLevel())
@@ -275,7 +304,6 @@ public final class KidoEvents {
         if (spell.chantable() && BleachConfig.get(BleachConfig.KIDO_CHAT_CASTING)) {
             printIncantations(player, spell);
         }
-        return null;
     }
 
     // ---- The chant ----
@@ -1015,6 +1043,47 @@ public final class KidoEvents {
         }
     }
 
+    // ---- The Academy's lesson ----
+
+    /**
+     * The Academy instructor's Kidō lesson, once a day for a student: Kidō xp, then the next spell to learn named in
+     * chat with its incantation. Returns false, changing nothing, for one taught today or no student, and for a
+     * student whose Quincy power bars Kidō, who is told so.
+     */
+    public static boolean lesson(Player player, long now, long dayTime) {
+        SoulData data = SoulLogic.get(player);
+        long day = KidoLogic.lessonDay(now, dayTime);
+        if (!ShinigamiLogic.isStudent(data) || KidoLogic.lessonTaken(data, day)) {
+            return false;
+        }
+        // Only a lesson taken today greys the button, so a student the Academy cannot teach Kidō is told why here.
+        if (QuincyLogic.blocksShinigamiPower(data)) {
+            player.sendSystemMessage(Component.translatable("message.bleach.kido.lesson.quincy")
+                    .withStyle(ChatFormatting.GRAY));
+            return false;
+        }
+        ShinigamiProgress progress = data.shinigami();
+        data.setShinigami(progress.withKido(progress.kido().withLessonDay(day)));
+        int xp = BleachConfig.get(BleachConfig.KIDO_LESSON_XP);
+        player.sendSystemMessage(Component.translatable("message.bleach.kido.lesson", xp).withStyle(ChatFormatting.GRAY));
+        // The level-up line takes the action bar; the next spell is named from the level the lesson left.
+        SoulLogic.addStatXp(player, data, Stat.KIDO, xp);
+        Optional<Holder.Reference<KidoSpell>> next = KidoSpell.registry(player.level())
+                .flatMap(spells -> KidoLogic.nextToLearn(data, spells));
+        if (next.isEmpty()) {
+            player.sendSystemMessage(Component.translatable("message.bleach.kido.lesson.mastered")
+                    .withStyle(ChatFormatting.GRAY));
+            return true;
+        }
+        KidoSpell spell = next.get().value();
+        player.sendSystemMessage(Component.translatable("message.bleach.kido.lesson.next", spell.title(), spell.level())
+                .withStyle(ChatFormatting.GRAY));
+        if (spell.chantable() && BleachConfig.get(BleachConfig.KIDO_CHAT_CASTING)) {
+            printIncantations(player, spell, "message.bleach.kido.lesson.incantation");
+        }
+        return true;
+    }
+
     // ---- Listeners ----
 
     /**
@@ -1141,8 +1210,12 @@ public final class KidoEvents {
      * while the chat is open to type one. On a mock player, which has no chat, this does nothing.
      */
     private static void printIncantations(Player player, KidoSpell spell) {
-        player.sendSystemMessage(Component.translatable("message.bleach.kido.incantation", spell.title())
-                .withStyle(ChatFormatting.GRAY));
+        printIncantations(player, spell, "message.bleach.kido.incantation");
+    }
+
+    /** {@link #printIncantations(Player, KidoSpell)} under this heading, which is given the spell's title. */
+    private static void printIncantations(Player player, KidoSpell spell, String heading) {
+        player.sendSystemMessage(Component.translatable(heading, spell.title()).withStyle(ChatFormatting.GRAY));
         for (String incantation : spell.incantations()) {
             player.sendSystemMessage(Component.literal(incantation).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         }

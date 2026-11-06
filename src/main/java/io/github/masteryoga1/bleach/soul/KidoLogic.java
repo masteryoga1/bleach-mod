@@ -22,11 +22,11 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * The rules of Kidō: who may cast, the spells a soul knows by its Kidō level and the one it has chosen, the gate
- * on casting by name alone, a spell's strength, cost and training, how a line said in chat is heard as an
- * incantation, the misfire of a cast by name, the gather of a spell held in the palm on the key, the hand (a spell
- * may be weaker cast with no zanpakutō at hand), the reiatsu gap that cuts what a spell does besides its blow, and
- * the bind's contest and who may be bound.
+ * The rules of Kidō: who may cast, the spells a soul knows by its Kidō level and the one it has chosen, the next
+ * spell to learn and the Academy's daily lesson, the gate on casting by name alone, a spell's strength, cost and
+ * training, how a line said in chat is heard as an incantation, the misfire of a cast by name, the gather of a spell
+ * held in the palm on the key, the hand (a spell may be weaker cast with no zanpakutō at hand), the reiatsu gap that
+ * cuts what a spell does besides its blow, and the bind's contest and who may be bound.
  * Like {@link ShinigamiLogic}, these only read and change a {@link SoulData}, a spell and the config
  * ({@link #mayCast} also asks the player whether it lives, watches, is held or is bound, the hand and the gap look at
  * the caster and the creature, and the bind's rules at the creature, whose wary mark they keep), so game tests can
@@ -148,15 +148,15 @@ public final class KidoLogic {
      * power lent, which refuses only a cast by name: a lender still chants, as Rukia does after lending hers. Server
      * side: on a client the taken-over row is always clear, since {@link VisoredLogic#takenOver} reads a time that is
      * not saved or sent (a player's own effects are sent to it, so the bound row holds there too).
-     * (6f's page, to grey spells out while taken over, reads {@code ClientSouls.appearance(player).hollowLook()} and
-     * {@link HollowPlayerLogic#LOOK_TAKEN_OVER}, as the soul screen does.)
+     * (The Kidō page reads the taken-over bit of the look, {@link HollowPlayerLogic#LOOK_TAKEN_OVER}, as the soul
+     * screen does.)
      */
     @Nullable
     public static Refusal mayCast(Player player, SoulData data, long now, Form form) {
         if (!player.isAlive() || player.isSpectator() || Negacion.held(player)) {
             return Refusal.UNABLE;
         }
-        if (!ShinigamiLogic.spirituallyTrained(data) || QuincyLogic.blocksShinigamiPower(data)) {
+        if (!trained(data)) {
             return Refusal.UNTRAINED;
         }
         if (VisoredLogic.takenOver(data)) {
@@ -177,6 +177,14 @@ public final class KidoLogic {
      */
     public static boolean mayChoose(@Nullable Refusal refusal) {
         return refusal == null || refusal == Refusal.TAKEN || refusal == Refusal.LENT || refusal == Refusal.BOUND;
+    }
+
+    /**
+     * Whether this soul may use Kidō at all: a Shinigami's power or an Academy student, and no awakened Quincy power
+     * where hybrids are not allowed. The soul screen offers the Kidō page by it.
+     */
+    public static boolean trained(SoulData data) {
+        return ShinigamiLogic.spirituallyTrained(data) && !QuincyLogic.blocksShinigamiPower(data);
     }
 
     // ---- Knowing and choosing ----
@@ -201,6 +209,14 @@ public final class KidoLogic {
         return Optional.of(known.get(Math.max(0, indexOf(known, data.shinigami().kido().chosen()))));
     }
 
+    /** The spell of this id if this soul knows it ({@link #known}); empty for no id, no such spell or one it does not. */
+    public static Optional<Holder.Reference<KidoSpell>> knownSpell(SoulData data, Registry<KidoSpell> spells,
+                                                                   Optional<ResourceLocation> id) {
+        int kido = data.level(Stat.KIDO);
+        return id.flatMap(spells::getHolder)
+                .filter(spell -> spell.value().castable() && spell.value().level() <= kido);
+    }
+
     /** The known spell after {@link #chosen}, wrapping round to the first; empty when it knows none. */
     public static Optional<Holder.Reference<KidoSpell>> next(SoulData data, Registry<KidoSpell> spells) {
         List<Holder.Reference<KidoSpell>> known = known(data, spells);
@@ -215,6 +231,34 @@ public final class KidoLogic {
     public static void choose(SoulData data, ResourceLocation id) {
         ShinigamiProgress progress = data.shinigami();
         data.setShinigami(progress.withKido(progress.kido().withChosen(Optional.of(id))));
+    }
+
+    /**
+     * The spell this soul learns next: the castable one of the lowest level above its Kidō level, the first in
+     * {@link KidoSpell#ORDER} among equals; empty once it knows them all.
+     */
+    public static Optional<Holder.Reference<KidoSpell>> nextToLearn(SoulData data, Registry<KidoSpell> spells) {
+        int kido = data.level(Stat.KIDO);
+        Holder.Reference<KidoSpell> next = null;
+        for (Holder.Reference<KidoSpell> spell : KidoSpell.sorted(spells)) {
+            int level = spell.value().level();
+            if (spell.value().castable() && level > kido && (next == null || level < next.value().level())) {
+                next = spell;
+            }
+        }
+        return Optional.ofNullable(next);
+    }
+
+    // ---- The Academy's lesson ----
+
+    /** The day the instructor's lesson counts by: the Quincy Elder's ({@link QuincyArtsLogic#gloveDay}). */
+    public static long lessonDay(long gameTime, long dayTime) {
+        return QuincyArtsLogic.gloveDay(gameTime, dayTime);
+    }
+
+    /** Whether this soul had the instructor's lesson on this day, which greys the lesson in the dialogue. */
+    public static boolean lessonTaken(SoulData data, long day) {
+        return data.shinigami().kido().lessonDay() == day;
     }
 
     // ---- The gate and the strength ----

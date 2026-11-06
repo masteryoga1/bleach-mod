@@ -70,6 +70,7 @@ import javax.annotation.Nullable;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
@@ -207,8 +208,10 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * which must reach the client two blocks south of the player, facing it, 5 wide and 4 tall, and be gone 6 seconds
  * later. Sneaking with the key once more must choose Kaidō, which the action bar must name alone, and the key held must
  * heal a hurt villager two blocks south of the player, which must reach the client whole within three seconds, and
- * then, with no one in reach and natural regeneration off, the player's own wounds, by a heart a second, before the run
- * quits.
+ * then, with no one in reach and natural regeneration off, the player's own wounds, by a heart a second; then the soul
+ * screen's Kidō button must open the Kidō page with all 14 spells and Kaidō chosen, a click on Sōkatsui's row must
+ * choose it on the server, which the action bar and chat must show, and the page's Back button must go back to the
+ * soul screen before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -484,6 +487,8 @@ public final class ClientSmokeTest {
                 expect(minecraft, soul.state() == SoulState.HOLLOW, "the client never saw the Hollow");
                 minecraft.setScreen(new SoulStatsScreen());
             }
+            case 240 -> expect(minecraft, minecraft.screen instanceof SoulStatsScreen stats && stats.kidoButton() == null,
+                    "the soul screen offered a Hollow the Kidō page");
             case 260 -> {
                 // Now a Shinigami, with a full reserve and nothing slowing them down.
                 minecraft.setScreen(null);
@@ -545,6 +550,8 @@ public final class ClientSmokeTest {
             case 510 -> minecraft.setScreen(new SoulStatsScreen());
             // A screenshot shows the last frame drawn, so it waits a moment for the screen to be drawn.
             case 515 -> shot(minecraft, "stats");
+            case 520 -> expect(minecraft, minecraft.screen instanceof SoulStatsScreen stats && stats.kidoButton() != null,
+                    "the soul screen offered a new Shinigami no Kidō page");
             case 550 -> minecraft.setScreen(null);
             // Hollows vanish on Peaceful. Back on the ground, off the footing, facing north, and clear of the
             // Academy: placed 20 blocks south, it starts at that chunk's corner and turns at random, so it
@@ -1322,7 +1329,35 @@ public final class ClientSmokeTest {
             case 6415 -> KidoKeys.CAST.setDown(false);
             // Natural regeneration back, once the last window has closed.
             case 6425 -> command(minecraft, "gamerule naturalRegeneration true");
-            case 6450 -> {
+            // The Kidō page, from the soul screen's own button.
+            case 6455 -> minecraft.setScreen(new SoulStatsScreen());
+            case 6460 -> {
+                Button kido = minecraft.screen instanceof SoulStatsScreen stats ? stats.kidoButton() : null;
+                expect(minecraft, kido != null, "the soul screen offered a Shinigami of Kidō 42 no Kidō page");
+                if (kido != null) {
+                    kido.onPress();
+                }
+            }
+            // A click on Sōkatsui's row as the last frame drew it, through the page's own hit test; the chat is cleared
+            // so the incantation it prints is new.
+            case 6490 -> {
+                chatLines.clear();
+                expect(minecraft, minecraft.screen instanceof KidoScreen page
+                                && page.clickRow(KidoSpell.SOKATSUI.location()),
+                        "the Kidō page drew no row for Sōkatsui to click");
+            }
+            // Sōkatsui marked: the window from 6493 passed by 6520, and the frames since show the synced choice.
+            case 6525 -> shot(minecraft, "kido_page_chosen");
+            // Back to the soul screen, through the page's own Back button.
+            case 6530 -> {
+                Button back = minecraft.screen instanceof KidoScreen page ? page.backButton() : null;
+                expect(minecraft, back != null, "the Kidō page had no Back button");
+                if (back != null) {
+                    back.onPress();
+                }
+            }
+            case 6550 -> minecraft.setScreen(null);
+            case 6560 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1862,6 +1897,22 @@ public final class ClientSmokeTest {
                         + (ticksInWorld == 6380 ? "; on the server: " + serverHeal(minecraft) : "") + ")");
         expectWithin(minecraft, 6392, 6420, () -> player.getHealth() >= healthBefore + 5.5F,
                 "three seconds of Kaidō never healed the player's own wounds by three hearts");
+        // The Kidō page, once drawn: all 14 spells, Shō first and Kaidō last, and Kaidō, chosen, shows its heal.
+        if (expectWithin(minecraft, 6463, 6480, () -> minecraft.screen instanceof KidoScreen page
+                        && page.listed().size() == 14 && page.listed().get(0).is(KidoSpell.SHO)
+                        && page.listed().get(13).is(KidoSpell.KAIDO) && chosenIs(soul, KidoSpell.KAIDO),
+                "the soul screen's Kidō button never opened a page of 14 spells with Kaidō chosen")) {
+            shot(minecraft, "kido_page");
+        }
+        // The click reached the server, which chose Sōkatsui and said so as Sneak + U would, and the choice came back.
+        expectWithin(minecraft, 6493, 6520, () -> minecraft.screen instanceof KidoScreen
+                        && chosenIs(soul, KidoSpell.SOKATSUI) && chosenShown(minecraft, KidoSpell.SOKATSUI)
+                        && chatShows(incantation(minecraft, KidoSpell.SOKATSUI, 0))
+                        && serverChosen(minecraft, KidoSpell.SOKATSUI),
+                "a click on Sōkatsui's row never chose it (the action bar's last lines: " + recentActionBar() + ")");
+        // Back on the page went back to the soul screen, which built its buttons again, the Kidō button among them.
+        expectWithin(minecraft, 6531, 6548, () -> minecraft.screen instanceof SoulStatsScreen stats
+                && stats.kidoButton() != null, "the Kidō page's Back button never went back to the soul screen");
     }
 
     /**
@@ -1980,6 +2031,23 @@ public final class ClientSmokeTest {
             }).get(2L, TimeUnit.SECONDS);
         } catch (Exception e) {
             return "unread (" + e + ")";
+        }
+    }
+
+    /** Whether the integrated server's own copy of the soul has this spell chosen, read on its thread. */
+    private static boolean serverChosen(Minecraft minecraft, ResourceKey<KidoSpell> key) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server == null || local == null) {
+            return false;
+        }
+        try {
+            return server.submit(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                return player != null && chosenIs(SoulLogic.get(player), key);
+            }).get(2L, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return false;
         }
     }
 

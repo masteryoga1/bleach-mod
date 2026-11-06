@@ -15,6 +15,7 @@ import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
+import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.MenosEvolution;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
@@ -59,7 +60,7 @@ import net.minecraft.world.level.Level;
  * a Hollow has devoured and what they were, Quincy blood (its reishi and Blut, the Hollow poison in it,
  * souls destroyed and how rich the reishi is here, how far its arts have come, and the Quincy Elder's
  * lessons), stats with training progress, awakened powers (an Arrancar's with the form it rose from and its
- * rank) and what comes next.
+ * rank) and what comes next, and a button to the Kidō page for a soul that may use Kidō.
  */
 public final class SoulStatsScreen extends Screen {
     private static final int PANEL_WIDTH = 240;
@@ -86,6 +87,9 @@ public final class SoulStatsScreen extends Screen {
     private static final float TICKS_PER_SECOND = 20.0F;
     private static final int XP_BACKGROUND = 0xFF303030;
     private static final int XP_FILL = 0xFF6FBF4F;
+    /** The Kidō page's button, or null for a soul that may not use Kidō. */
+    @Nullable
+    private Button kido;
 
     public SoulStatsScreen() {
         super(Component.translatable("screen.bleach.soul"));
@@ -93,9 +97,21 @@ public final class SoulStatsScreen extends Screen {
 
     @Override
     protected void init() {
+        // A soul that may use Kidō has its page beside Done.
+        boolean offered = minecraft != null && minecraft.player != null
+                && KidoLogic.trained(minecraft.player.getData(SoulAttachments.SOUL));
+        kido = offered ? addRenderableWidget(Button.builder(Component.translatable("screen.bleach.kido"),
+                        button -> minecraft.setScreen(new KidoScreen(this)))
+                .bounds(width / 2 - 100, height - DONE_TOP, 98, 20).build()) : null;
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
-                .bounds(width / 2 - 100, height - DONE_TOP, 200, 20)
+                .bounds(offered ? width / 2 + 2 : width / 2 - 100, height - DONE_TOP, offered ? 98 : 200, 20)
                 .build());
+    }
+
+    /** The Kidō page's button, or null when this soul may not use Kidō (the smoke test presses it). */
+    @Nullable
+    public Button kidoButton() {
+        return kido;
     }
 
     @Override
