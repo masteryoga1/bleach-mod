@@ -101,11 +101,18 @@ public final class SafeLanding {
         return level.getWorldBorder().isWithinBounds(box) && level.noCollision(entity, box) ? spot : null;
     }
 
-    /** This spot raised by up to {@code rise} whole blocks, as far as the body has room, so a roof keeps it on the floor. */
+    /**
+     * This spot raised by up to {@code rise} whole blocks, as far as the body has clean room, so a roof, or lava or
+     * something harmful above, keeps it lower.
+     */
     public static Vec3 risen(Entity entity, ServerLevel level, Vec3 spot, int rise) {
         AABB box = entity.getDimensions(Pose.STANDING).makeBoundingBox(spot);
         int up = 0;
-        while (up < rise && level.noCollision(entity, box.move(0.0, up + 1, 0.0))) {
+        while (up < rise) {
+            AABB next = box.move(0.0, up + 1, 0.0);
+            if (!level.noCollision(entity, next) || touchesLava(level, next) || isHarmful(level, entity, next)) {
+                break;
+            }
             up++;
         }
         return spot.add(0.0, up, 0.0);

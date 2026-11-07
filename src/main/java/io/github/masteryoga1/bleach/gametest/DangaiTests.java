@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.soul.BakudoEffect;
 import io.github.masteryoga1.bleach.soul.ChainEvents;
 import io.github.masteryoga1.bleach.soul.DangaiEvents;
+import io.github.masteryoga1.bleach.soul.SafeLanding;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
@@ -314,6 +315,19 @@ public final class DangaiTests {
         ServerPlayer south = inLane(helper, shinigami(), 251, 160.5,
                 crossing(BleachWorlds.SOUL_SOCIETY, 251, (float) (Math.PI / 2.0)));
         ServerLevel dangai = holdLane(helper, 252, 10);
+
+        // The way home rises only as far as the body has clean room: the lane's roof, or lava below it, keeps it lower.
+        holdLane(helper, 250, 2);
+        Vec3 floor = new Vec3(DangaiPlan.laneX(250), DangaiPlan.FLOOR_Y, 40.5);
+        BlockPos above = BlockPos.containing(floor).above(4);
+        double open = SafeLanding.risen(south, dangai, floor, 24).y - floor.y;
+        dangai.setBlock(above, Blocks.LAVA.defaultBlockState(), Block.UPDATE_CLIENTS);
+        double underLava = SafeLanding.risen(south, dangai, floor, 24).y - floor.y;
+        dangai.setBlock(above, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+        helper.assertTrue(open == DangaiPlan.LANE_HEIGHT - 2 && underLava == 2.0, "a spot on a lane's floor rose "
+                + open + " blocks under its roof and " + underLava + " under lava 4 up, not "
+                + (DangaiPlan.LANE_HEIGHT - 2) + " and 2");
+
         helper.setBlock(1, 0, 1, Blocks.STONE);
         BlockPos left = helper.absolutePos(new BlockPos(1, 1, 1));
         TravelRecord home = crossing(Level.OVERWORLD, 252, 0.0F).withHumanWorldReturn(GlobalPos.of(Level.OVERWORLD, left));
