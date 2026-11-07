@@ -364,9 +364,9 @@ public final class TravelTests {
 
     /**
      * The way home lands on the carpet a soul left from, though the block it stood in is the carpet's and a roof is
-     * over it, and a spot walled in lands on top of its column.
+     * over it, and a spot walled in lands on top of its column. Open to the sky, so no barrier roofs the test's columns.
      */
-    @GameTest(template = "lane")
+    @GameTest(template = "lane", skyAccess = true)
     public static void theWayHomeLandsOnTheFloorItLeft(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         Player player = mock(helper, GameType.SURVIVAL, shinigami());
