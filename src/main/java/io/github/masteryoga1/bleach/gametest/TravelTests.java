@@ -362,6 +362,32 @@ public final class TravelTests {
         helper.assertTrue(order.equals(expected), "with " + what + ", a gate home tries " + order + ", not " + expected);
     }
 
+    /**
+     * The way home lands on the carpet a soul left from, though the block it stood in is the carpet's and a roof is
+     * over it, and a spot walled in lands on top of its column.
+     */
+    @GameTest(template = "lane")
+    public static void theWayHomeLandsOnTheFloorItLeft(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Player player = mock(helper, GameType.SURVIVAL, shinigami());
+        helper.setBlock(2, 1, 1, Blocks.WHITE_CARPET);
+        helper.setBlock(2, 3, 1, Blocks.STONE);
+        Vec3 carpet = helper.absoluteVec(new Vec3(2.5, 1.0, 1.5));
+        Vec3 onCarpet = carpet.add(0.0, 1.0 / 16.0, 0.0);
+        Vec3 spot = TravelEvents.landing(player, level, carpet);
+        helper.assertTrue(spot != null && spot.distanceTo(onCarpet) < SAME, "the soul that left from the carpet came "
+                + "back to " + spot + ", not onto it at " + onCarpet);
+
+        helper.setBlock(6, 1, 1, Blocks.STONE);
+        helper.setBlock(6, 2, 1, Blocks.STONE);
+        Vec3 walled = helper.absoluteVec(new Vec3(6.5, 1.0, 1.5));
+        Vec3 onTop = walled.add(0.0, 2.0, 0.0);
+        spot = TravelEvents.landing(player, level, walled);
+        helper.assertTrue(spot != null && spot.distanceTo(onTop) < SAME, "the soul whose spot was walled in came back to "
+                + spot + ", not to the top of its column at " + onTop);
+        helper.succeed();
+    }
+
     // ---- Crossing ----
 
     /**
@@ -475,12 +501,16 @@ public final class TravelTests {
             refuses(helper, TravelEvents.onKey(player, GateKeyPayload.GateKey.CANCEL, now - 45L),
                     TravelLogic.Refusal.SLIPPED, "a screen opened during the turn");
 
+            // Begun 10 ticks after the third, the fourth turn is neither seen nor heard by those nearby.
+            player.swinging = false;
             refuses(helper, TravelEvents.onKey(player, GateKeyPayload.GateKey.PRESS, now - 40L), null, "the fourth turn");
+            helper.assertFalse(player.swinging, "the blade was seen to turn again 10 ticks after it last was");
             // Let go 20 ticks in, short of the 29 a turn of 30 needs.
             refuses(helper, TravelEvents.onKey(player, GateKeyPayload.GateKey.RELEASE, now - 20L),
                     TravelLogic.Refusal.SLIPPED, "letting go too soon");
 
             refuses(helper, TravelEvents.onKey(player, GateKeyPayload.GateKey.PRESS, now - 30L), null, "the fifth turn");
+            helper.assertTrue(player.swinging, "the blade was not seen to turn a second after it last was");
             refuses(helper, TravelEvents.onKey(player, GateKeyPayload.GateKey.PRESS, now - 20L), null,
                     "a second press during the turn");
             helper.assertTrue(gates(helper).isEmpty(), "a gate opened before any turn was done");

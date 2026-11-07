@@ -7,6 +7,8 @@ import io.github.masteryoga1.bleach.network.GateKeyPayload;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -24,6 +26,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
@@ -46,6 +49,8 @@ public final class TravelEvents {
     private static final float TURN_PITCH = 1.2F;
     private static final float ARRIVAL_VOLUME = 1.0F;
     private static final float ARRIVAL_PITCH = 1.6F;
+    /** Ticks after a turn is seen and heard begun before another is, so a key pressed again and again stays quiet. */
+    private static final int TURN_SHOWN_TICKS = 20;
 
     private TravelEvents() {
     }
@@ -89,9 +94,13 @@ public final class TravelEvents {
             return refusal;
         }
         data.senkaimonOpensAt = now + TravelLogic.unlockTicks();
-        player.swing(InteractionHand.MAIN_HAND, true);
-        SpiritSenses.play(player, SoundEvents.TRIAL_SPAWNER_OPEN_SHUTTER, SoundSource.PLAYERS, TURN_VOLUME, TURN_PITCH,
-                false);
+        // Those nearby see the blade turn and hear it at most once a second, however often the key goes down.
+        if (data.senkaimonTurnShownAt == SoulData.NEVER || now - data.senkaimonTurnShownAt >= TURN_SHOWN_TICKS) {
+            data.senkaimonTurnShownAt = now;
+            player.swing(InteractionHand.MAIN_HAND, true);
+            SpiritSenses.play(player, SoundEvents.TRIAL_SPAWNER_OPEN_SHUTTER, SoundSource.PLAYERS, TURN_VOLUME,
+                    TURN_PITCH, false);
+        }
         player.displayClientMessage(Component.translatable(TURNING_KEY).withStyle(ChatFormatting.GRAY), true);
         return null;
     }
@@ -196,19 +205,30 @@ public final class TravelEvents {
     }
 
     /**
-     * Where the soul comes out for this wanted spot: there, settled by {@link SafeLanding#landingSpot}, or else on top
-     * of its column, so a spot built over still lands; null if neither will hold it.
+     * Where the soul comes out for this wanted spot: there, settled by {@link SafeLanding#landingSpot}, or on top of the
+     * block the spot is in when that is part of the floor, or else on top of its column, so a spot built over still
+     * lands; null if none will hold it. Public for game tests.
      */
     @Nullable
-    private static Vec3 landing(ServerPlayer passer, ServerLevel level, Vec3 wanted) {
+    public static Vec3 landing(Entity passer, ServerLevel level, Vec3 wanted) {
         Vec3 spot = SafeLanding.landingSpot(passer, level, wanted);
         if (spot != null) {
             return spot;
         }
+        // The first try loaded this chunk unless its spot lay outside the world's height, where every block is air.
+        // A return point is the block the soul stood in, so a carpet, slab, step or path there is the floor it stood on.
+        BlockPos in = BlockPos.containing(wanted);
+        VoxelShape floor = level.getBlockState(in).getCollisionShape(level, in);
+        if (!floor.isEmpty()) {
+            spot = SafeLanding.landingSpot(passer, level,
+                    new Vec3(wanted.x, in.getY() + floor.max(Direction.Axis.Y), wanted.z));
+            if (spot != null) {
+                return spot;
+            }
+        }
         int x = Mth.floor(wanted.x);
         int z = Mth.floor(wanted.z);
-        // The first try loaded the chunk unless its spot lay outside the world's height, and a column not loaded would
-        // read as the world's floor.
+        // A column not loaded would read as the world's floor.
         level.getChunk(x >> 4, z >> 4);
         double top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         return SafeLanding.landingSpot(passer, level, new Vec3(wanted.x, top, wanted.z));

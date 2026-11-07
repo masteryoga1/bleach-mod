@@ -312,6 +312,8 @@ public final class SoulData {
     long senkaimonOpensAt = NEVER;
     /** Game time this soul may open its next Senkaimon. Not saved. */
     long senkaimonReadyAt = NEVER;
+    /** Game time this soul's Senkaimon turn was last seen and heard begun, or {@link #NEVER}. Not saved. */
+    long senkaimonTurnShownAt = NEVER;
 
     public SoulData() {
     }
