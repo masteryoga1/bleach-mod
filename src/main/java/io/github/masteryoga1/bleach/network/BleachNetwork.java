@@ -32,8 +32,9 @@ public final class BleachNetwork {
      * 17: {@code ZanpakutoKey.MASK} and the mask's four fields in the Visored record.
      * 18: the Kidō key, the synced Kidō spells and the Kidō record in ShinigamiProgress.
      * 19: the day of the instructor's Kidō lesson in the Kidō record, and the lesson in the student's dialogue.
+     * 20: the Gate key.
      */
-    private static final String VERSION = "19";
+    private static final String VERSION = "20";
 
     private BleachNetwork() {
     }
@@ -60,6 +61,7 @@ public final class BleachNetwork {
                 .playToServer(QuincyKeyPayload.TYPE, QuincyKeyPayload.STREAM_CODEC, QuincyKeyPayload::handle)
                 .playToServer(HollowKeyPayload.TYPE, HollowKeyPayload.STREAM_CODEC, HollowKeyPayload::handle)
                 .playToServer(KidoKeyPayload.TYPE, KidoKeyPayload.STREAM_CODEC, KidoKeyPayload::handle)
+                .playToServer(GateKeyPayload.TYPE, GateKeyPayload.STREAM_CODEC, GateKeyPayload::handle)
                 .playToClient(PesquisaPayload.TYPE, PesquisaPayload.STREAM_CODEC, PesquisaPayload::handle);
     }
 
@@ -175,5 +177,10 @@ public final class BleachNetwork {
      */
     public static void requestKidoKey(KidoKeyPayload.KidoKey key, Optional<ResourceLocation> spell) {
         PacketDistributor.sendToServer(new KidoKeyPayload(key, spell));
+    }
+
+    /** Tells the server the Gate key went down or came up, or that a screen opened while it was held. */
+    public static void requestGateKey(GateKeyPayload.GateKey key) {
+        PacketDistributor.sendToServer(new GateKeyPayload(key));
     }
 }

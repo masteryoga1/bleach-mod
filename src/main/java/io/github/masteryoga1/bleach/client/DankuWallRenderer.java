@@ -67,7 +67,7 @@ public final class DankuWallRenderer extends EntityRenderer<DankuWall> {
     }
 
     /** One flat rectangle in the plane z = 0, seen from both sides. */
-    private static void rect(VertexConsumer out, PoseStack.Pose pose, float x0, float y0, float x1, float y1, int argb) {
+    static void rect(VertexConsumer out, PoseStack.Pose pose, float x0, float y0, float x1, float y1, int argb) {
         float[] xs = {x0, x1, x1, x0};
         float[] ys = {y0, y0, y1, y1};
         for (int corner : CORNERS) {
@@ -76,7 +76,7 @@ public final class DankuWallRenderer extends EntityRenderer<DankuWall> {
     }
 
     /** A colour with this alpha, from 0 to 1. */
-    private static int argb(float alpha, int rgb) {
+    static int argb(float alpha, int rgb) {
         return FastColor.ARGB32.color(Math.round(Mth.clamp(alpha, 0.0F, 1.0F) * 255.0F), rgb);
     }
 

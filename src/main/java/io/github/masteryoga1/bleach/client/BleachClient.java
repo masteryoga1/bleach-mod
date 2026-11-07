@@ -124,6 +124,7 @@ public final class BleachClient {
         event.register(HollowKeys.DEVOUR);
         event.register(HollowKeys.CERO);
         event.register(KidoKeys.CAST);
+        event.register(GateKeys.OPEN);
     }
 
     /**
@@ -229,6 +230,7 @@ public final class BleachClient {
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
         event.registerEntityRenderer(ModEntities.CAJA_NEGACION.get(), CajaNegacionRenderer::new);
         event.registerEntityRenderer(ModEntities.DANKU_WALL.get(), DankuWallRenderer::new);
+        event.registerEntityRenderer(ModEntities.SENKAIMON.get(), SenkaimonRenderer::new);
         event.registerEntityRenderer(ModEntities.PLUS.get(), PlusRenderer::new);
         event.registerEntityRenderer(ModEntities.GARGANTA.get(), GargantaRenderer::new);
         event.registerEntityRenderer(ModEntities.GETSUGA_TENSHO.get(), GetsugaTenshoRenderer::new);
@@ -301,6 +303,7 @@ public final class BleachClient {
         QuincyClient.tick(minecraft);
         HollowKeys.tick(minecraft);
         KidoKeys.tick(minecraft);
+        GateKeys.tick(minecraft);
 
         if (minecraft.level != null) {
             SpiritShimmer.tick(minecraft);

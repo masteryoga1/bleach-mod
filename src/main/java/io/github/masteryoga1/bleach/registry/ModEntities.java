@@ -25,6 +25,7 @@ import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
+import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
@@ -40,7 +41,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Arrancar NPCs, a
  * Shinigami's inner Hollow, Pluses, the Garganta, zanpakutō techniques, the Cero, Negación's light and the
- * Caja Negación, Dankū's wall, and the Quincy's arrows, blades and Gintō spells.
+ * Caja Negación, Dankū's wall, the Senkaimon, and the Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -360,6 +361,23 @@ public final class ModEntities {
                     .clientTrackingRange(8)
                     .updateInterval(20)
                     .build(BleachMod.id("ginto_cast").toString()));
+
+    // ---- Travel ----
+
+    /**
+     * A Senkaimon: the gate a Shinigami turns open between the Human World and Soul Society. Never saved, and never
+     * summoned: a gate leads on from where its opener stood.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<Senkaimon>> SENKAIMON =
+            ENTITY_TYPES.register("senkaimon", () -> EntityType.Builder
+                    .<Senkaimon>of(Senkaimon::new, MobCategory.MISC)
+                    .sized(3.0F, 4.0F)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(Integer.MAX_VALUE)
+                    .build(BleachMod.id("senkaimon").toString()));
 
     private ModEntities() {
     }

@@ -34,6 +34,8 @@ public final class SeireiteiPlan {
     public static final int HILL_BIOME_RADIUS = 52, WALL_BIOME_INNER = 504, WALL_BIOME_OUTER = 528;
     /** The first districts of the rough and of the wilds' biome. */
     public static final int ROUGH_FROM_DISTRICT = 31, WILDS_FROM_DISTRICT = 79;
+    /** The Senkaimon court, where every gate from the Human World comes out: open lawn north-east of the hill. */
+    public static final int SENKAIMON_COURT_X = SEIREITEI_RADIUS * 3 / 8, SENKAIMON_COURT_Z = -SEIREITEI_RADIUS * 9 / 16;
 
     private SeireiteiPlan() {
     }

@@ -22,7 +22,7 @@ import net.minecraft.world.phys.Vec3;
  * the nested records ({@link HollowProgress} has room).
  */
 public final class SoulData {
-    private static final long NEVER = Long.MIN_VALUE / 2;
+    static final long NEVER = Long.MIN_VALUE / 2;
     /** No hit has passed through since the last tick. Fire ticks never reach this, burning or not. */
     static final int NO_FIRE_RECORDED = Integer.MAX_VALUE;
 
@@ -308,6 +308,10 @@ public final class SoulData {
     long granReyCeroStartedAt = NEVER;
     /** Game time this Gillian last called down Negación, for the cooldown (see {@link Negacion}). */
     long lastNegacionAt = NEVER;
+    /** Game time this soul's Senkaimon turn opens its gate, or {@link #NEVER} (see {@link TravelEvents}). Not saved. */
+    long senkaimonOpensAt = NEVER;
+    /** Game time this soul may open its next Senkaimon. Not saved. */
+    long senkaimonReadyAt = NEVER;
 
     public SoulData() {
     }

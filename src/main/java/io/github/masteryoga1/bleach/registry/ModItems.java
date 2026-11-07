@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.EmptyGintoItem;
 import io.github.masteryoga1.bleach.item.GintoItem;
+import io.github.masteryoga1.bleach.item.HellButterflyItem;
 import io.github.masteryoga1.bleach.item.HollowBaitItem;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
 import io.github.masteryoga1.bleach.item.QuincyGarbItem;
@@ -64,6 +65,10 @@ public final class ModItems {
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",
             () -> new DenreishinkiItem(new Item.Properties().stacksTo(1)));
+
+    /** The Hell Butterfly that guides a Shinigami through a Senkaimon. See {@link HellButterflyItem}. */
+    public static final DeferredItem<HellButterflyItem> HELL_BUTTERFLY = ITEMS.register("hell_butterfly",
+            () -> new HellButterflyItem(new Item.Properties().stacksTo(1)));
 
     /**
      * The silver cross handed down in Quincy families. In Quincy hands it draws the Heilig Bogen, a bow

@@ -22,6 +22,7 @@ import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
+import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
@@ -51,6 +52,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.TravelLogic;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
@@ -220,16 +222,18 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * then, with no one in reach and natural regeneration off, the player's own wounds, by a heart a second; then the soul
  * screen's Kidō button must open the Kidō page with all 14 spells and Kaidō chosen, a click on Sōkatsui's row must
  * choose it on the server, which the action bar and chat must show, and the page's Back button must go back to the
- * soul screen. Last, a tp must stand the player on Seireitei's lawn in Soul Society at exactly y 72, where the south wall
- * must reach the client in Sekkiseki to its top beside the gate's 16-block gap, and a tp back must bring it home before
- * the run quits.
+ * soul screen. Last, handed a Jigokuchō, holding the Gate key must turn the blade, which the action bar must say, and
+ * open a Senkaimon that reaches the client two blocks south of the player, facing it, 3 wide and 4 tall. Standing in it
+ * must bring the player to the Senkaimon court on Seireitei's lawn at exactly y 72. A tp across the lawn must stand it
+ * where the south wall reaches the client in Sekkiseki to its top beside the gate's 16-block gap. Once the first gate's
+ * wait has run, a gate opened in Soul Society must bring the player home before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Seireiheki, and HUD
- * are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run,
- * and so does anything that did not reach the client as expected.
+ * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
+ * Seireiheki, and HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client
+ * code fails the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -1364,8 +1368,9 @@ public final class ClientSmokeTest {
             }
             // Sōkatsui marked: the window from 6493 passed by 6520, and the frames since show the synced choice.
             case 6525 -> shot(minecraft, "kido_page_chosen");
-            // Soul Society's arrival chunks asked for well before the tp, without blocking the server (a forceload
-            // generates on its thread): one CI run sent the player into chunks not yet made, and it fell into the void.
+            // Soul Society's arrival chunks asked for well before the pass and the tp, without blocking the server (a
+            // forceload generates on its thread): one CI run sent the player into chunks not yet made, and it fell into
+            // the void.
             case 6526 -> holdArrival(minecraft, true);
             // Back to the soul screen, through the page's own Back button.
             case 6530 -> {
@@ -1376,18 +1381,40 @@ public final class ClientSmokeTest {
                 }
             }
             case 6550 -> minecraft.setScreen(null);
-            // To Soul Society: onto Seireitei's lawn, at y 72 for any seed, facing the south wall 40 blocks off.
-            case 6660 -> {
-                returnTo = player.position();
-                command(minecraft, String.format(Locale.ROOT, "execute in %s run tp @s %.1f %d %.1f 0 -20",
-                        BleachWorlds.SOUL_SOCIETY.location(), SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
+            // To Soul Society by Senkaimon: facing south again, handed a Jigokuchō, and full for the gate's cost.
+            case 6560 -> {
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                command(minecraft, "give @s bleach:hell_butterfly");
+                command(minecraft, "bleach reiryoku @s 800 800");
             }
+            // Pressed about 6601, the blade turns for 30 ticks and the gate opens on the server about 6631.
+            case 6600 -> {
+                expect(minecraft, TravelLogic.turnsKey(player, player.getMainHandItem()),
+                        "the Shinigami holds no blade of its own");
+                GateKeys.OPEN.setDown(true);
+            }
+            // Let go well after the gate opens (a late server only lengthens the hold), which the server ignores.
+            case 6652 -> GateKeys.OPEN.setDown(false);
+            // Faded in by now, its doors folded back.
+            case 6650 -> shot(minecraft, "senkaimon");
+            // Into the gate: 21 ticks inside pass it, about 6677, to the court.
+            case 6655 -> command(minecraft, "tp @s ~ ~ ~2");
+            // Where it stands in the gate, whose block the gate home brings it back to.
+            case 6660 -> returnTo = player.position();
+            // Across the lawn, at y 72 for any seed, facing the south wall 40 blocks off.
+            case 6810 -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f 0 -20", SOUL_SOCIETY_X,
+                    SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
             // The wall's chunks have had a hundred ticks or more to be drawn since they reached the client.
-            case 6840 -> shot(minecraft, "seireiheki");
-            case 6845 -> command(minecraft, String.format(Locale.ROOT,
-                    "execute in minecraft:overworld run tp @s %.3f %.3f %.3f", returnTo.x, returnTo.y, returnTo.z));
-            case 6850 -> holdArrival(minecraft, false);
-            case 6910 -> {
+            case 6990 -> shot(minecraft, "seireiheki");
+            case 6995 -> holdArrival(minecraft, false);
+            // Home by a gate opened in Soul Society. The first gate's wait of 600 server ticks from about 6631 has run
+            // by about 7231, 89 ticks before the press; the gate opens about 7351, two blocks south.
+            case 7310 -> command(minecraft, "bleach reiryoku @s 800 800");
+            case 7320 -> GateKeys.OPEN.setDown(true);
+            case 7368 -> GateKeys.OPEN.setDown(false);
+            // Into it: it passes about 7392, to the bottom centre of the block the first gate was taken from.
+            case 7370 -> command(minecraft, "tp @s ~ ~ ~2");
+            case 7500 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1945,9 +1972,27 @@ public final class ClientSmokeTest {
                 && stats.kidoButton() != null, "the Kidō page's Back button never went back to the soul screen");
     }
 
-    /** The checks of Soul Society, each window from the step it follows: there, the wall seen, and home again. */
+    /**
+     * The checks of Soul Society, each window from the step it follows: the blade turned and the gate open, the court,
+     * the lawn and the wall seen, and home again by a gate from there.
+     */
     private static void checkSoulSociety(Minecraft minecraft, LocalPlayer player) {
-        expectWithin(minecraft, 6662, 6740, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
+        Component turning = Component.translatable("message.bleach.senkaimon.turning");
+        expectWithin(minecraft, 6603, 6628, () -> actionBarShows(turning),
+                "holding the Gate key never turned the blade (the action bar's last lines: " + recentActionBar() + ")");
+        // From a little before the turn is done to the tick before the tp into the gate.
+        expectWithin(minecraft, 6630, 6654, () -> gateAhead(minecraft, player),
+                "the turned blade never opened a Senkaimon two blocks south of the player, facing it, 3 wide and 4 tall"
+                        + " (the action bar's last lines: " + recentActionBar() + ")");
+        expectWithin(minecraft, 6665, 6800, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
+                        && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
+                        && horizontalDistance(player.position(), TravelLogic.COURT) < 0.5,
+                "the Senkaimon never brought the player to its court on Seireitei's lawn at y 72 (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString()
+                        + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
+                        + ", the court's block " + minecraft.level.getBlockState(BlockPos.containing(TravelLogic.COURT)
+                                .below()) + "; the action bar's last lines: " + recentActionBar() + ")");
+        expectWithin(minecraft, 6812, 6890, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
                         && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
                         && horizontalDistance(player.position(), new Vec3(SOUL_SOCIETY_X, 0.0, SOUL_SOCIETY_Z)) < 0.5,
                 "the tp never stood the player on Seireitei's lawn at y 72 (it is in "
@@ -1955,10 +2000,38 @@ public final class ClientSmokeTest {
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
                         + ", the lawn's block " + minecraft.level.getBlockState(BlockPos.containing(SOUL_SOCIETY_X,
                                 SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
-        expectWithin(minecraft, 6700, 6835, () -> wallStands(minecraft.level),
+        expectWithin(minecraft, 6850, 6985, () -> wallStands(minecraft.level),
                 "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a 16-block gap");
-        expectWithin(minecraft, 6847, 6900, () -> minecraft.level.dimension() == Level.OVERWORLD
-                && player.position().distanceTo(returnTo) < 1.5, "the tp back never brought the player home");
+        // The cooldown line shows here instead if the first gate's wait had not run.
+        expectWithin(minecraft, 7323, 7348, () -> actionBarShows(turning),
+                "in Soul Society, holding the Gate key never turned the blade (the action bar's last lines: "
+                        + recentActionBar() + ")");
+        expectWithin(minecraft, 7350, 7369, () -> gateAhead(minecraft, player),
+                "in Soul Society, the turned blade never opened a Senkaimon two blocks south of the player (the action"
+                        + " bar's last lines: " + recentActionBar() + ")");
+        // Home to the bottom centre of the block it left from, at most 0.71 across from where it stood.
+        expectWithin(minecraft, 7380, 7480, () -> minecraft.level.dimension() == Level.OVERWORLD && player.onGround()
+                        && horizontalDistance(player.position(), returnTo) < 1.0
+                        && Math.abs(player.getY() - returnTo.y) < 0.01,
+                "the Senkaimon from Soul Society never brought the player home (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.position() + ", not by " + returnTo
+                        + "; the action bar's last lines: " + recentActionBar() + ")");
+    }
+
+    /**
+     * Whether the player's Senkaimon has reached the client as it should stand: seen, facing south as the player does,
+     * two blocks ahead at the feet, 3 wide, 4 tall and a block deep.
+     */
+    private static boolean gateAhead(Minecraft minecraft, LocalPlayer player) {
+        Senkaimon gate = nearest(minecraft, Senkaimon.class, 4.0, seen -> !ClientSouls.isHiddenFromViewer(seen));
+        if (gate == null) {
+            return false;
+        }
+        AABB box = gate.getBoundingBox();
+        return gate.facing() == Direction.SOUTH
+                && Math.abs(gate.getX() - player.getX()) < 0.3 && Math.abs(gate.getZ() - (player.getZ() + 2.0)) < 0.3
+                && Math.abs(gate.getY() - player.getY()) < 0.3 && Math.abs(box.getXsize() - 3.0) < 0.01
+                && Math.abs(box.getYsize() - 4.0) < 0.01 && Math.abs(box.getZsize() - Senkaimon.THICKNESS) < 0.01;
     }
 
     /** Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of an open gap. */
@@ -2094,24 +2167,28 @@ public final class ClientSmokeTest {
     }
 
     /**
-     * Holds (or lets go of) Soul Society's arrival chunks on the integrated server with a forced ticket, which
-     * generates them in the background, as the forceload command would not.
+     * Holds (or lets go of) both arrival chunks in Soul Society, the Senkaimon court's and the lawn spot's, on the
+     * integrated server with a forced ticket each, which generates them in the background, as the forceload command
+     * would not.
      */
     private static void holdArrival(Minecraft minecraft, boolean hold) {
         MinecraftServer server = minecraft.getSingleplayerServer();
         if (server == null) {
             return;
         }
-        ChunkPos chunk = new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
+        List<ChunkPos> chunks = List.of(new ChunkPos(BlockPos.containing(TravelLogic.COURT)),
+                new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z)));
         server.execute(() -> {
             ServerLevel level = server.getLevel(BleachWorlds.SOUL_SOCIETY);
             if (level == null) {
                 return;
             }
-            if (hold) {
-                level.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 1, chunk);
-            } else {
-                level.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            for (ChunkPos chunk : chunks) {
+                if (hold) {
+                    level.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+                } else {
+                    level.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+                }
             }
         });
     }

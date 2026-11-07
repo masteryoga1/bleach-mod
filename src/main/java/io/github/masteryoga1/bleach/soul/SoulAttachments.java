@@ -27,6 +27,11 @@ public final class SoulAttachments {
             () -> AttachmentType.builder(() -> List.<ItemStack>of())
                     .serialize(ItemStack.OPTIONAL_CODEC.listOf(), list -> !list.isEmpty()).build());
 
+    /** Where the soul last left the Human World by a Senkaimon, and its last Jigokuchō's day. Saved; kept through death. */
+    public static final Supplier<AttachmentType<TravelRecord>> TRAVEL = ATTACHMENT_TYPES.register("travel",
+            () -> AttachmentType.builder(() -> TravelRecord.NONE)
+                    .serialize(TravelRecord.CODEC, record -> !record.equals(TravelRecord.NONE)).copyOnDeath().build());
+
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());

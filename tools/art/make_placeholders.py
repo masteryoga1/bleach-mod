@@ -709,6 +709,24 @@ def denreishinki():
     return c
 
 
+def hell_butterfly():
+    """A Jigokuchō: a black body between purple wings edged in black, two antennae curling up from the head."""
+    c = Canvas(16, 16)
+    rows = [(2, 11, 14), (3, 10, 15), (4, 9, 16), (5, 9, 16), (6, 9, 15), (7, 9, 14), (8, 9, 13),
+            (9, 9, 13), (10, 9, 14), (11, 9, 14), (12, 10, 13)]
+    wing = set()
+    for y, x0, x1 in rows:  # the right wings, mirrored to the left about the body
+        for x in range(x0, x1):
+            wing |= {(x, y), (15 - x, y)}
+    for x, y in wing:
+        inside = all((x + dx, y + dy) in wing for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+        c.put(x, y, PURPLE if inside else BLACK)
+    c.rect(7, 4, 9, 13, BLACK)  # the body
+    for x, y in [(6, 3), (5, 2), (9, 3), (10, 2)]:  # the antennae
+        c.put(x, y, BLACK)
+    return c
+
+
 def quincy_cross():
     """The Quincy Cross: a silver cross on a short chain, with a pale blue stone where the arms meet."""
     c = Canvas(16, 16)
@@ -1620,6 +1638,7 @@ TEXTURES = {
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,
     "item/denreishinki.png": denreishinki,
+    "item/hell_butterfly.png": hell_butterfly,
     "item/quincy_cross.png": quincy_cross,
     "item/heilig_bogen_pulling_0.png": heilig_bogen(0),
     "item/heilig_bogen_pulling_1.png": heilig_bogen(1),

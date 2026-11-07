@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,8 +18,9 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Moving a player somewhere they have not walked to (back to where they died, or to the Academy
- * after Konsō) without dropping them into a wall, a liquid, a long fall or something that hurts.
+ * Moving a player somewhere they have not walked to (back to where they died, to the Academy
+ * after Konsō, or through a Senkaimon) without dropping them into a wall, a liquid, a long fall or
+ * something that hurts.
  */
 public final class SafeLanding {
     private SafeLanding() {
@@ -32,10 +34,24 @@ public final class SafeLanding {
      *         something harmful, outside the world border, or over the void
      */
     public static boolean tryMoveTo(ServerPlayer player, ServerLevel level, Vec3 target) {
-        if (target.y < level.getMinBuildHeight() || target.y >= level.getMaxBuildHeight()) {
+        Vec3 spot = landingSpot(player, level, target);
+        if (spot == null) {
             return false;
         }
-        AABB box = player.getDimensions(Pose.STANDING).makeBoundingBox(target);
+        player.teleportTo(level, spot.x, spot.y, spot.z, player.getYRot(), player.getXRot());
+        return true;
+    }
+
+    /**
+     * Where an entity sent to the spot would stand, settled onto the ground below it with its chunks loaded first, or
+     * null where {@link #tryMoveTo} would refuse it.
+     */
+    @Nullable
+    public static Vec3 landingSpot(Entity entity, ServerLevel level, Vec3 target) {
+        if (target.y < level.getMinBuildHeight() || target.y >= level.getMaxBuildHeight()) {
+            return null;
+        }
+        AABB box = entity.getDimensions(Pose.STANDING).makeBoundingBox(target);
         // The spot may not be loaded (the player may have sat on the death screen, or be headed
         // somewhere far), and collision checks treat unloaded chunks as empty, so load it first.
         for (int chunkX = Mth.floor(box.minX) >> 4; chunkX <= Mth.floor(box.maxX) >> 4; chunkX++) {
@@ -43,22 +59,21 @@ public final class SafeLanding {
                 level.getChunk(chunkX, chunkZ);
             }
         }
-        if (!level.noCollision(player, box)) {
-            return false;
+        if (!level.noCollision(entity, box)) {
+            return null;
         }
-        while (level.noCollision(player, box.move(0.0, -1.0, 0.0))) {
+        while (level.noCollision(entity, box.move(0.0, -1.0, 0.0))) {
             box = box.move(0.0, -1.0, 0.0);
             if (box.minY < level.getMinBuildHeight()) {
-                return false;
+                return null;
             }
         }
         // The drop above moves in whole blocks; settle the rest of the way onto what the feet will rest on.
-        box = box.move(Entity.collideBoundingBox(player, new Vec3(0.0, -1.0, 0.0), box, level, List.of()));
-        if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, player, box)) {
-            return false;
+        box = box.move(Entity.collideBoundingBox(entity, new Vec3(0.0, -1.0, 0.0), box, level, List.of()));
+        if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, entity, box)) {
+            return null;
         }
-        player.teleportTo(level, target.x, box.minY, target.z, player.getYRot(), player.getXRot());
-        return true;
+        return new Vec3(target.x, box.minY, target.z);
     }
 
     /**
