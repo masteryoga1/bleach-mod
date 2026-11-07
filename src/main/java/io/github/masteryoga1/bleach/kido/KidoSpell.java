@@ -139,8 +139,8 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         chantTicks = Mth.clamp(chantTicks, 0, MAX_CHANT_TICKS);
         // A heal is channelled on the key: never chanted, never gathered.
         incantations = shape == Shape.HEAL ? List.of() : cleaned(incantations);
-        costShare = within(costShare, 0.0F, 1.0F);
-        minCost = within(minCost, 0.0F, MAX_MIN_COST);
+        costShare = Clamp.within(costShare, 0.0F, 1.0F);
+        minCost = Clamp.within(minCost, 0.0F, MAX_MIN_COST);
         cooldownTicks = Mth.clamp(cooldownTicks, 1, MAX_COOLDOWN_TICKS);
         xp = Mth.clamp(xp, 0, MAX_XP);
         look = look == null ? Look.NONE : look;
@@ -234,9 +234,15 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         return List.copyOf(kept);
     }
 
-    /** A value kept between the two, with not a number read as the low end. */
-    private static float within(float value, float min, float max) {
-        return Float.isNaN(value) ? min : Mth.clamp(value, min, max);
+    /**
+     * The clamp the spell and its parts share. It stands apart from the spell, so that making a part's {@code NONE}
+     * first never sets the spell up, whose codec would then read that {@code NONE} before it is made.
+     */
+    private static final class Clamp {
+        /** A value kept between the two, with not a number read as the low end. */
+        static float within(float value, float min, float max) {
+            return Float.isNaN(value) ? min : Mth.clamp(value, min, max);
+        }
     }
 
     /** The three kinds of Kidō, each numbered by difficulty. */
@@ -334,8 +340,7 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
      */
     public record Look(int colour, Optional<ResourceLocation> sound, float pitch, Optional<ResourceLocation> particle,
                        BindStyle bind) {
-        // Built before NONE, with plain defaults: making NONE calls the spell's clamp, which may set the spell up,
-        // and the spell's codec reads this one.
+        // Built before NONE, with plain defaults, so that it needs nothing made first.
         public static final Codec<Look> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 ZanpakutoSpirit.COLOUR_CODEC.lenientOptionalFieldOf("colour", 0xFFFFFF).forGetter(Look::colour),
                 ResourceLocation.CODEC.lenientOptionalFieldOf("sound").forGetter(Look::sound),
@@ -350,7 +355,7 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         public Look {
             colour &= 0xFFFFFF;
             sound = sound == null ? Optional.empty() : sound;
-            pitch = within(pitch, 0.5F, 2.0F);
+            pitch = Clamp.within(pitch, 0.5F, 2.0F);
             particle = particle == null ? Optional.empty() : particle;
             bind = bind == null ? BindStyle.DEFAULT : bind;
         }
@@ -391,8 +396,7 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
     public record Effect(float damage, float damagePerRoot, float maxDamage, double range, float radius, int pierce,
                          float blastRadius, float blastShare, float knockback, float burnSeconds, float angle,
                          float blindSeconds, float bareShare, float boundSeconds, float heldSeconds, Ward ward) {
-        // Built before NONE, with plain defaults: making NONE calls the spell's clamp, which may set the spell up,
-        // and the spell's codec reads this one.
+        // Built before NONE, with plain defaults, so that it needs nothing made first.
         public static final Codec<Effect> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.FLOAT.lenientOptionalFieldOf("damage", 0.0F).forGetter(Effect::damage),
                 Codec.FLOAT.lenientOptionalFieldOf("damage_per_root", 0.0F).forGetter(Effect::damagePerRoot),
@@ -420,21 +424,21 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
                 0.0F, 1.0F, 0.0F, 0.0F);
 
         public Effect {
-            damage = within(damage, 0.0F, 1_000.0F);
-            damagePerRoot = within(damagePerRoot, 0.0F, 50.0F);
-            maxDamage = within(maxDamage, 0.0F, 1_000.0F);
+            damage = Clamp.within(damage, 0.0F, 1_000.0F);
+            damagePerRoot = Clamp.within(damagePerRoot, 0.0F, 50.0F);
+            maxDamage = Clamp.within(maxDamage, 0.0F, 1_000.0F);
             range = Double.isNaN(range) ? 1.0 : Mth.clamp(range, 1.0, 128.0);
-            radius = within(radius, 0.05F, 8.0F);
+            radius = Clamp.within(radius, 0.05F, 8.0F);
             pierce = Mth.clamp(pierce, 1, 64);
-            blastRadius = within(blastRadius, 0.0F, 16.0F);
-            blastShare = within(blastShare, 0.0F, 1.0F);
-            knockback = within(knockback, 0.0F, 10.0F);
-            burnSeconds = within(burnSeconds, 0.0F, 60.0F);
-            angle = within(angle, 1.0F, 180.0F);
-            blindSeconds = within(blindSeconds, 0.0F, 30.0F);
-            bareShare = within(bareShare, 0.0F, 1.0F);
-            boundSeconds = within(boundSeconds, 0.0F, MAX_BIND_SECONDS);
-            heldSeconds = within(heldSeconds, 0.0F, MAX_BIND_SECONDS);
+            blastRadius = Clamp.within(blastRadius, 0.0F, 16.0F);
+            blastShare = Clamp.within(blastShare, 0.0F, 1.0F);
+            knockback = Clamp.within(knockback, 0.0F, 10.0F);
+            burnSeconds = Clamp.within(burnSeconds, 0.0F, 60.0F);
+            angle = Clamp.within(angle, 1.0F, 180.0F);
+            blindSeconds = Clamp.within(blindSeconds, 0.0F, 30.0F);
+            bareShare = Clamp.within(bareShare, 0.0F, 1.0F);
+            boundSeconds = Clamp.within(boundSeconds, 0.0F, MAX_BIND_SECONDS);
+            heldSeconds = Clamp.within(heldSeconds, 0.0F, MAX_BIND_SECONDS);
             ward = ward == null ? Ward.NONE : ward;
         }
 
@@ -480,19 +484,11 @@ public record KidoSpell(Kind kind, int number, Component name, Shape shape, int 
         public static final Ward NONE = new Ward(0.0F, 0.0F, 0.0F, 0, 0.0F);
 
         public Ward {
-            seconds = clamped(seconds, 0.0F, MAX_SECONDS);
-            lostSeconds = clamped(lostSeconds, 0.0F, MAX_LOST_SECONDS);
-            speedSeconds = clamped(speedSeconds, 0.0F, MAX_SPEED_SECONDS);
+            seconds = Clamp.within(seconds, 0.0F, MAX_SECONDS);
+            lostSeconds = Clamp.within(lostSeconds, 0.0F, MAX_LOST_SECONDS);
+            speedSeconds = Clamp.within(speedSeconds, 0.0F, MAX_SPEED_SECONDS);
             speedLevel = Mth.clamp(speedLevel, 0, MAX_SPEED_LEVEL);
-            height = clamped(height, 0.0F, MAX_HEIGHT);
-        }
-
-        /**
-         * A value kept between the two, with not a number read as the low end. The spell's own clamp would set the
-         * spell up whenever a ward is made first, and {@link Effect#NONE} would then be built with no ward yet.
-         */
-        private static float clamped(float value, float min, float max) {
-            return Float.isNaN(value) ? min : Mth.clamp(value, min, max);
+            height = Clamp.within(height, 0.0F, MAX_HEIGHT);
         }
     }
 }
