@@ -319,11 +319,11 @@ public final class DangaiTests {
         // The way home rises only as far as the body has clean room: the lane's roof, or lava below it, keeps it lower.
         holdLane(helper, 250, 2);
         Vec3 floor = new Vec3(DangaiPlan.laneX(250), DangaiPlan.FLOOR_Y, 40.5);
-        BlockPos above = BlockPos.containing(floor).above(4);
+        BlockPos lava = BlockPos.containing(floor).above(4);
         double open = SafeLanding.risen(south, dangai, floor, 24).y - floor.y;
-        dangai.setBlock(above, Blocks.LAVA.defaultBlockState(), Block.UPDATE_CLIENTS);
+        dangai.setBlock(lava, Blocks.LAVA.defaultBlockState(), Block.UPDATE_CLIENTS);
         double underLava = SafeLanding.risen(south, dangai, floor, 24).y - floor.y;
-        dangai.setBlock(above, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+        dangai.setBlock(lava, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
         helper.assertTrue(open == DangaiPlan.LANE_HEIGHT - 2 && underLava == 2.0, "a spot on a lane's floor rose "
                 + open + " blocks under its roof and " + underLava + " under lava 4 up, not "
                 + (DangaiPlan.LANE_HEIGHT - 2) + " and 2");
