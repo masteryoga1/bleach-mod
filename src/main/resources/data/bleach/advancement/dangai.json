@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:clock"
+    },
+    "title": {
+      "translate": "advancements.bleach.dangai.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.dangai.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "dangai": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "dangai"
+      }
+    }
+  }
+}

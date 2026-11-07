@@ -42,7 +42,6 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  */
 public final class TravelEvents {
     private static final String TURNING_KEY = "message.bleach.senkaimon.turning";
-    private static final String UNGUIDED_KEY = "message.bleach.senkaimon.unguided";
     private static final String NO_LANDING_KEY = "message.bleach.senkaimon.no_landing";
     private static final String RECEIVED_KEY = "message.bleach.hell_butterfly.received";
     /** The lock's turn, heard as the key goes down, and the chime of a soul coming out on the far side. */
@@ -152,16 +151,19 @@ public final class TravelEvents {
     // ---- The gate ----
 
     /**
-     * Where this gate takes this soul, or null, telling it why, when it may not pass: it is not guided (a body its Hollow
-     * holds is told so), or nowhere on the far side will hold it. The far side's chunks load here.
+     * Where this gate takes this soul, or null, telling it why, when it may not pass. A soul it does not guide goes into
+     * the Dangai ({@link DangaiEvents#into}) unless its Hollow holds its body; any soul is refused if nowhere on the far
+     * side will hold it. The far side's chunks load here.
      */
     @Nullable
     public static DimensionTransition destination(Senkaimon gate, ServerPlayer passer) {
         if (!TravelLogic.guided(passer)) {
-            boolean seized = SoulLogic.hasSoul(passer) && VisoredLogic.takenOver(SoulLogic.get(passer));
-            String key = seized ? TravelLogic.Refusal.TAKEN.messageKey() : UNGUIDED_KEY;
-            passer.displayClientMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY), true);
-            return null;
+            if (SoulLogic.hasSoul(passer) && VisoredLogic.takenOver(SoulLogic.get(passer))) {
+                passer.displayClientMessage(Component.translatable(TravelLogic.Refusal.TAKEN.messageKey())
+                        .withStyle(ChatFormatting.GRAY), true);
+                return null;
+            }
+            return DangaiEvents.into(gate, passer);
         }
         ResourceKey<Level> to = gate.leadsTo();
         ServerLevel target = to == null ? null : BleachWorlds.level(passer.server, to);
@@ -183,7 +185,7 @@ public final class TravelEvents {
      * worked out only when it is reached; null if none will.
      */
     @Nullable
-    private static Vec3 homeward(ServerPlayer passer, ServerLevel target) {
+    static Vec3 homeward(ServerPlayer passer, ServerLevel target) {
         TravelRecord record = passer.getData(SoulAttachments.TRAVEL);
         ResourceKey<Level> respawnWorld = passer.getRespawnPosition() == null ? null : passer.getRespawnDimension();
         for (TravelLogic.Return way : TravelLogic.returnOrder(record, respawnWorld)) {
@@ -249,8 +251,11 @@ public final class TravelEvents {
         return top;
     }
 
-    /** After the pass: a soul that left the Human World remembers the block it left from, and the far side chimes. */
-    private static void arrived(Entity entity, GlobalPos left) {
+    /**
+     * After the pass: a soul that left the Human World remembers the block it left from, and the far side chimes. Also
+     * run as a soul comes into or out of the Dangai.
+     */
+    static void arrived(Entity entity, GlobalPos left) {
         if (left.dimension() == Level.OVERWORLD && entity instanceof Player player) {
             player.setData(SoulAttachments.TRAVEL, player.getData(SoulAttachments.TRAVEL).withHumanWorldReturn(left));
         }

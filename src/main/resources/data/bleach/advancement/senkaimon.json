@@ -1,0 +1,24 @@
+{
+  "parent": "bleach:graduated",
+  "display": {
+    "icon": {
+      "id": "bleach:hell_butterfly"
+    },
+    "title": {
+      "translate": "advancements.bleach.senkaimon.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.senkaimon.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "senkaimon": {
+      "trigger": "minecraft:changed_dimension",
+      "conditions": {
+        "from": "minecraft:overworld",
+        "to": "bleach:soul_society"
+      }
+    }
+  }
+}

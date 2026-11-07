@@ -152,6 +152,10 @@ HOLLOW_IRIS = rgb(236, 200, 40)
 SEKKISEKI = rgb(222, 222, 214)
 SEKKISEKI_FLECK = rgb(204, 204, 197)
 SEKKISEKI_SEAM = rgb(176, 176, 170)
+# The Kōryū, the Dangai's current: translucent violet with brighter streaks wavering up it, flecked with light.
+KORYU = (112, 64, 196, 120)
+KORYU_STREAK = (176, 132, 255, 170)
+KORYU_GLINT = (226, 208, 255, 200)
 
 
 class Canvas:
@@ -1603,6 +1607,17 @@ def sekkiseki():
     return c
 
 
+def koryu():
+    """The Kōryū: a see-through violet current, three brighter streaks wavering up the block, flecked with light."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, KORYU)
+    for x0 in (2, 7, 12):
+        for y in range(16):
+            c.put(x0 + (1 if (y // 3 + x0) % 2 else 0), y, KORYU_STREAK)
+    mottle(c, 0, 0, 16, 16, KORYU_GLINT, 11, seed=5)
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -1697,6 +1712,7 @@ TEXTURES = {
     "misc/hollow_mask_edge.png": hollow_mask_edge,
     "misc/hollow_mask_edge_cracked.png": hollow_mask_edge_cracked,
     "block/sekkiseki.png": sekkiseki,
+    "block/koryu.png": koryu,
 }
 
 

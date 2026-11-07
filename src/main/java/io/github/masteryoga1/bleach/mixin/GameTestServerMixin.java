@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 /**
  * Game tests only: the test server makes its worlds from the flat preset alone, so datapack worlds never load. Handing
- * the bake the datapack's worlds too adds Soul Society and leaves the flat Overworld, the Nether and the End as they were.
+ * the bake the datapack's worlds too adds the mod's worlds and leaves the flat Overworld, Nether and End as they were.
  */
 @Mixin(GameTestServer.class)
 public abstract class GameTestServerMixin {

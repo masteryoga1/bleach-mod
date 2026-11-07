@@ -722,6 +722,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SENKAIMON_COST_SHARE;
     public static final ModConfigSpec.DoubleValue SENKAIMON_MIN_COST;
     public static final ModConfigSpec.IntValue SENKAIMON_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue DANGAI_KORYU_HOLD_SECONDS;
+    public static final ModConfigSpec.IntValue DANGAI_EXIT_HEIGHT;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -2911,6 +2913,16 @@ public final class BleachConfig {
         SENKAIMON_COOLDOWN_SECONDS = builder
                 .comment("Seconds before the same soul can open another Senkaimon. Creative mode never waits or pays.")
                 .defineInRange("cooldown_seconds", 30, 0, 3_600);
+        builder.pop();
+        builder.push("dangai");
+        DANGAI_KORYU_HOLD_SECONDS = builder
+                .comment("Seconds the Kōryū, the current the Dangai's lanes are walled with, holds a soul that touches"
+                        + " it. It cannot hold the same soul again until 2 seconds after it lets go.")
+                .defineInRange("koryu_hold_seconds", 1.5, 0.05, 30.0);
+        DANGAI_EXIT_HEIGHT = builder
+                .comment("Blocks over the ground a soul comes out at a Dangai lane's end, falling slowly. Under a roof it"
+                        + " comes out lower, on the floor if it must.")
+                .defineInRange("exit_height", 24, 0, 64);
         builder.pop();
         builder.pop();
 

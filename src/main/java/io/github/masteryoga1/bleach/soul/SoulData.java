@@ -314,6 +314,10 @@ public final class SoulData {
     long senkaimonReadyAt = NEVER;
     /** Game time this soul's Senkaimon turn was last seen and heard begun, or {@link #NEVER}. Not saved. */
     long senkaimonTurnShownAt = NEVER;
+    /** Game time the Kōryū can next take hold of this soul. Not saved. */
+    long koryuFreeAt = NEVER;
+    /** Game time a way out of the Dangai that was refused is next tried for this soul. Not saved. */
+    long dangaiRetryAt = NEVER;
 
     public SoulData() {
     }

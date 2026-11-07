@@ -40,6 +40,7 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
+import io.github.masteryoga1.bleach.soul.DangaiLogic;
 import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.KidoHeal;
@@ -55,6 +56,7 @@ import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.TravelLogic;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.DangaiPlan;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
@@ -91,6 +93,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -226,14 +229,16 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * open a Senkaimon that reaches the client two blocks south of the player, facing it, 3 wide and 4 tall. Standing in it
  * must bring the player to the Senkaimon court on Seireitei's lawn at exactly y 72. A tp across the lawn must stand it
  * where the south wall reaches the client in Sekkiseki to its top beside the gate's 16-block gap. Once the first gate's
- * wait has run, a gate opened in Soul Society must bring the player home before the run quits.
+ * wait has run, a gate opened in Soul Society must bring the player home. Then, its Jigokuchō taken, a third gate must
+ * take it into the Dangai, set on a lane's floor between its walls of Kōryū, which the action bar must say; moved near
+ * the lane's end, it walks out and must come out over the Rukongai, falling slowly, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, and HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client
- * code fails the run, and so does anything that did not reach the client as expected.
+ * Seireiheki, the Dangai's lane and Kōryū, and HUD are drawn, and screenshots of the main moments are saved for review.
+ * Any crash in the mod's client code fails the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -255,6 +260,8 @@ public final class ClientSmokeTest {
     private static final double RIFT_RANGE = 40.0;
     /** Where the player stands in Soul Society: Seireitei's lawn, 40 blocks inside the south wall, east of its gate. */
     private static final double SOUL_SOCIETY_X = 16.5, SOUL_SOCIETY_Z = SeireiteiPlan.SEIREITEI_RADIUS - 39.5;
+    /** Where the tp sets the player in its Dangai lane: 1.5 blocks short of the lane's end. */
+    private static final double LANE_END_Z = DangaiPlan.EXIT_Z - 1.5;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
     /**
@@ -295,6 +302,10 @@ public final class ClientSmokeTest {
     private static Vec3 negacionFrom;
     /** Where the player stood before going to Soul Society, to come back to. */
     private static Vec3 returnTo = Vec3.ZERO;
+    /** The Dangai lane whose end is held for the player, or -1 before then. */
+    private static int heldLane = -1;
+    /** The tick the player was first seen over the Rukongai out of the Dangai, or -1 before then. */
+    private static int skyFrom = -1;
     /** What the current step acts on: the Hollow to strike, the Plus to send on, or the Quincy to talk to. */
     @Nullable
     private static Entity subject;
@@ -478,6 +489,7 @@ public final class ClientSmokeTest {
         checkVisoredTakeover(minecraft, player, soul);
         checkKido(minecraft, player, soul);
         checkSoulSociety(minecraft, player);
+        checkDangai(minecraft, player);
         if (finished) {
             return;
         }
@@ -1414,7 +1426,41 @@ public final class ClientSmokeTest {
             case 7368 -> GateKeys.OPEN.setDown(false);
             // Into it: it passes about 7392, to the bottom centre of the block the first gate was taken from.
             case 7370 -> command(minecraft, "tp @s ~ ~ ~2");
+            // Through the Dangai by a third gate, with no Jigokuchō to guide it: a floor and room for the gate 2 blocks
+            // south, whatever the earlier beats left there. The wait from the gate at about 7351 runs to about 7951, and
+            // creative never waits or pays. The last action-bar line is still the turn's in Soul Society; it is
+            // forgotten, so the window from 7508 needs a new one.
             case 7500 -> {
+                command(minecraft, "clear @s bleach:hell_butterfly");
+                command(minecraft, "fill ~-2 ~-1 ~1 ~2 ~-1 ~3 stone");
+                command(minecraft, "fill ~-2 ~ ~1 ~2 ~3 ~3 air");
+                command(minecraft, "gamemode creative");
+                actionBar = null;
+            }
+            // Pressed about 7506, the blade turns for 30 ticks and the gate opens about 7536, two blocks south.
+            case 7505 -> {
+                expect(minecraft, TravelLogic.turnsKey(player, player.getMainHandItem()),
+                        "the Shinigami holds no blade of its own for the third gate");
+                GateKeys.OPEN.setDown(true);
+            }
+            case 7557 -> GateKeys.OPEN.setDown(false);
+            // Survival again before it steps in, so the pass and the whole crossing run by survival's rules.
+            case 7560 -> command(minecraft, "gamemode survival");
+            // Into it, unguided now: 21 ticks inside pass it, about 7584, into the Dangai at its lane's start.
+            case 7562 -> command(minecraft, "tp @s ~ ~ ~2");
+            // Down the lane, south, between its walls of Kōryū.
+            case 7615 -> shot(minecraft, "dangai");
+            // The lane's end asked for well before the tp, as Soul Society's arrival chunks were. The beats from 7621 to
+            // 7639 are left for the step that brings the Kōtotsu.
+            case 7620 -> holdLane(minecraft, Mth.floor(player.getX()) >> 4, true);
+            // Near the lane's end, in the same lane and on the same floor.
+            case 7640 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ %.1f", LANE_END_Z));
+            // The last 1.5 blocks take 9 ticks from rest at a walk, 8 with Hohō 10: it crosses z 160 about 7654 and comes
+            // out over the Rukongai. Coming out lets go of the key anyway, as the loading screen releases every key.
+            case 7645 -> minecraft.options.keyUp.setDown(true);
+            case 7665 -> minecraft.options.keyUp.setDown(false);
+            case 7890 -> {
+                holdLane(minecraft, heldLane, false);
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -2018,6 +2064,74 @@ public final class ClientSmokeTest {
                         + "; the action bar's last lines: " + recentActionBar() + ")");
     }
 
+    /** The checks of the crossing of the Dangai by a third gate, each window from the step it follows. */
+    private static void checkDangai(Minecraft minecraft, LocalPlayer player) {
+        // A fresh line: the turn's from Soul Society was forgotten at 7500.
+        Component turning = Component.translatable("message.bleach.senkaimon.turning");
+        expectWithin(minecraft, 7508, 7533, () -> actionBarShows(turning),
+                "with no Jigokuchō, holding the Gate key never turned the blade (the action bar's last lines: "
+                        + recentActionBar() + ")");
+        expectWithin(minecraft, 7535, 7559, () -> gateAhead(minecraft, player),
+                "the third gate never opened two blocks south (the action bar's last lines: " + recentActionBar() + ")");
+        // From two ticks after the pass, which the loading screen does not count, to the tick before the screenshot.
+        expectWithin(minecraft, 7586, 7614, () -> atLaneStart(minecraft, player),
+                "the gate without a Jigokuchō never set the player at a Dangai lane's start (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.position() + ", beside it "
+                        + laneWalls(minecraft, player) + "; the action bar's last lines: " + recentActionBar() + ")");
+        Component entered = Component.translatable("message.bleach.dangai.entered");
+        expectWithin(minecraft, 7587, 7639, () -> actionBarShows(entered),
+                "the Dangai's entry line never showed (the action bar's last lines: " + recentActionBar() + ")");
+        // From the tp to before the walk can reach the lane's end, 9 ticks from 7646 at the slowest.
+        expectWithin(minecraft, 7642, 7652, () -> minecraft.level.dimension() == BleachWorlds.DANGAI
+                        && player.getZ() > LANE_END_Z - 0.5,
+                "the tp never put the player near its lane's end (it is in " + minecraft.level.dimension().location()
+                        + " at " + player.position() + ")");
+        // From the walk, a tick for the server to see it and the loading screen, to a long stall while the server makes
+        // the district's column: the client counts on through that, the player standing in the lane. The slow fall from
+        // 24 blocks takes about 92 ticks, so the screenshot 20 ticks after the window passes is taken in the air.
+        double fromCentre = horizontalDistance(player.position(), Vec3.ZERO);
+        if (expectWithin(minecraft, 7658, 7860, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
+                        && player.hasEffect(MobEffects.SLOW_FALLING) && !player.onGround()
+                        && fromCentre >= SeireiteiPlan.districtStart(1)
+                        && fromCentre <= SeireiteiPlan.districtStart(DangaiLogic.EXIT_DISTRICTS + 1),
+                "the lane's end never let the player out over the Rukongai, falling slowly (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.position() + ", " + Math.round(fromCentre)
+                        + " blocks from the centre, falling slowly " + player.hasEffect(MobEffects.SLOW_FALLING)
+                        + ", on the ground " + player.onGround() + "; the action bar's last lines: " + recentActionBar()
+                        + ")")) {
+            skyFrom = ticksInWorld;
+        }
+        if (skyFrom >= 0 && ticksInWorld == skyFrom + 20) {
+            shot(minecraft, "rukongai_sky");
+        }
+    }
+
+    /**
+     * Whether the player stands where a gate sets a soul it does not guide: in the Dangai on a lane's floor, down its
+     * middle, a step from the rock behind it, the Kōryū's two walls on either side.
+     */
+    private static boolean atLaneStart(Minecraft minecraft, LocalPlayer player) {
+        int lane = Mth.floor(player.getX()) >> 4;
+        Block koryu = ModBlocks.KORYU.get();
+        return minecraft.level.dimension() == BleachWorlds.DANGAI && player.onGround()
+                && Math.abs(player.getY() - DangaiPlan.FLOOR_Y) < 0.01
+                && Math.abs(player.getX() - DangaiPlan.laneX(lane)) < 0.01 && player.getZ() < 2.0
+                && minecraft.level.getBlockState(laneWall(lane, DangaiPlan.WEST_WALL, player)).is(koryu)
+                && minecraft.level.getBlockState(laneWall(lane, DangaiPlan.EAST_WALL, player)).is(koryu);
+    }
+
+    /** The block of this wall of the lane level with the player's feet. */
+    private static BlockPos laneWall(int lane, int wall, LocalPlayer player) {
+        return BlockPos.containing((lane << 4) + wall, DangaiPlan.FLOOR_Y, player.getZ());
+    }
+
+    /** The blocks where the lane the player is in should have its walls, for a failure to name. */
+    private static String laneWalls(Minecraft minecraft, LocalPlayer player) {
+        int lane = Mth.floor(player.getX()) >> 4;
+        return minecraft.level.getBlockState(laneWall(lane, DangaiPlan.WEST_WALL, player)) + " and "
+                + minecraft.level.getBlockState(laneWall(lane, DangaiPlan.EAST_WALL, player));
+    }
+
     /**
      * Whether the player's Senkaimon has reached the client as it should stand: seen, facing south as the player does,
      * two blocks ahead at the feet, 3 wide, 4 tall and a block deep.
@@ -2189,6 +2303,30 @@ public final class ClientSmokeTest {
                 } else {
                     level.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
                 }
+            }
+        });
+    }
+
+    /**
+     * Holds (or lets go of) the end of this Dangai lane on the integrated server with a forced ticket, as
+     * {@link #holdArrival} does for Soul Society, so it is made in the background before the player is moved there.
+     */
+    private static void holdLane(Minecraft minecraft, int lane, boolean hold) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        if (server == null || lane < 0) {
+            return;
+        }
+        heldLane = lane;
+        ChunkPos chunk = new ChunkPos(lane, Mth.floor(LANE_END_Z) >> 4);
+        server.execute(() -> {
+            ServerLevel level = server.getLevel(BleachWorlds.DANGAI);
+            if (level == null) {
+                return;
+            }
+            if (hold) {
+                level.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            } else {
+                level.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
             }
         });
     }
