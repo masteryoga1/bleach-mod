@@ -8,13 +8,18 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -64,5 +69,36 @@ public final class SoulSocietyWorldTests {
                         && soul.getBlockState(new BlockPos(w - 1, 90, g)).isAir(),
                 "the south gate's gap is not open lawn between walls");
         helper.succeed();
+    }
+
+    /**
+     * A joined player takes the mod's login payloads, crosses into Soul Society as a gate will send it, stays there
+     * while it ticks, and leaves the server when disconnected.
+     */
+    @GameTest(template = "empty")
+    public static void aJoinedPlayerCrossesToSoulSociety(GameTestHelper helper) {
+        MinecraftServer server = helper.getLevel().getServer();
+        ServerLevel soul = server.getLevel(BleachWorlds.SOUL_SOCIETY);
+        helper.assertTrue(soul != null, "the test server has no Soul Society");
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
+        helper.assertTrue(server.getPlayerList().getPlayer(player.getUUID()) == player
+                && player.level() == helper.getLevel(), "the player did not join in the test's world");
+        Vec3 court = new Vec3(192.5, SeireiteiPlan.PLATEAU_Y, -287.5);
+        soul.getChunk(BlockPos.containing(court));
+        player.changeDimension(new DimensionTransition(soul, court, Vec3.ZERO, 0.0F, 0.0F,
+                DimensionTransition.DO_NOTHING));
+        helper.assertTrue(player.level() == soul && player.position().distanceTo(court) < 1.0e-6,
+                "the player did not arrive at the court");
+        helper.runAfterDelay(20, () -> {
+            helper.assertTrue(player.level() == soul && !player.isRemoved()
+                    && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 1.0e-6,
+                    "after 20 ticks the player is no longer standing at the court");
+            player.connection.disconnect(Component.literal("Test finished"));
+        });
+        helper.runAfterDelay(22, () -> {
+            helper.assertTrue(server.getPlayerList().getPlayer(player.getUUID()) == null && player.isRemoved(),
+                    "the disconnected player is still on the server");
+            helper.succeed();
+        });
     }
 }
