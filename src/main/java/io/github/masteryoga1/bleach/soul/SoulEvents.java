@@ -80,6 +80,7 @@ public final class SoulEvents {
         ShikaiEvents.register(bus);
         VisoredEvents.register(bus);
         KidoEvents.register(bus);
+        TravelEvents.register(bus);
         QuincyEvents.register(bus);
         QuincyArtsEvents.register(bus);
         QuincyNpcEvents.register(bus);

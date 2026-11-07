@@ -398,7 +398,7 @@ public final class KidoTests {
     }
 
     /** The same for a whole number, such as a time in seconds. */
-    private static void withConfig(ModConfigSpec.IntValue value, int set, Runnable body) {
+    static void withConfig(ModConfigSpec.IntValue value, int set, Runnable body) {
         int before = BleachConfig.get(value);
         value.set(set);
         try {

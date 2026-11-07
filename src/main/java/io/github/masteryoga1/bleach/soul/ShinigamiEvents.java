@@ -190,6 +190,7 @@ public final class ShinigamiEvents {
         give(player, new ItemStack(ModItems.SHIHAKUSHO_HAKAMA.get()));
         give(player, new ItemStack(ModItems.WARAJI.get()));
         DenreishinkiItem.giveIfMissing(player);
+        TravelEvents.butterflyAtGraduation(player);
         playSound(player, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE);
         player.sendSystemMessage(Component.translatable("message.bleach.graduated").withStyle(ChatFormatting.GOLD));
         if (player instanceof ServerPlayer serverPlayer) {

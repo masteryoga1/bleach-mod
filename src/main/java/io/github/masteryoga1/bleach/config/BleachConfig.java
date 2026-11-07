@@ -717,6 +717,12 @@ public final class BleachConfig {
     public static final ModConfigSpec.BooleanValue VISORED_FALL_INTO_HOLLOW;
     public static final ModConfigSpec.IntValue VISORED_LOSSES_TO_FALL;
 
+    public static final ModConfigSpec.DoubleValue SENKAIMON_UNLOCK_SECONDS;
+    public static final ModConfigSpec.IntValue SENKAIMON_OPEN_SECONDS;
+    public static final ModConfigSpec.DoubleValue SENKAIMON_COST_SHARE;
+    public static final ModConfigSpec.DoubleValue SENKAIMON_MIN_COST;
+    public static final ModConfigSpec.IntValue SENKAIMON_COOLDOWN_SECONDS;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -2885,6 +2891,26 @@ public final class BleachConfig {
                 .comment("With fall_into_hollow on: a fight lost that brings the soul's count of losses to this or past it"
                         + " makes it a Hollow.")
                 .defineInRange("losses_to_fall", 3, 1, 100);
+        builder.pop();
+        builder.pop();
+
+        builder.push("travel");
+        builder.push("senkaimon");
+        SENKAIMON_UNLOCK_SECONDS = builder
+                .comment("Seconds the Gate key is held, the blade turned like a key, before a Senkaimon opens.")
+                .defineInRange("unlock_seconds", 1.5, 0.05, 10.0);
+        SENKAIMON_OPEN_SECONDS = builder
+                .comment("Seconds a Senkaimon stays open.")
+                .defineInRange("open_seconds", 30, 5, 300);
+        SENKAIMON_COST_SHARE = builder
+                .comment("Share of maximum reiryoku a Senkaimon costs its opener as it opens (0.05 is 5%).")
+                .defineInRange("cost_share", 0.05, 0.0, 1.0);
+        SENKAIMON_MIN_COST = builder
+                .comment("The least reiryoku a Senkaimon costs.")
+                .defineInRange("min_cost", 5.0, 0.0, 10_000.0);
+        SENKAIMON_COOLDOWN_SECONDS = builder
+                .comment("Seconds before the same soul can open another Senkaimon. Creative mode never waits or pays.")
+                .defineInRange("cooldown_seconds", 30, 0, 3_600);
         builder.pop();
         builder.pop();
 
