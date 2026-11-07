@@ -7,7 +7,6 @@ import io.github.masteryoga1.bleach.network.GateKeyPayload;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
@@ -21,10 +20,12 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.bus.api.IEventBus;
@@ -215,7 +216,7 @@ public final class TravelEvents {
         if (spot != null) {
             return spot;
         }
-        double floor = floorTop(level, BlockPos.containing(wanted));
+        double floor = floorTop(passer, level, wanted);
         if (!Double.isNaN(floor)) {
             spot = SafeLanding.landingSpot(passer, level, new Vec3(wanted.x, floor, wanted.z));
             if (spot != null) {
@@ -231,19 +232,21 @@ public final class TravelEvents {
     }
 
     /**
-     * The top of the floor a soul stood on in this block, or NaN if it has none. A return point is the block the soul
-     * stood in, so its floor is a carpet, slab, step or path there, or a fence or wall below standing taller than its
-     * block. Read after a landing try, which loaded the chunk unless the block lay outside the world, where all is air.
+     * The top of the floor a soul stood on at this spot, or NaN if nothing is underfoot: the highest of the shapes its
+     * body there would meet that reach down to its feet. A return point is the block the soul stood in, so its floor may
+     * rise into that block: a carpet, slab, step or path there, or a fence or wall below, with anything sitting on it.
+     * Read after a landing try, which loaded the chunk unless the spot lay outside the world, where all is air.
      */
-    private static double floorTop(ServerLevel level, BlockPos in) {
-        VoxelShape here = level.getBlockState(in).getCollisionShape(level, in);
-        if (!here.isEmpty()) {
-            return in.getY() + here.max(Direction.Axis.Y);
+    private static double floorTop(Entity passer, ServerLevel level, Vec3 wanted) {
+        AABB body = passer.getDimensions(Pose.STANDING).makeBoundingBox(wanted);
+        double top = Double.NaN;
+        for (VoxelShape shape : level.getBlockCollisions(passer, body)) {
+            double reach = shape.max(Direction.Axis.Y);
+            if (shape.min(Direction.Axis.Y) <= wanted.y && (Double.isNaN(top) || reach > top)) {
+                top = reach;
+            }
         }
-        BlockPos below = in.below();
-        VoxelShape under = level.getBlockState(below).getCollisionShape(level, below);
-        return !under.isEmpty() && under.max(Direction.Axis.Y) > 1.0 ? below.getY() + under.max(Direction.Axis.Y)
-                : Double.NaN;
+        return top;
     }
 
     /** After the pass: a soul that left the Human World remembers the block it left from, and the far side chimes. */

@@ -364,8 +364,8 @@ public final class TravelTests {
 
     /**
      * The way home lands on the carpet a soul left from, though the block it stood in is the carpet's and a roof is
-     * over it, and on the fence it left from, though the block it stood in is the air above; a spot walled in lands on
-     * top of its column. Open to the sky, so no barrier roofs the test's columns.
+     * over it, and on the fence it left from, though the block it stood in is the air above, or a carpet on the fence
+     * is; a spot walled in lands on top of its column. Open to the sky, so no barrier roofs the test's columns.
      */
     @GameTest(template = "lane", skyAccess = true)
     public static void theWayHomeLandsOnTheFloorItLeft(GameTestHelper helper) {
@@ -385,6 +385,14 @@ public final class TravelTests {
         spot = TravelEvents.landing(player, level, aboveFence);
         helper.assertTrue(spot != null && spot.distanceTo(onFence) < SAME, "the soul that left from the fence came back "
                 + "to " + spot + ", not onto it at " + onFence);
+
+        helper.setBlock(4, 1, 1, Blocks.OAK_FENCE);
+        helper.setBlock(4, 2, 1, Blocks.WHITE_CARPET);
+        Vec3 carpetOnFence = helper.absoluteVec(new Vec3(4.5, 2.0, 1.5));
+        Vec3 onPost = carpetOnFence.add(0.0, 0.5, 0.0);
+        spot = TravelEvents.landing(player, level, carpetOnFence);
+        helper.assertTrue(spot != null && spot.distanceTo(onPost) < SAME, "the soul that left from the carpeted fence "
+                + "came back to " + spot + ", not onto the post at " + onPost);
 
         helper.setBlock(6, 1, 1, Blocks.STONE);
         helper.setBlock(6, 2, 1, Blocks.STONE);
