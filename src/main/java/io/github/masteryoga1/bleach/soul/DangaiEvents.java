@@ -25,6 +25,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
@@ -48,12 +49,16 @@ public final class DangaiEvents {
     private DangaiEvents() {
     }
 
-    /** Each tick in the Dangai, the end of a crossing by any way out or by death, and the fresh start at login. */
+    /**
+     * Each tick in the Dangai, the end of a crossing by any way out or by death, the fresh start at login, and the
+     * pearls left behind.
+     */
     public static void register(IEventBus bus) {
         bus.addListener(DangaiEvents::onPlayerTick);
         bus.addListener(DangaiEvents::onChangedDimension);
         bus.addListener(DangaiEvents::onRespawn);
         bus.addListener(DangaiEvents::onLoggedIn);
+        bus.addListener(DangaiEvents::onPearl);
     }
 
     // ---- The way in ----
@@ -279,6 +284,14 @@ public final class DangaiEvents {
     private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             atLogin(player);
+        }
+    }
+
+    /** A pearl still flying in the Dangai never pulls back a soul that has come out of it, which would be lost there. */
+    private static void onPearl(EntityTeleportEvent.EnderPearl event) {
+        if (event.getPearlEntity().level().dimension() == BleachWorlds.DANGAI
+                && event.getPlayer().level().dimension() != BleachWorlds.DANGAI) {
+            event.setCanceled(true);
         }
     }
 }

@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -197,10 +198,11 @@ public final class ChainEvents {
      * not end in a long fall.
      *
      * @return false, leaving them at their respawn point, if that spot is unsafe (see {@link SafeLanding#tryMoveTo})
+     *         or in the Dangai, where a soul with no crossing to follow would only be put out again
      */
-    private static boolean returnToDeathPoint(ServerPlayer player, GlobalPos location, @Nullable Vec3 exact) {
+    public static boolean returnToDeathPoint(ServerPlayer player, GlobalPos location, @Nullable Vec3 exact) {
         ServerLevel level = player.server.getLevel(location.dimension());
-        if (level == null) {
+        if (level == null || location.dimension() == BleachWorlds.DANGAI) {
             return false;
         }
         return SafeLanding.tryMoveTo(player, level, exact != null ? exact : Vec3.atBottomCenterOf(location.pos()));

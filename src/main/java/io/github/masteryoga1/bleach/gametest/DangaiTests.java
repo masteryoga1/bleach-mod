@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.soul.BakudoEffect;
+import io.github.masteryoga1.bleach.soul.ChainEvents;
 import io.github.masteryoga1.bleach.soul.DangaiEvents;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -36,6 +38,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ThrownEnderpearl;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
@@ -48,7 +51,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -81,19 +87,28 @@ public final class DangaiTests {
     }
 
     /**
-     * The real Dangai, the 3×3 chunks round this chunk of a lane loaded now and held by a forced ticket, so a soul set
-     * there has its floor at once. Never released, as the Senkaimon court's in {@link TravelTests} is not.
+     * The real Dangai, the 5×5 chunks round this chunk of a lane loaded now and held by a forced ticket, so a soul set
+     * there has its floor at once and what stands there ticks at once. Never released, as the Senkaimon court's in
+     * {@link TravelTests} is not.
      */
     private static ServerLevel holdLane(GameTestHelper helper, int lane, int chunkZ) {
         ServerLevel dangai = dangai(helper);
-        for (int x = -1; x <= 1; x++) {
-            for (int z = -1; z <= 1; z++) {
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -2; z <= 2; z++) {
                 dangai.getChunk(lane + x, chunkZ + z);
             }
         }
         ChunkPos held = new ChunkPos(lane, chunkZ);
-        dangai.getChunkSource().addRegionTicket(TicketType.FORCED, held, 1, held);
+        dangai.getChunkSource().addRegionTicket(TicketType.FORCED, held, 2, held);
         return dangai;
+    }
+
+    /** The landing of this soul's pearl, thrown in this world, as NeoForge asks about it. */
+    private static EntityTeleportEvent.EnderPearl pearlFor(ServerPlayer owner, ServerLevel level) {
+        ThrownEnderpearl pearl = new ThrownEnderpearl(level, owner);
+        Vec3 at = pearl.position();
+        return new EntityTeleportEvent.EnderPearl(owner, at.x, at.y, at.z, pearl, 5.0F,
+                BlockHitResult.miss(at, Direction.UP, BlockPos.containing(at)));
     }
 
     /**
@@ -414,6 +429,17 @@ public final class DangaiTests {
                     + spawn.toShortString());
             helper.assertTrue(lost.getData(SoulAttachments.TRAVEL).crossing().isEmpty(), "the soul put out is on a "
                     + "crossing: " + lost.getData(SoulAttachments.TRAVEL));
+
+            // Out of the Dangai, it is not taken back in: not as a Plus to where it fell, nor by a pearl left there.
+            GlobalPos fell = GlobalPos.of(BleachWorlds.DANGAI, BlockPos.containing(DangaiPlan.laneX(254),
+                    DangaiPlan.FLOOR_Y, 80.5));
+            helper.assertFalse(ChainEvents.returnToDeathPoint(lost, fell, null) || lost.level() != overworld,
+                    "a Plus that died in the Dangai went back there, to " + TravelTests.where(lost));
+            EntityTeleportEvent.EnderPearl left = NeoForge.EVENT_BUS.post(pearlFor(lost, dangai(helper)));
+            EntityTeleportEvent.EnderPearl here = NeoForge.EVENT_BUS.post(pearlFor(lost, overworld));
+            helper.assertTrue(left.isCanceled() && !here.isCanceled(), "a pearl left in the Dangai "
+                    + (left.isCanceled() ? "was stopped" : "pulled the soul back") + ", and one in the Human World "
+                    + (here.isCanceled() ? "was stopped too" : "was let land"));
             helper.succeed();
         });
     }
