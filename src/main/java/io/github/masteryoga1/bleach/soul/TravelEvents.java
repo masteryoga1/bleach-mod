@@ -205,9 +205,9 @@ public final class TravelEvents {
     }
 
     /**
-     * Where the soul comes out for this wanted spot: there, settled by {@link SafeLanding#landingSpot}, or on top of the
-     * block the spot is in when that is part of the floor, or else on top of its column, so a spot built over still
-     * lands; null if none will hold it. Public for game tests.
+     * Where the soul comes out for this wanted spot: there, settled by {@link SafeLanding#landingSpot}, or on the floor
+     * a soul stood on in the spot's block, or else on top of its column, so a spot built over still lands; null if none
+     * will hold it. Public for game tests.
      */
     @Nullable
     public static Vec3 landing(Entity passer, ServerLevel level, Vec3 wanted) {
@@ -215,13 +215,9 @@ public final class TravelEvents {
         if (spot != null) {
             return spot;
         }
-        // The first try loaded this chunk unless its spot lay outside the world's height, where every block is air.
-        // A return point is the block the soul stood in, so a carpet, slab, step or path there is the floor it stood on.
-        BlockPos in = BlockPos.containing(wanted);
-        VoxelShape floor = level.getBlockState(in).getCollisionShape(level, in);
-        if (!floor.isEmpty()) {
-            spot = SafeLanding.landingSpot(passer, level,
-                    new Vec3(wanted.x, in.getY() + floor.max(Direction.Axis.Y), wanted.z));
+        double floor = floorTop(level, BlockPos.containing(wanted));
+        if (!Double.isNaN(floor)) {
+            spot = SafeLanding.landingSpot(passer, level, new Vec3(wanted.x, floor, wanted.z));
             if (spot != null) {
                 return spot;
             }
@@ -232,6 +228,22 @@ public final class TravelEvents {
         level.getChunk(x >> 4, z >> 4);
         double top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         return SafeLanding.landingSpot(passer, level, new Vec3(wanted.x, top, wanted.z));
+    }
+
+    /**
+     * The top of the floor a soul stood on in this block, or NaN if it has none. A return point is the block the soul
+     * stood in, so its floor is a carpet, slab, step or path there, or a fence or wall below standing taller than its
+     * block. Read after a landing try, which loaded the chunk unless the block lay outside the world, where all is air.
+     */
+    private static double floorTop(ServerLevel level, BlockPos in) {
+        VoxelShape here = level.getBlockState(in).getCollisionShape(level, in);
+        if (!here.isEmpty()) {
+            return in.getY() + here.max(Direction.Axis.Y);
+        }
+        BlockPos below = in.below();
+        VoxelShape under = level.getBlockState(below).getCollisionShape(level, below);
+        return !under.isEmpty() && under.max(Direction.Axis.Y) > 1.0 ? below.getY() + under.max(Direction.Axis.Y)
+                : Double.NaN;
     }
 
     /** After the pass: a soul that left the Human World remembers the block it left from, and the far side chimes. */
