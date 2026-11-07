@@ -8,6 +8,7 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
 /** Tags the mod defines in its data pack. */
@@ -59,6 +60,9 @@ public final class BleachTags {
     public static final TagKey<Biome> REISHI_RICH = TagKey.create(Registries.BIOME, BleachMod.id("reishi_rich"));
     /** Biomes where reishi runs thin, so a Quincy gathers it more slowly: deserts, badlands and the deepest caves. */
     public static final TagKey<Biome> REISHI_THIN = TagKey.create(Registries.BIOME, BleachMod.id("reishi_thin"));
+
+    /** Blocks that undo reiryoku, against which spirit shots are to fizzle: Sekkiseki. No rule reads it yet. */
+    public static final TagKey<Block> NEGATES_REIRYOKU = TagKey.create(Registries.BLOCK, BleachMod.id("negates_reiryoku"));
 
     /**
      * The effects Ransōtengai's threads shake off and keep off while woven: slowness, mining fatigue

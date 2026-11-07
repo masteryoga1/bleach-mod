@@ -59,6 +59,7 @@ public final class ModItems {
             () -> new ShihakushoItem(ArmorItem.Type.BOOTS));
 
     public static final DeferredItem<BlockItem> TAILORING_TABLE = ITEMS.registerSimpleBlockItem(ModBlocks.TAILORING_TABLE);
+    public static final DeferredItem<BlockItem> SEKKISEKI = ITEMS.registerSimpleBlockItem(ModBlocks.SEKKISEKI);
 
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",

@@ -52,6 +52,8 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
@@ -61,6 +63,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -72,6 +75,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
@@ -82,7 +86,9 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -94,10 +100,13 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomModelData;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.phys.AABB;
@@ -211,14 +220,16 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * then, with no one in reach and natural regeneration off, the player's own wounds, by a heart a second; then the soul
  * screen's Kidō button must open the Kidō page with all 14 spells and Kaidō chosen, a click on Sōkatsui's row must
  * choose it on the server, which the action bar and chat must show, and the page's Back button must go back to the
- * soul screen before the run quits.
+ * soul screen. Last, a tp must stand the player on Seireitei's lawn in Soul Society at exactly y 72, where the south wall
+ * must reach the client in Sekkiseki to its top beside the gate's 16-block gap, and a tp back must bring it home before
+ * the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
- * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, and HUD are drawn,
- * and screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and so does
- * anything that did not reach the client as expected.
+ * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Seireiheki, and HUD
+ * are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run,
+ * and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -238,6 +249,8 @@ public final class ClientSmokeTest {
     /** How far around the player the summoned Hollows and Plus, and the Garganta, are looked for. */
     private static final double SUMMONED_RANGE = 24.0;
     private static final double RIFT_RANGE = 40.0;
+    /** Where the player stands in Soul Society: Seireitei's lawn, 40 blocks inside the south wall, east of its gate. */
+    private static final double SOUL_SOCIETY_X = 16.5, SOUL_SOCIETY_Z = SeireiteiPlan.SEIREITEI_RADIUS - 39.5;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
     /**
@@ -276,6 +289,8 @@ public final class ClientSmokeTest {
     /** Where the player stood as it was mounted on the Negación light, or null before then. */
     @Nullable
     private static Vec3 negacionFrom;
+    /** Where the player stood before going to Soul Society, to come back to. */
+    private static Vec3 returnTo = Vec3.ZERO;
     /** What the current step acts on: the Hollow to strike, the Plus to send on, or the Quincy to talk to. */
     @Nullable
     private static Entity subject;
@@ -458,6 +473,7 @@ public final class ClientSmokeTest {
         checkVisoredArts(minecraft, player, soul);
         checkVisoredTakeover(minecraft, player, soul);
         checkKido(minecraft, player, soul);
+        checkSoulSociety(minecraft, player);
         if (finished) {
             return;
         }
@@ -1348,6 +1364,9 @@ public final class ClientSmokeTest {
             }
             // Sōkatsui marked: the window from 6493 passed by 6520, and the frames since show the synced choice.
             case 6525 -> shot(minecraft, "kido_page_chosen");
+            // Soul Society's arrival chunks asked for well before the tp, without blocking the server (a forceload
+            // generates on its thread): one CI run sent the player into chunks not yet made, and it fell into the void.
+            case 6526 -> holdArrival(minecraft, true);
             // Back to the soul screen, through the page's own Back button.
             case 6530 -> {
                 Button back = minecraft.screen instanceof KidoScreen page ? page.backButton() : null;
@@ -1357,7 +1376,18 @@ public final class ClientSmokeTest {
                 }
             }
             case 6550 -> minecraft.setScreen(null);
-            case 6560 -> {
+            // To Soul Society: onto Seireitei's lawn, at y 72 for any seed, facing the south wall 40 blocks off.
+            case 6660 -> {
+                returnTo = player.position();
+                command(minecraft, String.format(Locale.ROOT, "execute in %s run tp @s %.1f %d %.1f 0 -20",
+                        BleachWorlds.SOUL_SOCIETY.location(), SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
+            }
+            // The wall's chunks have had a hundred ticks or more to be drawn since they reached the client.
+            case 6840 -> shot(minecraft, "seireiheki");
+            case 6845 -> command(minecraft, String.format(Locale.ROOT,
+                    "execute in minecraft:overworld run tp @s %.3f %.3f %.3f", returnTo.x, returnTo.y, returnTo.z));
+            case 6850 -> holdArrival(minecraft, false);
+            case 6910 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -1915,6 +1945,35 @@ public final class ClientSmokeTest {
                 && stats.kidoButton() != null, "the Kidō page's Back button never went back to the soul screen");
     }
 
+    /** The checks of Soul Society, each window from the step it follows: there, the wall seen, and home again. */
+    private static void checkSoulSociety(Minecraft minecraft, LocalPlayer player) {
+        expectWithin(minecraft, 6662, 6740, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
+                        && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
+                        && horizontalDistance(player.position(), new Vec3(SOUL_SOCIETY_X, 0.0, SOUL_SOCIETY_Z)) < 0.5,
+                "the tp never stood the player on Seireitei's lawn at y 72 (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString()
+                        + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
+                        + ", the lawn's block " + minecraft.level.getBlockState(BlockPos.containing(SOUL_SOCIETY_X,
+                                SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
+        expectWithin(minecraft, 6700, 6835, () -> wallStands(minecraft.level),
+                "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a 16-block gap");
+        expectWithin(minecraft, 6847, 6900, () -> minecraft.level.dimension() == Level.OVERWORLD
+                && player.position().distanceTo(returnTo) < 1.5, "the tp back never brought the player home");
+    }
+
+    /** Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of an open gap. */
+    private static boolean wallStands(ClientLevel level) {
+        int z = SeireiteiPlan.SEIREITEI_RADIUS, w = SeireiteiPlan.GATE_HALF_WIDTH, top = SeireiteiPlan.WALL_TOP_Y;
+        Block sekkiseki = ModBlocks.SEKKISEKI.get();
+        // Each pair lies in one chunk, so the Sekkiseki shows that the air beside it was sent, not missing.
+        return level.getBlockState(new BlockPos(w, 90, z)).is(sekkiseki)
+                && level.getBlockState(new BlockPos(w - 1, 90, z)).isAir()
+                && level.getBlockState(new BlockPos(-w - 1, 90, z)).is(sekkiseki)
+                && level.getBlockState(new BlockPos(-w, 90, z)).isAir()
+                && level.getBlockState(new BlockPos(16, top - 1, z)).is(sekkiseki)
+                && level.getBlockState(new BlockPos(16, top, z)).isAir();
+    }
+
     /**
      * Whether this wall stands as the player's Dankū should: seen, facing south as the player does, two blocks ahead at
      * the feet, 5 wide, 4 tall and a quarter of a block thick.
@@ -2032,6 +2091,29 @@ public final class ClientSmokeTest {
         } catch (Exception e) {
             return "unread (" + e + ")";
         }
+    }
+
+    /**
+     * Holds (or lets go of) Soul Society's arrival chunks on the integrated server with a forced ticket, which
+     * generates them in the background, as the forceload command would not.
+     */
+    private static void holdArrival(Minecraft minecraft, boolean hold) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        if (server == null) {
+            return;
+        }
+        ChunkPos chunk = new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
+        server.execute(() -> {
+            ServerLevel level = server.getLevel(BleachWorlds.SOUL_SOCIETY);
+            if (level == null) {
+                return;
+            }
+            if (hold) {
+                level.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            } else {
+                level.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            }
+        });
     }
 
     /** Whether the integrated server's own copy of the soul has this spell chosen, read on its thread. */
