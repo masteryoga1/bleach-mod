@@ -14,7 +14,12 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
@@ -38,6 +43,8 @@ import net.minecraft.world.level.Level;
 public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc {
     /** How close a visitor must stay for their answer to count, squared: 8 blocks. */
     private static final double TALK_RANGE_SQR = 64.0;
+    /** How near the nearest aware player must stand to be told a Shinigami NPC has left. */
+    private static final double DEPARTURE_MESSAGE_RANGE = 32.0;
     /** The Zankensoki in the order the exams list them. */
     public static final List<Stat> EXAMINED_ARTS = List.of(Stat.ZANJUTSU, Stat.HAKUDA, Stat.HOHO, Stat.KIDO);
 
@@ -85,6 +92,30 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
 
     /** Called when a visitor opens the dialogue. */
     protected void onDialogueOpened() {
+    }
+
+    /** The motes of light and the sound of a Shinigami passing between worlds, where this one stands. */
+    public void showPassage() {
+        if (level() instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.END_ROD, getX(), getY() + 0.8, getZ(), 12, 0.3, 0.5, 0.3, 0.02);
+            serverLevel.playSound(null, getX(), getY(), getZ(), SoundEvents.SOUL_ESCAPE.value(), SoundSource.NEUTRAL,
+                    1.0F, 1.0F);
+        }
+    }
+
+    /**
+     * Leaves as a Shinigami does, in motes of light, telling the nearest aware player within 32 blocks with this line,
+     * which takes the NPC's name.
+     */
+    protected void depart(String lineKey) {
+        showPassage();
+        Player nearest = level().getNearestPlayer(getX(), getY(), getZ(), DEPARTURE_MESSAGE_RANGE,
+                entity -> entity instanceof Player player && SoulLogic.hasSoul(player)
+                        && SoulLogic.isAware(SoulLogic.get(player)));
+        if (nearest != null) {
+            nearest.displayClientMessage(Component.translatable(lineKey, getDisplayName()), true);
+        }
+        discard();
     }
 
     @Override

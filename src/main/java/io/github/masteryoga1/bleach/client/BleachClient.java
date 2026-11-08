@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
+import io.github.masteryoga1.bleach.entity.DutyShinigami;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
@@ -151,11 +152,11 @@ public final class BleachClient {
     }
 
     /**
-     * The NPCs wear four of the game's default player skins until the mod has its own, no two alike:
-     * the Academy's instructor, the wounded Shinigami, the Quincy Elder and the Quincy Hunter. An Arrancar
-     * wears the mod's own placeholder skin under its uniform, and a Visored's inner Hollow another of the mod's,
-     * holding the copy of its host's blade out as an Arrancar holds its own. Hollows use the vanilla spider and wolf
-     * models or simple ones of the mod's, and a Plus looks like a villager.
+     * The Academy's instructor, the wounded Shinigami, the Quincy Elder and the Quincy Hunter wear four of the game's
+     * default player skins until the mod has its own, no two alike, and a Shinigami on duty the mod's own placeholder
+     * skin. An Arrancar wears the mod's own placeholder skin under its uniform, and a Visored's inner Hollow another of
+     * the mod's, holding the copy of its host's blade out as an Arrancar holds its own. Hollows use the vanilla spider
+     * and wolf models or simple ones of the mod's, and a Plus looks like a villager.
      * Zanpakutō techniques and Gintō spells are drawn from plain shapes and the mod's placeholder
      * textures, the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
      * in the mod's own textures, and a Cero as the vanilla beacon beam in its own colour (Negación's light and the
@@ -169,6 +170,9 @@ public final class BleachClient {
                 context -> new ShinigamiNpcRenderer<AcademyInstructor>(context, instructor));
         event.registerEntityRenderer(ModEntities.WOUNDED_SHINIGAMI.get(),
                 context -> new ShinigamiNpcRenderer<WoundedShinigami>(context, wounded));
+        ResourceLocation duty = BleachMod.id("textures/entity/duty_shinigami.png");
+        event.registerEntityRenderer(ModEntities.DUTY_SHINIGAMI.get(),
+                context -> new ShinigamiNpcRenderer<DutyShinigami>(context, duty));
         ResourceLocation elder = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/zuri.png");
         ResourceLocation hunter = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/efe.png");
         event.registerEntityRenderer(ModEntities.QUINCY_ELDER.get(),

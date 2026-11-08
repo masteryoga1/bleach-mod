@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.DankuWall;
+import io.github.masteryoga1.bleach.entity.DutyShinigami;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Gillian;
@@ -124,8 +125,9 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 /**
  * A check CI runs on a real client (the {@code runClientSmokeTest} Gradle task, which sets
  * {@code -Dbleach.smokeTest=true}). It makes a flat world, answers the bloodline question as a Human,
- * turns the player into a Plus, releases reiatsu, brings on Encroachment, turns them into a Hollow and
- * opens the soul screen. Then it makes them a Shinigami in the Shihakushō with a sheathed Asauchi,
+ * turns the player into a Plus, beside whom a summoned Shinigami on duty must be seen and must leave when
+ * its time is up, releases reiatsu, brings on Encroachment, turns them into a Hollow and opens the soul
+ * screen. Then it makes them a Shinigami in the Shihakushō with a sheathed Asauchi,
  * opens the Tailoring Table and the instructor's dialogue, flash steps, stands on reishi footing by
  * jumping while falling, places an Academy, summons each Hollow and a Plus, cracks a mask, purifies a
  * Hollow, sends a Plus on, opens a Garganta and checks that a soul just below the threshold sees only
@@ -392,6 +394,12 @@ public final class ClientSmokeTest {
             bloodline.choose(BloodlineChoice.HUMAN);
         }
         expectWithin(minecraft, 2, 230, () -> soul.quincy().decided(), "the bloodline answer never reached the server");
+        if (expectWithin(minecraft, 104, 135, () -> count(minecraft, DutyShinigami.class, 16.0) >= 1,
+                "the summoned Shinigami on duty never reached the client")) {
+            shot(minecraft, "duty");
+        }
+        expectWithin(minecraft, 200, 218, () -> count(minecraft, DutyShinigami.class, 16.0) == 0,
+                "the Shinigami on duty never left when its time was up");
         expectWithin(minecraft, 345, 380,
                 () -> horizontalDistance(player.position(), dashFrom) >= DASH_MIN_DISTANCE,
                 "the flash step did not carry the player " + DASH_MIN_DISTANCE + " blocks");
@@ -508,6 +516,13 @@ public final class ClientSmokeTest {
                 expect(minecraft, soul.state() == SoulState.PLUS && soul.chainMaxTicks() > 0,
                         "the client never saw the Plus and its chain");
                 command(minecraft, "bleach reiryoku @s 500");
+            }
+            // A Shinigami on duty, 4 blocks ahead and facing the Plus. It stays past 180, when the player stops being a
+            // Plus: cutting the hour's chain to 30 seconds at 140 makes the Plus due a visit, and none comes down on its
+            // own while this one stands within 128 blocks.
+            case 82 -> {
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                command(minecraft, "summon bleach:duty_shinigami ~ ~ ~4 {Lifetime:110,Rotation:[180f,0f]}");
             }
             case 100 -> BleachNetwork.requestReiatsuToggle();
             case 140 -> {

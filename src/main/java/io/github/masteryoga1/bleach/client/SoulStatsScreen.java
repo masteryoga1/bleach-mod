@@ -535,8 +535,9 @@ public final class SoulStatsScreen extends Screen {
 
     /**
      * What this soul can do next. A Plus in the Overworld who was told where the Academy is gets its
-     * direction too, and a Plus who could gnaw its own chain is told it can, with the Devour key. A
-     * Hollow is told how to feed with that key and, once it has, how many souls are within it. A Menos
+     * direction too, a Plus in another world is told no Shinigami on duty comes there, and a Plus who
+     * could gnaw its own chain is told it can, with the Devour key. A Hollow is told how to feed with
+     * that key and, once it has, how many souls are within it. A Menos
      * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
      * how long it may go without a Hollow before it sinks back, wherever the server lets it, and a Gillian how
      * to call down Negación, where the server lets it. An Adjuchas or Vasto Lorde is told it can tear off its
@@ -577,8 +578,13 @@ public final class SoulStatsScreen extends Screen {
         if (!key.equals("plus")) {
             return Component.translatable("screen.bleach.soul.next." + key);
         }
+        // The Shinigami on duty is promised only where the server sends one: in the Overworld, not in creative or spectator.
+        boolean duty = BleachConfig.get(BleachConfig.KONSO_DUTY_SHINIGAMI) && !player.isCreative() && !player.isSpectator();
+        boolean overworld = player.level().dimension() == Level.OVERWORLD;
         Component plus;
-        if (data.shinigami().academyPos().isPresent() && player.level().dimension() == Level.OVERWORLD) {
+        if (!overworld && duty) {
+            plus = Component.translatable("screen.bleach.soul.next.plus.elsewhere");
+        } else if (overworld && data.shinigami().academyPos().isPresent()) {
             BlockPos academy = data.shinigami().academyPos().get();
             double dx = academy.getX() + 0.5 - player.getX();
             double dz = academy.getZ() + 0.5 - player.getZ();
@@ -587,6 +593,9 @@ public final class SoulStatsScreen extends Screen {
                     ShinigamiLogic.roundedDistance(Math.sqrt(dx * dx + dz * dz)));
         } else {
             plus = Component.translatable("screen.bleach.soul.next.plus");
+        }
+        if (overworld && duty) {
+            plus = plus.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.plus.duty"));
         }
         // Only where the server would let it gnaw: not for a Quincy, nor with Hollowfication or gnawing off.
         if (DevourLogic.gnawRefusal(player, data) == DevourLogic.Gnaw.GNAWING) {

@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.soul;
 
+import com.mojang.serialization.Codec;
 import io.github.masteryoga1.bleach.BleachMod;
 import java.util.List;
 import java.util.function.Supplier;
@@ -31,6 +32,14 @@ public final class SoulAttachments {
     public static final Supplier<AttachmentType<TravelRecord>> TRAVEL = ATTACHMENT_TYPES.register("travel",
             () -> AttachmentType.builder(() -> TravelRecord.NONE)
                     .serialize(TravelRecord.CODEC, record -> !record.equals(TravelRecord.NONE)).copyOnDeath().build());
+
+    /**
+     * The game time a Shinigami on duty last came down to this soul, so the next waits (see {@link DutyEvents}). Saved
+     * once one has come; kept through death; never sent.
+     */
+    public static final Supplier<AttachmentType<Long>> DUTY_VISIT = ATTACHMENT_TYPES.register("duty_visit",
+            () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
+                    .serialize(Codec.LONG, at -> at != ShinigamiProgress.NEVER).copyOnDeath().build());
 
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",

@@ -86,6 +86,7 @@ public final class SoulEvents {
         QuincyArtsEvents.register(bus);
         QuincyNpcEvents.register(bus);
         BaitEvents.register(bus);
+        DutyEvents.register(bus);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {

@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.DankuWall;
+import io.github.masteryoga1.bleach.entity.DutyShinigami;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
@@ -63,6 +64,18 @@ public final class ModEntities {
                     .eyeHeight(1.62F)
                     .clientTrackingRange(10)
                     .build(BleachMod.id("wounded_shinigami").toString()));
+
+    /**
+     * A Shinigami on duty, come down to a Plus whose chain has begun to wear. It cannot be hurt and is never saved: a
+     * visit is gone with its chunk.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<DutyShinigami>> DUTY_SHINIGAMI =
+            ENTITY_TYPES.register("duty_shinigami", () -> EntityType.Builder
+                    .<DutyShinigami>of(DutyShinigami::new, MobCategory.MISC)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("duty_shinigami").toString()));
 
     // ---- Living Quincy (see QuincyNpc): seen by everyone, and seeing spirits themselves ----
 
@@ -415,6 +428,7 @@ public final class ModEntities {
     public static void onAttributes(EntityAttributeCreationEvent event) {
         event.put(ACADEMY_INSTRUCTOR.get(), ShinigamiNpc.createAttributes().build());
         event.put(WOUNDED_SHINIGAMI.get(), ShinigamiNpc.createAttributes().build());
+        event.put(DUTY_SHINIGAMI.get(), ShinigamiNpc.createAttributes().build());
         event.put(QUINCY_ELDER.get(), QuincyNpc.createAttributes().build());
         event.put(QUINCY_HUNTER.get(), QuincyHunter.createHunterAttributes().build());
         event.put(SPIDER_HOLLOW.get(), SpiderHollow.createAttributes().build());

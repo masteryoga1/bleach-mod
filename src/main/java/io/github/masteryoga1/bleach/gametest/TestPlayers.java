@@ -34,11 +34,13 @@ import net.neoforged.neoforge.network.registration.NetworkRegistry;
 /**
  * Real server players for game tests. Vanilla's mock server player cannot take the mod's payloads, so this joins one
  * the way NeoForge's own test framework does: on an in-memory connection that has every channel, answers teleports and
- * keep-alives as a client would, and keeps what the action bar shows for the test to read.
+ * keep-alives as a client would, and keeps what its action bar and chat show for the test to read.
  */
 final class TestPlayers {
     /** What each joined player has been shown on its action bar, for its test to read. */
     private static final Map<UUID, List<Component>> ACTION_BAR = new ConcurrentHashMap<>();
+    /** What each joined player has been shown in chat, for its test to read. */
+    private static final Map<UUID, List<Component>> CHAT = new ConcurrentHashMap<>();
 
     private TestPlayers() {
     }
@@ -72,8 +74,9 @@ final class TestPlayers {
                             player.connection.handleAcceptTeleportPacket(answer);
                         }
                     }));
-                } else if (packet instanceof ClientboundSystemChatPacket chat && chat.overlay()) {
-                    ACTION_BAR.computeIfAbsent(player.getUUID(), id -> new CopyOnWriteArrayList<>()).add(chat.content());
+                } else if (packet instanceof ClientboundSystemChatPacket chat) {
+                    (chat.overlay() ? ACTION_BAR : CHAT).computeIfAbsent(player.getUUID(),
+                            id -> new CopyOnWriteArrayList<>()).add(chat.content());
                 }
             }
         };
@@ -91,6 +94,11 @@ final class TestPlayers {
     /** The lines this joined player has been shown on its action bar so far, oldest first. */
     static List<Component> actionBar(ServerPlayer player) {
         return ACTION_BAR.getOrDefault(player.getUUID(), List.of());
+    }
+
+    /** The lines this joined player has been shown in chat so far, oldest first. */
+    static List<Component> chat(ServerPlayer player) {
+        return CHAT.getOrDefault(player.getUUID(), List.of());
     }
 
     /** Takes the player off the server when its test ends; the server drops it on its next tick. */
@@ -113,9 +121,10 @@ final class TestPlayers {
         public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
         }
 
-        /** Forgets the player's action bar and disconnects it, unless it has already gone. */
+        /** Forgets the player's action bar and chat and disconnects it, unless it has already gone. */
         private void leave() {
             ACTION_BAR.remove(player.getUUID());
+            CHAT.remove(player.getUUID());
             if (!player.hasDisconnected()) {
                 player.connection.disconnect(Component.literal("Test finished"));
             }

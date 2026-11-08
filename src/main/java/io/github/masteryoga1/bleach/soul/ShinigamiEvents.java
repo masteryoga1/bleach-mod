@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
+import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
@@ -605,11 +606,24 @@ public final class ShinigamiEvents {
      */
     @Nullable
     static WoundedShinigami spawnWoundedFor(ServerPlayer player, SoulData data, long now) {
-        ServerLevel level = player.serverLevel();
         EntityType<WoundedShinigami> type = ModEntities.WOUNDED_SHINIGAMI.get();
-        Vec3 spot = SpawnSpots.openGround(level, player, type, ENCOUNTER_MIN_DISTANCE, ENCOUNTER_MAX_DISTANCE,
-                ENCOUNTER_TRIES, Integer.MAX_VALUE);
-        WoundedShinigami npc = spot != null ? type.create(level) : null;
+        WoundedShinigami npc = comeDownAt(player, type, SpawnSpots.openGround(player.serverLevel(), player, type,
+                ENCOUNTER_MIN_DISTANCE, ENCOUNTER_MAX_DISTANCE, ENCOUNTER_TRIES, Integer.MAX_VALUE));
+        if (npc != null) {
+            data.setShinigami(data.shinigami().withWoundedMetAt(now));
+        }
+        return npc;
+    }
+
+    /**
+     * A Shinigami NPC comes down at this spot near the player, facing them. No conditions are checked here.
+     *
+     * @return it, or null if there was no spot or it could not be added
+     */
+    @Nullable
+    public static <T extends ShinigamiNpc> T comeDownAt(ServerPlayer player, EntityType<T> type, @Nullable Vec3 spot) {
+        ServerLevel level = player.serverLevel();
+        T npc = spot != null ? type.create(level) : null;
         if (npc == null) {
             return null;
         }
@@ -618,11 +632,7 @@ public final class ShinigamiEvents {
         npc.setYHeadRot(yaw);
         npc.setYBodyRot(yaw);
         EventHooks.finalizeMobSpawn(npc, level, level.getCurrentDifficultyAt(npc.blockPosition()), MobSpawnType.EVENT, null);
-        if (!level.addFreshEntity(npc)) {
-            return null;
-        }
-        data.setShinigami(data.shinigami().withWoundedMetAt(now));
-        return npc;
+        return level.addFreshEntity(npc) ? npc : null;
     }
 
     private static void powerEffects(Player human) {
