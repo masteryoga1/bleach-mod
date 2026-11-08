@@ -578,8 +578,8 @@ public final class SoulStatsScreen extends Screen {
         if (!key.equals("plus")) {
             return Component.translatable("screen.bleach.soul.next." + key);
         }
-        // The Shinigami on duty is promised only where the server sends one, and only in the Overworld.
-        boolean duty = BleachConfig.get(BleachConfig.KONSO_DUTY_SHINIGAMI);
+        // The Shinigami on duty is promised only where the server sends one: in the Overworld, not in creative or spectator.
+        boolean duty = BleachConfig.get(BleachConfig.KONSO_DUTY_SHINIGAMI) && !player.isCreative() && !player.isSpectator();
         boolean overworld = player.level().dimension() == Level.OVERWORLD;
         Component plus;
         if (!overworld && duty) {

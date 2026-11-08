@@ -128,8 +128,9 @@ public final class DutyEvents {
     private static DutyShinigami comeDown(ServerPlayer player) {
         ServerLevel level = player.serverLevel();
         EntityType<DutyShinigami> type = ModEntities.DUTY_SHINIGAMI.get();
-        boolean roofed = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, player.getBlockX(), player.getBlockZ())
-                > player.getEyeY();
+        // Water counts in the heightmap, so a Plus in it is not taken to be under a roof.
+        boolean roofed = !player.isInWater() && level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                player.getBlockX(), player.getBlockZ()) > player.getEyeY();
         Vec3 spot = roofed ? floorNear(level, player, type) : null;
         if (spot == null) {
             spot = SpawnSpots.openGround(level, player, type, MIN_DISTANCE, MAX_DISTANCE, TRIES, MAX_RISE);

@@ -297,8 +297,9 @@ public final class DutyTests {
                     }
                     DutyShinigami below = visit(helper, plus, data, now + 3 * WAIT + 2, "the floor under a roof");
                     double under = horizontal(below, plus);
-                    // The cleared floor beyond the template's edge lies 2 lower; the roof's top is 4 up.
-                    helper.assertTrue(under >= 2.99 && under <= 10.01 && below.getY() <= plus.getY() + 0.01
+                    // A spot 3 to 10 away lands on a block's centre, up to 0.71 off; the cleared floor beyond the template's
+                    // edge lies 2 lower, and the roof's top is 4 up.
+                    helper.assertTrue(under >= 2.29 && under <= 10.71 && below.getY() <= plus.getY() + 0.01
                                     && below.getY() >= plus.getY() - 4.01,
                             "under a roof it came down " + under + " blocks away at y " + below.getY());
                     clear.run();
