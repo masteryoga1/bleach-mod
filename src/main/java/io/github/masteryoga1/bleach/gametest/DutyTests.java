@@ -61,10 +61,10 @@ public final class DutyTests {
     private static final double REACH = 17.0;
     /** How many visits are tried before the test gives up on finding ground for one. */
     private static final int TRIES = 5;
-    /** How far above the Plus the perch stands: more than 16 blocks over any ground about, the test's own roof too. */
+    /** How far above the Plus the perch stands: more than 16 blocks over any ground about, the test's barrier walls too. */
     private static final int PERCH = 40;
-    /** How far above the Plus's feet the roof is laid, and how far out each way: its top is within 16 of the Plus. */
-    private static final int ROOF = 10;
+    /** How far above the Plus's feet the roof is laid, over the barrier walls, and how far out each way: its top is 13 up. */
+    private static final int ROOF = 12;
     private static final int REACH_BLOCKS = 16;
     /** The tick by which the arrivals must be done; past it, everything is cleared away and the test fails. */
     private static final int GIVE_UP_TICK = 290;
@@ -195,7 +195,7 @@ public final class DutyTests {
      * not on the roof. The chunks about are forced while it runs and let go, with every block and NPC it made, on every
      * way out.
      */
-    @GameTest(template = "field", batch = "duty", timeoutTicks = 300)
+    @GameTest(template = "field", batch = "duty", skyAccess = true, timeoutTicks = 300)
     public static void dutyShinigamiComesDownNearAPlus(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         ServerPlayer plus = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(8.5, 1.0, 8.5));
@@ -281,7 +281,7 @@ public final class DutyTests {
                             "on the tower it came down " + near + " blocks away at y " + top.getY());
                     helper.assertTrue(unreachable(plus) == before + 1, "a Plus on the tower was told none could reach it");
 
-                    // Under a roof, as in a shallow cave: on the floor about the Plus, not on the roof's top 11 blocks up.
+                    // Under a roof, as in a shallow cave: on the floor about the Plus, not on the roof's top 13 blocks up.
                     top.discard();
                     built.forEach(pos -> level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState()));
                     built.clear();
@@ -294,7 +294,7 @@ public final class DutyTests {
                     }
                     DutyShinigami below = visit(helper, plus, data, now + 3 * WAIT + 2, "the floor under a roof");
                     double under = horizontal(below, plus);
-                    // The cleared floor beyond the template's edge lies 2 lower; the roof's top would be 11 up.
+                    // The cleared floor beyond the template's edge lies 2 lower; the roof's top would be 13 up.
                     helper.assertTrue(under >= 2.99 && under <= 10.01 && Math.abs(below.getY() - plus.getY()) <= 4.01,
                             "under a roof it came down " + under + " blocks away at y " + below.getY());
                     clear.run();
