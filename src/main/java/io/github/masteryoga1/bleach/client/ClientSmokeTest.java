@@ -114,6 +114,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.phys.AABB;
@@ -129,7 +130,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * its time is up, releases reiatsu, brings on Encroachment, turns them into a Hollow and opens the soul
  * screen. Then it makes them a Shinigami in the Shihakushō with a sheathed Asauchi,
  * opens the Tailoring Table and the instructor's dialogue, flash steps, stands on reishi footing by
- * jumping while falling, places an Academy, summons each Hollow and a Plus, cracks a mask, purifies a
+ * jumping while falling, summons each Hollow and a Plus, cracks a mask, purifies a
  * Hollow, sends a Plus on, opens a Garganta and checks that a soul just below the threshold sees only
  * a shimmer. Next, as a Shinigami again whose Asauchi bond is full, it sits in Jinzen through the real
  * sneak and use keys, takes the red ribbon, closes the screen, learns Zangetsu's name, releases it,
@@ -231,11 +232,13 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * soul screen. Last, handed a Jigokuchō, holding the Gate key must turn the blade, which the action bar must say, and
  * open a Senkaimon that reaches the client two blocks south of the player, facing it, 3 wide and 4 tall. Standing in it
  * must bring the player to the Senkaimon court on Seireitei's lawn at exactly y 72. A tp across the lawn must stand it
- * where the south wall reaches the client in Sekkiseki to its top beside the gate's 16-block gap. Once the first gate's
- * wait has run, a gate opened in Soul Society must bring the player home. Then, its Jigokuchō taken, a third gate must
- * take it into the Dangai, set on a lane's floor between its walls of Kōryū, which the action bar must say, with the
- * lane's Kōtotsu waiting at its start; it looks back at the Kōtotsu, then, moved near the lane's end, it walks out and
- * must come out over the Rukongai, falling slowly, before the run quits.
+ * where the south wall reaches the client in Sekkiseki to its top beside the gate's 16-block gap. A tp must then stand
+ * it two blocks inside the Academy's gate in Seireitei, where the Academy and its instructor must reach the client,
+ * and another must stand it on the lawn again. Once the first gate's wait has run, a gate opened in Soul Society must
+ * bring the player home. Then, its Jigokuchō taken, a third gate must take it into the Dangai, set on a lane's floor
+ * between its walls of Kōryū, which the action bar must say, with the lane's Kōtotsu waiting at its start; it looks
+ * back at the Kōtotsu, then, moved near the lane's end, it walks out and must come out over the Rukongai, falling
+ * slowly, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -265,6 +268,9 @@ public final class ClientSmokeTest {
     private static final double RIFT_RANGE = 40.0;
     /** Where the player stands in Soul Society: Seireitei's lawn, 40 blocks inside the south wall, east of its gate. */
     private static final double SOUL_SOCIETY_X = 16.5, SOUL_SOCIETY_Z = SeireiteiPlan.SEIREITEI_RADIUS - 39.5;
+    /** The tp that stands the player there, at y 72 for any seed, facing the south wall 40 blocks off. */
+    private static final String LAWN_TP = String.format(Locale.ROOT, "tp @s %.1f %d %.1f 0 -20", SOUL_SOCIETY_X,
+            SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z);
     /** Where the tp sets the player in its Dangai lane: 1.5 blocks short of the lane's end. */
     private static final double LANE_END_Z = DangaiPlan.EXIT_Z - 1.5;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
@@ -409,8 +415,6 @@ public final class ClientSmokeTest {
                 "jumping while falling did not stand the player on reishi footing")) {
             shot(minecraft, "footing");
         }
-        expectWithin(minecraft, 450, 500, () -> instructorsNear(minecraft, 64.0).size() >= 2,
-                "the placed Academy's instructor never reached the client");
         expectWithin(minecraft, 565, 620, () -> summonedSeen(minecraft),
                 "the summoned Hollows and Plus never reached the client");
         if (expectWithin(minecraft, 660, 700, () -> subject instanceof Hollow hollow && hollow.isMaskCracked(),
@@ -595,18 +599,14 @@ public final class ClientSmokeTest {
             // Pressing jump again while falling, through the real key, asks for footing.
             case 386 -> minecraft.options.keyJump.setDown(true);
             case 388 -> minecraft.options.keyJump.setDown(false);
-            case 440 -> command(minecraft, "place structure bleach:academy ~ ~-12 ~20");
-            case 505 -> shot(minecraft, "academy");
             case 510 -> minecraft.setScreen(new SoulStatsScreen());
             // A screenshot shows the last frame drawn, so it waits a moment for the screen to be drawn.
             case 515 -> shot(minecraft, "stats");
             case 520 -> expect(minecraft, minecraft.screen instanceof SoulStatsScreen stats && stats.kidoButton() != null,
                     "the soul screen offered a new Shinigami no Kidō page");
             case 550 -> minecraft.setScreen(null);
-            // Hollows vanish on Peaceful. Back on the ground, off the footing, facing north, and clear of the
-            // Academy: placed 20 blocks south, it starts at that chunk's corner and turns at random, so it
-            // can reach up to 12 blocks north of this spot, and an arrow shot up under its ceiling bursts
-            // at once.
+            // Hollows vanish on Peaceful. Back on the ground, off the footing and facing north, 24 blocks north of
+            // here, where every later spot is laid out.
             case 560 -> {
                 command(minecraft, "difficulty easy");
                 command(minecraft, "tp @s ~ -60 ~-24 180 0");
@@ -903,7 +903,7 @@ public final class ClientSmokeTest {
                 shot(minecraft, "tailoring_page_2");
             }
             case 2856 -> player.closeContainer();
-            // Hollow Bait, by command: the Academy close by and the quiet game rule are passed over.
+            // Hollow Bait, by command: the instructor close by and the quiet game rule are passed over.
             case 2860 -> {
                 command(minecraft, "kill @e[type=bleach:quincy_hunter]");
                 command(minecraft, "kill @e[type=bleach:quincy_elder]");
@@ -1432,11 +1432,16 @@ public final class ClientSmokeTest {
             // Where it stands in the gate, whose block the gate home brings it back to.
             case 6660 -> returnTo = player.position();
             // Across the lawn, at y 72 for any seed, facing the south wall 40 blocks off.
-            case 6810 -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f 0 -20", SOUL_SOCIETY_X,
-                    SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z));
+            case 6810 -> command(minecraft, LAWN_TP);
             // The wall's chunks have had a hundred ticks or more to be drawn since they reached the client.
             case 6990 -> shot(minecraft, "seireiheki");
-            case 6995 -> holdArrival(minecraft, false);
+            // To the Academy in Seireitei, two blocks inside its gate, facing its hall.
+            case 7000 -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f 90 0",
+                    SeireiteiPlan.ACADEMY_LANDING_X, SeireiteiPlan.ACADEMY_FLOOR_Y, SeireiteiPlan.ACADEMY_LANDING_Z));
+            case 7095 -> shot(minecraft, "academy");
+            // Back to the lawn, where the gate home opens.
+            case 7100 -> command(minecraft, LAWN_TP);
+            case 7190 -> holdArrival(minecraft, false);
             // Home by a gate opened in Soul Society. The first gate's wait of 600 server ticks from about 6631 has run
             // by about 7231, 89 ticks before the press; the gate opens about 7351, two blocks south.
             case 7310 -> command(minecraft, "bleach reiryoku @s 800 800");
@@ -2043,7 +2048,7 @@ public final class ClientSmokeTest {
 
     /**
      * The checks of Soul Society, each window from the step it follows: the blade turned and the gate open, the court,
-     * the lawn and the wall seen, and home again by a gate from there.
+     * the lawn and the wall seen, the Academy in Seireitei and the lawn again, and home again by a gate from there.
      */
     private static void checkSoulSociety(Minecraft minecraft, LocalPlayer player) {
         Component turning = Component.translatable("message.bleach.senkaimon.turning");
@@ -2061,9 +2066,7 @@ public final class ClientSmokeTest {
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
                         + ", the court's block " + minecraft.level.getBlockState(BlockPos.containing(TravelLogic.COURT)
                                 .below()) + "; the action bar's last lines: " + recentActionBar() + ")");
-        expectWithin(minecraft, 6812, 6890, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
-                        && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
-                        && horizontalDistance(player.position(), new Vec3(SOUL_SOCIETY_X, 0.0, SOUL_SOCIETY_Z)) < 0.5,
+        expectWithin(minecraft, 6812, 6890, () -> onLawn(minecraft, player),
                 "the tp never stood the player on Seireitei's lawn at y 72 (it is in "
                         + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString()
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
@@ -2071,6 +2074,13 @@ public final class ClientSmokeTest {
                                 SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
         expectWithin(minecraft, 6850, 6985, () -> wallStands(minecraft.level),
                 "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a 16-block gap");
+        expectWithin(minecraft, 7010, 7090, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
+                        && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.ACADEMY_FLOOR_Y) < 0.01
+                        && academyStands(minecraft.level) && !instructorsNear(minecraft, 32.0).isEmpty(),
+                "the Academy never stood in Seireitei with its instructor (the player is in "
+                        + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString() + ")");
+        expectWithin(minecraft, 7105, 7180, () -> onLawn(minecraft, player),
+                "the tp never stood the player on the lawn again before the gate home");
         // The cooldown line shows here instead if the first gate's wait had not run.
         expectWithin(minecraft, 7323, 7348, () -> actionBarShows(turning),
                 "in Soul Society, holding the Gate key never turned the blade (the action bar's last lines: "
@@ -2186,6 +2196,20 @@ public final class ClientSmokeTest {
                 && level.getBlockState(new BlockPos(-w, 90, z)).isAir()
                 && level.getBlockState(new BlockPos(16, top - 1, z)).is(sekkiseki)
                 && level.getBlockState(new BlockPos(16, top, z)).isAir();
+    }
+
+    /** Whether the player stands on Seireitei's lawn at y 72, where {@link #LAWN_TP} sets it. */
+    private static boolean onLawn(Minecraft minecraft, LocalPlayer player) {
+        return minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
+                && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
+                && horizontalDistance(player.position(), new Vec3(SOUL_SOCIETY_X, 0.0, SOUL_SOCIETY_Z)) < 0.5;
+    }
+
+    /** Whether the client holds the Academy as the plan lays it: its Tailoring Table and its gate's north post. */
+    private static boolean academyStands(ClientLevel level) {
+        int x = SeireiteiPlan.ACADEMY_X, y = SeireiteiPlan.ACADEMY_FLOOR_Y, z = SeireiteiPlan.ACADEMY_Z;
+        return level.getBlockState(new BlockPos(x - 13, y, z + 3)).is(ModBlocks.TAILORING_TABLE.get())
+                && level.getBlockState(new BlockPos(x, y, z + 5)).is(Blocks.STRIPPED_DARK_OAK_LOG);
     }
 
     /**
@@ -2308,9 +2332,10 @@ public final class ClientSmokeTest {
     }
 
     /**
-     * Holds (or lets go of) both arrival chunks in Soul Society, the Senkaimon court's and the lawn spot's, on the
-     * integrated server with a forced ticket each, which generates them in the background, as the forceload command
-     * would not.
+     * Holds (or lets go of) the arrival chunks in Soul Society, the Senkaimon court's, the lawn spot's and the Academy's,
+     * on the integrated server with a forced ticket each, which generates them in the background, as the forceload
+     * command would not. The Academy's landing lies in its hall's chunk, and a ticket reaches a chunk each way, so the
+     * gate's is held too.
      */
     private static void holdArrival(Minecraft minecraft, boolean hold) {
         MinecraftServer server = minecraft.getSingleplayerServer();
@@ -2318,7 +2343,9 @@ public final class ClientSmokeTest {
             return;
         }
         List<ChunkPos> chunks = List.of(new ChunkPos(BlockPos.containing(TravelLogic.COURT)),
-                new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z)));
+                new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z)),
+                new ChunkPos(BlockPos.containing(SeireiteiPlan.ACADEMY_LANDING_X, SeireiteiPlan.ACADEMY_FLOOR_Y,
+                        SeireiteiPlan.ACADEMY_LANDING_Z)));
         server.execute(() -> {
             ServerLevel level = server.getLevel(BleachWorlds.SOUL_SOCIETY);
             if (level == null) {

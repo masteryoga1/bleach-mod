@@ -1,0 +1,13 @@
+{
+  "placement": {
+    "type": "bleach:site",
+    "group": "academy",
+    "salt": 0
+  },
+  "structures": [
+    {
+      "structure": "bleach:seireitei_academy",
+      "weight": 1
+    }
+  ]
+}

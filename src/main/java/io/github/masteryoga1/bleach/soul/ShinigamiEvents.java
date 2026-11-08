@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.world.AcademySite;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -85,6 +86,9 @@ public final class ShinigamiEvents {
         bus.addListener(ShinigamiEvents::onChangedDimension);
         bus.addListener(ShinigamiEvents::onLoggedIn);
         bus.addListener(ShinigamiEvents::onServerStarted);
+        // The Academy in Seireitei is completed where its chunks were made before it, or with structures off.
+        bus.addListener(AcademySite::onChunkLoad);
+        bus.addListener(AcademySite::onServerTick);
     }
 
     /** A new world builds its guaranteed Academy before anyone can build where it goes. Not for game tests. */

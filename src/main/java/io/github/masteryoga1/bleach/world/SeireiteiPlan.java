@@ -1,8 +1,16 @@
 package io.github.masteryoga1.bleach.world;
 
+import io.github.masteryoga1.bleach.BleachMod;
+import java.util.List;
+import javax.annotation.Nullable;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Rotation;
+
 /**
- * Soul Society's plan: every size and height that Java needs and the world's JSON must agree with. x and z are blocks
- * from the centre column, north is -z, and a height is the y a player stands at, one above the top block.
+ * Soul Society's plan: every size and height that Java needs and the world's JSON must agree with, and the places where
+ * its buildings stand. x and z are blocks from the centre column, north is -z, and a height is the y a player stands at,
+ * one above the top block.
  */
 public final class SeireiteiPlan {
     /** Seireitei's ground, the gate gaps' and the Rukongai's base. */
@@ -36,6 +44,16 @@ public final class SeireiteiPlan {
     public static final int ROUGH_FROM_DISTRICT = 31, WILDS_FROM_DISTRICT = 79;
     /** The Senkaimon court, where every gate from the Human World comes out: open lawn north-east of the hill. */
     public static final int SENKAIMON_COURT_X = SEIREITEI_RADIUS * 3 / 8, SENKAIMON_COURT_Z = -SEIREITEI_RADIUS * 9 / 16;
+    /** The Shin'ō Academy's north-east corner, where its template is placed from; its gate faces east. */
+    public static final int ACADEMY_X = -192, ACADEMY_Z = 224;
+    /** The y a soul stands at on the Academy's floor, which is laid on the lawn. */
+    public static final int ACADEMY_FLOOR_Y = PLATEAU_Y + 1;
+    /** Where a soul sent to the Academy lands: on the path two blocks inside its gate. */
+    public static final double ACADEMY_LANDING_X = ACADEMY_X - 1.5, ACADEMY_LANDING_Z = ACADEMY_Z + 7.5;
+
+    /** Every planned site: a template set whole at its corner, turned, on the ground there, one structure for each group. */
+    public static final List<Site> SITES = List.of(
+            new Site("academy", ACADEMY_X, ACADEMY_Z, BleachMod.id("academy/academy"), Rotation.CLOCKWISE_90));
 
     private SeireiteiPlan() {
     }
@@ -60,5 +78,29 @@ public final class SeireiteiPlan {
     /** The radius where this Rukongai district, 1 to 80, begins. */
     public static int districtStart(int district) {
         return WALL_OUTER_RADIUS + DISTRICT_DEPTH * (district - 1);
+    }
+
+    /** The group's sites, in the plan's order. */
+    public static List<Site> sites(String group) {
+        return SITES.stream().filter(site -> site.group().equals(group)).toList();
+    }
+
+    /** The group's site whose structure starts in this chunk, or null. */
+    @Nullable
+    public static Site siteAt(String group, int chunkX, int chunkZ) {
+        for (Site site : SITES) {
+            if (site.group().equals(group) && site.x() >> 4 == chunkX && site.z() >> 4 == chunkZ) {
+                return site;
+            }
+        }
+        return null;
+    }
+
+    /** One planned site: its group, the corner its template is placed from, the template and its turn. */
+    public record Site(String group, int x, int z, ResourceLocation template, Rotation rotation) {
+        /** The chunk its structure starts in, the one holding its corner. */
+        public ChunkPos chunk() {
+            return new ChunkPos(x >> 4, z >> 4);
+        }
     }
 }
