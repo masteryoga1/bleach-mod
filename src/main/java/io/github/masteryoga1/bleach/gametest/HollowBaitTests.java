@@ -126,19 +126,19 @@ public final class HollowBaitTests {
     /**
      * Forces every chunk within this reach of the point that is not forced already, and returns those it forced.
      * A forced chunk only lets creatures tick once every chunk two around it is loaded too, so that ring is
-     * loaded here and now: the test server runs its ticks as fast as it can, and ground still being generated
-     * off the thread could outlast the test.
+     * loaded first, here and now: the test server runs its ticks as fast as it can, and ground still being
+     * generated off the thread could outlast the test.
      */
-    private static List<ChunkPos> forceAround(ServerLevel level, Vec3 centre, double reach) {
+    static List<ChunkPos> forceAround(ServerLevel level, Vec3 centre, double reach) {
+        for (ChunkPos chunk : chunksAround(centre, reach + ENTITY_TICKING_RING)) {
+            level.getChunk(chunk.x, chunk.z);
+        }
         List<ChunkPos> forced = new ArrayList<>();
         for (ChunkPos chunk : chunksAround(centre, reach)) {
             if (!level.getForcedChunks().contains(chunk.toLong())) {
                 level.setChunkForced(chunk.x, chunk.z, true);
                 forced.add(chunk);
             }
-        }
-        for (ChunkPos chunk : chunksAround(centre, reach + ENTITY_TICKING_RING)) {
-            level.getChunk(chunk.x, chunk.z);
         }
         return forced;
     }
@@ -158,7 +158,7 @@ public final class HollowBaitTests {
     }
 
     /** Whether creatures tick everywhere within this reach of the point, as a wave's landing needs. */
-    private static boolean allTicking(ServerLevel level, Vec3 centre, double reach) {
+    static boolean allTicking(ServerLevel level, Vec3 centre, double reach) {
         for (ChunkPos chunk : chunksAround(centre, reach)) {
             if (!level.isPositionEntityTicking(chunk.getMiddleBlockPosition((int) centre.y))) {
                 return false;
@@ -186,7 +186,7 @@ public final class HollowBaitTests {
     }
 
     /** Runs a step of a site test, clearing everything away first if it fails. */
-    private static Runnable orClear(Runnable step, Runnable clear) {
+    static Runnable orClear(Runnable step, Runnable clear) {
         return () -> {
             try {
                 step.run();

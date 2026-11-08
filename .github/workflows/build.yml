@@ -92,17 +92,17 @@ jobs:
           if-no-files-found: ignore
 
   # Starts the real game client under a virtual display and runs ClientSmokeTest: it makes a world, answers
-  # the bloodline question, becomes a Plus, a Hollow and then a Shinigami in the Shihakushō, opens the
-  # Tailoring Table and an instructor's dialogue, flash steps, stands on reishi footing and places an
-  # Academy, then summons each Hollow and a Plus, cracks a mask, purifies a Hollow, sends a Plus on, opens
-  # a Garganta and checks what a soul just below the awareness threshold sees, sits in Jinzen, learns
-  # Zangetsu's name, releases it and fires a Getsuga Tenshō, then becomes a Quincy, draws the Heilig Bogen,
-  # shoots a Hollow, calls Blut Vene and uses Hirenkyaku, then masters the Sanrei Glove, tears it off for
-  # Letzt Stil, is sealed and restored, streams arrows from Ginrei Kojaku, calls Licht Regen, forms and
-  # fires a Seele Schneider, casts Wolke and Heizen, flies in Vollständig with Sklaverei, then meets a
-  # Quincy Elder and Hunter, passes the Ransōtengai trial, wears the Wandenreich uniform, pages the
-  # Tailoring Table, draws a bait wave and cracks the sky, becomes a Hollow, sheds the uniform and devours
-  # a Plus, nearly all with the camera behind the player, and quits.
+  # the bloodline question, becomes a Plus, who meets a Shinigami on duty, then a Hollow and then a
+  # Shinigami in the Shihakushō, opens the Tailoring Table and an instructor's dialogue, flash steps,
+  # stands on reishi footing and places an Academy, then summons each Hollow and a Plus, cracks a mask,
+  # purifies a Hollow, sends a Plus on, opens a Garganta and checks what a soul just below the awareness
+  # threshold sees, sits in Jinzen, learns Zangetsu's name, releases it and fires a Getsuga Tenshō, then
+  # becomes a Quincy, draws the Heilig Bogen, shoots a Hollow, calls Blut Vene and uses Hirenkyaku, then
+  # masters the Sanrei Glove, tears it off for Letzt Stil, is sealed and restored, streams arrows from
+  # Ginrei Kojaku, calls Licht Regen, forms and fires a Seele Schneider, casts Wolke and Heizen, flies in
+  # Vollständig with Sklaverei, then meets a Quincy Elder and Hunter, passes the Ransōtengai trial, wears
+  # the Wandenreich uniform, pages the Tailoring Table, draws a bait wave and cracks the sky, becomes a
+  # Hollow, sheds the uniform and devours a Plus, nearly all with the camera behind the player, and quits.
   # Game tests only run on a server, so this is what catches crashes in rendering, the HUD, the screens and
   # the client mixins. Its screenshots are kept for review.
   client-smoke-test:

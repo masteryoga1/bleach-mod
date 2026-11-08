@@ -66,6 +66,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue KONSO_GROWTH;
     public static final ModConfigSpec.IntValue KONSO_REWARDED_PER_DAY;
     public static final ModConfigSpec.BooleanValue KONSO_SENDS_TO_ACADEMY;
+    public static final ModConfigSpec.BooleanValue KONSO_DUTY_SHINIGAMI;
+    public static final ModConfigSpec.IntValue KONSO_DUTY_AFTER_MINUTES;
+    public static final ModConfigSpec.IntValue KONSO_DUTY_REVISIT_MINUTES;
 
     public static final ModConfigSpec.DoubleValue TRANSFER_FRACTION;
     public static final ModConfigSpec.IntValue GIVER_RECOVERY_MINUTES;
@@ -900,6 +903,18 @@ public final class BleachConfig {
         KONSO_SENDS_TO_ACADEMY = builder
                 .comment("Whether a player sent on by Konsō arrives at the nearest Academy, standing in for the Rukongai.")
                 .define("sends_to_academy", true);
+        KONSO_DUTY_SHINIGAMI = builder
+                .comment("Whether a Shinigami on duty comes down in the Overworld to a Plus whose chain has begun to wear,"
+                        + " to perform its Konsō. It comes at any hour, whatever the mob spawning rule.")
+                .define("duty_shinigami", true);
+        KONSO_DUTY_AFTER_MINUTES = builder
+                .comment("Minutes of play a Plus's chain wears before a Shinigami on duty first comes, never more than a"
+                        + " quarter of the chain.")
+                .defineInRange("duty_after_minutes", 5, 0, 1_440);
+        KONSO_DUTY_REVISIT_MINUTES = builder
+                .comment("Minutes before a Shinigami on duty comes again to a Plus it came to, and before a Plus that"
+                        + " none could reach, or one in another world, is told so again.")
+                .defineInRange("duty_revisit_minutes", 10, 1, 1_440);
         builder.pop();
 
         builder.push("substitute");

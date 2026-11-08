@@ -25,7 +25,7 @@ public enum DialogueView {
     HOLLOW,
     /** The wounded Shinigami asks a Human who can see her to take her power. */
     OFFER_POWER,
-    /** The wounded Shinigami has nothing to ask of this visitor. */
+    /** A Shinigami NPC away from its work, the wounded one or one on duty, has nothing to ask of this visitor. */
     RESTING,
     /** A Quincy, whose kind the Shinigami distrust. */
     QUINCY,

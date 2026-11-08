@@ -13,8 +13,8 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Where something can come down near a soul: a wounded Shinigami, a Garganta's Hollows or a
- * wandering Plus. Every spot is open ground under the sky, in a chunk that is ticking.
+ * Where something can come down near a soul: a wounded Shinigami, a Shinigami on duty, a Garganta's Hollows or a
+ * wandering Plus. Every spot is in a chunk that is ticking, and open ground under the sky but for {@link #floorNear}'s.
  */
 public final class SpawnSpots {
     private SpawnSpots() {
@@ -38,7 +38,26 @@ public final class SpawnSpots {
     @Nullable
     public static Vec3 openGround(ServerLevel level, Entity around, EntityType<?> type, float scale,
                                   double minDistance, double maxDistance, int tries, int maxRise) {
+        return search(level, around, type, scale, minDistance, maxDistance, tries, maxRise, false);
+    }
+
+    /**
+     * As {@link #openGround(ServerLevel, Entity, EntityType, double, double, int, int)}, but on any floor at most
+     * {@code maxRise} blocks above or below {@code around}, under a roof or not: in a cave or a tunnel, or on a tower's
+     * top. Each column tried is searched from the highest of those heights down.
+     */
+    @Nullable
+    public static Vec3 floorNear(ServerLevel level, Entity around, EntityType<?> type, double minDistance,
+                                 double maxDistance, int tries, int maxRise) {
+        return search(level, around, type, 1.0F, minDistance, maxDistance, tries, maxRise, true);
+    }
+
+    /** The search both make: each column's top, or under a roof every height in reach; the same rules for either. */
+    @Nullable
+    private static Vec3 search(ServerLevel level, Entity around, EntityType<?> type, float scale, double minDistance,
+                               double maxDistance, int tries, int maxRise, boolean underRoof) {
         RandomSource random = around.getRandom();
+        int feet = Mth.floor(around.getY());
         for (int i = 0; i < tries; i++) {
             double angle = random.nextDouble() * 2.0 * Math.PI;
             double distance = Mth.nextDouble(random, minDistance, maxDistance);
@@ -47,16 +66,19 @@ public final class SpawnSpots {
             if (!level.isPositionEntityTicking(BlockPos.containing(x, around.getY(), z))) {
                 continue;
             }
-            BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
-            BlockPos below = pos.below();
-            if (!level.getWorldBorder().isWithinBounds(pos) || !level.getFluidState(pos).isEmpty()
-                    || !level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)
-                    || Math.abs(pos.getY() - around.getY()) > maxRise) {
-                continue;
-            }
-            AABB box = box(type, scale, x + 0.5, pos.getY(), z + 0.5);
-            if (level.noCollision(box) && !level.containsAnyLiquid(box)) {
-                return new Vec3(x + 0.5, pos.getY(), z + 0.5);
+            int top = underRoof ? feet + maxRise : level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            for (int y = top; y >= (underRoof ? feet - maxRise : top); y--) {
+                BlockPos pos = new BlockPos(x, y, z);
+                BlockPos below = pos.below();
+                if (!level.getWorldBorder().isWithinBounds(pos) || !level.getFluidState(pos).isEmpty()
+                        || !level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)
+                        || Math.abs(y - around.getY()) > maxRise) {
+                    continue;
+                }
+                AABB box = box(type, scale, x + 0.5, y, z + 0.5);
+                if (level.noCollision(box) && !level.containsAnyLiquid(box)) {
+                    return new Vec3(x + 0.5, y, z + 0.5);
+                }
             }
         }
         return null;

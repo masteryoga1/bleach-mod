@@ -126,6 +126,9 @@ ARRANCAR_BLACK = rgb(30, 30, 34)
 TATTOO_GLYPH = rgb(255, 255, 255)
 # An Arrancar NPC's pale skin.
 ARRANCAR_SKIN = rgb(226, 214, 200)
+# A Shinigami on duty's warm skin and short dark hair.
+DUTY_SKIN = rgb(222, 184, 150)
+DUTY_HAIR = rgb(44, 34, 30)
 # The Caja Negación: a slate cube, lit from above and its left, seamed in Negación's pale gold.
 CAJA_FACE = rgb(0x3A, 0x3D, 0x48)
 CAJA_SIDE = rgb(0x2A, 0x2C, 0x35)
@@ -1458,6 +1461,25 @@ def arrancar_npc():
     return c
 
 
+def duty_shinigami():
+    """The skin a Shinigami on duty wears under its Shihakushō, in the player skin layout with wide arms: warm skin on
+    the head, body, arms and legs, short dark hair over the top, back and sides of the head and two rows down the face,
+    and two dark eyes beneath. Every overlay layer (hat, jacket, sleeves, trousers) stays clear: the renderer draws the
+    Shihakushō and the blade at the hip over it."""
+    c = Canvas(64, 64)
+    # Head, body, right arm, left arm, right leg, left leg: where each net starts, and the box's size.
+    for u, v, w, h, d in ((0, 0, 8, 8, 8), (16, 16, 8, 12, 4), (40, 16, 4, 12, 4), (32, 48, 4, 12, 4),
+                          (0, 16, 4, 12, 4), (16, 48, 4, 12, 4)):
+        box(c, u, v, w, h, d, DUTY_SKIN)
+    c.rect(8, 0, 16, 8, DUTY_HAIR)        # the top of the head
+    c.rect(0, 8, 8, 16, DUTY_HAIR)        # its right side
+    c.rect(16, 8, 32, 16, DUTY_HAIR)      # its left side and back
+    c.rect(8, 8, 16, 10, DUTY_HAIR)       # the fringe, two rows down the face
+    c.rect(9, 12, 11, 13, VOID)           # the eyes, two pixels wide, either side of the middle
+    c.rect(13, 12, 15, 13, VOID)
+    return c
+
+
 def inner_hollow():
     """A Visored's inner Hollow, its host's white double, in the player skin layout with wide arms: white skin, and
     white hair over the top, back and sides of the head and down the face to its third row, over two black eyes with
@@ -1703,6 +1725,7 @@ TEXTURES = {
     "entity/arrancar_hole.png": arrancar_hole,
     "entity/arrancar_digits.png": arrancar_digits,
     "entity/arrancar.png": arrancar_npc,
+    "entity/duty_shinigami.png": duty_shinigami,
     "entity/inner_hollow.png": inner_hollow,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),

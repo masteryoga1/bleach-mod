@@ -118,6 +118,8 @@ public final class SoulData {
     long arrivalGraceUntil = NEVER;
     /** Game time this Plus was last told a Hollow's bite gnawed at its chain, so the message is not spammed. */
     long lastBiteMessageAt = NEVER;
+    /** Game time this Plus was last told why no Shinigami on duty came, so it is told once a revisit's wait. */
+    long dutyToldAt = NEVER;
     /** Blows that landed on a Hollow's body in a row, without one to the mask, for the hint to aim for the mask. */
     int bodyHitsWithoutMask;
     /** The Jinzen this soul is sitting in, from settling down to opening its eyes: see {@link JinzenLogic}. */

@@ -201,6 +201,9 @@ public final class ModItems {
     public static final DeferredItem<DeferredSpawnEggItem> WOUNDED_SHINIGAMI_SPAWN_EGG = ITEMS.register(
             "wounded_shinigami_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.WOUNDED_SHINIGAMI, 0x1A1A1A, 0x8B1A1A, new Item.Properties()));
+    public static final DeferredItem<DeferredSpawnEggItem> DUTY_SHINIGAMI_SPAWN_EGG = ITEMS.register(
+            "duty_shinigami_spawn_egg",
+            () -> new DeferredSpawnEggItem(ModEntities.DUTY_SHINIGAMI, 0x1A1A1A, 0x4A6FA5, new Item.Properties()));
     public static final DeferredItem<DeferredSpawnEggItem> QUINCY_ELDER_SPAWN_EGG = ITEMS.register(
             "quincy_elder_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.QUINCY_ELDER, 0xF2F2F2, 0x2E4A8A, new Item.Properties()));

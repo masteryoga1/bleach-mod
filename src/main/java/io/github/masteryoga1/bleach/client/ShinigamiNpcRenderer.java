@@ -14,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Draws a Shinigami NPC as a player in the Shihakushō with a blade at the hip, crouched when the NPC
- * is (the wounded Shinigami). Uses one of the game's default player skins for now.
+ * is (the wounded Shinigami), over the skin it is registered with: a default player skin, or the mod's own placeholder.
  */
 public final class ShinigamiNpcRenderer<T extends ShinigamiNpc> extends HumanoidMobRenderer<T, PlayerModel<T>> {
     private static final Vec3 CROUCH_OFFSET = new Vec3(0.0, -0.125, 0.0);

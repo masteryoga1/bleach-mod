@@ -3,20 +3,13 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
-import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import javax.annotation.Nullable;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.Pose;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
@@ -33,7 +26,6 @@ public final class WoundedShinigami extends ShinigamiNpc {
     private static final int LIFETIME_AFTER_TALKING = 1200;
     /** How long she lingers after giving her power away. */
     public static final int LIFETIME_AFTER_GIVING = 60;
-    private static final double DEPARTURE_MESSAGE_RANGE = 32.0;
     private static final float WOUNDED_HEALTH = 12.0F;
 
     private int lifetime = DEFAULT_LIFETIME;
@@ -120,23 +112,8 @@ public final class WoundedShinigami extends ShinigamiNpc {
             setPose(Pose.CROUCHING);
         }
         if (--lifetime <= 0 && isAlive()) {
-            depart();
+            depart("message.bleach.wounded_departs");
         }
-    }
-
-    private void depart() {
-        if (level() instanceof ServerLevel serverLevel) {
-            serverLevel.sendParticles(ParticleTypes.END_ROD, getX(), getY() + 0.8, getZ(), 12, 0.3, 0.5, 0.3, 0.02);
-            serverLevel.playSound(null, getX(), getY(), getZ(), SoundEvents.SOUL_ESCAPE.value(), SoundSource.NEUTRAL,
-                    1.0F, 1.0F);
-            Player nearest = serverLevel.getNearestPlayer(getX(), getY(), getZ(), DEPARTURE_MESSAGE_RANGE,
-                    entity -> entity instanceof Player player && SoulLogic.hasSoul(player)
-                            && SoulLogic.isAware(SoulLogic.get(player)));
-            if (nearest != null) {
-                nearest.displayClientMessage(Component.translatable("message.bleach.wounded_departs", getDisplayName()), true);
-            }
-        }
-        discard();
     }
 
     @Override
