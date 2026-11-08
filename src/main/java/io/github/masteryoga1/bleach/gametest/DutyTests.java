@@ -198,7 +198,8 @@ public final class DutyTests {
     @GameTest(template = "field", batch = "duty", skyAccess = true, timeoutTicks = 300)
     public static void dutyShinigamiComesDownNearAPlus(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        ServerPlayer plus = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(8.5, 1.0, 8.5));
+        // Standing on the field's floor, the layer at relative y 1, as the field's mobs stand at y 2.
+        ServerPlayer plus = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(8.5, 2.0, 8.5));
         SoulData data = wornPlus(CHAIN, WORN);
         plus.setData(SoulAttachments.SOUL, data);
         Vec3 start = plus.position();
