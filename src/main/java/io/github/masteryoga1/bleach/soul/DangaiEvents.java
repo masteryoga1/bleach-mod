@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.registry.ModEffects;
@@ -18,6 +19,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
@@ -30,11 +33,14 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
- * The Dangai, for every aware soul a Senkaimon does not guide: the way in, the Kōryū's hold, each tick in the lane, a
- * soul found there with no crossing, every way out, and the fresh start at login.
+ * The Dangai, for every aware soul a Senkaimon does not guide: the way in, the Kōryū's hold, each tick in the lane (the
+ * Kōtotsu's catch and throw, the lane's end), a soul found there with no crossing, every way out, and the fresh start
+ * at login.
  */
 public final class DangaiEvents {
     private static final String ENTERED_KEY = "message.bleach.dangai.entered";
+    private static final String KOTOTSU_KEY = "message.bleach.dangai.kototsu";
+    private static final String THROWN_KEY = "message.bleach.dangai.thrown";
     private static final String HELD_KEY = "message.bleach.dangai.held";
     private static final String LOST_KEY = "message.bleach.dangai.lost";
     private static final String NO_LANDING_KEY = "message.bleach.senkaimon.no_landing";
@@ -86,15 +92,15 @@ public final class DangaiEvents {
         return new DimensionTransition(dangai, spot, Vec3.ZERO, 0.0F, 0.0F, entity -> {
             TravelEvents.arrived(entity, left);
             if (entity instanceof ServerPlayer player) {
-                entered(player, crossing);
+                entered(player, crossing, Kototsu.meet(dangai, lane, dangai.getGameTime()));
             }
         });
     }
 
-    /** A soul just set at its lane's start keeps the crossing, and is told where it is. */
-    private static void entered(ServerPlayer player, TravelRecord.Crossing crossing) {
+    /** A soul just set at its lane's start keeps the crossing, its Kōtotsu setting out at this game time, and is told. */
+    private static void entered(ServerPlayer player, TravelRecord.Crossing crossing, long kototsuAt) {
         TravelRecord record = player.getData(SoulAttachments.TRAVEL);
-        player.setData(SoulAttachments.TRAVEL, record.withCrossing(Optional.of(crossing)));
+        player.setData(SoulAttachments.TRAVEL, record.withCrossing(Optional.of(crossing.withKototsuAt(kototsuAt))));
         player.displayClientMessage(Component.translatable(ENTERED_KEY).withStyle(ChatFormatting.GRAY), true);
     }
 
@@ -134,40 +140,86 @@ public final class DangaiEvents {
     // ---- In the lane, and out ----
 
     /**
-     * A soul's tick in the Dangai, before it moves: put out if it has no crossing, or let out once it reaches the lane's
-     * end; nothing while a way out that was refused waits to be tried again.
+     * A soul's tick in the Dangai, before it moves: put out if it has no crossing, told when its Kōtotsu sets out, let
+     * out at the lane's end, or thrown once the Kōtotsu's front passes its back (creative players are passed by);
+     * nothing while a way out that was refused waits to be tried again.
      */
     private static void tick(ServerPlayer player, long now) {
         if (now < SoulLogic.get(player).dangaiRetryAt) {
             return;
         }
-        TravelRecord.Crossing crossing = player.getData(SoulAttachments.TRAVEL).crossing().orElse(null);
+        TravelRecord record = player.getData(SoulAttachments.TRAVEL);
+        TravelRecord.Crossing crossing = record.crossing().orElse(null);
         if (crossing == null) {
             lost(player, now);
-        } else if (player.getZ() >= DangaiPlan.EXIT_Z) {
-            out(player, crossing, now);
+            return;
+        }
+        if (!crossing.met()) {
+            // A crossing begun before the Kōtotsu came meets its lane's now.
+            crossing = crossing.withKototsuAt(Kototsu.meet(player.serverLevel(), crossing.lane(), now));
+            player.setData(SoulAttachments.TRAVEL, record.withCrossing(Optional.of(crossing)));
+        }
+        if (now == crossing.kototsuAt()) {
+            player.displayClientMessage(Component.translatable(KOTOTSU_KEY).withStyle(ChatFormatting.GRAY), true);
+        }
+        if (player.getZ() >= DangaiPlan.EXIT_Z) {
+            out(player, crossing, false, now);
+        } else if (!player.isCreative()
+                && DangaiLogic.caught(DangaiLogic.front(crossing.kototsuAt(), now), player.getBoundingBox().minZ)) {
+            out(player, crossing, true, now);
         }
     }
 
     /**
-     * Out of the Dangai at the lane's end into the crossing's world, falling slowly, the crossing counted as made. A soul
-     * with nowhere to come out is put out at the Human World's spawn.
+     * Out of the Dangai into the crossing's world, by the lane's end or thrown by the Kōtotsu, falling slowly; only the
+     * lane's end counts as crossing it. A soul with nowhere to come out is put out at the Human World's spawn.
      */
-    private static void out(ServerPlayer player, TravelRecord.Crossing crossing, long now) {
+    private static void out(ServerPlayer player, TravelRecord.Crossing crossing, boolean thrown, long now) {
         ServerLevel target = BleachWorlds.level(player.server, crossing.to());
-        Vec3 spot = target == null ? null : laneEnd(player, target, crossing);
-        if (spot == null) {
+        Vec3 end = target == null ? null : laneEnd(player, target, crossing);
+        if (end == null) {
             lost(player, now);
             return;
         }
+        Vec3 spot = thrown ? thrownFrom(player, target, crossing.to(), end) : end;
+        int falling = thrown ? DangaiLogic.THROW_SLOW_FALLING_TICKS : DangaiLogic.EXIT_SLOW_FALLING_TICKS;
         GlobalPos left = GlobalPos.of(BleachWorlds.DANGAI, player.blockPosition());
         leave(player, new DimensionTransition(target, spot, Vec3.ZERO, player.getYRot(), 0.0F, entity -> {
             TravelEvents.arrived(entity, left);
             if (entity instanceof ServerPlayer soul) {
-                soul.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, DangaiLogic.EXIT_SLOW_FALLING_TICKS));
-                Milestones.grant(soul, Milestones.DANGAI);
+                soul.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, falling));
+                if (thrown) {
+                    soul.addEffect(new MobEffectInstance(MobEffects.CONFUSION, DangaiLogic.THROW_NAUSEA_TICKS));
+                    soul.sendSystemMessage(Component.translatable(THROWN_KEY)
+                            .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+                } else {
+                    Milestones.grant(soul, Milestones.DANGAI);
+                }
             }
         }), now);
+    }
+
+    /**
+     * Where the Kōtotsu throws this soul: a random {@code off_course_min} to {@code off_course_max} blocks across from
+     * the lane's end, high over the ground and never inside the Shakonmaku; the lane's end itself if no draw will hold it.
+     */
+    private static Vec3 thrownFrom(ServerPlayer player, ServerLevel target, ResourceKey<Level> world, Vec3 end) {
+        int one = BleachConfig.get(BleachConfig.DANGAI_OFF_COURSE_MIN);
+        int other = BleachConfig.get(BleachConfig.DANGAI_OFF_COURSE_MAX);
+        int min = Math.min(one, other);
+        int max = Math.max(one, other);
+        RandomSource random = player.getRandom();
+        for (int i = 0; i < DangaiLogic.THROW_TRIES; i++) {
+            Vec3 at = DangaiLogic.offCourse(end, random.nextDouble() * Mth.TWO_PI, min + random.nextDouble() * (max - min));
+            if (world == BleachWorlds.SOUL_SOCIETY && !DangaiLogic.outsideWall(at.x, at.z)) {
+                continue;
+            }
+            Vec3 spot = SafeLanding.skySpot(player, target, at.x, at.z, DangaiLogic.THROW_HEIGHT);
+            if (spot != null) {
+                return spot;
+            }
+        }
+        return end;
     }
 
     /**
@@ -218,9 +270,9 @@ public final class DangaiEvents {
     }
 
     /**
-     * At login, a soul inside the Dangai on a crossing starts its lane again; if the lane's start will not hold it, the
-     * crossing is dropped and its next tick puts it out. A dead soul and a spectator are left as they are. Public for
-     * game tests.
+     * At login, a soul inside the Dangai on a crossing starts its lane again with a Kōtotsu of its own, a full delay off;
+     * if the lane's start will not hold it, the crossing is dropped and its next tick puts it out. A dead soul and a
+     * spectator are left as they are. Public for game tests.
      */
     public static void atLogin(ServerPlayer player) {
         TravelRecord.Crossing crossing = player.getData(SoulAttachments.TRAVEL).crossing().orElse(null);
@@ -234,7 +286,7 @@ public final class DangaiEvents {
             return;
         }
         player.teleportTo(dangai, start.x, start.y, start.z, 0.0F, 0.0F);
-        entered(player, crossing);
+        entered(player, crossing, Kototsu.send(dangai, crossing.lane(), dangai.getGameTime()));
     }
 
     /** Ends this soul's crossing, if it is on one. */

@@ -75,6 +75,7 @@
   "entity.bleach.caja_negacion": "Caja Negación",
   "entity.bleach.danku_wall": "Dankū",
   "entity.bleach.senkaimon": "Senkaimon",
+  "entity.bleach.kototsu": "Kōtotsu",
   "entity.bleach.inner_hollow": "Inner Hollow",
   "entity.bleach.plus": "Plus",
   "entity.bleach.garganta": "Garganta",
@@ -880,7 +881,9 @@
   "message.bleach.senkaimon.no_landing": "The far side of the Senkaimon is blocked",
   "message.bleach.senkaimon.crowded": "Another Senkaimon stands too close",
   "message.bleach.dangai.entered": "No guide leads you: you are in the Dangai. Follow the lane to its end",
+  "message.bleach.dangai.kototsu": "The Kōtotsu is coming. Run!",
   "message.bleach.dangai.held": "The Kōryū's current holds you fast",
+  "message.bleach.dangai.thrown": "The Kōtotsu caught you and flung you out of the Dangai, far off your course.",
   "message.bleach.dangai.lost": "Nothing guided you through the Dangai, and it has let you out in the Human World.",
 
   "message.bleach.bloodline.quincy": "Quincy blood runs in your veins: you are %s",
@@ -1230,7 +1233,7 @@
   "advancements.bleach.senkaimon.title": "Through the Senkaimon",
   "advancements.bleach.senkaimon.description": "Pass through a Senkaimon from the Human World into Soul Society",
   "advancements.bleach.dangai.title": "Crossed the Dangai",
-  "advancements.bleach.dangai.description": "Reach the end of a Dangai lane",
+  "advancements.bleach.dangai.description": "Reach the end of a Dangai lane before the Kōtotsu catches you",
 
   "commands.bleach.info.header": "Soul of %s",
   "commands.bleach.info.state": "State: %s",

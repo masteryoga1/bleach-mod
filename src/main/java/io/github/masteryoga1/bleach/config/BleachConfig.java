@@ -722,7 +722,11 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SENKAIMON_COST_SHARE;
     public static final ModConfigSpec.DoubleValue SENKAIMON_MIN_COST;
     public static final ModConfigSpec.IntValue SENKAIMON_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue DANGAI_KOTOTSU_DELAY_SECONDS;
+    public static final ModConfigSpec.DoubleValue DANGAI_KOTOTSU_SPEED;
     public static final ModConfigSpec.DoubleValue DANGAI_KORYU_HOLD_SECONDS;
+    public static final ModConfigSpec.IntValue DANGAI_OFF_COURSE_MIN;
+    public static final ModConfigSpec.IntValue DANGAI_OFF_COURSE_MAX;
     public static final ModConfigSpec.IntValue DANGAI_EXIT_HEIGHT;
 
     static {
@@ -2915,10 +2919,25 @@ public final class BleachConfig {
                 .defineInRange("cooldown_seconds", 30, 0, 3_600);
         builder.pop();
         builder.push("dangai");
+        DANGAI_KOTOTSU_DELAY_SECONDS = builder
+                .comment("Seconds after the first soul of a crossing enters its Dangai lane before the Kōtotsu sets out"
+                        + " down the lane behind it.")
+                .defineInRange("kototsu_delay_seconds", 10, 0, 600);
+        DANGAI_KOTOTSU_SPEED = builder
+                .comment("Blocks a second the Kōtotsu comes down a Dangai lane. A walk is about 4.3 and a sprint about 5.6.")
+                .defineInRange("kototsu_speed", 7.0, 0.5, 100.0);
         DANGAI_KORYU_HOLD_SECONDS = builder
                 .comment("Seconds the Kōryū, the current the Dangai's lanes are walled with, holds a soul that touches"
                         + " it. It cannot hold the same soul again until 2 seconds after it lets go.")
                 .defineInRange("koryu_hold_seconds", 1.5, 0.05, 30.0);
+        DANGAI_OFF_COURSE_MIN = builder
+                .comment("The fewest blocks off course the Kōtotsu throws a soul it catches, measured across from where"
+                        + " the lane's end would have let it out.")
+                .defineInRange("off_course_min", 1_000, 0, 100_000);
+        DANGAI_OFF_COURSE_MAX = builder
+                .comment("The most blocks off course the Kōtotsu throws a soul it catches. Below off_course_min, the two"
+                        + " swap.")
+                .defineInRange("off_course_max", 2_000, 0, 100_000);
         DANGAI_EXIT_HEIGHT = builder
                 .comment("Blocks over the ground a soul comes out at a Dangai lane's end, falling slowly. Under a roof it"
                         + " comes out lower, on the floor if it must.")

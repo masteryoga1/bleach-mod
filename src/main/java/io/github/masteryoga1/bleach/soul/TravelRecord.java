@@ -41,15 +41,33 @@ public record TravelRecord(Optional<GlobalPos> humanWorldReturn, long butterflyD
     }
 
     /**
-     * A crossing of the Dangai: the world it leads to, its lane, and the gate's bearing from the Human World's centre
-     * (radians from +x towards +z), which a crossing to Soul Society reads. Every field is needed, so a crossing that
-     * reads badly reads as none.
+     * A crossing of the Dangai: the world it leads to, its lane, the gate's bearing from the Human World's centre
+     * (radians from +x towards +z), which a crossing to Soul Society reads, and the game time its lane's Kōtotsu sets
+     * out ({@link #UNMET} until it meets one). The first three are needed, so a crossing that reads badly reads as none.
      */
-    public record Crossing(ResourceKey<Level> to, int lane, float bearing) {
+    public record Crossing(ResourceKey<Level> to, int lane, float bearing, long kototsuAt) {
+        /** The set-out of a crossing that has not met its Kōtotsu, as every crossing saved before the Kōtotsu came. */
+        public static final long UNMET = -1L;
         public static final Codec<Crossing> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Level.RESOURCE_KEY_CODEC.fieldOf("to").forGetter(Crossing::to),
                 Codec.INT.fieldOf("lane").forGetter(Crossing::lane),
-                Codec.FLOAT.fieldOf("bearing").forGetter(Crossing::bearing))
+                Codec.FLOAT.fieldOf("bearing").forGetter(Crossing::bearing),
+                Codec.LONG.lenientOptionalFieldOf("kototsu_at", UNMET).forGetter(Crossing::kototsuAt))
                 .apply(instance, Crossing::new));
+
+        /** A crossing that has not met its Kōtotsu yet. */
+        public Crossing(ResourceKey<Level> to, int lane, float bearing) {
+            this(to, lane, bearing, UNMET);
+        }
+
+        /** Whether this crossing has met its lane's Kōtotsu. */
+        public boolean met() {
+            return kototsuAt >= 0L;
+        }
+
+        /** This crossing, its Kōtotsu setting out at this game time. */
+        public Crossing withKototsuAt(long at) {
+            return new Crossing(to, lane, bearing, at);
+        }
     }
 }
