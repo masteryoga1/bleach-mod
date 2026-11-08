@@ -14,6 +14,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -35,7 +36,7 @@ public final class DutyEvents {
     private static final double MAX_DISTANCE = 16.0;
     private static final int TRIES = 12;
     private static final int MAX_RISE = 16;
-    /** Failing that, a floor 3 to 10 blocks away within 4 of the Plus's height: a cave's, a tunnel's, a tower's top. */
+    /** A floor 3 to 10 blocks away within 4 of the Plus's height, first under a roof, else last: a cave's, a tower's. */
     private static final double FLOOR_MIN_DISTANCE = 3.0;
     private static final double FLOOR_MAX_DISTANCE = 10.0;
     private static final int FLOOR_RISE = 4;
@@ -119,16 +120,29 @@ public final class DutyEvents {
         return true;
     }
 
-    /** One comes down on open ground near the Plus, or else on a floor near its own height. */
+    /**
+     * One comes down on open ground near the Plus, or else on a floor near its own height. A Plus under a roof, as in a
+     * cave or a mine, is looked for on a floor about it first, so the visitor is not left on the ground above it.
+     */
     @Nullable
     private static DutyShinigami comeDown(ServerPlayer player) {
         ServerLevel level = player.serverLevel();
         EntityType<DutyShinigami> type = ModEntities.DUTY_SHINIGAMI.get();
-        Vec3 spot = SpawnSpots.openGround(level, player, type, MIN_DISTANCE, MAX_DISTANCE, TRIES, MAX_RISE);
+        boolean roofed = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, player.getBlockX(), player.getBlockZ())
+                > player.getEyeY();
+        Vec3 spot = roofed ? floorNear(level, player, type) : null;
         if (spot == null) {
-            spot = SpawnSpots.floorNear(level, player, type, FLOOR_MIN_DISTANCE, FLOOR_MAX_DISTANCE, TRIES, FLOOR_RISE);
+            spot = SpawnSpots.openGround(level, player, type, MIN_DISTANCE, MAX_DISTANCE, TRIES, MAX_RISE);
+        }
+        if (spot == null && !roofed) {
+            spot = floorNear(level, player, type);
         }
         return ShinigamiEvents.comeDownAt(player, type, spot);
+    }
+
+    @Nullable
+    private static Vec3 floorNear(ServerLevel level, ServerPlayer player, EntityType<DutyShinigami> type) {
+        return SpawnSpots.floorNear(level, player, type, FLOOR_MIN_DISTANCE, FLOOR_MAX_DISTANCE, TRIES, FLOOR_RISE);
     }
 
     /** The wait between two visits to one Plus, and between two lines telling it why none came, in ticks. */
