@@ -152,6 +152,12 @@ public final class TravelLogic {
         return Math.max(0L, (data.senkaimonReadyAt - now + TICKS_PER_SECOND - 1) / TICKS_PER_SECOND);
     }
 
+    /** Whether the instructor's wait for another Jigokuchō is over on this game day. */
+    public static boolean butterflyDue(TravelRecord record, long day) {
+        return record.butterflyDay() < 0
+                || day - record.butterflyDay() >= BleachConfig.get(BleachConfig.BUTTERFLY_REISSUE_DAYS);
+    }
+
     /**
      * Where a guided soul leaving Soul Society tries to come out, in order: where it last left the Human World by a
      * gate, its respawn point if that is in the Human World, and world spawn.

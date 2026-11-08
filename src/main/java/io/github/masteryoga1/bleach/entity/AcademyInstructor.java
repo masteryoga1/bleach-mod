@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
 import java.util.Set;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.CompoundTag;
@@ -80,10 +81,10 @@ public final class AcademyInstructor extends ShinigamiNpc {
         return REIRYOKU;
     }
 
-    /** A Plus he sends on is already at the Academy. */
+    /** Only from Soul Society is a Plus it frees already where Konsō would send it; anywhere else it is sent on. */
     @Override
     protected boolean sendsOn() {
-        return false;
+        return AcademyLocator.sendsOnFrom(level().dimension());
     }
 
     /** Where he stands and returns to, once he has stood somewhere. */

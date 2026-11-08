@@ -12,6 +12,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.TravelEvents;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.particles.ParticleTypes;
@@ -158,7 +159,10 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
         BleachNetwork.openDialogue(visitor, this, viewFor(data, now), required, unready, List.of());
     }
 
-    /** What the dialogue offers greyed out: a new Asauchi until the visitor may have one, and a lesson given today. */
+    /**
+     * What the dialogue offers greyed out: a new Asauchi until the visitor may have one, a lesson given today, and a
+     * Jigokuchō to one that carries one or was handed one today.
+     */
     public List<NpcAction> unreadyFor(Player visitor, SoulData data, long now) {
         List<NpcAction> unready = new ArrayList<>();
         if (!ShinigamiEvents.mayReceiveAsauchi(visitor, data, now)) {
@@ -166,6 +170,9 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
         }
         if (KidoLogic.lessonTaken(data, KidoLogic.lessonDay(now, level().getDayTime()))) {
             unready.add(NpcAction.LESSON);
+        }
+        if (!TravelEvents.mayReceiveButterfly(visitor, data, now, level().getDayTime())) {
+            unready.add(NpcAction.BUTTERFLY);
         }
         return unready;
     }
@@ -195,6 +202,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
             }
             case LESSON -> KidoEvents.lesson(visitor, level().getGameTime(), level().getDayTime());
             case PURIFY -> HollowPlayerEvents.purifyByInstructor(this, visitor);
+            case BUTTERFLY -> TravelEvents.issueButterfly(visitor, level().getGameTime(), level().getDayTime());
         }
     }
 

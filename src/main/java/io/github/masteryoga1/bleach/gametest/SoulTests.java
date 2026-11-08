@@ -9,8 +9,6 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
-import java.util.Optional;
-import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -67,8 +65,7 @@ public final class SoulTests {
         SoulData soul = new SoulData();
         soul.markInitialized();
         soul.setState(SoulState.RUKONGAI);
-        ShinigamiProgress progress = new ShinigamiProgress(true, 11L, 22L, 33.5F, 44L, 55L, 6L, 7,
-                Optional.of(new BlockPos(100, 64, -200)));
+        ShinigamiProgress progress = new ShinigamiProgress(true, 11L, 22L, 33.5F, 44L, 55L, 6L, 7);
         soul.setShinigami(progress);
         SoulData reloaded = SoulData.CODEC.parse(NbtOps.INSTANCE,
                 SoulData.CODEC.encodeStart(NbtOps.INSTANCE, soul).getOrThrow()).getOrThrow();

@@ -69,6 +69,7 @@ import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
@@ -106,7 +107,6 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 /**
@@ -121,7 +121,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach tier &lt;players&gt; &lt;path&gt; &lt;tier&gt;   (on an Arrancar, hollow sets the form it rose from)
  * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
- * /bleach academy                   (the nearest Academy; builds the guaranteed one if there is none)
+ * /bleach academy                   (where the Academy stands in Soul Society; a click suggests the teleport there)
  * /bleach garganta &lt;players&gt; [kind|numero|privaron]   (a tear now; not on Peaceful)
  *                                    (kind: spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas)
  *                                    (numero: a lone Número; privaron: a Privaron Espada and its Fracción)
@@ -537,21 +537,17 @@ public final class BleachCommand {
         return words.toString();
     }
 
-    /** Reports the nearest Academy, like {@code /locate}, searching from the source or, outside the Overworld, from spawn. */
+    /** Reports where the Academy stands in Soul Society, with a click that suggests the command to go there. */
     private static int academy(CommandSourceStack source) {
-        ServerLevel overworld = source.getServer().overworld();
-        BlockPos from = source.getLevel().dimension() == Level.OVERWORLD
-                ? BlockPos.containing(source.getPosition()) : overworld.getSharedSpawnPos();
-        BlockPos academy = AcademyLocator.nearest(overworld, from);
-        if (academy == null) {
+        if (BleachWorlds.level(source.getServer(), BleachWorlds.SOUL_SOCIETY) == null) {
             source.sendFailure(Component.translatable("commands.bleach.academy.none"));
             return 0;
         }
+        BlockPos gate = AcademyLocator.GATE;
         Component coordinates = ComponentUtils.wrapInSquareBrackets(
-                        Component.translatable("chat.coordinates", academy.getX(), "~", academy.getZ()))
+                        Component.translatable("chat.coordinates", gate.getX(), gate.getY(), gate.getZ()))
                 .withStyle(style -> style.withColor(ChatFormatting.GREEN)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                                "/execute in minecraft:overworld run tp @s " + academy.getX() + " ~ " + academy.getZ()))
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, AcademyLocator.teleportCommand()))
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                 Component.translatable("chat.coordinates.tooltip"))));
         source.sendSuccess(() -> Component.translatable("commands.bleach.academy.success", coordinates), false);

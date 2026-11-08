@@ -9,35 +9,44 @@ import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
+import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.HomeWorldRespawn;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulOffer;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
-import io.github.masteryoga1.bleach.world.AcademySites;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.world.AcademySite;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
+import net.minecraft.nbt.IntArrayTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
@@ -45,15 +54,24 @@ import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** Tests for the Shinigami NPCs, their dialogue, and what they do for the souls who talk to them. */
+/**
+ * Tests for the Shinigami NPCs, their dialogue and what they do for the souls who talk to them, and for the way on to
+ * the Academy in Soul Society.
+ */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class AcademyTests {
@@ -130,7 +148,7 @@ public final class AcademyTests {
                 case PLUS -> List.of(NpcAction.KONSO);
                 case SOUL -> List.of(NpcAction.ENROLL);
                 case STUDENT -> List.of(NpcAction.GRADUATE, NpcAction.ASAUCHI, NpcAction.LESSON);
-                case SUBSTITUTE, SHINIGAMI -> List.of(NpcAction.ASAUCHI);
+                case SUBSTITUTE, SHINIGAMI -> List.of(NpcAction.ASAUCHI, NpcAction.BUTTERFLY);
                 case OFFER_POWER -> List.of(NpcAction.ACCEPT_POWER);
                 case ELDER_GREETING, ELDER_LESSON -> List.of(NpcAction.LESSON);
                 case ELDER_TEACH -> List.of(NpcAction.RANSOTENGAI);
@@ -395,8 +413,11 @@ public final class AcademyTests {
         RegistryAccess access = helper.getLevel().registryAccess();
         helper.assertTrue(access.registryOrThrow(Registries.STRUCTURE).containsKey(BleachMod.id("academy")),
                 "the Academy structure did not load");
-        helper.assertTrue(access.registryOrThrow(Registries.STRUCTURE_SET).containsKey(BleachMod.id("academy")),
-                "the Academy structure set did not load");
+        helper.assertFalse(access.registryOrThrow(Registries.STRUCTURE_SET).containsKey(BleachMod.id("academy")),
+                "the Overworld Academy still has a structure set");
+        helper.assertTrue(access.registryOrThrow(Registries.STRUCTURE_SET).containsKey(BleachMod.id("seireitei_academy"))
+                        && access.registryOrThrow(Registries.STRUCTURE).containsKey(BleachMod.id("seireitei_academy")),
+                "the Seireitei Academy's structure and set did not load");
         helper.assertTrue(access.registryOrThrow(Registries.TEMPLATE_POOL).containsKey(BleachMod.id("academy/start")),
                 "the Academy template pool did not load");
         TagKey<Biome> biomes = TagKey.create(Registries.BIOME, BleachMod.id("has_structure/academy"));
@@ -409,55 +430,177 @@ public final class AcademyTests {
         helper.succeed();
     }
 
-    /** Far from the other tests, so building it disturbs nothing. */
-    @GameTest(template = "empty", timeoutTicks = 400)
-    public static void guaranteedAcademyIsPlaced(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        BlockPos corner = AcademySites.placeAt(level, new ChunkPos(1000, 1000));
-        helper.assertTrue(corner != null, "the Academy could not be built");
-        helper.assertTrue(corner.getX() == 16000 && corner.getZ() == 16000, "the Academy reports its place as " + corner);
-        AABB around = new AABB(corner).inflate(32.0, 0.0, 32.0).setMinY(level.getMinBuildHeight()).setMaxY(level.getMaxBuildHeight());
-        List<AcademyInstructor> instructors = level.getEntitiesOfClass(AcademyInstructor.class, around);
-        helper.assertTrue(instructors.size() == 1, "the built Academy has " + instructors.size() + " instructors");
-        BlockPos at = instructors.get(0).blockPosition();
-        helper.assertTrue(BlockPos.betweenClosedStream(at.offset(-8, -2, -8), at.offset(8, 2, 8))
-                        .anyMatch(pos -> level.getBlockState(pos).is(ModBlocks.TAILORING_TABLE.get())),
-                "the built Academy has no Tailoring Table near the instructor");
-        instructors.forEach(instructor -> instructor.discard());
-        helper.succeed();
+    // ---- The way to the Academy in Soul Society ----
+
+    /**
+     * Asserts that the test world's Academy stands, as its chunks' loads build it (see {@link SiteTests}): its start
+     * valid, and both of its chunks referring to it.
+     */
+    private static void assertAcademyStands(GameTestHelper helper, ServerLevel soul) {
+        Structure structure = soul.registryAccess().registryOrThrow(Registries.STRUCTURE).get(AcademySite.STRUCTURE);
+        ChunkPos home = AcademySite.startChunk();
+        StructureStart start = structure == null ? null : soul.getChunk(home.x, home.z).getStartForStructure(structure);
+        helper.assertTrue(start != null && start.isValid(), "the Academy in Soul Society has no valid start yet");
+        for (ChunkPos pos : AcademySite.COVERED) {
+            helper.assertTrue(soul.getChunk(pos.x, pos.z).getReferencesForStructure(structure).contains(home.toLong()),
+                    "chunk " + pos + " holds no reference to the Academy in Soul Society yet");
+        }
     }
 
-    /** Around a spot far from the other tests and from the Academy above, standing in for world spawn. */
-    @GameTest(template = "empty", timeoutTicks = 400)
-    public static void guaranteedAcademyIsBuiltNearSpawn(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        AcademySites sites = new AcademySites();
-        BlockPos spawn = new BlockPos(-16000, 64, 16000);
-        BlockPos built = sites.ensureGuaranteed(level, spawn);
-        helper.assertTrue(built != null, "no guaranteed Academy was built");
-        helper.assertTrue(sites.guaranteed().filter(built::equals).isPresent(), "the guaranteed Academy was not remembered");
-        double dx = built.getX() - spawn.getX();
-        double dz = built.getZ() - spawn.getZ();
-        double distance = Math.sqrt(dx * dx + dz * dz);
-        helper.assertTrue(distance > 64.0 && distance < 1320.0, "the guaranteed Academy is " + distance + " blocks from spawn");
-        helper.assertTrue(built.equals(sites.ensureGuaranteed(level, spawn)), "a second Academy was built");
-        AABB around = new AABB(built).inflate(32.0, 0.0, 32.0).setMinY(level.getMinBuildHeight()).setMaxY(level.getMaxBuildHeight());
-        List<AcademyInstructor> instructors = level.getEntitiesOfClass(AcademyInstructor.class, around);
-        helper.assertTrue(instructors.size() == 1, "the guaranteed Academy has " + instructors.size() + " instructors");
-        instructors.forEach(instructor -> instructor.discard());
-        helper.succeed();
+    /**
+     * A real Plus asks an Overworld instructor for Konsō and is sent on, into Soul Society, to the gates of the Academy,
+     * where its instructor stands, letting go of the bed it set in the Overworld. The Academy's chunks build it first.
+     */
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 400)
+    public static void anOverworldInstructorSendsASoulToTheAcademy(GameTestHelper helper) {
+        helper.assertTrue(AcademyLocator.sendsOnFrom(Level.OVERWORLD)
+                && !AcademyLocator.sendsOnFrom(BleachWorlds.SOUL_SOCIETY), "the instructors send on from the wrong worlds");
+        ServerLevel soul = SiteTests.holdAcademy(helper);
+        ServerPlayer plus = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(2.5, 1.0, 1.5));
+        SoulData data = ShinigamiTests.soul(SoulState.PLUS, 40.0F);
+        data.startChain(72_000);
+        plus.setData(SoulAttachments.SOUL, data);
+        plus.setRespawnPosition(Level.OVERWORLD, helper.absolutePos(new BlockPos(1, 1, 3)), 0.0F, true, false);
+        helper.startSequence()
+                .thenWaitUntil(() -> assertAcademyStands(helper, soul))
+                .thenExecute(() -> {
+                    AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 1, 1, 1);
+                    try {
+                        instructor.perform(plus, NpcAction.KONSO);
+                    } finally {
+                        // The Overworld one is persistent, and the test grid is never cleared.
+                        instructor.discard();
+                    }
+                    // A change of world is made at once, inside the Konsō.
+                    helper.assertTrue(plus.level() == soul, "the soul is still in " + plus.level().dimension().location());
+                    SoulData sent = SoulLogic.get(plus);
+                    helper.assertTrue(sent.state() == SoulState.RUKONGAI && sent.chainMaxTicks() == 0,
+                            "Konsō left a " + sent.state() + " with a chain of " + sent.chainMaxTicks());
+                    helper.assertTrue(plus.position().distanceTo(AcademyLocator.LANDING) < 0.01,
+                            "the soul landed at " + plus.position() + ", not " + AcademyLocator.LANDING);
+                    helper.assertTrue(plus.getRespawnPosition() == null,
+                            "the soul kept its bed at " + plus.getRespawnPosition());
+                })
+                .thenWaitUntil(() -> {
+                    // The Academy's own instructor, whose entities may load a little after its chunk's blocks.
+                    AABB near = plus.getBoundingBox().inflate(16.0);
+                    helper.assertFalse(soul.getEntitiesOfClass(AcademyInstructor.class, near).isEmpty(),
+                            "no instructor stands within 16 blocks of the landing");
+                })
+                .thenSucceed();
     }
 
+    /**
+     * What a soul senses of the Academy: in Soul Society which way and how far to its gate, and anywhere else only that
+     * it lies in Soul Society. And the teleport {@code /bleach academy} suggests, to where Konsō lands.
+     */
     @GameTest(template = "empty")
-    public static void academySitesSurviveSaving(GameTestHelper helper) {
-        HolderLookup.Provider registries = helper.getLevel().registryAccess();
-        AcademySites empty = AcademySites.load(new CompoundTag(), registries);
-        helper.assertTrue(empty.guaranteed().isEmpty(), "a new world remembers an Academy");
-        CompoundTag tag = new CompoundTag();
-        BlockPos site = new BlockPos(160, 0, -96);
-        tag.put("guaranteed", NbtUtils.writeBlockPos(site));
-        AcademySites loaded = AcademySites.load(AcademySites.load(tag, registries).save(new CompoundTag(), registries), registries);
-        helper.assertTrue(loaded.guaranteed().equals(Optional.of(site)), "the guaranteed Academy moved to " + loaded.guaranteed());
+    public static void sensingTheAcademy(GameTestHelper helper) {
+        BlockPos centre = new BlockPos(0, 72, 0);
+        assertLine(helper, AcademyLocator.senseLine(BleachWorlds.SOUL_SOCIETY, centre), "message.bleach.academy_sensed",
+                "message.bleach.direction.south_west", 300L);
+        assertLine(helper, AcademyLocator.senseLine(Level.OVERWORLD, centre), "message.bleach.academy_sensed.elsewhere",
+                null, 0L);
+        BlockPos south = new BlockPos(-192, 73, 531);
+        assertLine(helper, AcademyLocator.remindLine(BleachWorlds.SOUL_SOCIETY, south), "message.bleach.academy_direction",
+                "message.bleach.direction.north", 300L);
+        assertLine(helper, AcademyLocator.remindLine(Level.NETHER, south), "message.bleach.academy_direction.elsewhere",
+                null, 0L);
+        String command = AcademyLocator.teleportCommand();
+        helper.assertTrue(command.equals("/execute in bleach:soul_society run tp @s -193.5 73 231.5"),
+                "the Academy's command is " + command);
         helper.succeed();
+    }
+
+    /** A line with this key and, unless {@code direction} is null, that direction's key and this distance. */
+    private static void assertLine(GameTestHelper helper, Component line, String key, @Nullable String direction,
+                                   long distance) {
+        helper.assertTrue(line.getContents() instanceof TranslatableContents, "the line " + line + " is not translated");
+        TranslatableContents contents = (TranslatableContents) line.getContents();
+        helper.assertTrue(contents.getKey().equals(key), "the line's key is " + contents.getKey() + ", not " + key);
+        Object[] args = contents.getArgs();
+        if (direction == null) {
+            helper.assertTrue(args.length == 0, "the line far away has " + args.length + " arguments");
+            return;
+        }
+        helper.assertTrue(args.length == 2 && args[0] instanceof Component way
+                        && way.getContents() instanceof TranslatableContents towards && towards.getKey().equals(direction)
+                        && Long.valueOf(distance).equals(args[1]), "the line said " + line);
+    }
+
+    /** A soul's record saved while it remembered an Overworld Academy reads as before, and is written without it. */
+    @GameTest(template = "empty")
+    public static void oldAcademyPosIsIgnored(GameTestHelper helper) {
+        CompoundTag old = new CompoundTag();
+        old.putBoolean("enrolled", true);
+        old.putInt("konso_rewards", 7);
+        old.put("academy_pos", new IntArrayTag(new int[] {160, 64, -96}));
+        ShinigamiProgress read = ShinigamiProgress.CODEC.parse(NbtOps.INSTANCE, old).getOrThrow();
+        helper.assertTrue(read.enrolled() && read.konsoRewards() == 7 && read.asauchiIssuedAt() == ShinigamiProgress.NEVER,
+                "the record from before 7d3 read as " + read);
+        Tag written = ShinigamiProgress.CODEC.encodeStart(NbtOps.INSTANCE, read).getOrThrow();
+        helper.assertTrue(written instanceof CompoundTag tag && !tag.contains("academy_pos"),
+                "the record was written as " + written);
+        helper.succeed();
+    }
+
+    /**
+     * Who wakes at the Academy on dying: a soul that has passed on with no Shinigami power and no spawn of its own, and
+     * no one else. Then the real respawn event for a real player, once the Academy's chunks have built it: such a soul
+     * wakes at the gate, facing the hall, unless it is back from the End's fight, has a spawn of its own, or is a
+     * Shinigami. The player is never killed.
+     */
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 100)
+    public static void respawnWakesAtTheAcademy(GameTestHelper helper) {
+        SoulData withPower = ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F);
+        withPower.setTier(PowerPath.SHINIGAMI, 1);
+        SoulData torn = ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F);
+        torn.markSoulDestroyed();
+        List<SoulData> wake = List.of(ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F), ShinigamiTests.student(40.0F),
+                QuincyTests.in(SoulState.RUKONGAI, QuincyTests.quincy(Bloodline.ECHT, 1, 400.0F)));
+        List<SoulData> stay = List.of(withPower, torn, ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F),
+                ShinigamiTests.soul(SoulState.PLUS, 40.0F), ShinigamiTests.soul(SoulState.HUMAN, 400.0F),
+                ShinigamiTests.substitute(60.0F), ShinigamiTests.soul(SoulState.HOLLOW, 40.0F),
+                ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F));
+        for (SoulData data : wake) {
+            helper.assertTrue(HomeWorldRespawn.wakesAtAcademy(data, false), "a " + data.state() + " would not wake there");
+            helper.assertFalse(HomeWorldRespawn.wakesAtAcademy(data, true),
+                    "the Academy beat a " + data.state() + "'s own spawn");
+        }
+        for (SoulData data : stay) {
+            helper.assertFalse(HomeWorldRespawn.wakesAtAcademy(data, false), "a " + data.state() + " would wake there");
+        }
+
+        ServerLevel level = helper.getLevel();
+        ServerLevel soul = SiteTests.holdAcademy(helper);
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
+        player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F));
+        helper.startSequence()
+                .thenWaitUntil(() -> assertAcademyStands(helper, soul))
+                .thenExecute(() -> {
+                    DimensionTransition spawn = new DimensionTransition(level, player.position(), Vec3.ZERO, 0.0F, 0.0F,
+                            DimensionTransition.DO_NOTHING);
+                    DimensionTransition woken = respawn(player, spawn, false);
+                    helper.assertTrue(woken.newLevel() == soul && woken.pos().distanceTo(AcademyLocator.LANDING) < 0.01
+                                    && woken.yRot() == AcademyLocator.LANDING_YAW,
+                            "the Rukongai soul wakes in " + woken.newLevel().dimension().location() + " at " + woken.pos());
+                    helper.assertTrue(respawn(player, spawn, true) == spawn, "a soul back from the End's fight was moved");
+                    player.setRespawnPosition(Level.OVERWORLD, helper.absolutePos(new BlockPos(1, 1, 3)), 0.0F, true, false);
+                    helper.assertTrue(respawn(player, spawn, false) == spawn, "the Academy beat the soul's own spawn");
+                    DimensionTransition missing = new DimensionTransition(level, player.position(), Vec3.ZERO, 0.0F, 0.0F,
+                            true, DimensionTransition.DO_NOTHING);
+                    helper.assertTrue(respawn(player, missing, false).newLevel() == soul,
+                            "a soul whose bed is gone woke where it was");
+                    player.setRespawnPosition(Level.OVERWORLD, null, 0.0F, false, false);
+                    player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F));
+                    helper.assertTrue(respawn(player, spawn, false) == spawn, "a Shinigami was moved to the Academy");
+                })
+                .thenSucceed();
+    }
+
+    /** Where the real respawn event, posted for this soul, wakes it. */
+    private static DimensionTransition respawn(ServerPlayer player, DimensionTransition original, boolean fromEndFight) {
+        PlayerRespawnPositionEvent event = new PlayerRespawnPositionEvent(player, original, fromEndFight);
+        return NeoForge.EVENT_BUS.post(event).getDimensionTransition();
     }
 }

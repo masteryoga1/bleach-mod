@@ -31,7 +31,9 @@ public enum NpcAction {
     /** The Quincy Hunter's contest: whoever destroys more Hollows. */
     CONTEST(DialogueView.HUNTER_CHALLENGE, DialogueView.HUNTER_RIVALRY),
     /** The instructor's blade through a Hollow player's mask. */
-    PURIFY(DialogueView.HOLLOW_PURIFY);
+    PURIFY(DialogueView.HOLLOW_PURIFY),
+    /** The instructor's Jigokuchō, for a Shinigami or a Substitute that has lost its own. */
+    BUTTERFLY(DialogueView.SUBSTITUTE, DialogueView.SHINIGAMI);
 
     private static final IntFunction<NpcAction> BY_ID =
             ByIdMap.continuous(NpcAction::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);
