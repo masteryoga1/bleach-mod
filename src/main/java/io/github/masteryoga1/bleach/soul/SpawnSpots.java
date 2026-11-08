@@ -44,7 +44,8 @@ public final class SpawnSpots {
     /**
      * As {@link #openGround(ServerLevel, Entity, EntityType, double, double, int, int)}, but on any floor at most
      * {@code maxRise} blocks above or below {@code around}, under a roof or not: in a cave or a tunnel, or on a tower's
-     * top. Each column tried is searched from the highest of those heights down.
+     * top. Each column tried is searched from the soul's own height outward, one below, one above and so on, so the
+     * floor nearest that height wins over a roof above it.
      */
     @Nullable
     public static Vec3 floorNear(ServerLevel level, Entity around, EntityType<?> type, double minDistance,
@@ -52,7 +53,7 @@ public final class SpawnSpots {
         return search(level, around, type, 1.0F, minDistance, maxDistance, tries, maxRise, true);
     }
 
-    /** The search both make: each column's top, or under a roof every height in reach; the same rules for either. */
+    /** The search both make: each column's top, or under a roof every height in reach, nearest the soul's first. */
     @Nullable
     private static Vec3 search(ServerLevel level, Entity around, EntityType<?> type, float scale, double minDistance,
                                double maxDistance, int tries, int maxRise, boolean underRoof) {
@@ -66,8 +67,10 @@ public final class SpawnSpots {
             if (!level.isPositionEntityTicking(BlockPos.containing(x, around.getY(), z))) {
                 continue;
             }
-            int top = underRoof ? feet + maxRise : level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-            for (int y = top; y >= (underRoof ? feet - maxRise : top); y--) {
+            int top = underRoof ? feet : level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            for (int step = 0; step <= (underRoof ? 2 * maxRise : 0); step++) {
+                // 0, -1, +1, -2, +2 and so on from the soul's feet; just the top for open ground.
+                int y = top + (step % 2 == 0 ? step / 2 : -(step + 1) / 2);
                 BlockPos pos = new BlockPos(x, y, z);
                 BlockPos below = pos.below();
                 if (!level.getWorldBorder().isWithinBounds(pos) || !level.getFluidState(pos).isEmpty()

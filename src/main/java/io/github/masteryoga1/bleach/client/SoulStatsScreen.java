@@ -578,10 +578,13 @@ public final class SoulStatsScreen extends Screen {
         if (!key.equals("plus")) {
             return Component.translatable("screen.bleach.soul.next." + key);
         }
+        // The Shinigami on duty is promised only where the server sends one, and only in the Overworld.
+        boolean duty = BleachConfig.get(BleachConfig.KONSO_DUTY_SHINIGAMI);
+        boolean overworld = player.level().dimension() == Level.OVERWORLD;
         Component plus;
-        if (player.level().dimension() != Level.OVERWORLD) {
+        if (!overworld && duty) {
             plus = Component.translatable("screen.bleach.soul.next.plus.elsewhere");
-        } else if (data.shinigami().academyPos().isPresent()) {
+        } else if (overworld && data.shinigami().academyPos().isPresent()) {
             BlockPos academy = data.shinigami().academyPos().get();
             double dx = academy.getX() + 0.5 - player.getX();
             double dz = academy.getZ() + 0.5 - player.getZ();
@@ -590,6 +593,9 @@ public final class SoulStatsScreen extends Screen {
                     ShinigamiLogic.roundedDistance(Math.sqrt(dx * dx + dz * dz)));
         } else {
             plus = Component.translatable("screen.bleach.soul.next.plus");
+        }
+        if (overworld && duty) {
+            plus = plus.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.plus.duty"));
         }
         // Only where the server would let it gnaw: not for a Quincy, nor with Hollowfication or gnawing off.
         if (DevourLogic.gnawRefusal(player, data) == DevourLogic.Gnaw.GNAWING) {

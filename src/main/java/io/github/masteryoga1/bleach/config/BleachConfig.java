@@ -913,7 +913,7 @@ public final class BleachConfig {
                 .defineInRange("duty_after_minutes", 5, 0, 1_440);
         KONSO_DUTY_REVISIT_MINUTES = builder
                 .comment("Minutes before a Shinigami on duty comes again to a Plus it came to, and before a Plus that"
-                        + " none could reach, or one in another world, is told so again.")
+                        + " none could reach, or one in another world but Soul Society, is told so again.")
                 .defineInRange("duty_revisit_minutes", 10, 1, 1_440);
         builder.pop();
 
