@@ -5,6 +5,7 @@ import com.mojang.serialization.JsonOps;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
+import io.github.masteryoga1.bleach.world.gen.SiteStructure;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.UncheckedIOException;
@@ -90,10 +91,15 @@ public final class SoulSocietyTests {
         helper.assertTrue(inside == 0 && wall == 1, "Seireitei has " + inside + " features and its wall " + wall);
         Set<Holder<Biome>> ours = Set.copyOf(biomes);
         Registry<Structure> structures = access.registryOrThrow(Registries.STRUCTURE);
+        // Soul Society's own sites stand there by its plan (see SiteStructure); nothing else may, and so far one does.
         for (Structure structure : structures) {
-            helper.assertFalse(structure.biomes().stream().anyMatch(ours::contains),
+            helper.assertFalse(!(structure instanceof SiteStructure) && structure.biomes().stream().anyMatch(ours::contains),
                     structures.getKey(structure) + " can generate in Soul Society");
         }
+        List<String> sited = structures.stream().filter(structure -> structure.biomes().stream().anyMatch(ours::contains))
+                .map(structure -> String.valueOf(structures.getKey(structure))).toList();
+        helper.assertTrue(sited.equals(List.of(BleachMod.id("seireitei_academy").toString())),
+                "the structures that may stand in Soul Society are " + sited + ", not the Seireitei Academy alone");
 
         // The seam travel looks worlds up through: a stand-in while a test sets one, the real world again after.
         ServerLevel real = BleachWorlds.level(server, BleachWorlds.SOUL_SOCIETY);

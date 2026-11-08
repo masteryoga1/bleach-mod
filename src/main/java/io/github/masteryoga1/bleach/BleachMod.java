@@ -38,6 +38,9 @@ public final class BleachMod {
         ModBlocks.BLOCKS.register(modEventBus);
         ModWorldgen.DENSITY_FUNCTION_TYPES.register(modEventBus);
         ModWorldgen.FEATURES.register(modEventBus);
+        ModWorldgen.STRUCTURE_PLACEMENTS.register(modEventBus);
+        ModWorldgen.STRUCTURE_TYPES.register(modEventBus);
+        ModWorldgen.STRUCTURE_PIECES.register(modEventBus);
         ModComponents.COMPONENTS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
