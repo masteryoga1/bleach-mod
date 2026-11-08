@@ -152,9 +152,12 @@ public final class TravelLogic {
         return Math.max(0L, (data.senkaimonReadyAt - now + TICKS_PER_SECOND - 1) / TICKS_PER_SECOND);
     }
 
-    /** Whether the instructor's wait for another Jigokuchō is over on this game day. */
+    /**
+     * Whether the instructor's wait for another Jigokuchō is over on this game day. A day stamped later than today, as
+     * when the clock is set back after nights slept through, does not hold one back.
+     */
     public static boolean butterflyDue(TravelRecord record, long day) {
-        return record.butterflyDay() < 0
+        return record.butterflyDay() < 0 || day < record.butterflyDay()
                 || day - record.butterflyDay() >= BleachConfig.get(BleachConfig.BUTTERFLY_REISSUE_DAYS);
     }
 

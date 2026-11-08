@@ -119,6 +119,8 @@ public final class AcademyLocator {
         if (player.getRespawnPosition() != null && player.getRespawnDimension() != BleachWorlds.SOUL_SOCIETY) {
             player.setRespawnPosition(Level.OVERWORLD, null, 0.0F, false, false);
         }
+        // A soul sent on as it respawns is not yet its connection's player, which is what the teleport moves.
+        player.moveTo(spot.x, spot.y, spot.z, LANDING_YAW, 0.0F);
         player.teleportTo(soulSociety, spot.x, spot.y, spot.z, LANDING_YAW, 0.0F);
         player.sendSystemMessage(Component.translatable("message.bleach.konso.arrived")
                 .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));

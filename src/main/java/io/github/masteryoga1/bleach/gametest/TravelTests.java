@@ -682,6 +682,8 @@ public final class TravelTests {
                 "a graduate who lost its Jigokuchō was not handed another the next day");
         helper.assertTrue(butterflies(graduate) == 1, "a graduate handed another has " + butterflies(graduate));
         assertDay(helper, graduate, today + 1, "a graduate handed another the next day");
+        helper.assertTrue(TravelLogic.butterflyDue(graduate.getData(SoulAttachments.TRAVEL), today),
+                "a day stamped later than today, as after the clock is set back, held a Jigokuchō back");
 
         Player substitute = mock(helper, GameType.SURVIVAL, ShinigamiTests.substitute(60.0F));
         helper.assertTrue(TravelEvents.issueButterfly(substitute, sameDay, 0L) && butterflies(substitute) == 1,
