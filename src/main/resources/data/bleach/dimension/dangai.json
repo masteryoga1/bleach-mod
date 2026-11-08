@@ -1,0 +1,13 @@
+{
+  "type": "bleach:dangai",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "bleach:dangai",
+      "features": true,
+      "lakes": false,
+      "layers": [{"block": "minecraft:bedrock", "height": 32}],
+      "structure_overrides": []
+    }
+  }
+}

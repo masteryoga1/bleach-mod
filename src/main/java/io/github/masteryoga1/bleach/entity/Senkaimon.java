@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import io.github.masteryoga1.bleach.soul.TravelEvents;
 import io.github.masteryoga1.bleach.soul.TravelLogic;
+import io.github.masteryoga1.bleach.world.DangaiPlan;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -37,9 +38,10 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A Senkaimon: two lit shōji a Shinigami turns open with its blade, 3 wide and 4 tall, a block deep across the way it
- * faced. An aware soul a Jigokuchō guides passes after a second inside ({@link TravelEvents#destination}), and the
- * gate closes at its time. The server decides everything; a client draws it from its synced facing and end. Never
- * saved (its type is {@code noSave}), and hidden from the unaware as a spirit ({@code #bleach:spirits}).
+ * faced. An aware soul passes after a second inside ({@link TravelEvents#destination}), into the Dangai unless a
+ * Jigokuchō guides it, and the gate closes at its time. The server decides everything; a client draws it from its
+ * synced facing and end. Never saved (its type is {@code noSave}), and hidden from the unaware as a spirit
+ * ({@code #bleach:spirits}).
  */
 public final class Senkaimon extends Entity implements Portal {
     public static final float HALF_WIDTH = 1.5F;
@@ -64,11 +66,13 @@ public final class Senkaimon extends Entity implements Portal {
     private static final double MOTE_RISE = 1.0;
     private static final double MOTE_SPEED = 0.02;
 
-    // Server side only, never synced or saved: who opened it, and the world it leads to.
+    // Server side only, never synced or saved: who opened it, the world it leads to, and the Dangai lane those it does
+    // not guide cross.
     @Nullable
     private UUID opener;
     @Nullable
     private ResourceKey<Level> leadsTo;
+    private int lane;
 
     public Senkaimon(EntityType<? extends Senkaimon> type, Level level) {
         super(type, level);
@@ -94,6 +98,7 @@ public final class Senkaimon extends Entity implements Portal {
                 now + (long) BleachConfig.get(BleachConfig.SENKAIMON_OPEN_SECONDS) * TICKS_PER_SECOND);
         gate.opener = opener.getUUID();
         gate.leadsTo = to;
+        gate.lane = level.getRandom().nextInt(DangaiPlan.LANES);
         gate.moveTo(at.x, at.y, at.z, facing.toYRot(), 0.0F);
         if (!level.addFreshEntity(gate)) {
             return null;
@@ -152,6 +157,11 @@ public final class Senkaimon extends Entity implements Portal {
     @Nullable
     public ResourceKey<Level> leadsTo() {
         return leadsTo;
+    }
+
+    /** The Dangai lane those this gate does not guide cross, picked as it opened. Server side only. */
+    public int lane() {
+        return lane;
     }
 
     // ---- The entity ----

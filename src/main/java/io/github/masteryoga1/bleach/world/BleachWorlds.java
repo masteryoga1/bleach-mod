@@ -17,7 +17,7 @@ public final class BleachWorlds {
     public static final ResourceKey<Level> SOUL_SOCIETY = world("soul_society");
     /** Hueco Mundo's key; its world comes in a later step. */
     public static final ResourceKey<Level> HUECO_MUNDO = world("hueco_mundo");
-    /** The Dangai's key; its world comes in a later step. */
+    /** The Dangai's key: the corridor between the worlds, which the Senkaimon's unguided cross. */
     public static final ResourceKey<Level> DANGAI = world("dangai");
     public static final ResourceKey<DimensionType> SOUL_SOCIETY_TYPE =
             ResourceKey.create(Registries.DIMENSION_TYPE, BleachMod.id("soul_society"));

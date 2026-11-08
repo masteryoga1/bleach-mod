@@ -11,6 +11,7 @@ import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.DangaiLogic;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.PowerPath;
@@ -26,6 +27,7 @@ import io.github.masteryoga1.bleach.soul.TravelRecord;
 import io.github.masteryoga1.bleach.soul.VisoredEvents;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.DangaiPlan;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import java.util.ArrayList;
@@ -69,7 +71,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Senkaimon and the Jigokuchō: who may open a gate and where it leads, the turn of the blade and how it
- * ends, a gate's life, who is given a butterfly, and real players crossing to Soul Society and back or turned away.
+ * ends, a gate's life, who is given a butterfly, and real players crossing to Soul Society and back, taken into the
+ * Dangai, or turned away.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -79,7 +82,7 @@ public final class TravelTests {
     private static final long DAY = 24_000L;
     /** How near a spot worked out from the same numbers must be. */
     private static final double SAME = 1.0E-6;
-    private static final String UNGUIDED_KEY = "message.bleach.senkaimon.unguided";
+    private static final String ENTERED_KEY = "message.bleach.dangai.entered";
     private static final String MOUNT_KEY = "message.bleach.senkaimon.mount";
 
     private TravelTests() {
@@ -115,21 +118,21 @@ public final class TravelTests {
     }
 
     /** How many times this joined player's action bar has shown the line with this key. */
-    private static long lines(ServerPlayer player, String key) {
+    static long lines(ServerPlayer player, String key) {
         return TestPlayers.actionBar(player).stream()
                 .filter(line -> line.getContents() instanceof TranslatableContents words && words.getKey().equals(key))
                 .count();
     }
 
     /** The keys of every line this joined player's action bar has shown, oldest first, for a failure to name. */
-    private static List<String> said(ServerPlayer player) {
+    static List<String> said(ServerPlayer player) {
         return TestPlayers.actionBar(player).stream()
                 .map(line -> line.getContents() instanceof TranslatableContents words ? words.getKey() : line.getString())
                 .toList();
     }
 
     /** Where a joined player is, for a failure to name. */
-    private static String where(ServerPlayer player) {
+    static String where(ServerPlayer player) {
         return player.level().dimension().location() + " " + player.position();
     }
 
@@ -143,7 +146,8 @@ public final class TravelTests {
         return player.getInventory().countItem(ModItems.HELL_BUTTERFLY.get());
     }
 
-    private static void discard(Entity... entities) {
+    /** Takes away each of these that is still in its world. */
+    static void discard(Entity... entities) {
         for (Entity entity : entities) {
             if (entity != null && !entity.isRemoved()) {
                 entity.discard();
@@ -152,7 +156,7 @@ public final class TravelTests {
     }
 
     /** One step of a test that waits. Should it fail, everything on the list is taken away first. */
-    private static Runnable step(List<Entity> spawned, Runnable body) {
+    static Runnable step(List<Entity> spawned, Runnable body) {
         return () -> {
             try {
                 body.run();
@@ -637,14 +641,14 @@ public final class TravelTests {
         helper.assertTrue(day == expected, what + " was last given a Jigokuchō on day " + day + ", not " + expected);
     }
 
-    // ---- Turned away ----
+    // ---- Into the Dangai, or turned away ----
 
     /**
-     * Real players at an open gate: a Shinigami with no Jigokuchō and a Human carrying one are each told once that they
-     * are not guided, and a guided Shinigami on a mount is told once a second to get down. None of them passes.
+     * Real players at an open gate: a Shinigami with no Jigokuchō and a Human carrying one are taken into the gate's
+     * Dangai lane together, and a guided Shinigami on a mount is told once a second to get down.
      */
     @GameTest(template = "empty", batch = "senkaimon")
-    public static void theUnguidedAndTheMountedAreTurnedAway(GameTestHelper helper) {
+    public static void theUnguidedEnterTheDangaiAndTheMountedAreTurnedAway(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         long now = HollowPlayerTests.now(helper);
         ServerPlayer unguided = TestPlayers.join(helper, GameType.SURVIVAL, SPOT);
@@ -662,31 +666,54 @@ public final class TravelTests {
         HellButterflyItem.give(rider);
         ArmorStand stand = helper.spawn(EntityType.ARMOR_STAND, right);
         List<Entity> spawned = new ArrayList<>(List.of(stand));
+        Senkaimon[] opened = new Senkaimon[1];
         step(spawned, () -> {
             stand.setNoGravity(true);
             helper.assertTrue(rider.startRiding(stand, true), "the Shinigami would not ride the armour stand");
             Senkaimon gate = Senkaimon.open(level, unguided, now);
             helper.assertTrue(gate != null, "no gate opened");
             spawned.add(gate);
+            opened[0] = gate;
             Vec3 middle = helper.absoluteVec(new Vec3(1.5, 1.0, 2.5));
             helper.assertTrue(gate.position().distanceTo(middle) < SAME, "the gate stands at " + gate.position()
                     + ", not " + middle);
             unguided.teleportTo(level, gate.getX(), gate.getY(), gate.getZ(), 0.0F, 0.0F);
         }).run();
-        // Inside from the gate's first tick, the two on foot are asked on tick 21, and the re-armed wait asks no more.
+        // Inside from the gate's first tick, the two on foot pass on tick 21, together, to the start of the gate's lane.
         helper.runAtTickTime(45, step(spawned, () -> {
-            assertTurnedAway(helper, unguided, "the Shinigami with no Jigokuchō");
-            assertTurnedAway(helper, human, "the Human carrying a Jigokuchō");
+            TravelRecord.Crossing first = assertInLane(helper, unguided, opened[0], "the Shinigami with no Jigokuchō");
+            TravelRecord.Crossing second = assertInLane(helper, human, opened[0], "the Human carrying a Jigokuchō");
+            helper.assertTrue(first.equals(second), "the two who passed together cross apart: " + first + " and " + second);
             assertTurnedAway(helper, rider, "the mounted Shinigami");
-            helper.assertTrue(lines(unguided, UNGUIDED_KEY) == 1L, "the Shinigami with no Jigokuchō was told "
-                    + said(unguided));
-            helper.assertTrue(lines(human, UNGUIDED_KEY) == 1L, "the Human carrying a Jigokuchō was told " + said(human));
             // Told on the gate's 20th and 40th ticks.
-            helper.assertTrue(rider.isPassenger() && lines(rider, MOUNT_KEY) == 2L && lines(rider, UNGUIDED_KEY) == 0L,
+            helper.assertTrue(rider.isPassenger() && lines(rider, MOUNT_KEY) == 2L && lines(rider, ENTERED_KEY) == 0L,
                     "the mounted Shinigami (riding: " + rider.isPassenger() + ") was told " + said(rider));
             discard(spawned.toArray(new Entity[0]));
             helper.succeed();
         }));
+    }
+
+    /**
+     * Asserts this joined player passed this gate into the start of the gate's Dangai lane and was told so once, with a
+     * record of leaving the Human World and of a crossing to Soul Society on the gate's lane and bearing; that crossing.
+     */
+    private static TravelRecord.Crossing assertInLane(GameTestHelper helper, ServerPlayer player, Senkaimon gate,
+                                                      String what) {
+        Vec3 start = DangaiPlan.entry(gate.lane());
+        double across = Math.hypot(player.getX() - start.x, player.getZ() - start.z);
+        helper.assertTrue(player.level().dimension() == BleachWorlds.DANGAI && across < 0.5, what + " is at "
+                + where(player) + ", not at the start of lane " + gate.lane() + ", " + start + "; the action bar said "
+                + said(player));
+        helper.assertTrue(lines(player, ENTERED_KEY) == 1L, what + " was told " + said(player));
+        TravelRecord record = player.getData(SoulAttachments.TRAVEL);
+        TravelRecord.Crossing crossing = record.crossing().orElse(null);
+        float bearing = DangaiLogic.bearing(gate.getX(), gate.getZ());
+        // Field by field, so a field a later step adds to the crossing changes nothing here.
+        helper.assertTrue(record.humanWorldReturn().isPresent() && crossing != null
+                        && crossing.to() == BleachWorlds.SOUL_SOCIETY && crossing.lane() == gate.lane()
+                        && crossing.bearing() == bearing, what + "'s record is " + record + ", not one of leaving the Human "
+                        + "World with a crossing to Soul Society on lane " + gate.lane() + " at bearing " + bearing);
+        return crossing;
     }
 
     /** Asserts this joined player is still in the test's world, with no record of leaving it. */

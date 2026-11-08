@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.registry;
 
 import com.mojang.serialization.MapCodec;
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.world.gen.DangaiLaneFeature;
 import io.github.masteryoga1.bleach.world.gen.RadialDensity;
 import io.github.masteryoga1.bleach.world.gen.SeireihekiFeature;
 import net.minecraft.core.registries.Registries;
@@ -22,6 +23,9 @@ public final class ModWorldgen {
     /** {@code bleach:seireiheki}, which the wall's biome places. */
     public static final DeferredHolder<Feature<?>, SeireihekiFeature> SEIREIHEKI =
             FEATURES.register("seireiheki", SeireihekiFeature::new);
+    /** {@code bleach:dangai_lane}, which the Dangai's biome places. */
+    public static final DeferredHolder<Feature<?>, DangaiLaneFeature> DANGAI_LANE =
+            FEATURES.register("dangai_lane", DangaiLaneFeature::new);
 
     private ModWorldgen() {
     }

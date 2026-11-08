@@ -14,13 +14,14 @@ import net.minecraft.world.level.BlockCollisions;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * Moving a player somewhere they have not walked to (back to where they died, to the Academy
- * after Konsō, or through a Senkaimon) without dropping them into a wall, a liquid, a long fall or
- * something that hurts.
+ * after Konsō, through a Senkaimon, or out of the Dangai) without dropping them into a wall, a
+ * liquid, a long fall or something that hurts.
  */
 public final class SafeLanding {
     private SafeLanding() {
@@ -74,6 +75,47 @@ public final class SafeLanding {
             return null;
         }
         return new Vec3(target.x, box.minY, target.z);
+    }
+
+    /**
+     * Where an entity coming down from the sky over this column starts: {@code rise} blocks over its ground, the
+     * column's chunk loaded first; null over the void, over lava or ground that hurts, outside the world border, or
+     * where its body would meet a block. Water below is fine: the fall is slow.
+     */
+    @Nullable
+    public static Vec3 skySpot(Entity entity, ServerLevel level, double x, double z, int rise) {
+        int column = Mth.floor(x);
+        int row = Mth.floor(z);
+        level.getChunk(column >> 4, row >> 4);
+        int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, column, row);
+        if (top <= level.getMinBuildHeight()) {
+            return null;
+        }
+        BlockPos ground = new BlockPos(column, top - 1, row);
+        BlockState state = level.getBlockState(ground);
+        if (level.getFluidState(ground).is(FluidTags.LAVA) || isHarmful(state) || state.is(Blocks.MAGMA_BLOCK)) {
+            return null;
+        }
+        Vec3 spot = new Vec3(x, top + rise, z);
+        AABB box = entity.getDimensions(Pose.STANDING).makeBoundingBox(spot);
+        return level.getWorldBorder().isWithinBounds(box) && level.noCollision(entity, box) ? spot : null;
+    }
+
+    /**
+     * This spot raised by up to {@code rise} whole blocks, as far as the body has clean room, so a roof, or lava or
+     * something harmful above, keeps it lower.
+     */
+    public static Vec3 risen(Entity entity, ServerLevel level, Vec3 spot, int rise) {
+        AABB box = entity.getDimensions(Pose.STANDING).makeBoundingBox(spot);
+        int up = 0;
+        while (up < rise) {
+            AABB next = box.move(0.0, up + 1, 0.0);
+            if (!level.noCollision(entity, next) || touchesLava(level, next) || isHarmful(level, entity, next)) {
+                break;
+            }
+            up++;
+        }
+        return spot.add(0.0, up, 0.0);
     }
 
     /**
