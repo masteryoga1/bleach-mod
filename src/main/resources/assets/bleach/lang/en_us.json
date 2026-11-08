@@ -635,7 +635,7 @@
   "message.bleach.academy_sensed": "You feel the reiatsu of Shinigami %s, about %s blocks away.",
   "message.bleach.academy_sensed.elsewhere": "You feel the reiatsu of Shinigami, far away in Soul Society.",
   "message.bleach.academy_direction": "The Academy lies %s, about %s blocks away",
-  "message.bleach.academy_direction.elsewhere": "The Academy lies in Soul Society. Konsō will take you there",
+  "message.bleach.academy_direction.elsewhere": "The Academy lies in Soul Society",
   "message.bleach.konso.arrived": "You arrive before the gates of the Academy, in Soul Society.",
   "message.bleach.konso.no_academy": "Soul Society cannot be reached. Your soul lingers here, free of its chain.",
   "message.bleach.respawn.academy": "Your soul finds its way back to Soul Society, to the gates of the Academy.",
