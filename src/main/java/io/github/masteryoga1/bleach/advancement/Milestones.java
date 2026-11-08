@@ -177,7 +177,7 @@ public final class Milestones {
     public static final String MASKED = "masked";
     /** Its inner Hollow seized its body in a fight, before or after the win. Granted when it happens (VisoredEvents). */
     public static final String TAKEN_OVER = "taken_over";
-    /** Reached the end of a Dangai lane. Granted when it happens (DangaiEvents). */
+    /** Reached the end of a Dangai lane before the Kōtotsu caught it. Granted when it happens (DangaiEvents). */
     public static final String DANGAI = "dangai";
     // Each soul state is also a milestone under its own name: "plus", "hollow", "rukongai" and so on.
 

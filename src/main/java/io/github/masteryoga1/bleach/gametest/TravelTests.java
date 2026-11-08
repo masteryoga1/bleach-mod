@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.item.HellButterflyItem;
@@ -645,7 +646,7 @@ public final class TravelTests {
 
     /**
      * Real players at an open gate: a Shinigami with no Jigokuchō and a Human carrying one are taken into the gate's
-     * Dangai lane together, and a guided Shinigami on a mount is told once a second to get down.
+     * Dangai lane together, sharing its Kōtotsu, and a guided Shinigami on a mount is told once a second to get down.
      */
     @GameTest(template = "empty", batch = "senkaimon")
     public static void theUnguidedEnterTheDangaiAndTheMountedAreTurnedAway(GameTestHelper helper) {
@@ -674,6 +675,8 @@ public final class TravelTests {
             helper.assertTrue(gate != null, "no gate opened");
             spawned.add(gate);
             opened[0] = gate;
+            // Its lane's start held from now, so the Kōtotsu the first through sends there is found by the second.
+            DangaiTests.holdLane(helper, gate.lane(), 0);
             Vec3 middle = helper.absoluteVec(new Vec3(1.5, 1.0, 2.5));
             helper.assertTrue(gate.position().distanceTo(middle) < SAME, "the gate stands at " + gate.position()
                     + ", not " + middle);
@@ -681,9 +684,16 @@ public final class TravelTests {
         }).run();
         // Inside from the gate's first tick, the two on foot pass on tick 21, together, to the start of the gate's lane.
         helper.runAtTickTime(45, step(spawned, () -> {
+            // The lane's Kōtotsu, which the first through sent and the second met, goes with the test.
+            ServerLevel dangai = level.getServer().getLevel(BleachWorlds.DANGAI);
+            List<Kototsu> sweeping = dangai == null ? List.of() : Kototsu.inLane(dangai, opened[0].lane());
+            spawned.addAll(sweeping);
             TravelRecord.Crossing first = assertInLane(helper, unguided, opened[0], "the Shinigami with no Jigokuchō");
             TravelRecord.Crossing second = assertInLane(helper, human, opened[0], "the Human carrying a Jigokuchō");
             helper.assertTrue(first.equals(second), "the two who passed together cross apart: " + first + " and " + second);
+            helper.assertTrue(first.met() && sweeping.size() == 1 && sweeping.get(0).setsOutAt() == first.kototsuAt(),
+                    "the two who passed together do not share one Kōtotsu: their crossing's sets out at "
+                            + first.kototsuAt() + ", and lane " + opened[0].lane() + " holds " + sweeping.size());
             assertTurnedAway(helper, rider, "the mounted Shinigami");
             // Told on the gate's 20th and 40th ticks.
             helper.assertTrue(rider.isPassenger() && lines(rider, MOUNT_KEY) == 2L && lines(rider, ENTERED_KEY) == 0L,

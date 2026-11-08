@@ -15,6 +15,7 @@ import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
+import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.NpcAction;
@@ -230,15 +231,17 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * must bring the player to the Senkaimon court on Seireitei's lawn at exactly y 72. A tp across the lawn must stand it
  * where the south wall reaches the client in Sekkiseki to its top beside the gate's 16-block gap. Once the first gate's
  * wait has run, a gate opened in Soul Society must bring the player home. Then, its Jigokuchō taken, a third gate must
- * take it into the Dangai, set on a lane's floor between its walls of Kōryū, which the action bar must say; moved near
- * the lane's end, it walks out and must come out over the Rukongai, falling slowly, before the run quits.
+ * take it into the Dangai, set on a lane's floor between its walls of Kōryū, which the action bar must say, with the
+ * lane's Kōtotsu waiting at its start; it looks back at the Kōtotsu, then, moved near the lane's end, it walks out and
+ * must come out over the Rukongai, falling slowly, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, the Dangai's lane and Kōryū, and HUD are drawn, and screenshots of the main moments are saved for review.
- * Any crash in the mod's client code fails the run, and so does anything that did not reach the client as expected.
+ * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, and HUD are drawn, and screenshots of the main moments are saved
+ * for review. Any crash in the mod's client code fails the run, and so does anything that did not reach the client as
+ * expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -1450,9 +1453,14 @@ public final class ClientSmokeTest {
             case 7562 -> command(minecraft, "tp @s ~ ~ ~2");
             // Down the lane, south, between its walls of Kōryū.
             case 7615 -> shot(minecraft, "dangai");
-            // The lane's end asked for well before the tp, as Soul Society's arrival chunks were. The beats from 7621 to
-            // 7639 are left for the step that brings the Kōtotsu.
+            // The lane's end asked for well before the tp, as Soul Society's arrival chunks were.
             case 7620 -> holdLane(minecraft, Mth.floor(player.getX()) >> 4, true);
+            // A look back: 12 blocks down the lane, facing its start, so the whole face of the Kōtotsu met on entering
+            // is in view. It sets out about 7784, after the player is out, so it waits against the rock all this time.
+            case 7622 -> command(minecraft, "tp @s ~ ~ 12 180 0");
+            case 7630 -> shot(minecraft, "kototsu");
+            // Facing south again, for the tp near the lane's end, which keeps the rotation.
+            case 7635 -> command(minecraft, "tp @s ~ ~ ~ 0 0");
             // Near the lane's end, in the same lane and on the same floor.
             case 7640 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ %.1f", LANE_END_Z));
             // The last 1.5 blocks take 9 ticks from rest at a walk, 8 with Hohō 10: it crosses z 160 about 7654 and comes
@@ -2081,6 +2089,10 @@ public final class ClientSmokeTest {
         Component entered = Component.translatable("message.bleach.dangai.entered");
         expectWithin(minecraft, 7587, 7639, () -> actionBarShows(entered),
                 "the Dangai's entry line never showed (the action bar's last lines: " + recentActionBar() + ")");
+        // Sent as the player entered, the lane's Kōtotsu waits with its front at the lane's start until the look back.
+        expectWithin(minecraft, 7588, 7621, () -> count(minecraft, Kototsu.class, 4.0) == 1,
+                "no Kōtotsu waited at the lane's start (" + count(minecraft, Kototsu.class, 4.0) + " within 4 blocks of the"
+                        + " player at " + player.position() + ")");
         // From the tp to before the walk can reach the lane's end, 9 ticks from 7646 at the slowest.
         expectWithin(minecraft, 7642, 7652, () -> minecraft.level.dimension() == BleachWorlds.DANGAI
                         && player.getZ() > LANE_END_Z - 0.5,

@@ -18,6 +18,7 @@ import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
+import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
@@ -378,6 +379,21 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .updateInterval(Integer.MAX_VALUE)
                     .build(BleachMod.id("senkaimon").toString()));
+
+    /**
+     * The Kōtotsu, which sweeps a Dangai lane: 8 blocks every way, moving every tick. Never saved, and never summoned: one
+     * is sent as souls enter a lane.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<Kototsu>> KOTOTSU =
+            ENTITY_TYPES.register("kototsu", () -> EntityType.Builder
+                    .<Kototsu>of(Kototsu::new, MobCategory.MISC)
+                    .sized(8.0F, 8.0F)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(1)
+                    .build(BleachMod.id("kototsu").toString()));
 
     private ModEntities() {
     }

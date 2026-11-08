@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.world;
 
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -30,6 +31,12 @@ public final class DangaiPlan {
     /** Where a soul enters this lane: its middle, on the floor, half a block from the rock behind. */
     public static Vec3 entry(int lane) {
         return new Vec3(laneX(lane), FLOOR_Y, 0.5);
+    }
+
+    /** This lane's air, wall to wall and floor to ceiling, from the rock behind it to its cap. */
+    public static AABB laneBox(int lane) {
+        int x0 = 16 * lane;
+        return new AABB(x0 + WEST_WALL + 1, FLOOR_Y, 0, x0 + EAST_WALL, FLOOR_Y + LANE_HEIGHT, END_Z);
     }
 
     /** What lies at this block: rock everywhere but the lanes' air and their Kōryū. */

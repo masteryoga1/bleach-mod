@@ -1,12 +1,15 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.soul.BakudoEffect;
 import io.github.masteryoga1.bleach.soul.ChainEvents;
 import io.github.masteryoga1.bleach.soul.DangaiEvents;
+import io.github.masteryoga1.bleach.soul.DangaiLogic;
 import io.github.masteryoga1.bleach.soul.SafeLanding;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -14,6 +17,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.TravelRecord;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.DangaiPlan;
+import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,10 +37,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ThrownEnderpearl;
@@ -60,9 +66,10 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for the Dangai: its lanes as the plan lays them and the real world carved to it, the Kōryū's hold, the lane's
- * end into either world, and a login mid-crossing. Tests 1, 2, 5 and 6 are here; 3 and 4 come with the Kōtotsu.
- * The Dangai is shared by every test, so the tests that set souls in it run in their own batch, each on its own lanes.
+ * Tests for the Dangai: its lanes as the plan lays them and the real world carved to it, the Kōryū's hold, the
+ * Kōtotsu's race and throw, the lane's end into either world, and a login mid-crossing. The Dangai is shared by every
+ * test, so the tests that set souls in it run in their own batch, each on its own lanes, and each takes away every
+ * Kōtotsu it makes.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -92,7 +99,7 @@ public final class DangaiTests {
      * there has its floor at once and what stands there ticks at once. Never released, as the Senkaimon court's in
      * {@link TravelTests} is not.
      */
-    private static ServerLevel holdLane(GameTestHelper helper, int lane, int chunkZ) {
+    static ServerLevel holdLane(GameTestHelper helper, int lane, int chunkZ) {
         ServerLevel dangai = dangai(helper);
         for (int x = -2; x <= 2; x++) {
             for (int z = -2; z <= 2; z++) {
@@ -124,9 +131,14 @@ public final class DangaiTests {
         return player;
     }
 
-    /** A record of nothing but this crossing. */
+    /** A record of nothing but this crossing, which has not met its Kōtotsu, as every crossing before the Kōtotsu. */
     private static TravelRecord crossing(ResourceKey<Level> to, int lane, float bearing) {
         return TravelRecord.NONE.withCrossing(Optional.of(new TravelRecord.Crossing(to, lane, bearing)));
+    }
+
+    /** A record of nothing but this crossing, its Kōtotsu setting out at this game time. */
+    private static TravelRecord crossing(ResourceKey<Level> to, int lane, float bearing, long kototsuAt) {
+        return TravelRecord.NONE.withCrossing(Optional.of(new TravelRecord.Crossing(to, lane, bearing, kototsuAt)));
     }
 
     /** A mock player with this soul at {@link #SPOT}. */
@@ -151,8 +163,13 @@ public final class DangaiTests {
 
     /** The ticks of Slow Falling this player has left, or 0 without it. */
     private static int slowFalling(Player player) {
-        MobEffectInstance effect = player.getEffect(MobEffects.SLOW_FALLING);
-        return effect == null ? 0 : effect.getDuration();
+        return ticksLeft(player, MobEffects.SLOW_FALLING);
+    }
+
+    /** The ticks of this effect this player has left, or 0 without it. */
+    private static int ticksLeft(Player player, Holder<MobEffect> effect) {
+        MobEffectInstance instance = player.getEffect(effect);
+        return instance == null ? 0 : instance.getDuration();
     }
 
     /** Asserts what the plan lays at this block. */
@@ -298,6 +315,141 @@ public final class DangaiTests {
         });
     }
 
+    // ---- Test 3: the race ----
+
+    /**
+     * Test 3. At the default delay and speed, the Kōtotsu catches a soul that walks down a bedrock lane about 112
+     * blocks in, and a soul that sprints comes out at the lane's end ahead of it, worked tick by tick from the game's own
+     * speeds and friction. Its front stands at the start until it sets out, and one only level with a back has not caught
+     * it.
+     */
+    @GameTest(template = "empty")
+    public static void theKototsuCatchesAWalkerButNotASprinter(GameTestHelper helper) {
+        int delay = BleachConfig.get(BleachConfig.DANGAI_KOTOTSU_DELAY_SECONDS);
+        double speed = BleachConfig.get(BleachConfig.DANGAI_KOTOTSU_SPEED);
+        helper.assertTrue(delay == 10 && speed == 7.0, "the Kōtotsu sets out after " + delay + " seconds and comes "
+                + speed + " blocks a second, not 10 and 7");
+        long setsOut = DangaiLogic.kototsuAt(0L);
+        helper.assertTrue(setsOut == 200L, "a Kōtotsu met on tick 0 sets out on " + setsOut + ", not 200");
+        helper.assertTrue(DangaiLogic.front(200L, 200L) == 0.0 && DangaiLogic.front(200L, 220L) == 7.0,
+                "the front is at " + DangaiLogic.front(200L, 200L) + " as it sets out and " + DangaiLogic.front(200L, 220L)
+                        + " a second later, not 0 and 7");
+        helper.assertFalse(DangaiLogic.caught(5.0, 5.0), "a front level with a body's back caught it");
+
+        Player soul = helper.makeMockPlayer(GameType.SURVIVAL);
+        double walk = soul.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        soul.setSprinting(true);
+        double sprint = soul.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        double friction = Blocks.BEDROCK.getFriction();
+        double half = soul.getBbWidth() / 2.0;
+        Race walker = race(walk, friction, half, setsOut);
+        helper.assertTrue(walker.caught() && walker.tick() >= 515 && walker.tick() <= 530 && walker.z() >= 110.0
+                && walker.z() <= 116.0, "a soul walking at " + walk + " ran " + walker + ", not caught on a tick from 515 "
+                + "to 530 between z 110 and 116");
+        Race sprinter = race(sprint, friction, half, setsOut);
+        helper.assertTrue(!sprinter.caught() && sprinter.tick() >= 565 && sprinter.tick() <= 575
+                && sprinter.front() < 135.0, "a soul sprinting at " + sprint + " ran " + sprinter + ", not out on a tick "
+                + "from 565 to 575 with the front still short of z 135");
+        helper.succeed();
+    }
+
+    /** How a run down a lane ended: caught or out, on which tick, the soul's z and the Kōtotsu's front then. */
+    private record Race(boolean caught, int tick, double z, double front) {
+    }
+
+    /**
+     * A soul's run down a lane from rest at its start, at this movement speed on ground of this friction, as vanilla
+     * moves a body on the ground each tick, against a Kōtotsu setting out at this tick: out at the lane's end, or caught
+     * once the front passes its back, this far behind its middle.
+     */
+    private static Race race(double speed, double friction, double halfWidth, long setsOut) {
+        // A tick's push from the held key, and the share of its speed the ground leaves it for the next.
+        double push = 0.98 * speed * 0.21600002 / (friction * friction * friction);
+        double keep = friction * 0.91;
+        double z = DangaiPlan.entry(0).z;
+        double velocity = 0.0;
+        for (int tick = 1; tick <= 2_000; tick++) {
+            double step = velocity + push;
+            z += step;
+            velocity = step * keep;
+            double front = DangaiLogic.front(setsOut, tick);
+            if (z >= DangaiPlan.EXIT_Z) {
+                return new Race(false, tick, z, front);
+            }
+            if (DangaiLogic.caught(front, z - halfWidth)) {
+                return new Race(true, tick, z, front);
+            }
+        }
+        return new Race(false, -1, z, DangaiLogic.front(setsOut, 2_000L));
+    }
+
+    // ---- Test 4: the throw ----
+
+    /**
+     * Test 4. A soul whose back the Kōtotsu's front has passed is thrown out into its crossing's world, here Soul
+     * Society: 1,000 to 2,000 blocks across from where the lane's end would have let it out, outside the Shakonmaku and
+     * 32 blocks over the ground, falling slowly and reeling but unhurt, its crossing done but not counted as crossed.
+     */
+    @GameTest(template = "empty", batch = "dangai", timeoutTicks = 200)
+    public static void aSoulTheKototsuCatchesIsThrownFarOffCourse(GameTestHelper helper) {
+        helper.assertTrue(DangaiLogic.outsideWall(528.0, 0.0) && !DangaiLogic.outsideWall(527.9, 0.0)
+                && DangaiLogic.outsideWall(-400.0, 400.0), "the Shakonmaku's edge is not at 528 blocks from the centre");
+        Vec3 across = DangaiLogic.offCourse(new Vec3(536.0, 72.0, 0.0), Math.PI, 1_000.0);
+        helper.assertTrue(across.distanceTo(new Vec3(-464.0, 72.0, 0.0)) < 1.0E-9 && !DangaiLogic.outsideWall(across.x,
+                across.z), "1,000 blocks west of (536, 72, 0) is " + across + ", not (-464, 72, 0) inside the Shakonmaku");
+
+        ServerLevel soulSociety = helper.getLevel().getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
+        helper.assertTrue(soulSociety != null, "the test server has no Soul Society");
+        ServerLevel dangai = holdLane(helper, 248, 0);
+        long t = HollowPlayerTests.now(helper);
+        // Set out 20 ticks ago, so on its first tick there the front is already past its back at 0.2. The crossing has
+        // met its Kōtotsu, so none is sent.
+        ServerPlayer thrown = inLane(helper, shinigami(), 248, DangaiPlan.entry(248).z,
+                crossing(BleachWorlds.SOUL_SOCIETY, 248, 0.0F, Math.max(0L, t - 20L)));
+        float health = thrown.getHealth();
+        List<Entity> spawned = new ArrayList<>();
+        // Thrown on its first tick there; a stall making the far columns stops the clock too, so 19 ticks of slack.
+        helper.runAtTickTime(20, TravelTests.step(spawned, () -> {
+            List<Kototsu> sent = Kototsu.inLane(dangai, 248);
+            spawned.addAll(sent);
+            helper.assertTrue(sent.isEmpty(), "a crossing that had met its Kōtotsu sent " + sent.size() + " more");
+            helper.assertTrue(thrown.level() == soulSociety, "the soul the Kōtotsu caught is at "
+                    + TravelTests.where(thrown));
+            double fromCentre = Math.hypot(thrown.getX(), thrown.getZ());
+            helper.assertTrue(fromCentre >= SeireiteiPlan.SHAKONMAKU_RADIUS, "the thrown soul came down "
+                    + fromCentre + " blocks from the centre, inside the Shakonmaku");
+            // Across from the middle of the district the lane's end chose, due east of the centre on the gate's bearing.
+            boolean offCourse = false;
+            boolean atEnd = false;
+            for (int district = 1; district <= DangaiLogic.EXIT_DISTRICTS; district++) {
+                double off = Math.hypot(thrown.getX() - (504.0 + 32.0 * district), thrown.getZ());
+                offCourse |= off >= 1_000.0 - SAME && off <= 2_000.0 + SAME;
+                // All eight draws missing lets it out at the lane's end itself, about once in 30 million.
+                atEnd |= off < SAME;
+            }
+            helper.assertTrue(offCourse || atEnd, "the thrown soul came down at " + thrown.position() + ", not 1,000 to "
+                    + "2,000 blocks across from where the lane's end would have let it out");
+            // Its column loaded before its ground is read, as the throw left it.
+            BlockPos column = thrown.blockPosition();
+            soulSociety.getChunk(column.getX() >> 4, column.getZ() >> 4);
+            int top = soulSociety.getHeight(Heightmap.Types.MOTION_BLOCKING, column.getX(), column.getZ());
+            int rise = atEnd ? BleachConfig.get(BleachConfig.DANGAI_EXIT_HEIGHT) : DangaiLogic.THROW_HEIGHT;
+            helper.assertTrue(thrown.getY() >= top + rise - 2.0 && thrown.getY() <= top + rise + 0.001
+                    && !thrown.onGround(), "the thrown soul is at y " + thrown.getY() + (thrown.onGround() ? ", on the "
+                    + "ground," : "") + " over ground at " + top + ", not falling from " + rise + " blocks above it");
+            int falling = slowFalling(thrown);
+            int reeling = ticksLeft(thrown, MobEffects.CONFUSION);
+            helper.assertTrue(falling >= 270 && falling <= 299 && reeling >= 70 && reeling <= 99, "the thrown soul has "
+                    + falling + " ticks of Slow Falling and " + reeling + " of Nausea left, not 270 to 299 and 70 to 99");
+            helper.assertTrue(thrown.getHealth() == health, "the throw left the soul " + thrown.getHealth()
+                    + " health of " + health);
+            TravelRecord record = thrown.getData(SoulAttachments.TRAVEL);
+            helper.assertTrue(record.crossing().isEmpty(), "the thrown soul is still on a crossing: " + record);
+            helper.assertFalse(earned(thrown, "dangai"), "a soul the Kōtotsu caught has earned Crossed the Dangai");
+            helper.succeed();
+        }));
+    }
+
     // ---- Test 5: the lane's end ----
 
     /**
@@ -311,9 +463,11 @@ public final class DangaiTests {
         ServerLevel soulSociety = level.getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
         helper.assertTrue(soulSociety != null, "the test server has no Soul Society");
         holdLane(helper, 251, 10);
+        // Both crossings met a Kōtotsu that sets out long after the test, so none is sent and neither is caught.
+        long t = HollowPlayerTests.now(helper);
         // Due south of the centre, so it comes out on the z axis.
         ServerPlayer south = inLane(helper, shinigami(), 251, 160.5,
-                crossing(BleachWorlds.SOUL_SOCIETY, 251, (float) (Math.PI / 2.0)));
+                crossing(BleachWorlds.SOUL_SOCIETY, 251, (float) (Math.PI / 2.0), t + 10_000L));
         ServerLevel dangai = holdLane(helper, 252, 10);
 
         // The way home rises only as far as the body has clean room: the lane's roof, or lava below it, keeps it lower.
@@ -330,7 +484,8 @@ public final class DangaiTests {
 
         helper.setBlock(1, 0, 1, Blocks.STONE);
         BlockPos left = helper.absolutePos(new BlockPos(1, 1, 1));
-        TravelRecord home = crossing(Level.OVERWORLD, 252, 0.0F).withHumanWorldReturn(GlobalPos.of(Level.OVERWORLD, left));
+        TravelRecord home = crossing(Level.OVERWORLD, 252, 0.0F, t + 10_000L)
+                .withHumanWorldReturn(GlobalPos.of(Level.OVERWORLD, left));
         ServerPlayer rider = inLane(helper, shinigami(), 252, 160.5, home);
         ArmorStand stand = new ArmorStand(EntityType.ARMOR_STAND, dangai);
         List<Entity> spawned = new ArrayList<>(List.of(stand));
@@ -388,41 +543,29 @@ public final class DangaiTests {
 
     /**
      * Test 6. A soul that logs in mid-crossing is set at its lane's start again, facing down it, still on the same
-     * crossing and told it is in the Dangai; a soul found in the Dangai with no crossing is put out at the Human World's
-     * spawn. A crossing saved and read back is the same, and one saved without a field reads as none.
+     * crossing with a Kōtotsu of its own a full delay off, and told it is in the Dangai; a soul on a crossing from before
+     * the Kōtotsu meets its lane's at its first tick there; a soul found in the Dangai with no crossing is put out at the
+     * Human World's spawn. A crossing saved and read back is the same, one saved without a field it needs reads as none,
+     * and one saved without its Kōtotsu reads as one that has not met it.
      */
     @GameTest(template = "empty", batch = "dangai", timeoutTicks = 200)
     public static void aLoginMidCrossingStartsTheLaneAgain(GameTestHelper helper) {
         holdLane(helper, 253, 5);
         ServerLevel dangai = holdLane(helper, 253, 0);
-        TravelRecord.Crossing crossing = new TravelRecord.Crossing(BleachWorlds.SOUL_SOCIETY, 253, 0.5F);
-        ServerPlayer midway = inLane(helper, shinigami(), 253, 90.5, TravelRecord.NONE.withCrossing(Optional.of(crossing)));
-        // Turned round in the lane, as a soul that looked back would be.
-        midway.setYRot(90.0F);
-        DangaiEvents.atLogin(midway);
-        Vec3 start = DangaiPlan.entry(253);
-        helper.assertTrue(midway.level() == dangai && midway.position().distanceTo(start) < SAME
-                        && midway.getYRot() == 0.0F, "after its login the soul midway down lane 253 is at "
-                        + TravelTests.where(midway) + " facing " + midway.getYRot() + ", not at its start, " + start
-                        + ", facing down it");
-        TravelRecord.Crossing kept = midway.getData(SoulAttachments.TRAVEL).crossing().orElse(null);
-        // Field by field, so a field a later step adds to the crossing changes nothing here.
-        helper.assertTrue(kept != null && kept.to() == crossing.to() && kept.lane() == crossing.lane()
-                        && kept.bearing() == crossing.bearing(),
-                "after its login the soul's crossing is " + kept + ", not " + crossing);
-        // The teleport into the lane shows no line; only the login's fresh start does.
-        helper.assertTrue(TravelTests.lines(midway, ENTERED_KEY) == 1L, "after its login the soul was told "
-                + TravelTests.said(midway));
+        long t = HollowPlayerTests.now(helper);
+        // Its Kōtotsu set out 100 ticks ago, its front now 35 blocks down the lane, behind the soul's back at 90.2.
+        TravelRecord.Crossing crossing = new TravelRecord.Crossing(BleachWorlds.SOUL_SOCIETY, 253, 0.5F,
+                Math.max(0L, t - 100L));
 
-        holdLane(helper, 254, 3);
-        ServerPlayer lost = inLane(helper, shinigami(), 254, 50.5, TravelRecord.NONE);
-
+        // Saved and read back first, before any soul is in a lane.
         TravelRecord saved = new TravelRecord(Optional.of(GlobalPos.of(Level.OVERWORLD, new BlockPos(10, 64, -20))), 7L,
                 Optional.of(crossing));
         Tag tag = TravelRecord.CODEC.encodeStart(NbtOps.INSTANCE, saved).getOrThrow();
         TravelRecord read = TravelRecord.CODEC.parse(NbtOps.INSTANCE, tag).getOrThrow();
         helper.assertTrue(read.equals(saved), "saved " + saved + " but read " + read);
         CompoundTag broken = tag instanceof CompoundTag whole ? whole.copy() : new CompoundTag();
+        // Kept whole, for a crossing as it was saved before the Kōtotsu came.
+        CompoundTag unmetTag = broken.getCompound("crossing").copy();
         CompoundTag partial = broken.getCompound("crossing");
         helper.assertTrue(partial.contains("bearing"), "a crossing is saved as " + partial + ", with no bearing");
         partial.remove("bearing");
@@ -431,9 +574,60 @@ public final class DangaiTests {
         helper.assertTrue(lenient.crossing().isEmpty() && lenient.humanWorldReturn().equals(saved.humanWorldReturn())
                         && lenient.butterflyDay() == saved.butterflyDay(),
                 "a crossing saved without its bearing read as " + lenient + ", not as no crossing beside the rest");
+        helper.assertTrue(unmetTag.contains("kototsu_at"), "a crossing that has met its Kōtotsu is saved as " + unmetTag
+                + ", with no kototsu_at");
+        unmetTag.remove("kototsu_at");
+        TravelRecord.Crossing readUnmet = TravelRecord.Crossing.CODEC.parse(NbtOps.INSTANCE, unmetTag).getOrThrow();
+        helper.assertTrue(!readUnmet.met() && readUnmet.equals(crossing.withKototsuAt(TravelRecord.Crossing.UNMET)),
+                "a crossing saved without kototsu_at read as " + readUnmet + ", not as " + crossing + " unmet");
 
-        // Put out on its first tick there, somewhere within the spawn radius of the shared spawn.
-        helper.runAtTickTime(20, () -> {
+        ServerPlayer midway = inLane(helper, shinigami(), 253, 90.5, TravelRecord.NONE.withCrossing(Optional.of(crossing)));
+        // Turned round in the lane, as a soul that looked back would be.
+        midway.setYRot(90.0F);
+        List<Entity> spawned = new ArrayList<>();
+        TravelTests.step(spawned, () -> {
+            DangaiEvents.atLogin(midway);
+            // Taken away with the test whatever happens; counted at tick 20, since a chunk loaded this tick may not list
+            // what it holds until a later one.
+            spawned.addAll(Kototsu.inLane(dangai, 253));
+            Vec3 start = DangaiPlan.entry(253);
+            helper.assertTrue(midway.level() == dangai && midway.position().distanceTo(start) < SAME
+                            && midway.getYRot() == 0.0F, "after its login the soul midway down lane 253 is at "
+                            + TravelTests.where(midway) + " facing " + midway.getYRot() + ", not at its start, " + start
+                            + ", facing down it");
+            TravelRecord.Crossing kept = midway.getData(SoulAttachments.TRAVEL).crossing().orElse(null);
+            // Field by field, so a field a later step adds to the crossing changes nothing here.
+            helper.assertTrue(kept != null && kept.to() == crossing.to() && kept.lane() == crossing.lane()
+                            && kept.bearing() == crossing.bearing(),
+                    "after its login the soul's crossing is " + kept + ", not " + crossing);
+            // A Kōtotsu of its own, a full delay from the login: the one it met before is never taken up again.
+            helper.assertTrue(kept.kototsuAt() == t + 200L, "after its login the soul's Kōtotsu sets out at "
+                    + kept.kototsuAt() + ", not " + (t + 200L));
+            // The teleport into the lane shows no line; only the login's fresh start does.
+            helper.assertTrue(TravelTests.lines(midway, ENTERED_KEY) == 1L, "after its login the soul was told "
+                    + TravelTests.said(midway));
+        }).run();
+
+        holdLane(helper, 254, 3);
+        ServerPlayer lost = inLane(helper, shinigami(), 254, 50.5, TravelRecord.NONE);
+        // A crossing begun before the Kōtotsu came, which has met none.
+        holdLane(helper, 249, 1);
+        ServerPlayer early = inLane(helper, shinigami(), 249, 20.5, crossing(BleachWorlds.SOUL_SOCIETY, 249, 0.0F));
+
+        // Each soul has had its first tick in the Dangai by tick 20.
+        helper.runAtTickTime(20, TravelTests.step(spawned, () -> {
+            // The Kōtotsu the login sent and the one the soul on the old crossing met go with the test.
+            List<Kototsu> sent = Kototsu.inLane(dangai, 253);
+            List<Kototsu> found = Kototsu.inLane(dangai, 249);
+            spawned.addAll(sent);
+            spawned.addAll(found);
+            Vec3 waiting = new Vec3(DangaiPlan.laneX(253), DangaiPlan.FLOOR_Y, 0.0);
+            helper.assertTrue(sent.size() == 1 && sent.get(0).setsOutAt() == t + 200L
+                            && sent.get(0).position().distanceTo(waiting) < SAME, "after the login lane 253 holds "
+                            + sent.size() + " Kōtotsu, not one waiting at " + waiting + " to set out at " + (t + 200L)
+                            + (sent.isEmpty() ? "" : ": " + sent.get(0).position() + ", at " + sent.get(0).setsOutAt()));
+
+            // Put out on its first tick there, somewhere within the spawn radius of the shared spawn.
             ServerLevel overworld = helper.getLevel().getServer().overworld();
             BlockPos spawn = overworld.getSharedSpawnPos();
             int radius = overworld.getGameRules().getInt(GameRules.RULE_SPAWN_RADIUS);
@@ -454,7 +648,19 @@ public final class DangaiTests {
             helper.assertTrue(left.isCanceled() && !here.isCanceled(), "a pearl left in the Dangai "
                     + (left.isCanceled() ? "was stopped" : "pulled the soul back") + ", and one in the Human World "
                     + (here.isCanceled() ? "was stopped too" : "was let land"));
+
+            // The soul on the old crossing met its lane's Kōtotsu on its first tick there, which sent one, and waits on.
+            Vec3 still = new Vec3(DangaiPlan.laneX(249), DangaiPlan.FLOOR_Y, 20.5);
+            helper.assertTrue(early.level() == dangai && early.position().distanceTo(still) < SAME, "the soul on a "
+                    + "crossing from before the Kōtotsu is at " + TravelTests.where(early) + ", not still at " + still);
+            TravelRecord.Crossing meeting = early.getData(SoulAttachments.TRAVEL).crossing().orElse(null);
+            helper.assertTrue(meeting != null && meeting.met() && meeting.kototsuAt() >= t + 200L
+                    && meeting.kototsuAt() <= t + 221L, "the soul on a crossing from before the Kōtotsu is on " + meeting
+                    + ", not one whose Kōtotsu sets out from " + (t + 200L) + " to " + (t + 221L));
+            helper.assertTrue(found.size() == 1 && found.get(0).setsOutAt() == meeting.kototsuAt(), "lane 249 holds "
+                    + found.size() + " Kōtotsu, not one setting out at " + meeting.kototsuAt());
+            TravelTests.discard(spawned.toArray(new Entity[0]));
             helper.succeed();
-        });
+        }));
     }
 }
