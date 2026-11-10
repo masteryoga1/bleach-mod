@@ -14,9 +14,7 @@ import io.github.masteryoga1.bleach.world.AcademySite;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.server.level.ServerLevel;
@@ -36,7 +34,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.EventHooks;
-import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -85,32 +82,16 @@ public final class ShinigamiEvents {
         bus.addListener(ShinigamiEvents::onPlayerTick);
         bus.addListener(ShinigamiEvents::onChangedDimension);
         bus.addListener(ShinigamiEvents::onLoggedIn);
-        bus.addListener(ShinigamiEvents::onServerStarted);
         // The Academy in Seireitei is completed where its chunks were made before it, or with structures off.
         bus.addListener(AcademySite::onChunkLoad);
         bus.addListener(AcademySite::onServerTick);
     }
 
-    /** A new world builds its guaranteed Academy before anyone can build where it goes. Not for game tests. */
-    private static void onServerStarted(ServerStartedEvent event) {
-        if (!(event.getServer() instanceof GameTestServer)) {
-            AcademyLocator.prepareNewWorld(event.getServer());
-        }
-    }
-
-    /**
-     * A Plus who never learned where the Academy is (one from before there was an Academy) senses it
-     * now, and a soul who left while standing on reishi is standing on it again.
-     */
+    /** A soul who left while standing on reishi is standing on it again. */
     private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player) || !SoulLogic.hasSoul(player)) {
-            return;
+        if (event.getEntity() instanceof ServerPlayer player && SoulLogic.hasSoul(player)) {
+            ReishiFooting.resumeAfterLogin(player);
         }
-        SoulData data = SoulLogic.get(player);
-        if (data.state() == SoulState.PLUS && data.shinigami().academyPos().isEmpty()) {
-            AcademyLocator.sense(player);
-        }
-        ReishiFooting.resumeAfterLogin(player);
     }
 
     /** Reishi footing does not follow a soul into another world. */
@@ -444,7 +425,7 @@ public final class ShinigamiEvents {
         giverData.lastOfferAt = now;
         SoulLogic.get(target).pendingOffer = new SoulOffer(kind, giver.getUUID(), now + OFFER_TICKS);
         Component message = kind == SoulOffer.Kind.KONSO
-                ? konsoOffer(giver, target)
+                ? konsoOffer(giver)
                 : Component.translatable("message.bleach.offer.power", giver.getDisplayName());
         target.sendSystemMessage(message);
         target.displayClientMessage(Component.translatable("message.bleach.offer.hint").withStyle(ChatFormatting.GRAY), true);
@@ -453,19 +434,10 @@ public final class ShinigamiEvents {
         return true;
     }
 
-    /** Tells a Plus what Konsō would do: free them, and send them to the Academy if there is one. */
-    private static Component konsoOffer(Player giver, Player plus) {
-        BlockPos academy = BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY) && plus instanceof ServerPlayer soul
-                ? AcademyLocator.academyFor(soul) : null;
-        if (academy == null) {
-            return Component.translatable("message.bleach.offer.konso.nowhere", giver.getDisplayName());
-        }
-        if (plus.level().dimension() != Level.OVERWORLD) {
-            return Component.translatable("message.bleach.offer.konso.far", giver.getDisplayName());
-        }
-        BlockPos from = plus.blockPosition();
-        return Component.translatable("message.bleach.offer.konso", giver.getDisplayName(),
-                AcademyLocator.direction(from, academy), AcademyLocator.distance(from, academy));
+    /** Tells a Plus what Konsō would do: free it, and send it on to the Academy in Soul Society if the server does that. */
+    private static Component konsoOffer(Player giver) {
+        return Component.translatable(BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY)
+                ? "message.bleach.offer.konso" : "message.bleach.offer.konso.nowhere", giver.getDisplayName());
     }
 
     /** What the soul was offered, if it is still open. */

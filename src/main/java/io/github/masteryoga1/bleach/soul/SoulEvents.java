@@ -44,7 +44,7 @@ public final class SoulEvents {
     private static final int MEDITATION_TICKS_PER_XP = 100;
     /** Meditation stops training after this many XP grants (one minute) until the player moves again. */
     private static final int MEDITATION_GRANTS_PER_SESSION = 12;
-    /** A Plus who meditates this long is reminded which way the Academy lies, once per sitting. */
+    /** A Plus who meditates this long is reminded where the Academy lies, once per sitting. */
     private static final int ACADEMY_REMINDER_TICKS = 40;
     private static final float CLOSE_CALL_HEALTH_FRACTION = 0.3F;
     /**
@@ -72,6 +72,7 @@ public final class SoulEvents {
         ChainEvents.register(bus);
         ReiatsuEvents.register(bus);
         ShinigamiEvents.register(bus);
+        HomeWorldRespawn.register(bus);
         HollowEvents.register(bus);
         HollowPlayerEvents.register(bus);
         GargantaEvents.register(bus);

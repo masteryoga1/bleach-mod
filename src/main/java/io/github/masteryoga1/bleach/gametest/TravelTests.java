@@ -2,8 +2,10 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
+import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.item.HellButterflyItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
@@ -640,6 +642,81 @@ public final class TravelTests {
     private static void assertDay(GameTestHelper helper, Player player, long expected, String what) {
         long day = player.getData(SoulAttachments.TRAVEL).butterflyDay();
         helper.assertTrue(day == expected, what + " was last given a Jigokuchō on day " + day + ", not " + expected);
+    }
+
+    /**
+     * The instructor hands a soul with a Shinigami's power that carries no Jigokuchō another, once a game day: none to
+     * one that carries one, none twice on one day, and none to a soul without that power. Its dialogue greys the
+     * button for one that carries one, and the button hands one over.
+     */
+    @GameTest(template = "empty")
+    public static void instructorReissuesAJigokucho(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long today = KidoLogic.lessonDay(level.getGameTime(), level.getDayTime());
+        // Game times at the start of today and of tomorrow, each passed with a time of day of 0.
+        long sameDay = today * DAY;
+        long nextDay = (today + 1) * DAY;
+
+        Player graduate = mock(helper, GameType.SURVIVAL, ShinigamiTests.student(40.0F));
+        SoulData data = SoulLogic.get(graduate);
+        ShinigamiLogic.graduationRequirements().forEach((art, at) -> data.setLevel(art, at));
+        helper.assertTrue(ShinigamiEvents.graduate(graduate), "a trained student failed the exams");
+        helper.assertTrue(butterflies(graduate) == 1, "graduating gave " + butterflies(graduate) + " Jigokuchō");
+        assertDay(helper, graduate, today, "a graduate");
+        helper.assertFalse(TravelEvents.issueButterfly(graduate, sameDay, 0L),
+                "a Shinigami carrying a Jigokuchō was handed another");
+        helper.assertTrue(butterflies(graduate) == 1, "a Shinigami carrying a Jigokuchō has " + butterflies(graduate));
+
+        graduate.getInventory().clearContent();
+        helper.assertFalse(TravelEvents.mayReceiveButterfly(graduate, data, sameDay, 0L),
+                "the instructor would hand a graduate another on the day it was given one");
+        helper.assertFalse(TravelEvents.issueButterfly(graduate, sameDay, 0L),
+                "a graduate was handed another Jigokuchō on the day it was given one");
+        helper.assertTrue(butterflies(graduate) == 0, "a graduate refused on the day it graduated has "
+                + butterflies(graduate));
+        assertDay(helper, graduate, today, "a graduate refused on the day it graduated");
+
+        helper.assertTrue(TravelEvents.mayReceiveButterfly(graduate, data, nextDay, 0L),
+                "the instructor would not hand a graduate who lost its Jigokuchō another the next day");
+        helper.assertTrue(TravelEvents.issueButterfly(graduate, nextDay, 0L),
+                "a graduate who lost its Jigokuchō was not handed another the next day");
+        helper.assertTrue(butterflies(graduate) == 1, "a graduate handed another has " + butterflies(graduate));
+        assertDay(helper, graduate, today + 1, "a graduate handed another the next day");
+        helper.assertTrue(TravelLogic.butterflyDue(graduate.getData(SoulAttachments.TRAVEL), today),
+                "a day stamped later than today, as after the clock is set back, held a Jigokuchō back");
+
+        Player substitute = mock(helper, GameType.SURVIVAL, ShinigamiTests.substitute(60.0F));
+        helper.assertTrue(TravelEvents.issueButterfly(substitute, sameDay, 0L) && butterflies(substitute) == 1,
+                "a Substitute never given one was handed " + butterflies(substitute) + " Jigokuchō");
+
+        Player human = mock(helper, GameType.SURVIVAL, ShinigamiTests.soul(SoulState.HUMAN, 400.0F));
+        helper.assertFalse(TravelEvents.issueButterfly(human, nextDay, 0L), "a Human was handed a Jigokuchō");
+        helper.assertTrue(butterflies(human) == 0, "a Human refused one has " + butterflies(human) + " Jigokuchō");
+        assertDay(helper, human, -1L, "a Human refused one");
+        SoulData fallen = ShinigamiTests.soul(SoulState.HOLLOW, 400.0F);
+        fallen.setTier(PowerPath.SHINIGAMI, 1);
+        Player hollow = mock(helper, GameType.SURVIVAL, fallen);
+        helper.assertFalse(TravelEvents.issueButterfly(hollow, nextDay, 0L) || butterflies(hollow) != 0,
+                "a Hollow with a Shinigami tier was handed a Jigokuchō");
+
+        AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 1, 1, 1);
+        try {
+            long now = level.getGameTime();
+            helper.assertTrue(instructor.unreadyFor(graduate, data, now).contains(NpcAction.BUTTERFLY),
+                    "the instructor's dialogue offers a Jigokuchō to a Shinigami carrying one");
+            Player elder = mock(helper, GameType.SURVIVAL, shinigami());
+            helper.assertFalse(instructor.unreadyFor(elder, SoulLogic.get(elder), now).contains(NpcAction.BUTTERFLY),
+                    "the instructor's dialogue greys the Jigokuchō for a Shinigami that carries none");
+            instructor.perform(elder, NpcAction.BUTTERFLY);
+            helper.assertTrue(butterflies(elder) == 1, "asking the instructor for a Jigokuchō gave "
+                    + butterflies(elder));
+            // The instructor's own clock, the day the test began on.
+            assertDay(helper, elder, today, "a Shinigami the instructor handed one");
+        } finally {
+            // Persistent, and the test grid is never cleared.
+            instructor.discard();
+        }
+        helper.succeed();
     }
 
     // ---- Into the Dangai, or turned away ----

@@ -29,7 +29,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -272,8 +271,9 @@ public final class VisoredTests {
         helper.assertTrue(broken.visored().equals(ShinigamiProgress.Visored.NONE),
                 "a broken record read as " + broken.visored());
 
-        ShinigamiProgress nine = new ShinigamiProgress(false, NEVER, 0L, 0.0F, NEVER, NEVER, -1L, 0, Optional.empty());
-        helper.assertTrue(nine.visored().equals(ShinigamiProgress.Visored.NONE), "the 5i constructor gave " + nine.visored());
+        ShinigamiProgress eight = new ShinigamiProgress(false, NEVER, 0L, 0.0F, NEVER, NEVER, -1L, 0);
+        helper.assertTrue(eight.visored().equals(ShinigamiProgress.Visored.NONE),
+                "the 5i constructor gave " + eight.visored());
 
         SoulData soul = ShinigamiTests.soul(SoulState.SHINIGAMI, 900.0F);
         soul.setShinigami(progress);

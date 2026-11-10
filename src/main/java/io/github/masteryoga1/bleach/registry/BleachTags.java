@@ -31,7 +31,7 @@ public final class BleachTags {
     /** What a Hollow player can wear though its hide refuses armour: elytra, carved pumpkins and heads. */
     public static final TagKey<Item> HOLLOW_WEARABLE = TagKey.create(Registries.ITEM, BleachMod.id("hollow_wearable"));
 
-    /** Every kind of Academy a soul can be sent to. */
+    /** The Overworld's Academy structures, which no new chunk starts: kept for the old chunks that name them. */
     public static final TagKey<Structure> ACADEMY = TagKey.create(Registries.STRUCTURE, BleachMod.id("academy"));
 
     /** Every kind of Hollow mob, Fishbone D included. */

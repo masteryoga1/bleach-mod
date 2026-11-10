@@ -153,6 +153,15 @@ public final class TravelLogic {
     }
 
     /**
+     * Whether the instructor's wait for another Jigokuchō is over on this game day. A day stamped later than today, as
+     * when the clock is set back after nights slept through, does not hold one back.
+     */
+    public static boolean butterflyDue(TravelRecord record, long day) {
+        return record.butterflyDay() < 0 || day < record.butterflyDay()
+                || day - record.butterflyDay() >= BleachConfig.get(BleachConfig.BUTTERFLY_REISSUE_DAYS);
+    }
+
+    /**
      * Where a guided soul leaving Soul Society tries to come out, in order: where it last left the Human World by a
      * gate, its respawn point if that is in the Human World, and world spawn.
      */

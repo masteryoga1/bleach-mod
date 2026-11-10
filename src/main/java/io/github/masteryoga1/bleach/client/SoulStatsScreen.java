@@ -36,13 +36,14 @@ import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -534,8 +535,8 @@ public final class SoulStatsScreen extends Screen {
     }
 
     /**
-     * What this soul can do next. A Plus in the Overworld who was told where the Academy is gets its
-     * direction too, a Plus in another world is told no Shinigami on duty comes there, and a Plus who
+     * What this soul can do next. A Plus in Soul Society is told which way the Academy's gate lies, a
+     * Plus in another world but the Overworld that no Shinigami on duty comes there, and a Plus who
      * could gnaw its own chain is told it can, with the Devour key. A Hollow is told how to feed with
      * that key and, once it has, how many souls are within it. A Menos
      * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
@@ -582,15 +583,15 @@ public final class SoulStatsScreen extends Screen {
         boolean duty = BleachConfig.get(BleachConfig.KONSO_DUTY_SHINIGAMI) && !player.isCreative() && !player.isSpectator();
         boolean overworld = player.level().dimension() == Level.OVERWORLD;
         Component plus;
-        if (!overworld && duty) {
-            plus = Component.translatable("screen.bleach.soul.next.plus.elsewhere");
-        } else if (overworld && data.shinigami().academyPos().isPresent()) {
-            BlockPos academy = data.shinigami().academyPos().get();
-            double dx = academy.getX() + 0.5 - player.getX();
-            double dz = academy.getZ() + 0.5 - player.getZ();
+        // No Shinigami on duty comes to Soul Society: there the Academy itself is the way.
+        if (player.level().dimension() == BleachWorlds.SOUL_SOCIETY) {
+            double dx = AcademyLocator.GATE.getX() + 0.5 - player.getX();
+            double dz = AcademyLocator.GATE.getZ() + 0.5 - player.getZ();
             plus = Component.translatable("screen.bleach.soul.next.plus.academy",
                     Component.translatable(ShinigamiLogic.compassKey(dx, dz)),
                     ShinigamiLogic.roundedDistance(Math.sqrt(dx * dx + dz * dz)));
+        } else if (!overworld && duty) {
+            plus = Component.translatable("screen.bleach.soul.next.plus.elsewhere");
         } else {
             plus = Component.translatable("screen.bleach.soul.next.plus");
         }

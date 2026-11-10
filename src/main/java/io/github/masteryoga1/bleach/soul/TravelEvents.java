@@ -36,14 +36,17 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * The Senkaimon in play: the Gate key's turn, the gate's opening and who it takes where, and the Jigokuchō handed to a
- * new Shinigami. The rules are {@link TravelLogic}'s. The turn and the wait before the next gate are transients in the
- * soul, so a death or a relog starts them over. The key and the Jigokuchō take any {@link Player}, so game tests can use
- * mock players.
+ * new Shinigami, or by the instructor to one that has lost its own. The rules are {@link TravelLogic}'s. The turn and
+ * the wait before the next gate are transients in the soul, so a death or a relog starts them over. The key and the
+ * Jigokuchō take any {@link Player}, so game tests can use mock players.
  */
 public final class TravelEvents {
     private static final String TURNING_KEY = "message.bleach.senkaimon.turning";
     private static final String NO_LANDING_KEY = "message.bleach.senkaimon.no_landing";
     private static final String RECEIVED_KEY = "message.bleach.hell_butterfly.received";
+    private static final String ISSUED_KEY = "message.bleach.hell_butterfly.issued";
+    private static final String ALREADY_KEY = "message.bleach.hell_butterfly.already";
+    private static final String NOT_YET_KEY = "message.bleach.hell_butterfly.not_yet";
     /** The lock's turn, heard as the key goes down, and the chime of a soul coming out on the far side. */
     private static final float TURN_VOLUME = 0.8F;
     private static final float TURN_PITCH = 1.2F;
@@ -286,6 +289,38 @@ public final class TravelEvents {
                 && player.getData(SoulAttachments.TRAVEL).butterflyDay() < 0) {
             butterflyAtGraduation(player);
         }
+    }
+
+    /** Whether the instructor would hand this soul a Jigokuchō now; the dialogue greys the button otherwise. */
+    public static boolean mayReceiveButterfly(Player player, SoulData data, long now, long dayTime) {
+        return TravelLogic.shinigami(data) && !HellButterflyItem.carries(player)
+                && TravelLogic.butterflyDue(player.getData(SoulAttachments.TRAVEL), KidoLogic.lessonDay(now, dayTime));
+    }
+
+    /**
+     * The instructor's Jigokuchō, for a soul with a Shinigami's power that carries none, at most once every
+     * {@code butterfly_reissue_days}. A soul with that power is told on the action bar why not.
+     *
+     * @return whether one was handed over
+     */
+    public static boolean issueButterfly(Player player, long now, long dayTime) {
+        if (!SoulLogic.hasSoul(player) || !TravelLogic.shinigami(SoulLogic.get(player))) {
+            return false;
+        }
+        if (HellButterflyItem.carries(player)) {
+            player.displayClientMessage(Component.translatable(ALREADY_KEY), true);
+            return false;
+        }
+        long today = KidoLogic.lessonDay(now, dayTime);
+        TravelRecord record = player.getData(SoulAttachments.TRAVEL);
+        if (!TravelLogic.butterflyDue(record, today)) {
+            player.displayClientMessage(Component.translatable(NOT_YET_KEY), true);
+            return false;
+        }
+        HellButterflyItem.give(player);
+        player.setData(SoulAttachments.TRAVEL, record.withButterflyDay(today));
+        player.displayClientMessage(Component.translatable(ISSUED_KEY), true);
+        return true;
     }
 
     // ---- Listeners ----

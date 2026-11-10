@@ -270,6 +270,8 @@ public final class SiteTests {
      * here builds it. A whole Academy is left alone. One whose blocks stand with nothing saying so, as a {@code /place}
      * leaves it, regains its start and references and is not built again; one half built, with its start and references
      * gone and neither marker block placed, is built again, its hall with a second instructor, which goes at the end.
+     * The tests in {@link AcademyTests} that send a soul there wait for it to stand first, so whichever batch runs
+     * first, only the chunks' loads build it.
      */
     @GameTest(template = "empty", batch = "site", timeoutTicks = 100)
     public static void theSeireiteiAcademyStands(GameTestHelper helper) {

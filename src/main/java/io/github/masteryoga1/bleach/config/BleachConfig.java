@@ -60,8 +60,6 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue GRADUATION_KIDO_LEVEL;
     public static final ModConfigSpec.IntValue ASAUCHI_REISSUE_MINUTES;
     public static final ModConfigSpec.IntValue KIDO_LESSON_XP;
-    public static final ModConfigSpec.IntValue ACADEMY_LOCATE_RADIUS_CHUNKS;
-    public static final ModConfigSpec.BooleanValue ACADEMY_GUARANTEE;
 
     public static final ModConfigSpec.DoubleValue KONSO_GROWTH;
     public static final ModConfigSpec.IntValue KONSO_REWARDED_PER_DAY;
@@ -725,6 +723,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SENKAIMON_COST_SHARE;
     public static final ModConfigSpec.DoubleValue SENKAIMON_MIN_COST;
     public static final ModConfigSpec.IntValue SENKAIMON_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue BUTTERFLY_REISSUE_DAYS;
     public static final ModConfigSpec.IntValue DANGAI_KOTOTSU_DELAY_SECONDS;
     public static final ModConfigSpec.DoubleValue DANGAI_KOTOTSU_SPEED;
     public static final ModConfigSpec.DoubleValue DANGAI_KORYU_HOLD_SECONDS;
@@ -885,12 +884,6 @@ public final class BleachConfig {
                 .comment("Kidō xp the Academy instructor's lesson gives a student, once a day (a new day comes each"
                         + " morning, or every 20 minutes of play). 0 gives the lesson without xp.")
                 .defineInRange("kido_lesson_xp", 40, 0, 1_000);
-        ACADEMY_LOCATE_RADIUS_CHUNKS = builder
-                .comment("How far, in chunks, to search for an Academy building. Beyond this, one is built near world spawn if 'guarantee' is on. 0 never searches.")
-                .defineInRange("locate_radius_chunks", 64, 0, 256);
-        ACADEMY_GUARANTEE = builder
-                .comment("Whether an Academy is built near world spawn when none is within reach.")
-                .define("guarantee", true);
         builder.pop();
 
         builder.push("konso");
@@ -901,7 +894,9 @@ public final class BleachConfig {
                 .comment("How many Konsō a day grow a Shinigami's reiryoku.")
                 .defineInRange("rewarded_per_day", 10, 0, 1_000);
         KONSO_SENDS_TO_ACADEMY = builder
-                .comment("Whether a player sent on by Konsō arrives at the nearest Academy, standing in for the Rukongai.")
+                .comment("Whether a player sent on by Konsō arrives at the Academy in Soul Society, standing in for the"
+                        + " Rukongai, and whether a soul that has passed on with no Shinigami power, and has no spawn of its"
+                        + " own, wakes there when it dies.")
                 .define("sends_to_academy", true);
         KONSO_DUTY_SHINIGAMI = builder
                 .comment("Whether a Shinigami on duty comes down in the Overworld to a Plus whose chain has begun to wear,"
@@ -2932,6 +2927,10 @@ public final class BleachConfig {
         SENKAIMON_COOLDOWN_SECONDS = builder
                 .comment("Seconds before the same soul can open another Senkaimon. Creative mode never waits or pays.")
                 .defineInRange("cooldown_seconds", 30, 0, 3_600);
+        BUTTERFLY_REISSUE_DAYS = builder
+                .comment("Game days before the Academy instructor hands the same soul another Jigokuchō (a new day comes"
+                        + " each morning, or every 20 minutes of play). 0 hands one whenever none is carried.")
+                .defineInRange("butterfly_reissue_days", 1, 0, 30);
         builder.pop();
         builder.push("dangai");
         DANGAI_KOTOTSU_DELAY_SECONDS = builder
