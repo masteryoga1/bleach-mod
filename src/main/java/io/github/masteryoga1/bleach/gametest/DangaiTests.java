@@ -610,8 +610,11 @@ public final class DangaiTests {
 
         holdLane(helper, 254, 3);
         ServerPlayer lost = inLane(helper, shinigami(), 254, 50.5, TravelRecord.NONE);
-        // A crossing begun before the Kōtotsu came, which has met none.
+        // A crossing begun before the Kōtotsu came, which has met none. Its lane's start is held too, as lane 253's is: a
+        // chunk raised to entity ticking before its first status is confirmed lists no entities until every chunk within
+        // 2 of it is loaded, and the ring held at z 1 leaves out the row at z -2, which only the throw's test loads.
         holdLane(helper, 249, 1);
+        holdLane(helper, 249, 0);
         ServerPlayer early = inLane(helper, shinigami(), 249, 20.5, crossing(BleachWorlds.SOUL_SOCIETY, 249, 0.0F));
 
         // Each soul has had its first tick in the Dangai by tick 20.
