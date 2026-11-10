@@ -250,6 +250,9 @@ public final class RukongaiTests {
                 // Told once it is there: no other line has come in the last 60 ticks.
                 .thenWaitUntil(() -> helper.assertTrue(TravelTests.lines(player, SEIREITEI_KEY) == 1L,
                         "the soul in Seireitei was told " + TravelTests.said(player) + " at " + TravelTests.where(player)))
+                // Half the Seireitei line's own wait first, so the gap would be told within the next 40 ticks unless
+                // the other line, noted as it is sent, holds it back.
+                .thenIdle(30)
                 .thenExecute(() -> {
                     player.displayClientMessage(Component.literal("another line"), true);
                     otherAt[0] = player.level().getGameTime();
