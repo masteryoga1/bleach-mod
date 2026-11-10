@@ -44,6 +44,7 @@ import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -535,9 +536,10 @@ public final class SoulStatsScreen extends Screen {
     }
 
     /**
-     * What this soul can do next. A Plus in Soul Society is told which way the Academy's gate lies, a
-     * Plus in another world but the Overworld that no Shinigami on duty comes there, and a Plus who
-     * could gnaw its own chain is told it can, with the Devour key. A Hollow is told how to feed with
+     * What this soul can do next. In Soul Society a Plus, a soul that may enrol and a student are shown the
+     * way to the Academy, unless they are already there; a Plus in another world but the Overworld is told
+     * that no Shinigami on duty comes there, and a Plus who could gnaw its own chain is told it can, with the
+     * Devour key. A Hollow is told how to feed with
      * that key and, once it has, how many souls are within it. A Menos
      * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
      * how long it may go without a Hollow before it sinks back, wherever the server lets it, and a Gillian how
@@ -577,7 +579,9 @@ public final class SoulStatsScreen extends Screen {
                     .append(" ").append(granReyCero(data));
         }
         if (!key.equals("plus")) {
-            return Component.translatable("screen.bleach.soul.next." + key);
+            // A soul that may enrol, or is training, is shown the way to the Academy too (see withWay).
+            Component step = Component.translatable("screen.bleach.soul.next." + key);
+            return key.equals("rukongai") || key.startsWith("student") ? withWay(step, player) : step;
         }
         // The Shinigami on duty is promised only where the server sends one: in the Overworld, not in creative or spectator.
         boolean duty = BleachConfig.get(BleachConfig.KONSO_DUTY_SHINIGAMI) && !player.isCreative() && !player.isSpectator();
@@ -585,11 +589,7 @@ public final class SoulStatsScreen extends Screen {
         Component plus;
         // No Shinigami on duty comes to Soul Society: there the Academy itself is the way.
         if (player.level().dimension() == BleachWorlds.SOUL_SOCIETY) {
-            double dx = AcademyLocator.GATE.getX() + 0.5 - player.getX();
-            double dz = AcademyLocator.GATE.getZ() + 0.5 - player.getZ();
-            plus = Component.translatable("screen.bleach.soul.next.plus.academy",
-                    Component.translatable(ShinigamiLogic.compassKey(dx, dz)),
-                    ShinigamiLogic.roundedDistance(Math.sqrt(dx * dx + dz * dz)));
+            plus = withWay(Component.translatable("screen.bleach.soul.next.plus.academy"), player);
         } else if (!overworld && duty) {
             plus = Component.translatable("screen.bleach.soul.next.plus.elsewhere");
         } else {
@@ -603,6 +603,18 @@ public final class SoulStatsScreen extends Screen {
             return plus.copy().append(" ").append(Component.translatable("screen.bleach.soul.next.plus.gnaw", devour));
         }
         return plus;
+    }
+
+    /**
+     * This step, and after it the way to the Academy from the soul's block, in Soul Society only and not at the Academy
+     * itself, where "about 50 blocks away" would mislead.
+     */
+    private static Component withWay(Component step, Player player) {
+        BlockPos at = player.blockPosition();
+        if (player.level().dimension() != BleachWorlds.SOUL_SOCIETY || AcademyLocator.atAcademy(at)) {
+            return step;
+        }
+        return step.copy().append(" ").append(AcademyLocator.wayLine(at));
     }
 
     /**

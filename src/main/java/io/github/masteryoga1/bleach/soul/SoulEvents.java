@@ -73,6 +73,7 @@ public final class SoulEvents {
         ReiatsuEvents.register(bus);
         ShinigamiEvents.register(bus);
         HomeWorldRespawn.register(bus);
+        RukongaiEvents.register(bus);
         HollowEvents.register(bus);
         HollowPlayerEvents.register(bus);
         GargantaEvents.register(bus);

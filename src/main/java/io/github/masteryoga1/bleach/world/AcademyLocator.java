@@ -19,9 +19,9 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The way to the Shin'ō Academy, which stands in Seireitei (see {@link SeireiteiPlan} and {@link AcademySite}). In Soul
- * Society a soul senses which way it lies and how far; anywhere else, only that it is in Soul Society. Konsō sends a soul
- * to its gates, and so does dying with no spawn of one's own (see
- * {@link io.github.masteryoga1.bleach.soul.HomeWorldRespawn}).
+ * Society a soul senses which way it lies and how far, by the nearest of Seireitei's gates from outside its wall (see
+ * {@link Rukongai}); anywhere else, only that it is in Soul Society. Konsō sends a soul to its gates, and so does dying
+ * with no spawn of one's own (see {@link io.github.masteryoga1.bleach.soul.HomeWorldRespawn}).
  */
 public final class AcademyLocator {
     /** The middle of the Academy's gate, which a soul's sense points at: (-192, 73, 231). */
@@ -32,6 +32,8 @@ public final class AcademyLocator {
             SeireiteiPlan.ACADEMY_LANDING_Z);
     /** Facing west, into the courtyard and the hall's door. */
     public static final float LANDING_YAW = 90.0F;
+    /** How near the Academy's gate, across the ground, a soul is at the Academy and is shown no way to it. */
+    public static final int AT_ACADEMY_BLOCKS = 48;
 
     private AcademyLocator() {
     }
@@ -57,18 +59,43 @@ public final class AcademyLocator {
         return ShinigamiLogic.roundedDistance(Math.sqrt(horizontalDistanceSqr(from, to)));
     }
 
+    /** Whether this block lies within {@link #AT_ACADEMY_BLOCKS} of the Academy's gate across the ground. */
+    public static boolean atAcademy(BlockPos from) {
+        return horizontalDistanceSqr(from, GATE) <= AT_ACADEMY_BLOCKS * AT_ACADEMY_BLOCKS;
+    }
+
     /** What a soul here senses of the Academy: which way and how far in Soul Society, and only where it is elsewhere. */
     public static Component senseLine(ResourceKey<Level> world, BlockPos from) {
-        return world == BleachWorlds.SOUL_SOCIETY
-                ? Component.translatable("message.bleach.academy_sensed", direction(from, GATE), distance(from, GATE))
+        return world == BleachWorlds.SOUL_SOCIETY ? towards("message.bleach.academy_sensed", from)
                 : Component.translatable("message.bleach.academy_sensed.elsewhere");
     }
 
     /** What a meditating Plus here is reminded of: as {@link #senseLine}, for the action bar. */
     public static Component remindLine(ResourceKey<Level> world, BlockPos from) {
-        return world == BleachWorlds.SOUL_SOCIETY
-                ? Component.translatable("message.bleach.academy_direction", direction(from, GATE), distance(from, GATE))
+        return world == BleachWorlds.SOUL_SOCIETY ? towards("message.bleach.academy_direction", from)
                 : Component.translatable("message.bleach.academy_direction.elsewhere");
+    }
+
+    /**
+     * The way to the Academy from here in Soul Society, for the soul screen, which leaves it out {@link #atAcademy at the
+     * Academy}.
+     */
+    public static Component wayLine(BlockPos from) {
+        return towards("message.bleach.academy_way", from);
+    }
+
+    /**
+     * The key's line, with the way to the Academy's gate from inside the wall or its band, and from outside it the
+     * key's ".gate" line, naming the Academy in Seireitei and the nearest of its gates, with the way there: from
+     * outside, a straight line to the Academy would meet the wall.
+     */
+    private static Component towards(String key, BlockPos from) {
+        if (Rukongai.district(from.getX(), from.getZ()) <= Rukongai.WALL) {
+            return Component.translatable(key, direction(from, GATE), distance(from, GATE));
+        }
+        Rukongai.Region region = Rukongai.region(from.getX(), from.getZ());
+        return Component.translatable(key + ".gate", region.gateName(), direction(from, region.gate()),
+                distance(from, region.gate()));
     }
 
     /** A new Plus senses the Academy. */

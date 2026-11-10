@@ -491,8 +491,9 @@ public final class AcademyTests {
     }
 
     /**
-     * What a soul senses of the Academy: in Soul Society which way and how far to its gate, and anywhere else only that
-     * it lies in Soul Society. And the teleport {@code /bleach academy} suggests, to where Konsō lands.
+     * What a soul senses of the Academy: in Soul Society which way and how far to its gate, and from outside the wall,
+     * by the nearest gate, but not on the soul screen at the Academy; anywhere else only that it lies in Soul Society.
+     * And the teleport {@code /bleach academy} suggests, to where Konsō lands.
      */
     @GameTest(template = "empty")
     public static void sensingTheAcademy(GameTestHelper helper) {
@@ -501,11 +502,34 @@ public final class AcademyTests {
                 "message.bleach.direction.south_west", 300L);
         assertLine(helper, AcademyLocator.senseLine(Level.OVERWORLD, centre), "message.bleach.academy_sensed.elsewhere",
                 null, 0L);
+        // The second district of the South, outside the wall: the way in is by Shuwaimon, 200 blocks east.
         BlockPos south = new BlockPos(-192, 73, 531);
-        assertLine(helper, AcademyLocator.remindLine(BleachWorlds.SOUL_SOCIETY, south), "message.bleach.academy_direction",
-                "message.bleach.direction.north", 300L);
+        assertGateLine(helper, AcademyLocator.remindLine(BleachWorlds.SOUL_SOCIETY, south),
+                "message.bleach.academy_direction.gate", "message.bleach.place.gate.south", "message.bleach.direction.east",
+                200L);
         assertLine(helper, AcademyLocator.remindLine(Level.NETHER, south), "message.bleach.academy_direction.elsewhere",
                 null, 0L);
+        BlockPos inside = new BlockPos(-192, 73, 300);
+        assertLine(helper, AcademyLocator.remindLine(BleachWorlds.SOUL_SOCIETY, inside), "message.bleach.academy_direction",
+                "message.bleach.direction.north", 50L);
+        // The seventeenth district of the West: by Hakutōmon, not straight at the Academy through the wall.
+        BlockPos west = new BlockPos(-1000, 72, 300);
+        assertGateLine(helper, AcademyLocator.senseLine(BleachWorlds.SOUL_SOCIETY, west),
+                "message.bleach.academy_sensed.gate", "message.bleach.place.gate.west", "message.bleach.direction.north_east",
+                550L);
+        assertGateLine(helper, AcademyLocator.wayLine(west), "message.bleach.academy_way.gate",
+                "message.bleach.place.gate.west", "message.bleach.direction.north_east", 550L);
+        assertLine(helper, AcademyLocator.wayLine(centre), "message.bleach.academy_way",
+                "message.bleach.direction.south_west", 300L);
+
+        // The soul screen shows no way within 48 blocks of the gate, where "about 50 blocks away" would mislead.
+        BlockPos gate = AcademyLocator.GATE;
+        helper.assertTrue(AcademyLocator.AT_ACADEMY_BLOCKS == 48 && AcademyLocator.atAcademy(gate)
+                        && AcademyLocator.atAcademy(gate.offset(48, 0, 0))
+                        && AcademyLocator.atAcademy(BlockPos.containing(AcademyLocator.LANDING)),
+                "a soul at the Academy's gate, 48 blocks east of it or at its landing is not at the Academy");
+        helper.assertFalse(AcademyLocator.atAcademy(gate.offset(34, 0, 35)) || AcademyLocator.atAcademy(inside),
+                "a soul 48.8 or 69 blocks from the Academy's gate is at the Academy");
         String command = AcademyLocator.teleportCommand();
         helper.assertTrue(command.equals("/execute in bleach:soul_society run tp @s -193.5 73 231.5"),
                 "the Academy's command is " + command);
@@ -526,6 +550,20 @@ public final class AcademyTests {
         helper.assertTrue(args.length == 2 && args[0] instanceof Component way
                         && way.getContents() instanceof TranslatableContents towards && towards.getKey().equals(direction)
                         && Long.valueOf(distance).equals(args[1]), "the line said " + line);
+    }
+
+    /** A line from outside the wall with this key: the gate's name with {@code gateKey}, this direction and distance. */
+    private static void assertGateLine(GameTestHelper helper, Component line, String key, String gateKey, String direction,
+                                       long distance) {
+        helper.assertTrue(line.getContents() instanceof TranslatableContents, "the line " + line + " is not translated");
+        TranslatableContents contents = (TranslatableContents) line.getContents();
+        helper.assertTrue(contents.getKey().equals(key), "the line's key is " + contents.getKey() + ", not " + key);
+        Object[] args = contents.getArgs();
+        helper.assertTrue(args.length == 3 && args[0] instanceof Component gate
+                        && gate.getContents() instanceof TranslatableContents named && named.getKey().equals(gateKey)
+                        && args[1] instanceof Component way
+                        && way.getContents() instanceof TranslatableContents towards && towards.getKey().equals(direction)
+                        && Long.valueOf(distance).equals(args[2]), "the line said " + line);
     }
 
     /** A soul's record saved while it remembered an Overworld Academy reads as before, and is written without it. */

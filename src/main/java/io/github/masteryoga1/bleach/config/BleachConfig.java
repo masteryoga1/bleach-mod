@@ -731,6 +731,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue DANGAI_OFF_COURSE_MAX;
     public static final ModConfigSpec.IntValue DANGAI_EXIT_HEIGHT;
 
+    public static final ModConfigSpec.BooleanValue DISTRICT_NAMES;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -2957,6 +2959,14 @@ public final class BleachConfig {
                         + " comes out lower, on the floor if it must.")
                 .defineInRange("exit_height", 24, 0, 64);
         builder.pop();
+        builder.pop();
+
+        builder.push("soul_society");
+        DISTRICT_NAMES = builder
+                .comment("Whether the action bar names the place a soul comes into in Soul Society: Seireitei, the"
+                        + " Seireiheki, or the Rukongai's district and region, with the name canon gives it where it has"
+                        + " one.")
+                .define("district_names", true);
         builder.pop();
 
         SPEC = builder.build();
