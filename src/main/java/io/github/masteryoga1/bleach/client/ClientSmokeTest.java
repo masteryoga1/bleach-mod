@@ -306,6 +306,9 @@ public final class ClientSmokeTest {
     private static int bloodlineWaitTicks;
     /** The first tick of each {@link #expectWithin} window that has already passed. */
     private static final Set<Integer> windowsPassed = new HashSet<>();
+    /** When the player was sent into the third gate, by the clock and by the server's own tick count. */
+    private static long thirdGateTpAt;
+    private static int thirdGateTpTick;
     /** Where the player stood before the flash step. */
     private static Vec3 dashFrom;
     /** Where the player stood as it was mounted on the Negación light, or null before then. */
@@ -1470,7 +1473,12 @@ public final class ClientSmokeTest {
             // Survival again before it steps in, so the pass and the whole crossing run by survival's rules.
             case 7560 -> command(minecraft, "gamemode survival");
             // Into it, unguided now: 21 ticks inside pass it, about 7584, into the Dangai at its lane's start.
-            case 7562 -> command(minecraft, "tp @s ~ ~ ~2");
+            case 7562 -> {
+                command(minecraft, "tp @s ~ ~ ~2");
+                thirdGateTpAt = System.nanoTime();
+                MinecraftServer server = minecraft.getSingleplayerServer();
+                thirdGateTpTick = server == null ? -1 : server.getTickCount();
+            }
             // Down the lane, south, between its walls of Kōryū.
             case 7615 -> shot(minecraft, "dangai");
             // The lane's end asked for well before the tp, as Soul Society's arrival chunks were.
@@ -2106,11 +2114,20 @@ public final class ClientSmokeTest {
                         + recentActionBar() + ")");
         expectWithin(minecraft, 7535, 7559, () -> gateAhead(minecraft, player),
                 "the third gate never opened two blocks south (the action bar's last lines: " + recentActionBar() + ")");
-        // From two ticks after the pass, which the loading screen does not count, to the tick before the screenshot.
-        expectWithin(minecraft, 7586, 7614, () -> atLaneStart(minecraft, player),
+        // From two ticks after the pass, which the loading screen does not count, to the tick before the screenshot. On
+        // its last tick, a failure also reads the pass on the server, which only then is worth the wait.
+        boolean failing = ticksInWorld == 7614 && !windowsPassed.contains(7586);
+        if (expectWithin(minecraft, 7586, 7614, () -> atLaneStart(minecraft, player),
                 "the gate without a Jigokuchō never set the player at a Dangai lane's start (it is in "
                         + minecraft.level.dimension().location() + " at " + player.position() + ", beside it "
-                        + laneWalls(minecraft, player) + "; the action bar's last lines: " + recentActionBar() + ")");
+                        + laneWalls(minecraft, player) + "; the action bar's last lines: " + recentActionBar()
+                        + (failing ? "; on the server: " + serverPass(minecraft) : "") + ")")) {
+            // How near the window's end the pass comes, by the clock and by the server's ticks, read without waiting.
+            MinecraftServer server = minecraft.getSingleplayerServer();
+            BleachMod.LOGGER.info("Smoke test: at a Dangai lane's start at {}, {} ms and {} server ticks after the tp into "
+                    + "the third gate", ticksInWorld, (System.nanoTime() - thirdGateTpAt) / 1_000_000L,
+                    server == null ? "no" : server.getTickCount() - thirdGateTpTick);
+        }
         Component entered = Component.translatable("message.bleach.dangai.entered");
         expectWithin(minecraft, 7587, 7639, () -> actionBarShows(entered),
                 "the Dangai's entry line never showed (the action bar's last lines: " + recentActionBar() + ")");
@@ -2299,6 +2316,42 @@ public final class ClientSmokeTest {
     private static String villagerHealth(Minecraft minecraft) {
         Villager villager = nearest(minecraft, Villager.class, 4.0, Villager::isAlive);
         return villager == null ? "no villager in 4 blocks" : String.valueOf(villager.getHealth());
+    }
+
+    /**
+     * What the integrated server says of the pass into the third gate, read on its own thread, for a failure to name: its
+     * ticks since the tp, where it has the player, the player's portal state, and each gate within 4 blocks. A server
+     * thread busy for 2 seconds, as in a long load, reads as unread.
+     */
+    private static String serverPass(Minecraft minecraft) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server == null || local == null) {
+            return "no server";
+        }
+        try {
+            return server.submit(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                if (player == null) {
+                    return "no server player";
+                }
+                ServerLevel level = player.serverLevel();
+                StringBuilder out = new StringBuilder((server.getTickCount() - thirdGateTpTick) + " ticks since the tp, in "
+                        + level.dimension().location() + " at " + player.position() + ", changing world "
+                        + player.isChangingDimension() + ", portal cooldown " + player.getPortalCooldown() + ", portal "
+                        + (player.portalProcess == null ? "none" : "time " + player.portalProcess.getPortalTime()
+                                + (player.portalProcess.isInsidePortalThisTick() ? " inside" : " not inside"))
+                        + ", guided " + TravelLogic.guided(player) + ", riding " + player.isPassenger() + ", gates:");
+                for (Senkaimon gate : level.getEntitiesOfClass(Senkaimon.class, player.getBoundingBox().inflate(4.0))) {
+                    out.append(" at ").append(gate.position()).append(" aged ").append(gate.tickCount).append(", ")
+                            .append(gate.endsAt() - level.getGameTime()).append(" ticks left, lane ").append(gate.lane())
+                            .append(", ticking ").append(level.isPositionEntityTicking(gate.blockPosition()));
+                }
+                return out.toString();
+            }).get(2L, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return "unread (" + e + ")";
+        }
     }
 
     /**
