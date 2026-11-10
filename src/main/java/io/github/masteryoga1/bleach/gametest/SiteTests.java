@@ -82,7 +82,7 @@ public final class SiteTests {
     // ---- Shared helpers ----
 
     /** The test server's real Soul Society. */
-    private static ServerLevel soul(GameTestHelper helper) {
+    static ServerLevel soul(GameTestHelper helper) {
         ServerLevel soul = helper.getLevel().getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
         helper.assertTrue(soul != null, "the test server has no Soul Society");
         return soul;

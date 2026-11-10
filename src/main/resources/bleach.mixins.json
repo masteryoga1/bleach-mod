@@ -11,6 +11,7 @@
     "GameTestServerMixin",
     "LivingEntityMixin",
     "PlayerMixin",
+    "ServerPlayerMixin",
     "TargetingConditionsMixin",
     "ThrownPotionMixin",
     "WardenMixin"

@@ -120,6 +120,10 @@ public final class SoulData {
     long lastBiteMessageAt = NEVER;
     /** Game time this Plus was last told why no Shinigami on duty came, so it is told once a revisit's wait. */
     long dutyToldAt = NEVER;
+    /** The last place in Soul Society this soul was told it is in ({@code Rukongai.place}), or {@code Rukongai.NOWHERE}. */
+    int placeShown = Integer.MIN_VALUE;
+    /** Game time the server last put a line on this soul's action bar, so a place's name waits behind it. */
+    long actionBarAt = NEVER;
     /** Blows that landed on a Hollow's body in a row, without one to the mask, for the hint to aim for the mask. */
     int bodyHitsWithoutMask;
     /** The Jinzen this soul is sitting in, from settling down to opening its eyes: see {@link JinzenLogic}. */
