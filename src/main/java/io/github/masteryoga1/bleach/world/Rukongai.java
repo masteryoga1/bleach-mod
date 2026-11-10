@@ -5,6 +5,8 @@ import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 
 /**
  * The Rukongai's map, from {@link SeireiteiPlan}'s rings: which district of which region a block column lies in, by
@@ -35,27 +37,39 @@ public final class Rukongai {
             code(Region.NORTH, 79), "kusajishi",
             code(Region.NORTH, 80), "zaraki");
 
+    /** How far inside a region's diagonals a landing's bearing stays, so its block is in that region. */
+    private static final double EDGE = Math.toRadians(1.0);
+    /** The arc of a region a landing can fall in, in radians: its quarter, less a degree at each side. */
+    private static final double ARC = Math.PI / 2.0 - 2.0 * EDGE;
+
     private Rukongai() {
     }
 
-    /** The Rukongai's four regions, each with its gate in the Seireiheki, on the axis it lies along. */
+    /** The Rukongai's four regions, each with the bearing of its middle and its gate in the Seireiheki, on its axis. */
     public enum Region {
-        EAST("east", 1, 0),
-        SOUTH("south", 0, 1),
-        WEST("west", -1, 0),
-        NORTH("north", 0, -1);
+        EAST("east", 0.0, 1, 0),
+        SOUTH("south", Math.PI / 2.0, 0, 1),
+        WEST("west", Math.PI, -1, 0),
+        NORTH("north", Math.PI * 1.5, 0, -1);
 
         private final String key;
+        private final double bearing;
         private final BlockPos gate;
 
-        Region(String key, int x, int z) {
+        Region(String key, double bearing, int x, int z) {
             this.key = key;
+            this.bearing = bearing;
             this.gate = new BlockPos(x * SeireiteiPlan.GATE_RADIUS, SeireiteiPlan.PLATEAU_Y, z * SeireiteiPlan.GATE_RADIUS);
         }
 
         /** The last part of the region's lang keys: east, south, west or north. */
         public String key() {
             return key;
+        }
+
+        /** The bearing of the region's middle from the centre column, in radians from +x towards +z. */
+        public double bearing() {
+            return bearing;
         }
 
         /** The middle of the region's gate, mid-wall on its axis, at the plateau's height. */
@@ -134,6 +148,36 @@ public final class Rukongai {
                 ? Component.translatable("message.bleach.place.district", region.displayName(), district)
                 : Component.translatable("message.bleach.place.district.named", region.displayName(), district,
                         Component.translatable("message.bleach.place.name." + name));
+    }
+
+    /** Where Konsō sends a soul: a region, a district of it, and a block column there. */
+    public record Draw(Region region, int district, int x, int z) {
+    }
+
+    /**
+     * A landing for a soul sent on: a region at even odds, district 1 + floor(80 u^bias) for an even chance u (a bias of 1
+     * gives every district the same odds, more favours the inner ones), and a column in it.
+     */
+    public static Draw draw(RandomSource random, double bias) {
+        Region region = Region.values()[random.nextInt(Region.values().length)];
+        int district = districtFor(random.nextDouble(), bias);
+        return pointIn(region, district, random);
+    }
+
+    /** The district an even chance u in [0, 1) gives at this bias. */
+    public static int districtFor(double u, double bias) {
+        return Math.min(SeireiteiPlan.DISTRICTS, 1 + (int) Math.floor(SeireiteiPlan.DISTRICTS * Math.pow(u, bias)));
+    }
+
+    /**
+     * A column in this district of this region, at a bearing a degree inside the region's diagonals and a radius a
+     * block inside the district's edges, so the block lies in both.
+     */
+    public static Draw pointIn(Region region, int district, RandomSource random) {
+        double bearing = region.bearing() + (random.nextDouble() - 0.5) * ARC;
+        double radius = SeireiteiPlan.districtStart(district) + 1.0
+                + random.nextDouble() * (SeireiteiPlan.DISTRICT_DEPTH - 2.0);
+        return new Draw(region, district, Mth.floor(radius * Math.cos(bearing)), Mth.floor(radius * Math.sin(bearing)));
     }
 
     private static int code(Region region, int district) {

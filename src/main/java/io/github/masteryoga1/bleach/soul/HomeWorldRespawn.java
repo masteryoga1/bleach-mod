@@ -17,8 +17,9 @@ import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
 
 /**
  * A soul that has passed on and holds no Shinigami power cannot open a gate, so when it dies with no spawn of its own it
- * wakes at the gates of the Academy in Soul Society, where Konsō sends a soul (see {@link AcademyLocator#sendTo}). A bed
- * or anchor it set after passing on still wins. Only while the server sends souls on by Konsō at all.
+ * wakes at the gates of the Academy in Soul Society, where Konsō's shortcut sends a soul (see
+ * {@link AcademyLocator#sendTo}). A bed or anchor it set after passing on still wins. Only while the server's
+ * {@code [soul_society] home_world_respawn} is on.
  */
 public final class HomeWorldRespawn {
     private static final String WOKE_KEY = "message.bleach.respawn.academy";
@@ -46,7 +47,7 @@ public final class HomeWorldRespawn {
      */
     private static void onRespawnPosition(PlayerRespawnPositionEvent event) {
         if (event.isFromEndFight() || !(event.getEntity() instanceof ServerPlayer player) || !SoulLogic.hasSoul(player)
-                || !BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY)) {
+                || !BleachConfig.get(BleachConfig.HOME_WORLD_RESPAWN)) {
             return;
         }
         MinecraftServer server = player.server;

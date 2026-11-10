@@ -9,7 +9,6 @@ import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
-import io.github.masteryoga1.bleach.world.AcademyLocator;
 import io.github.masteryoga1.bleach.world.AcademySite;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -230,7 +229,8 @@ public final class ShinigamiEvents {
      * player who performs it grows a little stronger, up to a daily limit.
      *
      * @param performer who sends the Plus on: a player, a Shinigami NPC, or null
-     * @param sendOn    whether the soul is sent on to the Academy
+     * @param sendOn    whether the soul is sent on from outside Soul Society, where the server sends
+     *                  souls (see {@link RukongaiEvents#passedOn})
      * @return false, changing nothing, if the soul was not a Plus
      */
     public static boolean konso(@Nullable LivingEntity performer, Player plus, boolean sendOn) {
@@ -244,9 +244,7 @@ public final class ShinigamiEvents {
         if (plus instanceof ServerPlayer soul) {
             // Granted now, as the soul may enroll and graduate before the next periodic check.
             Milestones.check(soul, data);
-        }
-        if (sendOn && BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY) && plus instanceof ServerPlayer soul) {
-            AcademyLocator.sendTo(soul);
+            RukongaiEvents.passedOn(soul, sendOn);
         }
         if (performer instanceof Player player && SoulLogic.hasSoul(player)) {
             player.displayClientMessage(Component.translatable("message.bleach.konso.performed", plus.getDisplayName()), true);
@@ -425,19 +423,13 @@ public final class ShinigamiEvents {
         giverData.lastOfferAt = now;
         SoulLogic.get(target).pendingOffer = new SoulOffer(kind, giver.getUUID(), now + OFFER_TICKS);
         Component message = kind == SoulOffer.Kind.KONSO
-                ? konsoOffer(giver)
+                ? Component.translatable(RukongaiEvents.offerKey(target.level().dimension()), giver.getDisplayName())
                 : Component.translatable("message.bleach.offer.power", giver.getDisplayName());
         target.sendSystemMessage(message);
         target.displayClientMessage(Component.translatable("message.bleach.offer.hint").withStyle(ChatFormatting.GRAY), true);
         giver.displayClientMessage(Component.translatable(kind == SoulOffer.Kind.KONSO
                 ? "message.bleach.offer.sent" : "message.bleach.offer.sent.power", target.getDisplayName()), true);
         return true;
-    }
-
-    /** Tells a Plus what Konsō would do: free it, and send it on to the Academy in Soul Society if the server does that. */
-    private static Component konsoOffer(Player giver) {
-        return Component.translatable(BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY)
-                ? "message.bleach.offer.konso" : "message.bleach.offer.konso.nowhere", giver.getDisplayName());
     }
 
     /** What the soul was offered, if it is still open. */
