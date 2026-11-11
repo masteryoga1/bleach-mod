@@ -64,12 +64,16 @@ jobs:
       - name: Build the mod jar
         run: ./gradlew build --stacktrace
 
+      # Every upload is kept 3 days and never fails the build, so a full artifact store
+      # (the account's quota) cannot stop the game tests and the smoke test from running.
       - name: Upload the mod jar
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: bleach-mod-jar
           path: build/libs/*.jar
           if-no-files-found: error
+          retention-days: 3
 
       # Boots a headless Minecraft server with the mod and runs every game test.
       # A dev test server needs the Minecraft EULA accepted in its run folder.
@@ -84,12 +88,14 @@ jobs:
       - name: Upload the game test log
         if: failure()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: gametest-log
           path: |
             gametest.log
             run/gametest/logs/
           if-no-files-found: ignore
+          retention-days: 3
 
   # Starts the real game client under a virtual display and runs ClientSmokeTest: it makes a world, answers
   # the bloodline question, becomes a Plus, who meets a Shinigami on duty, then a Hollow and then a
@@ -134,14 +140,17 @@ jobs:
       - name: Upload the smoke test screenshots
         if: always()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: client-smoke-screenshots
           path: run/smoketest/screenshots/
           if-no-files-found: ignore
+          retention-days: 3
 
       - name: Upload the client log
         if: failure()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: client-smoke-test-log
           path: |
@@ -149,3 +158,4 @@ jobs:
             run/smoketest/logs/
             run/smoketest/crash-reports/
           if-no-files-found: ignore
+          retention-days: 3
