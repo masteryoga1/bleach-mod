@@ -81,7 +81,7 @@ public final class AcademyInstructor extends ShinigamiNpc {
         return REIRYOKU;
     }
 
-    /** Only from Soul Society is a Plus it frees already where Konsō would send it; anywhere else it is sent on. */
+    /** Only from Soul Society is a Plus it frees left where it stands; from anywhere else it is sent on. */
     @Override
     protected boolean sendsOn() {
         return AcademyLocator.sendsOnFrom(level().dimension());

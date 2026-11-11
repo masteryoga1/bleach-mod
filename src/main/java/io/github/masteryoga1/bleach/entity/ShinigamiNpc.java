@@ -88,7 +88,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
     /** This NPC's maximum reiryoku, which sets its reiatsu. */
     protected abstract float soulReiryoku();
 
-    /** Whether a Plus this NPC performs Konsō on is sent on to the Academy. */
+    /** Whether a Plus this NPC performs Konsō on is sent on from outside Soul Society, where the server sends souls. */
     protected abstract boolean sendsOn();
 
     /** Called when a visitor opens the dialogue. */

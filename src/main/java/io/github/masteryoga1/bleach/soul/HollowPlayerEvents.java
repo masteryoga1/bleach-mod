@@ -4,7 +4,6 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
-import io.github.masteryoga1.bleach.world.AcademyLocator;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -191,9 +190,10 @@ public final class HollowPlayerEvents {
     }
 
     /**
-     * A Hollow that a purifying blow killed wakes as a soul, and is sent on to the Academy as Konsō
-     * would send it, if the server does that. A respawn anchor it never stayed at gets its charge back.
-     * Sent on, it lets go of the anchor, as any soul Konsō sends.
+     * A Hollow that a purifying blow killed wakes as a soul, and is sent on as Konsō would send it,
+     * wherever the server sends souls; one that wakes in Soul Society stays (see
+     * {@link RukongaiEvents#passedOn}). A respawn anchor it was moved away from, never having stayed at
+     * it, gets its charge back.
      */
     private static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !SoulLogic.hasSoul(player)
@@ -202,13 +202,11 @@ public final class HollowPlayerEvents {
         }
         player.sendSystemMessage(Component.translatable("message.bleach.hollow_player.cleansed")
                 .withStyle(ChatFormatting.AQUA));
-        if (BleachConfig.get(BleachConfig.KONSO_SENDS_TO_ACADEMY)) {
-            ServerLevel respawnLevel = player.serverLevel();
-            boolean usedAnchor = ChainEvents.respawnedAtAnchor(player);
-            BlockPos anchor = player.getRespawnPosition();
-            if (AcademyLocator.sendTo(player) && usedAnchor) {
-                ChainEvents.refundAnchorCharge(respawnLevel, anchor);
-            }
+        ServerLevel respawnLevel = player.serverLevel();
+        boolean usedAnchor = ChainEvents.respawnedAtAnchor(player);
+        BlockPos anchor = player.getRespawnPosition();
+        if (RukongaiEvents.passedOn(player, true) && usedAnchor) {
+            ChainEvents.refundAnchorCharge(respawnLevel, anchor);
         }
         Milestones.grant(player, Milestones.CLEANSED);
     }

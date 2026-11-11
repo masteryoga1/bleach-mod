@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import io.github.masteryoga1.bleach.soul.TravelEvents;
 import io.github.masteryoga1.bleach.soul.TravelLogic;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.DangaiPlan;
 import java.util.UUID;
 import javax.annotation.Nullable;
@@ -22,6 +23,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -29,6 +31,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Portal;
 import net.minecraft.world.level.material.PushReaction;
@@ -102,6 +105,12 @@ public final class Senkaimon extends Entity implements Portal {
         gate.moveTo(at.x, at.y, at.z, facing.toYRot(), 0.0F);
         if (!level.addFreshEntity(gate)) {
             return null;
+        }
+        // Made ahead in the background, so one who passes unguided is not held while the lane's start is made.
+        ServerLevel dangai = BleachWorlds.level(level.getServer(), BleachWorlds.DANGAI);
+        if (dangai != null) {
+            BlockPos start = BlockPos.containing(DangaiPlan.entry(gate.lane));
+            dangai.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(start), 0, start);
         }
         if (opener instanceof LivingEntity living) {
             living.swing(InteractionHand.MAIN_HAND, true);

@@ -572,8 +572,13 @@ public final class TravelTests {
             int stack = new ItemStack(ModItems.HELL_BUTTERFLY.get()).getMaxStackSize();
             helper.assertTrue(stack == 1, "Jigokuchō stack to " + stack);
         }).run();
-        helper.runAtTickTime(95, step(spawned, () -> helper.assertFalse(gate[0].isRemoved(),
-                "the gate closed before its 5 seconds were up")));
+        helper.runAtTickTime(95, step(spawned, () -> {
+            helper.assertFalse(gate[0].isRemoved(), "the gate closed before its 5 seconds were up");
+            // Asked for as the gate opened, so one who passes unguided is not held while the lane's start is made.
+            ServerLevel dangai = BleachWorlds.level(helper.getLevel().getServer(), BleachWorlds.DANGAI);
+            helper.assertTrue(dangai != null && dangai.getChunkSource().hasChunk(gate[0].lane(), 0),
+                    "the start of the gate's lane " + gate[0].lane() + " in the Dangai is not being made");
+        }));
         helper.runAtTickTime(105, step(spawned, () -> {
             helper.assertTrue(gate[0].isRemoved(), "the gate is still open after its 5 seconds");
             helper.succeed();

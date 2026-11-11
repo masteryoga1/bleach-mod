@@ -23,8 +23,8 @@ public enum SoulState implements StringRepresentable {
     /** A Hollow that removed its mask and took on Shinigami-like powers. */
     ARRANCAR("arrancar", true),
     /**
-     * A soul that passed on through Konsō, free of its chain, and sent to the Academy in Soul Society if
-     * the server does that. Those with spiritual power can enroll at the Academy.
+     * A soul that passed on through Konsō, free of its chain, and sent to a district of the Rukongai in Soul
+     * Society, or wherever the server sends souls. Those with spiritual power can enrol at the Academy.
      */
     RUKONGAI("rukongai", true);
 

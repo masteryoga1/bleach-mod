@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.config;
 
 import io.github.masteryoga1.bleach.quincy.BloodlineMode;
 import io.github.masteryoga1.bleach.soul.HollowTier;
+import io.github.masteryoga1.bleach.soul.KonsoTarget;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -63,7 +64,7 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.DoubleValue KONSO_GROWTH;
     public static final ModConfigSpec.IntValue KONSO_REWARDED_PER_DAY;
-    public static final ModConfigSpec.BooleanValue KONSO_SENDS_TO_ACADEMY;
+    public static final ModConfigSpec.EnumValue<KonsoTarget> KONSO_SENDS_TO;
     public static final ModConfigSpec.BooleanValue KONSO_DUTY_SHINIGAMI;
     public static final ModConfigSpec.IntValue KONSO_DUTY_AFTER_MINUTES;
     public static final ModConfigSpec.IntValue KONSO_DUTY_REVISIT_MINUTES;
@@ -731,6 +732,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue DANGAI_OFF_COURSE_MAX;
     public static final ModConfigSpec.IntValue DANGAI_EXIT_HEIGHT;
 
+    public static final ModConfigSpec.DoubleValue KONSO_INNER_BIAS;
+    public static final ModConfigSpec.BooleanValue HOME_WORLD_RESPAWN;
     public static final ModConfigSpec.BooleanValue DISTRICT_NAMES;
 
     static {
@@ -895,11 +898,12 @@ public final class BleachConfig {
         KONSO_REWARDED_PER_DAY = builder
                 .comment("How many Konsō a day grow a Shinigami's reiryoku.")
                 .defineInRange("rewarded_per_day", 10, 0, 1_000);
-        KONSO_SENDS_TO_ACADEMY = builder
-                .comment("Whether a player sent on by Konsō arrives at the Academy in Soul Society, standing in for the"
-                        + " Rukongai, and whether a soul that has passed on with no Shinigami power, and has no spawn of its"
-                        + " own, wakes there when it dies.")
-                .define("sends_to_academy", true);
+        KONSO_SENDS_TO = builder
+                .comment("Where a player sent on by Konsō from outside Soul Society goes: RUKONGAI, to a district of the"
+                        + " Rukongai drawn by chance (see [soul_society]); ACADEMY, straight to the gates of the Academy"
+                        + " in Seireitei; or NOWHERE, staying where it stands, free of its chain. Konsō in Soul Society"
+                        + " moves no one.")
+                .defineEnum("sends_to", KonsoTarget.RUKONGAI);
         KONSO_DUTY_SHINIGAMI = builder
                 .comment("Whether a Shinigami on duty comes down in the Overworld to a Plus whose chain has begun to wear,"
                         + " to perform its Konsō. It comes at any hour, whatever the mob spawning rule.")
@@ -2962,6 +2966,15 @@ public final class BleachConfig {
         builder.pop();
 
         builder.push("soul_society");
+        KONSO_INNER_BIAS = builder
+                .comment("How strongly Konsō favours the Rukongai's inner districts: a soul sent there lands in district"
+                        + " 1 + floor(80 u^bias) for an even chance u. 1 gives every district the same chance, as canon"
+                        + " has it; at 2, half land in the first 20.")
+                .defineInRange("konso_inner_bias", 2.0, 1.0, 10.0);
+        HOME_WORLD_RESPAWN = builder
+                .comment("Whether a soul with no spawn of its own can wake in Soul Society when it dies, at the place that"
+                        + " is home to a soul of its kind; off, every soul wakes where vanilla puts it.")
+                .define("home_world_respawn", true);
         DISTRICT_NAMES = builder
                 .comment("Whether the action bar names the place a soul comes into in Soul Society: Seireitei, the"
                         + " Seireiheki, or the Rukongai's district and region, with the name canon gives it where it has"

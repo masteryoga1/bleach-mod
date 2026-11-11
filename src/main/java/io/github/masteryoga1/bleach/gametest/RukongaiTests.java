@@ -2,31 +2,52 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.NpcAction;
+import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.soul.HollowBody;
+import io.github.masteryoga1.bleach.soul.KonsoTarget;
 import io.github.masteryoga1.bleach.soul.RukongaiEvents;
+import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.TravelRecord;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Rukongai's map: which district of which region each column of Soul Society lies in, the names a soul is
  * told of where it is, and the place named on the action bar, which waits for any other line there to have had its time.
+ * And where Konsō sends a soul: a district of the Rukongai drawn by chance, which becomes its home.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -55,6 +76,12 @@ public final class RukongaiTests {
             {0, -3100, 81, NORTH}, {9000, 100, 266, EAST}};
     private static final String SEIREITEI_KEY = "message.bleach.place.seireitei";
     private static final String SEIREIHEKI_KEY = "message.bleach.place.seireiheki";
+    private static final String WOKE_KEY = "message.bleach.konso.rukongai";
+    private static final String WAY_KEY = "message.bleach.academy_way.gate";
+    /** How many draws a test of the odds makes. */
+    private static final int DRAWS = 10_000;
+    /** Seed 5's first column, and the three a landing there tries after it, all in Hokutan, District 3 of the West. */
+    private static final int[][] HOKUTAN = {{-605, -105}, {-525, -288}, {-552, -226}, {-520, -298}};
 
     private RukongaiTests() {
     }
@@ -82,18 +109,102 @@ public final class RukongaiTests {
      * anything else must equal the argument.
      */
     private static void assertKey(GameTestHelper helper, Component line, String key, Object... args) {
+        assertLeads(helper, line, key, args.length, args);
+    }
+
+    /** As {@link #assertKey}, for a line of {@code count} arguments whose first ones are these. */
+    private static void assertLeads(GameTestHelper helper, Component line, String key, int count, Object... first) {
         helper.assertTrue(line.getContents() instanceof TranslatableContents, "the line " + line + " is not translated");
         TranslatableContents contents = (TranslatableContents) line.getContents();
         Object[] actual = contents.getArgs();
-        helper.assertTrue(contents.getKey().equals(key) && actual.length == args.length,
-                "the line " + line + " is not " + key + " with " + args.length + " arguments");
-        for (int i = 0; i < args.length; i++) {
-            boolean same = args[i] instanceof String wanted
+        helper.assertTrue(contents.getKey().equals(key) && actual.length == count,
+                "the line " + line + " is not " + key + " with " + count + " arguments");
+        for (int i = 0; i < first.length; i++) {
+            boolean same = first[i] instanceof String wanted
                     ? actual[i] instanceof Component part && part.getContents() instanceof TranslatableContents words
                             && words.getKey().equals(wanted)
-                    : args[i].equals(actual[i]);
-            helper.assertTrue(same, "argument " + (i + 1) + " of " + key + " is " + actual[i] + ", not " + args[i]);
+                    : first[i].equals(actual[i]);
+            helper.assertTrue(same, "argument " + (i + 1) + " of " + key + " is " + actual[i] + ", not " + first[i]);
         }
+    }
+
+    /** Where in this joined player's chat the first line with this key from line {@code from} on is, or -1 for none. */
+    private static int chatLine(ServerPlayer player, String key, int from) {
+        List<Component> chat = TestPlayers.chat(player);
+        for (int i = from; i < chat.size(); i++) {
+            if (chat.get(i).getContents() instanceof TranslatableContents words && words.getKey().equals(key)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** The keys of every line this joined player's chat has shown, oldest first, for a failure to name. */
+    private static List<String> chatKeys(ServerPlayer player) {
+        return TestPlayers.chat(player).stream()
+                .map(line -> line.getContents() instanceof TranslatableContents words ? words.getKey() : line.getString())
+                .toList();
+    }
+
+    /** A real Plus joined at this spot in the test's box, with an hour of chain left. */
+    private static ServerPlayer chainedPlus(GameTestHelper helper, Vec3 at) {
+        ServerPlayer plus = TestPlayers.join(helper, GameType.SURVIVAL, at);
+        SoulData data = ShinigamiTests.soul(SoulState.PLUS, 40.0F);
+        data.startChain(72_000);
+        plus.setData(SoulAttachments.SOUL, data);
+        return plus;
+    }
+
+    /** An Overworld instructor, spawned for it at (1, 1, 1), performs Konsō on this Plus, and is taken away again. */
+    private static void instructorsKonso(GameTestHelper helper, ServerPlayer plus) {
+        AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 1, 1, 1);
+        try {
+            instructor.perform(plus, NpcAction.KONSO);
+        } finally {
+            // The Overworld one is persistent, and the test grid is never cleared.
+            instructor.discard();
+        }
+    }
+
+    /** What {@link #DRAWS} draws from one seed gave: the first, and how many fell where a test of the odds counts. */
+    private record Tally(Rukongai.Draw first, int inner, int outer, int[] regions, int astray) {
+    }
+
+    /**
+     * {@link #DRAWS} draws at this bias from this seed: the first, how many fell in districts 1 to 20 and past 70, how
+     * many in each region, and how many whose block lies outside the district or region drawn.
+     */
+    private static Tally tally(long seed, double bias) {
+        RandomSource random = RandomSource.create(seed);
+        Rukongai.Draw first = null;
+        int inner = 0, outer = 0, astray = 0;
+        int[] regions = new int[Rukongai.Region.values().length];
+        for (int i = 0; i < DRAWS; i++) {
+            Rukongai.Draw draw = Rukongai.draw(random, bias);
+            if (i == 0) {
+                first = draw;
+            }
+            if (draw.district() <= 20) {
+                inner++;
+            } else if (draw.district() > 70) {
+                outer++;
+            }
+            regions[draw.region().ordinal()]++;
+            if (Rukongai.district(draw.x(), draw.z()) != draw.district()
+                    || Rukongai.region(draw.x(), draw.z()) != draw.region()) {
+                astray++;
+            }
+        }
+        return new Tally(first, inner, outer, regions, astray);
+    }
+
+    /**
+     * Asserts that a count of {@link #DRAWS} draws lies within {@code spread} of {@code mean}. The count the seed gave
+     * when the test was written goes in the message, so a change in the draw's order of calls shows as a changed count.
+     */
+    private static void assertNear(GameTestHelper helper, int count, int mean, int spread, int seeded, String what) {
+        helper.assertTrue(Math.abs(count - mean) <= spread, count + " of " + DRAWS + " draws " + what + " (the seed gave "
+                + seeded + " as written), not within " + spread + " of " + mean);
     }
 
     // ---- The map ----
@@ -286,6 +397,308 @@ public final class RukongaiTests {
                                 && TravelTests.lines(player, SEIREITEI_KEY) == 1L,
                         "the soul back in the wall's gap was told " + TravelTests.said(player) + " at "
                                 + TravelTests.where(player)))
+                .thenSucceed();
+    }
+
+    // ---- Where Konsō sends a soul ----
+
+    /**
+     * The draw: the district an even chance gives at a bias, each region's middle, and ten thousand seeded draws, every
+     * block in the district and region drawn, at the odds the bias sets; seed 5's landing and retries, in Hokutan. Then
+     * the settings' defaults, and the home a travel record keeps, saved, read back, and read leniently.
+     */
+    @GameTest(template = "empty")
+    public static void konsoLandingsFavourTheInnerDistricts(GameTestHelper helper) {
+        // {u, bias, district}: half the chances fall in the first 20 districts at bias 2, a quarter at bias 1.
+        double[][] chances = {{0.0, 2.0, 1}, {0.4999, 2.0, 20}, {0.5, 2.0, 21}, {Math.nextDown(1.0), 2.0, 80},
+                {0.25, 1.0, 21}, {Math.nextDown(0.25), 1.0, 20}};
+        for (double[] chance : chances) {
+            int district = Rukongai.districtFor(chance[0], chance[1]);
+            helper.assertTrue(district == (int) chance[2], "a chance of " + chance[0] + " at bias " + chance[1]
+                    + " gives district " + district + ", not " + (int) chance[2]);
+        }
+        double[] bearings = {0.0, Math.PI / 2.0, Math.PI, Math.PI * 1.5};
+        for (Rukongai.Region region : Rukongai.Region.values()) {
+            helper.assertTrue(Math.abs(region.bearing() - bearings[region.ordinal()]) < 1.0E-9, "the " + region
+                    + " region's middle lies at a bearing of " + region.bearing() + ", not " + bearings[region.ordinal()]);
+        }
+
+        Tally biased = tally(7L, 2.0);
+        helper.assertTrue(biased.astray() == 0, biased.astray() + " of " + DRAWS + " blocks drawn lie outside their district "
+                + "or region");
+        assertNear(helper, biased.inner(), 5000, 200, 4991, "at bias 2 fell in districts 1 to 20");
+        assertNear(helper, biased.outer(), 646, 100, 625, "at bias 2 fell past district 70");
+        int[] seeded = {2537, 2494, 2546, 2423};
+        for (Rukongai.Region region : Rukongai.Region.values()) {
+            assertNear(helper, biased.regions()[region.ordinal()], 2500, 175, seeded[region.ordinal()],
+                    "at bias 2 fell in the " + region + " region");
+        }
+        Rukongai.Draw west33 = new Rukongai.Draw(Rukongai.Region.WEST, 33, -1138, 1066);
+        helper.assertTrue(west33.equals(biased.first()), "seed 7's first draw is " + biased.first() + ", not " + west33);
+        Tally even = tally(7L, 1.0);
+        assertNear(helper, even.inner(), 2500, 200, 2484, "at bias 1 fell in districts 1 to 20");
+        assertNear(helper, even.outer(), 1250, 150, 1255, "at bias 1 fell past district 70");
+
+        RandomSource random = RandomSource.create(5L);
+        Rukongai.Draw landing = Rukongai.draw(random, 2.0);
+        Rukongai.Draw hokutan = new Rukongai.Draw(Rukongai.Region.WEST, 3, HOKUTAN[0][0], HOKUTAN[0][1]);
+        helper.assertTrue(hokutan.equals(landing) && "hokutan".equals(Rukongai.canonName(Rukongai.Region.WEST, 3)),
+                "seed 5's first draw is " + landing + ", named " + Rukongai.canonName(landing.region(), landing.district())
+                        + ", not " + hokutan + ", Hokutan");
+        for (int i = 1; i < HOKUTAN.length; i++) {
+            Rukongai.Draw retry = Rukongai.pointIn(Rukongai.Region.WEST, 3, random);
+            helper.assertTrue(retry.x() == HOKUTAN[i][0] && retry.z() == HOKUTAN[i][1]
+                            && Rukongai.district(retry.x(), retry.z()) == 3
+                            && Rukongai.region(retry.x(), retry.z()) == Rukongai.Region.WEST,
+                    "seed 5's retry " + i + " is " + column(retry.x(), retry.z()) + ", not " + column(HOKUTAN[i][0],
+                            HOKUTAN[i][1]) + " in District 3 of the West");
+        }
+
+        helper.assertTrue(BleachConfig.KONSO_INNER_BIAS.getDefault() == 2.0
+                        && BleachConfig.KONSO_SENDS_TO.getDefault() == KonsoTarget.RUKONGAI
+                        && BleachConfig.HOME_WORLD_RESPAWN.getDefault(),
+                "the defaults are a bias of " + BleachConfig.KONSO_INNER_BIAS.getDefault() + ", sending to "
+                        + BleachConfig.KONSO_SENDS_TO.getDefault() + " and waking at home "
+                        + BleachConfig.HOME_WORLD_RESPAWN.getDefault());
+
+        BlockPos block = new BlockPos(-605, 72, -105);
+        TravelRecord home = TravelRecord.NONE.withRukongaiHome(block);
+        helper.assertTrue(!home.equals(TravelRecord.NONE) && home.rukongaiHome().equals(Optional.of(block)),
+                "a record of nothing but a home is " + home);
+        Tag saved = TravelRecord.CODEC.encodeStart(NbtOps.INSTANCE, home).getOrThrow();
+        TravelRecord read = TravelRecord.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
+        helper.assertTrue(read.equals(home), "saved " + home + " but read " + read);
+        // A record saved before there were homes, and one whose home is not a block.
+        CompoundTag old = new CompoundTag();
+        old.putLong("butterfly_day", 7L);
+        TravelRecord before = TravelRecord.CODEC.parse(NbtOps.INSTANCE, old).getOrThrow();
+        helper.assertTrue(before.butterflyDay() == 7L && before.rukongaiHome().isEmpty(), "an old record read as " + before);
+        CompoundTag bad = new CompoundTag();
+        bad.put("rukongai_home", IntTag.valueOf(3));
+        TravelRecord lenient = TravelRecord.CODEC.parse(NbtOps.INSTANCE, bad).getOrThrow();
+        helper.assertTrue(lenient.rukongaiHome().isEmpty(), "a home that is no block read as " + lenient);
+        helper.assertTrue(home.withButterflyDay(9L).rukongaiHome().equals(home.rukongaiHome())
+                        && home.withCrossing(Optional.empty()).rukongaiHome().equals(home.rukongaiHome()),
+                "a new butterfly day or crossing lost the home of " + home);
+        helper.succeed();
+    }
+
+    /**
+     * A real Plus freed by an Overworld instructor wakes in a district of the Rukongai, which becomes its home, facing
+     * Seireitei and with its bed let go, and is told where it woke and the way to the Academy. With the server sending
+     * souls nowhere, another stays where it stood with its bed. The Academy's chunks build it first, for the fallback.
+     */
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 400)
+    public static void anInstructorsKonsoSendsASoulToTheRukongai(GameTestHelper helper) {
+        ServerLevel soul = SiteTests.holdAcademy(helper);
+        ServerPlayer sent = chainedPlus(helper, new Vec3(2.5, 1.0, 1.5));
+        ServerPlayer kept = chainedPlus(helper, new Vec3(4.5, 1.0, 1.5));
+        BlockPos keptBed = helper.absolutePos(new BlockPos(3, 1, 3));
+        sent.setRespawnPosition(Level.OVERWORLD, helper.absolutePos(new BlockPos(1, 1, 3)), 0.0F, true, false);
+        kept.setRespawnPosition(Level.OVERWORLD, keptBed, 0.0F, true, false);
+        helper.startSequence()
+                .thenWaitUntil(() -> AcademyTests.assertAcademyStands(helper, soul))
+                .thenExecute(() -> {
+                    instructorsKonso(helper, sent);
+                    // A change of world is made at once, inside the Konsō.
+                    helper.assertTrue(sent.level() == soul, "the soul is still in " + TravelTests.where(sent));
+                    SoulData data = SoulLogic.get(sent);
+                    helper.assertTrue(data.state() == SoulState.RUKONGAI && data.chainMaxTicks() == 0,
+                            "Konsō left a " + data.state() + " with a chain of " + data.chainMaxTicks());
+                    int x = sent.getBlockX(), z = sent.getBlockZ();
+                    int district = Rukongai.district(x, z);
+                    helper.assertTrue(district >= 1 && district <= SeireiteiPlan.DISTRICTS,
+                            "the soul woke in ring " + district + ", at " + TravelTests.where(sent));
+                    Optional<BlockPos> home = sent.getData(SoulAttachments.TRAVEL).rukongaiHome();
+                    helper.assertTrue(home.equals(Optional.of(sent.blockPosition())),
+                            "the soul's home is " + home + ", not the block it woke in, " + sent.blockPosition());
+                    helper.assertTrue(sent.getRespawnPosition() == null,
+                            "the soul kept its bed at " + sent.getRespawnPosition());
+                    // Read against the way to the centre column, not against the yaw's own formula.
+                    Vec3 facing = Vec3.directionFromRotation(0.0F, sent.getYRot());
+                    double along = facing.dot(new Vec3(-sent.getX(), 0.0, -sent.getZ()).normalize());
+                    helper.assertTrue(along > 0.99, "the soul faces " + sent.getYRot() + ", not Seireitei's way ("
+                            + along + " along it)");
+                    List<Component> chat = TestPlayers.chat(sent);
+                    int woke = chatLine(sent, WOKE_KEY, 0);
+                    helper.assertTrue(woke >= 0, "the soul was never told where it woke: " + chatKeys(sent));
+                    assertKey(helper, chat.get(woke), WOKE_KEY, Rukongai.placeName(x, z));
+                    int way = chatLine(sent, WAY_KEY, woke + 1);
+                    helper.assertTrue(way >= 0, "the soul was never told the way to the Academy after where it woke: "
+                            + chatKeys(sent));
+                    assertLeads(helper, chat.get(way), WAY_KEY, 3,
+                            "message.bleach.place.gate." + Rukongai.region(x, z).key());
+                })
+                .thenExecute(() -> {
+                    Vec3 stood = kept.position();
+                    KonsoTarget before = BleachConfig.get(BleachConfig.KONSO_SENDS_TO);
+                    try {
+                        BleachConfig.KONSO_SENDS_TO.set(KonsoTarget.NOWHERE);
+                        instructorsKonso(helper, kept);
+                    } finally {
+                        BleachConfig.KONSO_SENDS_TO.set(before);
+                    }
+                    helper.assertTrue(kept.level() == helper.getLevel() && kept.position().distanceTo(stood) < 0.01,
+                            "the soul sent nowhere was moved from " + stood + " to " + TravelTests.where(kept));
+                    helper.assertTrue(SoulLogic.get(kept).state() == SoulState.RUKONGAI,
+                            "Konsō sending nowhere left a " + SoulLogic.get(kept).state());
+                    helper.assertTrue(kept.getData(SoulAttachments.TRAVEL).rukongaiHome().isEmpty(),
+                            "the soul sent nowhere has a home at " + kept.getData(SoulAttachments.TRAVEL).rukongaiHome());
+                    helper.assertTrue(keptBed.equals(kept.getRespawnPosition()),
+                            "the soul sent nowhere has its spawn at " + kept.getRespawnPosition() + ", not its bed");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Sent on with the draw seeded, a soul wakes in Hokutan, District 3 of the West: on the first column drawn unless its
+     * ground refused it, else on one of the three tried after it, standing on the ground, with that block as its home.
+     * It is told where it woke and, as it may enrol, the way to the Academy by Hakutōmon.
+     */
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 200)
+    public static void aSeededLandingWakesInHokutan(GameTestHelper helper) {
+        ServerLevel soul = SiteTests.holdAcademy(helper);
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(2.5, 1.0, 1.5));
+        player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F));
+        helper.startSequence()
+                .thenWaitUntil(() -> AcademyTests.assertAcademyStands(helper, soul))
+                .thenExecute(() -> {
+                    helper.assertTrue(RukongaiEvents.toRukongai(player, RandomSource.create(5L)),
+                            "the seeded landing moved no one");
+                    helper.assertTrue(player.level() == soul, "the soul landed in " + TravelTests.where(player));
+                    int taken = -1;
+                    for (int i = 0; i < HOKUTAN.length && taken < 0; i++) {
+                        if (Math.abs(player.getX() - (HOKUTAN[i][0] + 0.5)) < 0.01
+                                && Math.abs(player.getZ() - (HOKUTAN[i][1] + 0.5)) < 0.01) {
+                            taken = i;
+                        }
+                    }
+                    helper.assertTrue(taken >= 0, "the soul landed at " + player.position()
+                            + ", on none of the four columns drawn in Hokutan");
+                    // The ground under the feet may be farmland, 15/16 high.
+                    int top = soul.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, player.getBlockX(),
+                            player.getBlockZ());
+                    helper.assertTrue(Math.abs(player.getY() - top) <= 1.0, "the soul stands at y " + player.getY()
+                            + ", not on its column's ground at " + top);
+                    Optional<BlockPos> home = player.getData(SoulAttachments.TRAVEL).rukongaiHome();
+                    helper.assertTrue(home.equals(Optional.of(player.blockPosition())),
+                            "the soul's home is " + home + ", not the block it woke in, " + player.blockPosition());
+                    List<Component> chat = TestPlayers.chat(player);
+                    int woke = chatLine(player, WOKE_KEY, 0);
+                    helper.assertTrue(woke >= 0, "the soul was never told where it woke: " + chatKeys(player));
+                    assertKey(helper, chat.get(woke), WOKE_KEY, "message.bleach.place.district.named");
+                    Component where = (Component) ((TranslatableContents) chat.get(woke).getContents()).getArgs()[0];
+                    assertKey(helper, where, "message.bleach.place.district.named", "message.bleach.place.region.west",
+                            Integer.valueOf(3), "message.bleach.place.name.hokutan");
+                    int way = chatLine(player, WAY_KEY, woke + 1);
+                    helper.assertTrue(way >= 0, "the soul was never told the way to the Academy after where it woke: "
+                            + chatKeys(player));
+                    if (taken == 0) {
+                        // From (-605, -105) to Hakutōmon at (-516, 0): 89 east and 105 south, 137.6 blocks.
+                        assertKey(helper, chat.get(way), WAY_KEY, "message.bleach.place.gate.west",
+                                "message.bleach.direction.south_east", Long.valueOf(150L));
+                    } else {
+                        assertLeads(helper, chat.get(way), WAY_KEY, 3, "message.bleach.place.gate.west");
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A real Hollow that a purifying blow killed wakes as a soul outside Soul Society and is sent on to a district of the
+     * Rukongai, as Konsō sends a soul, with that block as its home: told first that it was cleansed, then where it woke.
+     * The player is never killed: its respawn's event is posted for it where it stands.
+     */
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 300)
+    public static void aCleansedHollowWakesInTheRukongai(GameTestHelper helper) {
+        ServerLevel soul = SiteTests.holdAcademy(helper);
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(2.5, 1.0, 1.5));
+        SoulData old = ShinigamiTests.soul(SoulState.HOLLOW, 40.0F);
+        HollowBody.markPurifiedOnDeath(old);
+        helper.assertTrue(old.hollow().purifiedOnDeath(), "a purifying blow did not mark the Hollow");
+        // What the Hollow's death leaves: a Rukongai soul that knows it was cleansed.
+        player.setData(SoulAttachments.SOUL, SoulLogic.afterDeath(old));
+        helper.startSequence()
+                .thenWaitUntil(() -> AcademyTests.assertAcademyStands(helper, soul))
+                .thenExecute(() -> {
+                    NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerRespawnEvent(player, false));
+                    helper.assertTrue(player.level() == soul, "the cleansed soul is still in " + TravelTests.where(player));
+                    helper.assertTrue(SoulLogic.get(player).state() == SoulState.RUKONGAI,
+                            "the cleansed Hollow woke as a " + SoulLogic.get(player).state());
+                    int district = Rukongai.district(player.getBlockX(), player.getBlockZ());
+                    helper.assertTrue(district >= 1 && district <= SeireiteiPlan.DISTRICTS,
+                            "the cleansed soul woke in ring " + district + ", at " + TravelTests.where(player));
+                    Optional<BlockPos> home = player.getData(SoulAttachments.TRAVEL).rukongaiHome();
+                    helper.assertTrue(home.equals(Optional.of(player.blockPosition())),
+                            "the cleansed soul's home is " + home + ", not the block it woke in, " + player.blockPosition());
+                    int cleansed = chatLine(player, "message.bleach.hollow_player.cleansed", 0);
+                    helper.assertTrue(cleansed >= 0 && chatLine(player, WOKE_KEY, cleansed + 1) >= 0,
+                            "the cleansed soul was not told it was cleansed and then where it woke: " + chatKeys(player));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Konsō in Soul Society moves no one: a Plus freed in a district of the Rukongai stays and takes the block it stands
+     * in as its home, and one freed in Seireitei stays with none. The offer says the soul will linger there, and
+     * elsewhere says where the server sends souls.
+     */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void konsoInSoulSocietyMovesNoOne(GameTestHelper helper) {
+        ServerLevel soul = SiteTests.soul(helper);
+        // District 2 of the South on its ground, and Seireitei's lawn, each column's chunk loaded first.
+        soul.getChunk(0, 35);
+        soul.getChunk(6, 6);
+        int top = soul.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, 0, 560);
+        ServerPlayer rukongai = chainedPlus(helper, new Vec3(1.5, 1.0, 1.5));
+        ServerPlayer seireitei = chainedPlus(helper, new Vec3(3.5, 1.0, 1.5));
+        rukongai.teleportTo(soul, 0.5, top, 560.5, 0.0F, 0.0F);
+        seireitei.teleportTo(soul, 100.5, SeireiteiPlan.PLATEAU_Y, 100.5, 0.0F, 0.0F);
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    Vec3 inRukongai = rukongai.position();
+                    Vec3 inSeireitei = seireitei.position();
+                    helper.assertTrue(ShinigamiEvents.konso(null, rukongai, true)
+                            && ShinigamiEvents.konso(null, seireitei, true), "Konsō did not take on a Plus in Soul Society");
+                    helper.assertTrue(rukongai.level() == soul && rukongai.position().distanceTo(inRukongai) < 0.01,
+                            "the soul freed in the Rukongai was moved from " + inRukongai + " to "
+                                    + TravelTests.where(rukongai));
+                    helper.assertTrue(seireitei.level() == soul && seireitei.position().distanceTo(inSeireitei) < 0.01,
+                            "the soul freed in Seireitei was moved from " + inSeireitei + " to "
+                                    + TravelTests.where(seireitei));
+                    helper.assertTrue(SoulLogic.get(rukongai).state() == SoulState.RUKONGAI
+                                    && SoulLogic.get(seireitei).state() == SoulState.RUKONGAI,
+                            "Konsō in Soul Society left a " + SoulLogic.get(rukongai).state() + " and a "
+                                    + SoulLogic.get(seireitei).state());
+                    BlockPos stands = rukongai.blockPosition();
+                    Optional<BlockPos> home = rukongai.getData(SoulAttachments.TRAVEL).rukongaiHome();
+                    helper.assertTrue(stands.getX() == 0 && stands.getZ() == 560 && home.equals(Optional.of(stands)),
+                            "the soul freed in the Rukongai at " + stands.toShortString() + " has its home at " + home);
+                    helper.assertTrue(seireitei.getData(SoulAttachments.TRAVEL).rukongaiHome().isEmpty(),
+                            "the soul freed in Seireitei has a home at "
+                                    + seireitei.getData(SoulAttachments.TRAVEL).rukongaiHome());
+                    helper.assertTrue(chatLine(rukongai, WOKE_KEY, 0) < 0 && chatLine(seireitei, WOKE_KEY, 0) < 0,
+                            "a soul freed in Soul Society was told it woke there: " + chatKeys(rukongai) + ", "
+                                    + chatKeys(seireitei));
+
+                    String nowhere = "message.bleach.offer.konso.nowhere";
+                    helper.assertTrue(RukongaiEvents.offerKey(BleachWorlds.SOUL_SOCIETY).equals(nowhere),
+                            "the offer in Soul Society is " + RukongaiEvents.offerKey(BleachWorlds.SOUL_SOCIETY));
+                    Map<KonsoTarget, String> offers = Map.of(KonsoTarget.RUKONGAI, "message.bleach.offer.konso.rukongai",
+                            KonsoTarget.ACADEMY, "message.bleach.offer.konso", KonsoTarget.NOWHERE, nowhere);
+                    KonsoTarget before = BleachConfig.get(BleachConfig.KONSO_SENDS_TO);
+                    try {
+                        for (KonsoTarget target : KonsoTarget.values()) {
+                            BleachConfig.KONSO_SENDS_TO.set(target);
+                            String key = RukongaiEvents.offerKey(Level.OVERWORLD);
+                            helper.assertTrue(key.equals(offers.get(target)),
+                                    "sending souls to " + target + ", the offer in the Overworld is " + key);
+                        }
+                    } finally {
+                        BleachConfig.KONSO_SENDS_TO.set(before);
+                    }
+                })
                 .thenSucceed();
     }
 }

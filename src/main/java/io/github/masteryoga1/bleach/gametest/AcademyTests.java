@@ -15,6 +15,7 @@ import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.HomeWorldRespawn;
+import io.github.masteryoga1.bleach.soul.KonsoTarget;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
@@ -436,7 +437,7 @@ public final class AcademyTests {
      * Asserts that the test world's Academy stands, as its chunks' loads build it (see {@link SiteTests}): its start
      * valid, and both of its chunks referring to it.
      */
-    private static void assertAcademyStands(GameTestHelper helper, ServerLevel soul) {
+    static void assertAcademyStands(GameTestHelper helper, ServerLevel soul) {
         Structure structure = soul.registryAccess().registryOrThrow(Registries.STRUCTURE).get(AcademySite.STRUCTURE);
         ChunkPos home = AcademySite.startChunk();
         StructureStart start = structure == null ? null : soul.getChunk(home.x, home.z).getStartForStructure(structure);
@@ -449,7 +450,8 @@ public final class AcademyTests {
 
     /**
      * A real Plus asks an Overworld instructor for Konsō and is sent on, into Soul Society, to the gates of the Academy,
-     * where its instructor stands, letting go of the bed it set in the Overworld. The Academy's chunks build it first.
+     * where the server takes the shortcut and where its instructor stands, letting go of the bed it set in the Overworld.
+     * The Academy's chunks build it first.
      */
     @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 400)
     public static void anOverworldInstructorSendsASoulToTheAcademy(GameTestHelper helper) {
@@ -465,9 +467,12 @@ public final class AcademyTests {
                 .thenWaitUntil(() -> assertAcademyStands(helper, soul))
                 .thenExecute(() -> {
                     AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 1, 1, 1);
+                    KonsoTarget sendsTo = BleachConfig.get(BleachConfig.KONSO_SENDS_TO);
                     try {
+                        BleachConfig.KONSO_SENDS_TO.set(KonsoTarget.ACADEMY);
                         instructor.perform(plus, NpcAction.KONSO);
                     } finally {
+                        BleachConfig.KONSO_SENDS_TO.set(sendsTo);
                         // The Overworld one is persistent, and the test grid is never cleared.
                         instructor.discard();
                     }
@@ -493,7 +498,7 @@ public final class AcademyTests {
     /**
      * What a soul senses of the Academy: in Soul Society which way and how far to its gate, and from outside the wall,
      * by the nearest gate, but not on the soul screen at the Academy; anywhere else only that it lies in Soul Society.
-     * And the teleport {@code /bleach academy} suggests, to where Konsō lands.
+     * And the teleport {@code /bleach academy} suggests, to where Konsō's shortcut lands.
      */
     @GameTest(template = "empty")
     public static void sensingTheAcademy(GameTestHelper helper) {

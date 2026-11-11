@@ -20,8 +20,9 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The way to the Shin'ō Academy, which stands in Seireitei (see {@link SeireiteiPlan} and {@link AcademySite}). In Soul
  * Society a soul senses which way it lies and how far, by the nearest of Seireitei's gates from outside its wall (see
- * {@link Rukongai}); anywhere else, only that it is in Soul Society. Konsō sends a soul to its gates, and so does dying
- * with no spawn of one's own (see {@link io.github.masteryoga1.bleach.soul.HomeWorldRespawn}).
+ * {@link Rukongai}); anywhere else, only that it is in Soul Society. Konsō sends a soul to its gates where the server
+ * takes that shortcut (see {@link io.github.masteryoga1.bleach.soul.KonsoTarget}), and dying with no spawn of one's own
+ * wakes a passed-on soul there (see {@link io.github.masteryoga1.bleach.soul.HomeWorldRespawn}).
  */
 public final class AcademyLocator {
     /** The middle of the Academy's gate, which a soul's sense points at: (-192, 73, 231). */
@@ -38,7 +39,7 @@ public final class AcademyLocator {
     private AcademyLocator() {
     }
 
-    /** Whether an instructor standing in this world sends the Plus it frees on to the Academy: anywhere but Soul Society. */
+    /** Whether an instructor standing in this world sends the Plus it frees on: anywhere but Soul Society. */
     public static boolean sendsOnFrom(ResourceKey<Level> world) {
         return world != BleachWorlds.SOUL_SOCIETY;
     }
@@ -130,8 +131,21 @@ public final class AcademyLocator {
     }
 
     /**
-     * Sends a soul that has just passed on to the gates of the Academy in Soul Society. A bed or anchor it set outside
-     * Soul Society before it passed on is let go, so it is not drawn back there when it dies.
+     * Sets a soul that has just passed on down at this spot in Soul Society, facing this way. A bed or anchor it set
+     * outside Soul Society before it passed on is let go, so it is not drawn back there when it dies.
+     */
+    public static void setDown(ServerPlayer player, ServerLevel soulSociety, Vec3 spot, float yaw) {
+        if (player.getRespawnPosition() != null && player.getRespawnDimension() != BleachWorlds.SOUL_SOCIETY) {
+            player.setRespawnPosition(Level.OVERWORLD, null, 0.0F, false, false);
+        }
+        // A soul sent on as it respawns is not yet its connection's player, which is what the teleport moves.
+        player.moveTo(spot.x, spot.y, spot.z, yaw, 0.0F);
+        player.teleportTo(soulSociety, spot.x, spot.y, spot.z, yaw, 0.0F);
+    }
+
+    /**
+     * Sends a soul that has just passed on to the gates of the Academy in Soul Society, letting go a bed or anchor it
+     * set outside Soul Society (see {@link #setDown}).
      *
      * @return false, leaving the soul where it is, if there is no Soul Society or nowhere safe to land
      */
@@ -143,12 +157,7 @@ public final class AcademyLocator {
                     .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
             return false;
         }
-        if (player.getRespawnPosition() != null && player.getRespawnDimension() != BleachWorlds.SOUL_SOCIETY) {
-            player.setRespawnPosition(Level.OVERWORLD, null, 0.0F, false, false);
-        }
-        // A soul sent on as it respawns is not yet its connection's player, which is what the teleport moves.
-        player.moveTo(spot.x, spot.y, spot.z, LANDING_YAW, 0.0F);
-        player.teleportTo(soulSociety, spot.x, spot.y, spot.z, LANDING_YAW, 0.0F);
+        setDown(player, soulSociety, spot, LANDING_YAW);
         player.sendSystemMessage(Component.translatable("message.bleach.konso.arrived")
                 .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         return true;
