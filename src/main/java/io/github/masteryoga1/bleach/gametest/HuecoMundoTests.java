@@ -83,6 +83,11 @@ public final class HuecoMundoTests {
         assertCrafts(helper, List.of(trunk, trunk, trunk, trunk), new ItemStack(ModItems.HUECO_QUARTZ_BRICKS.get(), 4));
         assertSmelts(helper, new ItemStack(ModItems.WHITE_SANDSTONE.get()), ModItems.SMOOTH_WHITE_SANDSTONE.get());
         assertSmelts(helper, grain, Items.GLASS);
+        // The recipe book offers each of the mod's three once its ingredient is first held, as vanilla's are offered.
+        for (String recipe : List.of("white_sandstone", "smooth_white_sandstone", "hueco_quartz_bricks")) {
+            ResourceLocation unlock = BleachMod.id("recipes/building_blocks/" + recipe);
+            helper.assertTrue(level.getServer().getAdvancements().get(unlock) != null, recipe + " has no recipe unlock");
+        }
         helper.succeed();
     }
 
