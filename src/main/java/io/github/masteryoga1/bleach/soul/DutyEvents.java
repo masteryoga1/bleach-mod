@@ -113,6 +113,10 @@ public final class DutyEvents {
         DutyShinigami duty = world == Level.OVERWORLD ? comeDown(player) : null;
         if (duty == null) {
             String key = unreachedKey(world);
+            // A Plus gnawing at its chain wears it even where it would hold.
+            if (HOLDS_KEY.equals(key) && DevourLogic.gnawing(data)) {
+                key = ELSEWHERE_KEY;
+            }
             if (key != null && now - data.dutyToldAt >= revisitTicks()) {
                 data.dutyToldAt = now;
                 player.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
