@@ -60,6 +60,7 @@ import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.DangaiPlan;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
+import io.github.masteryoga1.bleach.world.MoonPhases;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
@@ -244,14 +245,14 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * slowly. Last, as a soul that has passed on, it is killed, and a new player must wake at a Rukongai home drawn for it,
  * at least 32 blocks from where it died, with the district named on the action bar, and Hueco Mundo's five blocks, set
  * down before it, must reach the client. A tp must then stand it on white sand on Las Noches' level ground in Hueco
- * Mundo at exactly y 96, and another must bring it to the Overworld, to the block it left by its first gate, before
- * the run quits.
+ * Mundo at exactly y 96, under a black sky with the moon full overhead where the Overworld's is new, and another must
+ * bring it to the Overworld, to the block it left by its first gate, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks and dunes, and HUD are drawn, and
+ * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, dunes and moon, and HUD are drawn, and
  * screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and so does
  * anything that did not reach the client as expected.
  */
@@ -1560,7 +1561,11 @@ public final class ClientSmokeTest {
             }
             // Hueco Mundo's arrival chunk and the Overworld's chunk home asked for 150 ticks before the tp, as Soul
             // Society's arrival chunks were, so both are made or loaded in the background first.
-            case 8235 -> holdHuecoMundo(minecraft, true);
+            case 8235 -> {
+                holdHuecoMundo(minecraft, true);
+                // Day 4, whose new moon stands full over Hueco Mundo.
+                command(minecraft, "time set 97000");
+            }
             // To Hueco Mundo, by command as only an operator can go there yet: onto Las Noches' level ground at y 96 for
             // any seed, 4.5 blocks inside its edge, facing south over the slope to the dunes.
             case 8385 -> command(minecraft, String.format(Locale.ROOT, "execute in %s run tp @s %.1f %d %.1f 0 0",
@@ -1570,6 +1575,14 @@ public final class ClientSmokeTest {
             case 8560 -> minecraft.options.hideGui = true;
             case 8565 -> {
                 shot(minecraft, "hueco_mundo");
+                minecraft.options.hideGui = false;
+            }
+            // Looking straight up from the player's own eyes at the moon overhead, full here as the Overworld's is new.
+            // The hand and the HUD are hidden for the shot again, so the held item covers none of the sky.
+            case 8570 -> command(minecraft, "tp @s ~ ~ ~ 0 -90");
+            case 8580 -> minecraft.options.hideGui = true;
+            case 8585 -> {
+                shot(minecraft, "hueco_mundo_moon");
                 minecraft.options.hideGui = false;
             }
             // Home to the Overworld, to the block the first gate was taken from.
@@ -2287,12 +2300,18 @@ public final class ClientSmokeTest {
 
     /** The checks of the trip to Hueco Mundo, each window from the step it follows: on its level ground, and home again. */
     private static void checkHuecoMundo(Minecraft minecraft, LocalPlayer player) {
+        // The sky is chosen as the client makes the level on arrival, and the moon reads the day time sent with it.
         expectWithin(minecraft, 8387, 8555, () -> minecraft.level.dimension() == BleachWorlds.HUECO_MUNDO
                         && player.onGround() && Math.abs(player.getY() - HuecoMundoPlan.LEVEL_Y) < 0.01
                         && horizontalDistance(player.position(), new Vec3(HUECO_MUNDO_X, 0.0, HUECO_MUNDO_Z)) < 0.5
-                        && minecraft.level.getBlockState(player.blockPosition().below()).is(ModBlocks.WHITE_SAND.get()),
-                "the tp never stood the player on white sand on Las Noches' level ground at y 96 (it is in "
-                        + minecraft.level.dimension().location() + " at " + player.position() + ")");
+                        && minecraft.level.getBlockState(player.blockPosition().below()).is(ModBlocks.WHITE_SAND.get())
+                        && minecraft.level.effects() instanceof HuecoMundoEffects
+                        && Float.isNaN(minecraft.level.effects().getCloudHeight())
+                        && MoonPhases.opposite(minecraft.level.getMoonPhase()) == MoonPhases.FULL,
+                "the tp never stood the player on white sand on Las Noches' level ground at y 96, under Hueco Mundo's"
+                        + " cloudless sky with the moon full (it is in " + minecraft.level.dimension().location() + " at "
+                        + player.position() + ", under " + minecraft.level.effects().getClass().getSimpleName()
+                        + " in moon phase " + minecraft.level.getMoonPhase() + ")");
         expectWithin(minecraft, 8592, 8685, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
                         && player.onGround() && player.position().distanceTo(returnTo) < 1.5,
                 "the tp back never brought the player home to the Overworld (it is in "
