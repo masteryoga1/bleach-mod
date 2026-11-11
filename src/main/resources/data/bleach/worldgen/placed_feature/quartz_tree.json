@@ -1,0 +1,7 @@
+{"feature": "bleach:quartz_tree", "placement": [
+  {"type": "minecraft:rarity_filter", "chance": 3},
+  {"type": "minecraft:in_square"},
+  {"type": "minecraft:heightmap", "heightmap": "OCEAN_FLOOR"},
+  {"type": "minecraft:biome"},
+  {"type": "minecraft:block_predicate_filter",
+    "predicate": {"type": "minecraft:matching_blocks", "offset": [0, -1, 0], "blocks": "bleach:white_sand"}}]}

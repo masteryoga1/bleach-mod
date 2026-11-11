@@ -59,6 +59,7 @@ import io.github.masteryoga1.bleach.soul.TravelLogic;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.DangaiPlan;
+import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
@@ -242,15 +243,17 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * back at the Kōtotsu, then, moved near the lane's end, it walks out and must come out over the Rukongai, falling
  * slowly. Last, as a soul that has passed on, it is killed, and a new player must wake at a Rukongai home drawn for it,
  * at least 32 blocks from where it died, with the district named on the action bar, and Hueco Mundo's five blocks, set
- * down before it, must reach the client before the run quits.
+ * down before it, must reach the client. A tp must then stand it on white sand on Las Noches' level ground in Hueco
+ * Mundo at exactly y 96, and another must bring it to the Overworld, to the block it left by its first gate, before
+ * the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, and HUD are drawn, and screenshots of the
- * main moments are saved for review. Any crash in the mod's client code fails the run, and so does anything that did
- * not reach the client as expected.
+ * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks and dunes, and HUD are drawn, and
+ * screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and so does
+ * anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -277,6 +280,8 @@ public final class ClientSmokeTest {
             SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z);
     /** Where the tp sets the player in its Dangai lane: 1.5 blocks short of the lane's end. */
     private static final double LANE_END_Z = DangaiPlan.EXIT_Z - 1.5;
+    /** Where the player stands in Hueco Mundo: on Las Noches' level ground, 4.5 blocks inside its edge, due south. */
+    private static final double HUECO_MUNDO_X = 0.5, HUECO_MUNDO_Z = HuecoMundoPlan.LEVEL_RADIUS - 4.5;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
     /**
@@ -528,6 +533,7 @@ public final class ClientSmokeTest {
         checkDangai(minecraft, player);
         checkWaking(minecraft, player);
         checkHuecoMundoBlocks(minecraft);
+        checkHuecoMundo(minecraft, player);
         if (finished) {
             return;
         }
@@ -1528,7 +1534,7 @@ public final class ClientSmokeTest {
                 command(minecraft, "kill @s");
             }
             case 8205 -> shot(minecraft, "rukongai_home");
-            // Last, Hueco Mundo's five blocks in a row 3 blocks south of where the soul woke, seen through its own eyes
+            // Then Hueco Mundo's five blocks in a row 3 blocks south of where the soul woke, seen through its own eyes
             // looking a little down: facing south, white sand at the row's west end is on the right and the bricks at its
             // east end on the left. A home is drawn by chance, so a floor of stone and a room cleared from the block before
             // the soul make the view the same whatever stands there: a slope, a trunk or tall grass. The hand and the HUD
@@ -1552,7 +1558,25 @@ public final class ClientSmokeTest {
                 shot(minecraft, "hueco_mundo_blocks");
                 minecraft.options.hideGui = false;
             }
-            case 8235 -> {
+            // Hueco Mundo's arrival chunk and the Overworld's chunk home asked for 150 ticks before the tp, as Soul
+            // Society's arrival chunks were, so both are made or loaded in the background first.
+            case 8235 -> holdHuecoMundo(minecraft, true);
+            // To Hueco Mundo, by command as only an operator can go there yet: onto Las Noches' level ground at y 96 for
+            // any seed, 4.5 blocks inside its edge, facing south over the slope to the dunes.
+            case 8385 -> command(minecraft, String.format(Locale.ROOT, "execute in %s run tp @s %.1f %d %.1f 0 0",
+                    BleachWorlds.HUECO_MUNDO.location(), HUECO_MUNDO_X, HuecoMundoPlan.LEVEL_Y, HUECO_MUNDO_Z));
+            // The slope and the dunes beyond have had a hundred ticks or more to reach the client and be drawn. The hand
+            // and the HUD are hidden for the shot, as in the blocks beat, so the held item covers none of the plain.
+            case 8560 -> minecraft.options.hideGui = true;
+            case 8565 -> {
+                shot(minecraft, "hueco_mundo");
+                minecraft.options.hideGui = false;
+            }
+            // Home to the Overworld, to the block the first gate was taken from.
+            case 8590 -> command(minecraft, String.format(Locale.ROOT,
+                    "execute in minecraft:overworld run tp @s %.3f %.3f %.3f", returnTo.x, returnTo.y, returnTo.z));
+            case 8695 -> {
+                holdHuecoMundo(minecraft, false);
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -2261,6 +2285,20 @@ public final class ClientSmokeTest {
         return true;
     }
 
+    /** The checks of the trip to Hueco Mundo, each window from the step it follows: on its level ground, and home again. */
+    private static void checkHuecoMundo(Minecraft minecraft, LocalPlayer player) {
+        expectWithin(minecraft, 8387, 8555, () -> minecraft.level.dimension() == BleachWorlds.HUECO_MUNDO
+                        && player.onGround() && Math.abs(player.getY() - HuecoMundoPlan.LEVEL_Y) < 0.01
+                        && horizontalDistance(player.position(), new Vec3(HUECO_MUNDO_X, 0.0, HUECO_MUNDO_Z)) < 0.5
+                        && minecraft.level.getBlockState(player.blockPosition().below()).is(ModBlocks.WHITE_SAND.get()),
+                "the tp never stood the player on white sand on Las Noches' level ground at y 96 (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.position() + ")");
+        expectWithin(minecraft, 8592, 8685, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
+                        && player.onGround() && player.position().distanceTo(returnTo) < 1.5,
+                "the tp back never brought the player home to the Overworld (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.position() + ")");
+    }
+
     /**
      * Whether the player stands where a gate sets a soul it does not guide: in the Dangai on a lane's floor, down its
      * middle, a step from the rock behind it, the Kōryū's two walls on either side.
@@ -2535,6 +2573,32 @@ public final class ClientSmokeTest {
                 level.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 1, chunk);
             } else {
                 level.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            }
+        });
+    }
+
+    /**
+     * Holds (or lets go of) the chunk the player arrives in on Hueco Mundo's level ground and the Overworld's chunk it
+     * comes home to, on the integrated server with a forced ticket each, as {@link #holdArrival} does for Soul Society.
+     */
+    private static void holdHuecoMundo(Minecraft minecraft, boolean hold) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        if (server == null) {
+            return;
+        }
+        ChunkPos there = new ChunkPos(BlockPos.containing(HUECO_MUNDO_X, HuecoMundoPlan.LEVEL_Y, HUECO_MUNDO_Z));
+        ChunkPos home = new ChunkPos(BlockPos.containing(returnTo));
+        server.execute(() -> {
+            ServerLevel level = server.getLevel(BleachWorlds.HUECO_MUNDO);
+            if (level == null) {
+                return;
+            }
+            if (hold) {
+                level.getChunkSource().addRegionTicket(TicketType.FORCED, there, 1, there);
+                server.overworld().getChunkSource().addRegionTicket(TicketType.FORCED, home, 1, home);
+            } else {
+                level.getChunkSource().removeRegionTicket(TicketType.FORCED, there, 1, there);
+                server.overworld().getChunkSource().removeRegionTicket(TicketType.FORCED, home, 1, home);
             }
         });
     }

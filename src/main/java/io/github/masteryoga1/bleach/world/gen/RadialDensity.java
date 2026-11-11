@@ -9,7 +9,7 @@ import net.minecraft.world.level.levelgen.DensityFunction;
 
 /**
  * The density function {@code bleach:radial}: how far a block's centre lies from the centre column, or from the nearer
- * axis, in blocks. Soul Society's rings and gate gaps are cut from it.
+ * axis, in blocks. Soul Society's rings and gate gaps are cut from it, as are Hueco Mundo's level ground, slope and biomes.
  */
 public record RadialDensity(Mode mode) implements DensityFunction.SimpleFunction {
     /** The type registered as {@code bleach:radial}: its one field is the mode. */

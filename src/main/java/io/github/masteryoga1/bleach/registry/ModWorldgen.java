@@ -32,7 +32,7 @@ public final class ModWorldgen {
     public static final DeferredRegister<StructurePieceType> STRUCTURE_PIECES =
             DeferredRegister.create(Registries.STRUCTURE_PIECE, BleachMod.MODID);
 
-    /** {@code bleach:radial}, which Soul Society's noise settings read. */
+    /** {@code bleach:radial}, which Soul Society's and Hueco Mundo's noise settings read. */
     public static final DeferredHolder<MapCodec<? extends DensityFunction>, MapCodec<RadialDensity>> RADIAL =
             DENSITY_FUNCTION_TYPES.register("radial", () -> RadialDensity.DATA_CODEC);
     /** {@code bleach:seireiheki}, which the wall's biome places. */
