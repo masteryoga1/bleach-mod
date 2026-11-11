@@ -71,7 +71,7 @@ public final class QuincyLogic {
     public static final double REISHI_PER_MAX_REIRYOKU = 0.1;
     public static final double CHANNEL_PER_REIATSU_CONTROL_LEVEL = 0.02;
     public static final int GATHER_INTERVAL_TICKS = 20;
-    public static final double NETHER_DENSITY = 0.6, END_DENSITY = 0.8, SOUL_SOCIETY_DENSITY = 1.5;
+    public static final double NETHER_DENSITY = 0.6, END_DENSITY = 0.8, SOUL_SOCIETY_DENSITY = 1.5, HUECO_MUNDO_DENSITY = 2.0;
     public static final double RICH_BIOME_MULTIPLIER = 1.3, THIN_BIOME_MULTIPLIER = 0.7;
     public static final double RIFT_DENSITY_BONUS = 0.5, RIFT_DENSITY_RANGE = 24.0;
     public static final double AURA_DENSITY_BONUS = 0.5, MAX_DENSITY = 3.0;
@@ -402,13 +402,19 @@ public final class QuincyLogic {
         return (float) (rate * poisonGatherMultiplier(data.quincy().poison()));
     }
 
-    /** How rich in reishi a world is: the Nether and the End less so than the Overworld, Soul Society, made of it, more. */
+    /**
+     * How rich in reishi a world is: the Nether and the End less so than the Overworld, Soul Society, made of it, more,
+     * and Hueco Mundo more again.
+     */
     public static double dimensionDensity(ResourceKey<Level> dimension) {
         if (dimension == Level.NETHER) {
             return NETHER_DENSITY;
         }
         if (dimension == BleachWorlds.SOUL_SOCIETY) {
             return SOUL_SOCIETY_DENSITY;
+        }
+        if (dimension == BleachWorlds.HUECO_MUNDO) {
+            return HUECO_MUNDO_DENSITY;
         }
         return dimension == Level.END ? END_DENSITY : 1.0;
     }

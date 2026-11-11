@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
+import io.github.masteryoga1.bleach.world.MoonPhases;
 import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.OptionalLong;
@@ -67,8 +68,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * Hueco Mundo: its world on the test server, held at midnight on the Overworld's day count; its ground, read from its
  * own files and worked out by the generator's own code at three seeds, and as the real world generates it; its biomes
- * by radius and depth; and its blocks, each with its item, drop, tool and tags, white sand's fall, and what is crafted
- * and smelted.
+ * by radius and depth; its blocks, each with its item, drop, tool and tags, white sand's fall, and what is crafted and
+ * smelted; and the moon its sky shows, half a cycle on from the Overworld's.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -399,6 +400,25 @@ public final class HuecoMundoTests {
             helper.setBlock(0, 1, 0, sandstone);
             helper.setBlock(0, 2, 0, sand);
         }, clear).run();
+    }
+
+    @GameTest(template = "empty")
+    public static void huecoMundoMoonIsOpposite(GameTestHelper helper) {
+        // {phase, opposite}: full and new trade places, each waning phase meets the waxing one half a cycle on, and a
+        // phase past the cycle's ends is read round it.
+        int[][] pairs = {{0, 4}, {1, 5}, {2, 6}, {3, 7}, {4, 0}, {5, 1}, {6, 2}, {7, 3}, {-1, 3}, {12, 0}};
+        for (int[] pair : pairs) {
+            helper.assertTrue(MoonPhases.opposite(pair[0]) == pair[1],
+                    "phase " + pair[0] + "'s opposite is " + MoonPhases.opposite(pair[0]) + ", not " + pair[1]);
+        }
+        ServerLevel hueco = helper.getLevel().getServer().getLevel(BleachWorlds.HUECO_MUNDO);
+        helper.assertTrue(hueco != null
+                        && MoonPhases.opposite(hueco.getMoonPhase()) == (helper.getLevel().getMoonPhase() + 4) % 8,
+                "Hueco Mundo's sky would not show the Overworld's moon half a cycle on");
+        // The smoke test's day: dayTime 97,000 is day 4, a new moon in the Overworld and so a full one in Hueco Mundo.
+        helper.assertTrue(hueco.dimensionType().moonPhase(97_000L) == MoonPhases.NEW
+                && MoonPhases.opposite(MoonPhases.NEW) == MoonPhases.FULL, "day 4's moon is not new, or not full opposite");
+        helper.succeed();
     }
 
     /**

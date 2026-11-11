@@ -87,6 +87,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachClient::registerScreens);
         modEventBus.addListener(BleachClient::registerRenderers);
         modEventBus.addListener(BleachModelLayers::register);
+        modEventBus.addListener(HuecoMundoEffects::register);
         modEventBus.addListener(BleachClient::registerClientExtensions);
         QuincyClient.register(modEventBus);
         HollowPlayerClient.register(NeoForge.EVENT_BUS);

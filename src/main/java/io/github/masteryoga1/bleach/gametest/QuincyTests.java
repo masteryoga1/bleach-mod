@@ -429,6 +429,7 @@ public final class QuincyTests {
         assertNear(helper, QuincyLogic.dimensionDensity(Level.NETHER), 0.6, "the Nether's density");
         assertNear(helper, QuincyLogic.dimensionDensity(Level.END), 0.8, "the End's density");
         assertNear(helper, QuincyLogic.dimensionDensity(BleachWorlds.SOUL_SOCIETY), 1.5, "Soul Society's density");
+        assertNear(helper, QuincyLogic.dimensionDensity(BleachWorlds.HUECO_MUNDO), 2.0, "Hueco Mundo's density");
         assertNear(helper, QuincyLogic.dimensionDensity(ResourceKey.create(Registries.DIMENSION, BleachMod.id("elsewhere"))),
                 1.0, "another world's density");
 
