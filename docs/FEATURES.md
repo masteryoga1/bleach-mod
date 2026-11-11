@@ -139,10 +139,10 @@ The first playable slice: become a Shinigami, awaken your zanpakutō and hunt Ho
 
 **Hueco Mundo**
 
-- [ ] **Hueco Mundo dimension** [Canon+KD]: white sand dunes under a black sky, quartz-like trees, no water, and a moon whose phase is opposite the Overworld's.
-- [ ] **Forest of Menos** [Canon+KD]: the vast cavern under the sand where Gillian roam and the quartz trees take root.
+- [ ] **Hueco Mundo dimension** [Canon+KD]: white sand dunes under a black sky, quartz-like trees, no water, and a moon whose phase is opposite the Overworld's. *So far: the land, reached for now only by an operator's command. White dunes from y 88 to 108 under a midnight that never ends, on a crust of white sandstone, with lone trees of white quartz; a level white plain 200 blocks in radius at y 96 round the centre, where Las Noches will stand, easing into the dunes over 32 blocks. No water (poured water boils away), no rain, nothing living and no vanilla structures; a bed there lets no one sleep or set a spawn, and a charged respawn anchor blows up. The sky is still the Overworld's.*
+- [ ] **Forest of Menos** [Canon+KD]: the vast cavern under the sand where Gillian roam and the quartz trees take root. *So far: the cavern, from y 24 to 80 under all of Hueco Mundo, floored with white sandstone, its Hueco quartz trunks about 7 blocks across and some 20 apart rising from floor to ceiling. It is sealed under 8 to 28 blocks of crust and reached only by digging, with a fall of over 50 blocks to its floor; the Gillian come in a later step.*
 - [ ] **Las Noches** [Canon]: the all-white fortress with a central dome, five towers and an artificial blue sky inside.
-- [x] **White sand and quartz blocks** [Canon+KD]: the Hueco Mundo building palette. *White sand, which falls as sand does and smelts to glass; white sandstone and smooth white sandstone, crafted and smelted from it as their vanilla kin are; Hueco quartz, a pillar; and Hueco quartz bricks, crafted from it. Hueco Mundo, where they are found, comes in the next part of this round; until then they come only from the creative menu or a command.*
+- [x] **White sand and quartz blocks** [Canon+KD]: the Hueco Mundo building palette. *White sand, which falls as sand does and smelts to glass; white sandstone and smooth white sandstone, crafted and smelted from it as their vanilla kin are; Hueco quartz, a pillar; and Hueco quartz bricks, crafted from it. White sand lies on Hueco Mundo's dunes over its white sandstone, and Hueco quartz grows in its lone trees and in the trunks of the Forest of Menos.*
 
 **Human World**
 

@@ -1,0 +1,16 @@
+{
+  "type": "bleach:hueco_mundo",
+  "generator": {"type": "minecraft:noise", "settings": "bleach:hueco_mundo", "biome_source": {"type": "minecraft:multi_noise",
+    "biomes": [
+      {"biome": "bleach:forest_of_menos", "parameters": {"temperature": [0.0, 2.0], "humidity": [0.0, 1.0],
+        "continentalness": 0.0, "erosion": 0.0, "depth": 1.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:las_noches", "parameters": {"temperature": [0.0, 0.0319], "humidity": 0.0, "continentalness": 0.0,
+        "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:las_noches_grounds", "parameters": {"temperature": [0.0, 0.0319], "humidity": 1.0,
+        "continentalness": 0.0, "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:las_noches_grounds", "parameters": {"temperature": [0.032, 0.1079], "humidity": [0.0, 1.0],
+        "continentalness": 0.0, "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}},
+      {"biome": "bleach:hueco_mundo", "parameters": {"temperature": [0.108, 2.0], "humidity": [0.0, 1.0],
+        "continentalness": 0.0, "erosion": 0.0, "depth": 0.0, "weirdness": 0.0, "offset": 0.0}}
+    ]}}
+}

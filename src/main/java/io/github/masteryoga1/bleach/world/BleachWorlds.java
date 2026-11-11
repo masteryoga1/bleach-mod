@@ -15,7 +15,7 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 /** The mod's three worlds, and the one place travel code looks a world up, which a game test can point elsewhere. */
 public final class BleachWorlds {
     public static final ResourceKey<Level> SOUL_SOCIETY = world("soul_society");
-    /** Hueco Mundo's key; its world comes in a later step. */
+    /** Hueco Mundo's key: white dunes under an endless midnight, over the Forest of Menos. */
     public static final ResourceKey<Level> HUECO_MUNDO = world("hueco_mundo");
     /** The Dangai's key: the corridor between the worlds, which the Senkaimon's unguided cross. */
     public static final ResourceKey<Level> DANGAI = world("dangai");
@@ -23,6 +23,10 @@ public final class BleachWorlds {
             ResourceKey.create(Registries.DIMENSION_TYPE, BleachMod.id("soul_society"));
     public static final ResourceKey<NoiseGeneratorSettings> SOUL_SOCIETY_NOISE =
             ResourceKey.create(Registries.NOISE_SETTINGS, BleachMod.id("soul_society"));
+    public static final ResourceKey<DimensionType> HUECO_MUNDO_TYPE =
+            ResourceKey.create(Registries.DIMENSION_TYPE, BleachMod.id("hueco_mundo"));
+    public static final ResourceKey<NoiseGeneratorSettings> HUECO_MUNDO_NOISE =
+            ResourceKey.create(Registries.NOISE_SETTINGS, BleachMod.id("hueco_mundo"));
 
     private static final Map<ResourceKey<Level>, ResourceKey<Level>> STAND_INS = new ConcurrentHashMap<>();
 

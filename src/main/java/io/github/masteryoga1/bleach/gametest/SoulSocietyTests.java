@@ -39,6 +39,7 @@ import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -111,7 +112,7 @@ public final class SoulSocietyTests {
             BleachWorlds.standIn(BleachWorlds.SOUL_SOCIETY, null);
         }
         helper.assertTrue(BleachWorlds.level(server, BleachWorlds.SOUL_SOCIETY) == real, "the stand-in outlasted its test");
-        helper.assertTrue(BleachWorlds.level(server, BleachWorlds.HUECO_MUNDO) == null, "Hueco Mundo has a world already");
+        helper.assertTrue(BleachWorlds.level(server, BleachWorlds.HUECO_MUNDO) != null, "Hueco Mundo has no world");
         helper.assertTrue(BleachWorlds.isSpiritWorld(BleachWorlds.DANGAI) && !BleachWorlds.isSpiritWorld(Level.OVERWORLD),
                 "the spirit worlds are not the mod's three");
         helper.succeed();
@@ -119,7 +120,7 @@ public final class SoulSocietyTests {
 
     @GameTest(template = "empty")
     public static void seireiteiStandsOnThePlan(GameTestHelper helper) {
-        NoiseBasedChunkGenerator generator = (NoiseBasedChunkGenerator) stem(helper).generator();
+        NoiseBasedChunkGenerator generator = (NoiseBasedChunkGenerator) stem(helper, "soul_society").generator();
         int plateau = SeireiteiPlan.PLATEAU_Y, top = SeireiteiPlan.WALL_TOP_Y, mesa = SeireiteiPlan.MESA_TOP_Y;
         int floor = SeireiteiPlan.CAVERN_FLOOR_Y, ceiling = SeireiteiPlan.CAVERN_CEILING_Y, rim = SeireiteiPlan.CAVERN_RADIUS;
         int g = SeireiteiPlan.GATE_RADIUS, w = SeireiteiPlan.GATE_HALF_WIDTH;
@@ -129,7 +130,7 @@ public final class SoulSocietyTests {
                 {20, floor, -1.0}, {20, floor - 1, 64.0}, {20, ceiling - 1, -1.0}, {20, ceiling, mesa - 0.5 - ceiling},
                 {rim - 1, 80, -1.0}, {rim, 80, mesa - 0.5 - 80}};
         for (long seed : SEEDS) {
-            RandomState noise = noise(helper, seed);
+            RandomState noise = noise(helper, BleachWorlds.SOUL_SOCIETY_NOISE, seed);
             for (double[] at : exact) {
                 int x = (int) at[0], y = (int) at[1];
                 near(helper, density(noise, x, y, 0), at[2], "the density at (" + x + ", " + y + ", 0)");
@@ -164,10 +165,10 @@ public final class SoulSocietyTests {
 
     @GameTest(template = "empty")
     public static void rukongaiRoughensOutward(GameTestHelper helper) {
-        NoiseBasedChunkGenerator generator = (NoiseBasedChunkGenerator) stem(helper).generator();
+        NoiseBasedChunkGenerator generator = (NoiseBasedChunkGenerator) stem(helper, "soul_society").generator();
         int plateau = SeireiteiPlan.PLATEAU_Y, depth = SeireiteiPlan.DISTRICT_DEPTH;
         for (long seed : SEEDS) {
-            RandomState noise = noise(helper, seed);
+            RandomState noise = noise(helper, BleachWorlds.SOUL_SOCIETY_NOISE, seed);
             IntSummaryStatistics outside = ring(generator, noise, SeireiteiPlan.WALL_OUTER_RADIUS + 10);
             IntSummaryStatistics fifth = ring(generator, noise, SeireiteiPlan.districtStart(5) + depth / 2);
             IntSummaryStatistics sixtieth = ring(generator, noise, SeireiteiPlan.districtStart(60) + depth / 2);
@@ -189,7 +190,7 @@ public final class SoulSocietyTests {
 
     @GameTest(template = "empty")
     public static void biomesFollowTheRadius(GameTestHelper helper) {
-        LevelStem stem = stem(helper);
+        LevelStem stem = stem(helper, "soul_society");
         helper.assertTrue(stem.type().is(BleachWorlds.SOUL_SOCIETY_TYPE)
                         && stem.generator() instanceof NoiseBasedChunkGenerator generator
                         && generator.generatorSettings().is(BleachWorlds.SOUL_SOCIETY_NOISE)
@@ -201,7 +202,7 @@ public final class SoulSocietyTests {
         Set<String> possible = source.possibleBiomes().stream().map(Holder::getRegisteredName).collect(Collectors.toSet());
         helper.assertTrue(possible.equals(BIOMES.stream().map(name -> "bleach:" + name).collect(Collectors.toSet())),
                 "Soul Society can hold " + possible);
-        RandomState noise = noise(helper, SEEDS[1]);
+        RandomState noise = noise(helper, BleachWorlds.SOUL_SOCIETY_NOISE, SEEDS[1]);
         // {x, z, biome}, on the 4-block grid the biomes are stored on; two heights, since depth plays no part.
         int[][] points = {{20, 0, 0}, {300, 0, 1}, {SeireiteiPlan.GATE_RADIUS, 0, 2}, {0, -1000, 3}, {2400, 0, 4},
                 {0, 3200, 5}, {6000, 0, 5}};
@@ -231,10 +232,10 @@ public final class SoulSocietyTests {
         helper.succeed();
     }
 
-    /** Soul Society's world as its file reads, decoded as the server decodes world files. */
-    private static LevelStem stem(GameTestHelper helper) {
+    /** One of the mod's worlds as its file reads, decoded as the server decodes world files; shared with Hueco Mundo's. */
+    static LevelStem stem(GameTestHelper helper, String world) {
         MinecraftServer server = helper.getLevel().getServer();
-        try (Reader reader = server.getResourceManager().getResourceOrThrow(BleachMod.id("dimension/soul_society.json"))
+        try (Reader reader = server.getResourceManager().getResourceOrThrow(BleachMod.id("dimension/" + world + ".json"))
                 .openAsReader()) {
             return LevelStem.CODEC.parse(server.registryAccess().createSerializationContext(JsonOps.INSTANCE),
                     JsonParser.parseReader(reader)).getOrThrow();
@@ -243,9 +244,9 @@ public final class SoulSocietyTests {
         }
     }
 
-    /** Soul Society's router and climate as a world of this seed has them. */
-    private static RandomState noise(GameTestHelper helper, long seed) {
-        return RandomState.create(helper.getLevel().registryAccess().asGetterLookup(), BleachWorlds.SOUL_SOCIETY_NOISE, seed);
+    /** A world's router and climate, from these noise settings, as a world of this seed has them. */
+    static RandomState noise(GameTestHelper helper, ResourceKey<NoiseGeneratorSettings> settings, long seed) {
+        return RandomState.create(helper.getLevel().registryAccess().asGetterLookup(), settings, seed);
     }
 
     private static List<Holder<Biome>> biomes(RegistryAccess access) {
@@ -258,7 +259,7 @@ public final class SoulSocietyTests {
         return biome.value().getGenerationSettings().features().stream().mapToInt(HolderSet::size).sum();
     }
 
-    private static double density(RandomState noise, int x, int y, int z) {
+    static double density(RandomState noise, int x, int y, int z) {
         return noise.router().finalDensity().compute(new DensityFunction.SinglePointContext(x, y, z));
     }
 
@@ -267,19 +268,19 @@ public final class SoulSocietyTests {
         return generator.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, HEIGHTS, noise);
     }
 
-    private static void assertStands(GameTestHelper helper, NoiseBasedChunkGenerator generator, RandomState noise, int x,
+    static void assertStands(GameTestHelper helper, NoiseBasedChunkGenerator generator, RandomState noise, int x,
             int z, int y) {
         int stands = stand(generator, noise, x, z);
         helper.assertTrue(stands == y, "(" + x + ", " + z + ") stands at " + stands + ", not " + y);
     }
 
     /** The stand heights of 64 columns evenly round a circle of this radius about the centre column. */
-    private static IntSummaryStatistics ring(NoiseBasedChunkGenerator generator, RandomState noise, int radius) {
+    static IntSummaryStatistics ring(NoiseBasedChunkGenerator generator, RandomState noise, int radius) {
         return IntStream.range(0, 64).map(i -> stand(generator, noise, Mth.floor(radius * Math.cos(Math.PI * i / 32)),
                 Mth.floor(radius * Math.sin(Math.PI * i / 32)))).summaryStatistics();
     }
 
-    private static void near(GameTestHelper helper, double actual, double expected, String what) {
+    static void near(GameTestHelper helper, double actual, double expected, String what) {
         helper.assertTrue(Math.abs(actual - expected) < EXACT, what + " is " + actual + ", not " + expected);
     }
 }
