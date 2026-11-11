@@ -245,8 +245,10 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * slowly. Last, as a soul that has passed on, it is killed, and a new player must wake at a Rukongai home drawn for it,
  * at least 32 blocks from where it died, with the district named on the action bar, and Hueco Mundo's five blocks, set
  * down before it, must reach the client. A tp must then stand it on white sand on Las Noches' level ground in Hueco
- * Mundo at exactly y 96, under a black sky with the moon full overhead where the Overworld's is new, and another must
- * bring it to the Overworld, to the block it left by its first gate, before the run quits.
+ * Mundo at exactly y 96, under a black sky with the moon full overhead where the Overworld's is new. Made an Arrancar
+ * there, it holds the Gate key: the action bar must say the air is torn at, and a Garganta of a person's size must open
+ * 1.8 blocks ahead, level with its feet. Another tp must then bring it to the Overworld, to the block it left by its
+ * first gate, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -2378,10 +2380,13 @@ public final class ClientSmokeTest {
                 + minecraft.level.getBlockState(laneWall(lane, DangaiPlan.EAST_WALL, player));
     }
 
-    /** Whether a Garganta of size 1 stands fully open 1.8 blocks south of the player, seen and level with its feet. */
+    /**
+     * Whether a Garganta of size 1 has begun to open 1.8 blocks south of the player, seen and level with its feet. Its
+     * opening is enough, not its full width ten ticks on, so the window allows a server as late as the Senkaimon's do.
+     */
     private static boolean riftAhead(Minecraft minecraft, LocalPlayer player) {
         GargantaRift rift = nearest(minecraft, GargantaRift.class, 4.0, seen -> !ClientSouls.isHiddenFromViewer(seen));
-        return rift != null && rift.openness(0.0F) >= 1.0F && Math.abs(rift.size() - 1.0F) < 0.01
+        return rift != null && rift.openness(0.0F) > 0.0F && Math.abs(rift.size() - 1.0F) < 0.01
                 && Math.abs(rift.getX() - player.getX()) < 0.3 && Math.abs(rift.getZ() - (player.getZ() + RIFT_AHEAD)) < 0.3
                 && Math.abs(rift.getY() - player.getY()) < 0.3;
     }

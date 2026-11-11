@@ -83,10 +83,11 @@ public final class GargantaTests {
     // ---- Who may open a Garganta ----
 
     /**
-     * Each rule for opening a Garganta, in its order: the dead, the held, the powerless, the bound, the wrong world, the
-     * wait and the cost, then creative's pass and, last, a gate already in reach. Then the tear one opens, its size by
-     * its opener's height, where a Garganta leads from each world, sneaking or not, and which gate the key opens for
-     * each soul. It runs in a batch of its own, so no other test's gate stands within the reach it checks.
+     * Each rule for opening a Garganta, each tried on a soul that fails it alone: the dead, the held, the powerless, the
+     * bound, the wrong world, the wait and the cost, then creative's pass and, last, a gate already in reach. Then the
+     * tear one opens, its size by its opener's height, where a Garganta leads from each world, sneaking or not, and which
+     * gate the key opens for each soul. It runs in a batch of its own, so no other test's gate stands within the reach it
+     * checks.
      */
     @GameTest(template = "empty", batch = "garganta_open")
     public static void onlyAMenosOrAnArrancarOpensAGarganta(GameTestHelper helper) {
