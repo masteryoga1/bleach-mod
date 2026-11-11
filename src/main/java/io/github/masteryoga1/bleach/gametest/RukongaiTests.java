@@ -4,15 +4,21 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.NpcAction;
+import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.soul.DevourEvents;
+import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.HollowBody;
 import io.github.masteryoga1.bleach.soul.KonsoTarget;
+import io.github.masteryoga1.bleach.soul.PlusEvents;
 import io.github.masteryoga1.bleach.soul.RukongaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.TravelEvents;
+import io.github.masteryoga1.bleach.soul.TravelLogic;
 import io.github.masteryoga1.bleach.soul.TravelRecord;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.Rukongai;
@@ -30,14 +36,19 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -47,7 +58,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * Tests for the Rukongai's map: which district of which region each column of Soul Society lies in, the names a soul is
  * told of where it is, and the place named on the action bar, which waits for any other line there to have had its time.
- * And where Konsō sends a soul: a district of the Rukongai drawn by chance, which becomes its home.
+ * And where Konsō sends a soul: a district of the Rukongai drawn by chance, which becomes its home. Then where a soul
+ * wakes when it dies, at that home among others, and the worlds where a Plus's chain holds.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -144,6 +156,13 @@ public final class RukongaiTests {
         return TestPlayers.chat(player).stream()
                 .map(line -> line.getContents() instanceof TranslatableContents words ? words.getKey() : line.getString())
                 .toList();
+    }
+
+    /** How many times this joined player has been told the line with this key in chat. */
+    private static long told(ServerPlayer player, String key) {
+        return TestPlayers.chat(player).stream()
+                .filter(line -> line.getContents() instanceof TranslatableContents words && words.getKey().equals(key))
+                .count();
     }
 
     /** A real Plus joined at this spot in the test's box, with an hour of chain left. */
@@ -698,6 +717,218 @@ public final class RukongaiTests {
                     } finally {
                         BleachConfig.KONSO_SENDS_TO.set(before);
                     }
+                })
+                .thenSucceed();
+    }
+
+    // ---- Waking at home ----
+
+    /**
+     * Where the real respawn event wakes a soul with no spawn of its own, once the Academy's chunks have built it: a
+     * Rukongai soul at its home, on the ground there and facing Seireitei; one with none at a home drawn as it dies,
+     * which it keeps; a Shinigami at the Senkaimon court, facing south; and a living Substitute where vanilla puts it.
+     * The player is never killed.
+     */
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 300)
+    public static void respawnWakesAtHome(GameTestHelper helper) {
+        ServerLevel soul = SiteTests.holdAcademy(helper);
+        TravelTests.holdCourt(helper);
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
+        // The first of seed 5's Hokutan columns whose ground holds a soul, made now, so the first respawn makes none.
+        BlockPos found = null;
+        for (int i = 0; i < HOKUTAN.length && found == null; i++) {
+            if (RukongaiEvents.groundAt(player, soul, HOKUTAN[i][0], HOKUTAN[i][1]) != null) {
+                found = new BlockPos(HOKUTAN[i][0], SeireiteiPlan.PLATEAU_Y, HOKUTAN[i][1]);
+            }
+        }
+        helper.assertTrue(found != null, "none of Hokutan's four columns will hold a soul");
+        BlockPos hokutan = found;
+        player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F));
+        player.setData(SoulAttachments.TRAVEL, TravelRecord.NONE.withRukongaiHome(hokutan));
+        helper.startSequence()
+                .thenWaitUntil(() -> AcademyTests.assertAcademyStands(helper, soul))
+                .thenExecute(() -> {
+                    DimensionTransition spawn = new DimensionTransition(helper.getLevel(), player.position(), Vec3.ZERO,
+                            0.0F, 0.0F, DimensionTransition.DO_NOTHING);
+                    DimensionTransition home = AcademyTests.respawn(player, spawn, false);
+                    Vec3 at = home.pos();
+                    int top = soul.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, hokutan.getX(), hokutan.getZ());
+                    helper.assertTrue(home.newLevel() == soul && Math.abs(at.x - (hokutan.getX() + 0.5)) < 0.01
+                                    && Math.abs(at.z - (hokutan.getZ() + 0.5)) < 0.01 && Math.abs(at.y - top) <= 1.0,
+                            "the soul at home in Hokutan wakes in " + home.newLevel().dimension().location() + " at " + at
+                                    + ", not on its home's ground at y " + top);
+                    // Read against the way to the centre column, not against the yaw's own formula.
+                    double along = Vec3.directionFromRotation(0.0F, home.yRot())
+                            .dot(new Vec3(-at.x, 0.0, -at.z).normalize());
+                    helper.assertTrue(along > 0.99, "the soul at home faces " + home.yRot() + ", not Seireitei's way ("
+                            + along + " along it)");
+
+                    player.setData(SoulAttachments.TRAVEL, TravelRecord.NONE);
+                    DimensionTransition drawn = AcademyTests.respawn(player, spawn, false);
+                    BlockPos block = BlockPos.containing(drawn.pos());
+                    int district = Rukongai.district(block.getX(), block.getZ());
+                    helper.assertTrue(drawn.newLevel() == soul && district >= 1 && district <= SeireiteiPlan.DISTRICTS,
+                            "the soul with no home wakes in " + drawn.newLevel().dimension().location() + " at "
+                                    + drawn.pos() + ", in ring " + district);
+                    // Saved on the soul as it died, for the respawn to carry over.
+                    Optional<BlockPos> kept = player.getData(SoulAttachments.TRAVEL).rukongaiHome();
+                    helper.assertTrue(kept.equals(Optional.of(block)),
+                            "the soul's new home is " + kept + ", not the block it wakes in, " + block);
+
+                    player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F));
+                    Vec3 lawn = TravelEvents.landing(player, soul, TravelLogic.COURT);
+                    DimensionTransition court = AcademyTests.respawn(player, spawn, false);
+                    helper.assertTrue(lawn != null && court.newLevel() == soul && court.pos().distanceTo(lawn) < 0.01
+                                    && court.yRot() == 0.0F,
+                            "the Shinigami wakes in " + court.newLevel().dimension().location() + " at " + court.pos()
+                                    + " facing " + court.yRot() + ", not on the court's lawn at " + lawn);
+
+                    player.setData(SoulAttachments.SOUL, ShinigamiTests.substitute(60.0F));
+                    helper.assertTrue(AcademyTests.respawn(player, spawn, false) == spawn,
+                            "a living Substitute was moved to Soul Society");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A soul killed in the Overworld wakes, through the server's own respawn, at its Rukongai home: a new player in the
+     * dead one's place, on the home's ground, told so once and set down nowhere else.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void aSoulKilledInTheOverworldWakesAtItsHome(GameTestHelper helper) {
+        // District 1 of the South Rukongai, outside the south gate: held first, so the respawn makes no ground.
+        BlockPos home = new BlockPos(0, SeireiteiPlan.PLATEAU_Y, 530);
+        ServerLevel soul = SiteTests.soul(helper);
+        hold(soul, new ChunkPos(home));
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
+        player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F));
+        player.setData(SoulAttachments.TRAVEL, TravelRecord.NONE.withRukongaiHome(home));
+        ServerPlayer[] woken = new ServerPlayer[1];
+        helper.startSequence()
+                .thenExecute(() -> {
+                    player.kill();
+                    helper.assertTrue(player.isDeadOrDying(), "the soul did not die");
+                    try {
+                        player.connection.handleClientCommand(
+                                new ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.PERFORM_RESPAWN));
+                    } catch (RuntimeException e) {
+                        // A respawn that throws once the new player is listed leaves the connection naming the dead
+                        // one; handed on as the respawn would have, so TestPlayers' Leaver still takes the new one off.
+                        ServerPlayer listed = soul.getServer().getPlayerList().getPlayer(player.getUUID());
+                        if (listed != null && listed != player) {
+                            player.connection.player = listed;
+                        }
+                        throw e;
+                    }
+                    ServerPlayer now = soul.getServer().getPlayerList().getPlayer(player.getUUID());
+                    helper.assertTrue(now != null && now != player && player.isRemoved(),
+                            "no new player woke in the dead one's place");
+                    woken[0] = now;
+                    // TestPlayers' Leaver holds the dead player; its connection, now the woken one's, is what it closes.
+                    helper.assertTrue(player.connection == now.connection && now.connection.player == now
+                            && !player.hasDisconnected(), "the woken player does not have the dead one's connection");
+                    int top = soul.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, home.getX(), home.getZ());
+                    helper.assertTrue(now.level() == soul && Math.abs(now.getX() - 0.5) < 0.01
+                                    && Math.abs(now.getZ() - 530.5) < 0.01 && Math.abs(now.getY() - top) <= 1.0,
+                            "the soul woke at " + TravelTests.where(now) + ", not on its home's ground at y " + top);
+                    helper.assertTrue(now.getData(SoulAttachments.TRAVEL).rukongaiHome().equals(Optional.of(home)),
+                            "the home was not kept through death: " + now.getData(SoulAttachments.TRAVEL));
+                })
+                // Told once in chat a tick after waking, and the district on the action bar at its first check.
+                .thenWaitUntil(() -> helper.assertTrue(told(woken[0], "message.bleach.respawn.rukongai") == 1
+                                && TravelTests.lines(woken[0], "message.bleach.place.district") >= 1,
+                        "the woken soul was told " + chatKeys(woken[0]) + " and " + TravelTests.said(woken[0])))
+                .thenExecute(() -> {
+                    ServerPlayer now = woken[0];
+                    helper.assertTrue(Math.abs(now.getX() - 0.5) < 0.01 && Math.abs(now.getZ() - 530.5) < 0.01,
+                            "the woken soul was moved again, to " + TravelTests.where(now));
+                    helper.assertTrue(told(now, "message.bleach.konso.rukongai") == 0
+                                    && told(now, "message.bleach.konso.arrived") == 0
+                                    && told(now, "message.bleach.respawn.academy") == 0,
+                            "the woken soul was set down twice: " + chatKeys(now));
+                })
+                .thenSucceed();
+    }
+
+    // ---- Where the chain holds ----
+
+    /**
+     * A Plus's chain wears only in the Human World and the Dangai, and no Plus rises from a villager anywhere else. A
+     * real Plus on Seireitei's lawn, its ground held, keeps its chain as it was, unless it gnaws at it, and back in the
+     * Overworld its chain wears again.
+     */
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void theChainHoldsOutsideTheHumanWorld(GameTestHelper helper) {
+        for (ResourceKey<Level> world : List.of(Level.OVERWORLD, BleachWorlds.DANGAI)) {
+            helper.assertTrue(SoulLogic.chainWearsIn(world), "a Plus's chain holds in " + world.location());
+        }
+        for (ResourceKey<Level> world : List.of(BleachWorlds.SOUL_SOCIETY, Level.NETHER, Level.END,
+                BleachWorlds.HUECO_MUNDO)) {
+            helper.assertFalse(SoulLogic.chainWearsIn(world), "a Plus's chain wears in " + world.location());
+        }
+
+        ServerLevel soul = SiteTests.soul(helper);
+        ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "the test server has no Nether");
+        // Made in each world but never added to it, so there is nothing to take away.
+        for (ServerLevel elsewhere : List.of(nether, soul)) {
+            helper.assertTrue(PlusEvents.spawnVillagerPlus(elsewhere, EntityType.VILLAGER.create(elsewhere)) == null,
+                    "a villager dead in " + elsewhere.dimension().location() + " left a Plus");
+        }
+        Villager villager = EntityType.VILLAGER.create(helper.getLevel());
+        Vec3 fell = helper.absoluteVec(new Vec3(3.5, 1.0, 1.5));
+        villager.moveTo(fell.x, fell.y, fell.z, 0.0F, 0.0F);
+        PlusSpirit left = PlusEvents.spawnVillagerPlus(helper.getLevel(), villager);
+        if (left != null) {
+            left.discard();
+        }
+        helper.assertTrue(left != null, "a villager dead in the Overworld left no Plus");
+
+        // Seireitei's lawn at radius 141, grass at 71 and air above, away from the Academy, the court and their NPCs.
+        hold(soul, new ChunkPos(new BlockPos(-100, SeireiteiPlan.PLATEAU_Y, 100)));
+        ServerPlayer player = chainedPlus(helper, new Vec3(1.5, 1.0, 1.5));
+        long[] chain = {0L};
+        int[] from = {0};
+        helper.startSequence()
+                .thenExecute(() -> {
+                    player.teleportTo(soul, -99.5, SeireiteiPlan.PLATEAU_Y, 100.5, 0.0F, 0.0F);
+                    chain[0] = SoulLogic.get(player).chainTicks();
+                    from[0] = player.tickCount;
+                })
+                .thenWaitUntil(() -> helper.assertTrue(player.tickCount - from[0] >= 40,
+                        "the Plus has ticked " + (player.tickCount - from[0]) + " times in Soul Society"))
+                .thenExecute(() -> {
+                    SoulData data = SoulLogic.get(player);
+                    helper.assertTrue(player.level() == soul && data.chainTicks() == chain[0],
+                            "in " + TravelTests.where(player) + " the chain went from " + chain[0] + " to "
+                                    + data.chainTicks());
+                    // The positive control: gnawing at it, the Plus wears its chain in any world.
+                    DevourLogic.Gnaw gnaw = DevourEvents.startGnaw(player, data, soul.getGameTime());
+                    helper.assertTrue(gnaw == DevourLogic.Gnaw.GNAWING, "the Plus could not gnaw: " + gnaw);
+                    chain[0] = data.chainTicks();
+                    from[0] = player.tickCount;
+                })
+                .thenWaitUntil(() -> helper.assertTrue(player.tickCount - from[0] >= 40,
+                        "the gnawing Plus has ticked " + (player.tickCount - from[0]) + " times in Soul Society"))
+                .thenExecute(() -> {
+                    SoulData data = SoulLogic.get(player);
+                    // 40 a tick, halved were a Shinigami near, for 40 ticks, less one for where in a tick each read falls.
+                    helper.assertTrue(chain[0] - data.chainTicks() >= 780, "gnawing in Soul Society wore the chain from "
+                            + chain[0] + " to " + data.chainTicks());
+                    DevourEvents.stopGnaw(data);
+                    Vec3 back = helper.absoluteVec(new Vec3(1.5, 1.0, 1.5));
+                    player.teleportTo(helper.getLevel(), back.x, back.y, back.z, 0.0F, 0.0F);
+                    chain[0] = data.chainTicks();
+                    from[0] = player.tickCount;
+                })
+                .thenWaitUntil(() -> helper.assertTrue(player.tickCount - from[0] >= 40,
+                        "the Plus has ticked " + (player.tickCount - from[0]) + " times back in the Overworld"))
+                .thenExecute(() -> {
+                    SoulData data = SoulLogic.get(player);
+                    // One a tick, halved were a Shinigami near, less one.
+                    helper.assertTrue(player.level() == helper.getLevel() && chain[0] - data.chainTicks() >= 19,
+                            "back in " + TravelTests.where(player) + " the chain went from " + chain[0] + " to "
+                                    + data.chainTicks());
                 })
                 .thenSucceed();
     }

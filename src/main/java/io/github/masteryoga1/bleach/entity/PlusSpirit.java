@@ -295,7 +295,8 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
     /**
      * Server side, every tick so it still happens with NoAI: the chain wears away, Encroachment pangs,
      * and a chain that runs out turns the Plus into a Hollow. Where none may form, the last link holds
-     * and it tries again later. A departing Plus only rises or sinks.
+     * and it tries again later. Where its chain holds (see {@link SoulLogic#chainWearsIn}) none of this
+     * happens. A departing Plus only rises or sinks.
      */
     @Override
     public void tick() {
@@ -308,10 +309,11 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
             return;
         }
         SoulData soul = soul();
+        boolean wears = SoulLogic.chainWearsIn(server.dimension());
         if (tickCount % 20 == 0) {
             nearShinigami = ChainEvents.shinigamiNearby(this);
         }
-        if (tickCount >= nextConversionTry) {
+        if (wears && tickCount >= nextConversionTry) {
             double speed = HollowLogic.plusErosionSpeed(getHealth() / getMaxHealth(), nearShinigami);
             if (SoulLogic.erodeChain(soul, speed)) {
                 if (PlusEvents.hollowfy(server, this)) {
@@ -321,7 +323,7 @@ public class PlusSpirit extends PathfinderMob implements VillagerDataHolder {
                 nextConversionTry = tickCount + CONVERSION_RETRY_TICKS;
             }
         }
-        if (SoulLogic.isEncroaching(soul)) {
+        if (wears && SoulLogic.isEncroaching(soul)) {
             if (++pangTicks >= PANG_INTERVAL_TICKS) {
                 pangTicks = 0;
                 pang(server);

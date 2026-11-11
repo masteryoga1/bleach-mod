@@ -91,13 +91,17 @@ public final class PlusEvents {
 
     /**
      * The Plus a dead villager or wandering trader leaves: it looks as they did, keeps their name and
-     * stays near their home or workplace (or where they fell), with its whole chain ahead of it. None
-     * while there are already enough Pluses around.
+     * stays near their home or workplace (or where they fell), with its whole chain ahead of it, in the
+     * Overworld only. None while there are already enough Pluses around.
      *
      * @return the Plus, or null if none was left
      */
     @Nullable
     public static PlusSpirit spawnVillagerPlus(ServerLevel level, AbstractVillager villager) {
+        // Only the Human World's dead linger as Pluses: no Shinigami on duty comes to one anywhere else.
+        if (level.dimension() != Level.OVERWORLD) {
+            return null;
+        }
         double rangeSqr = VILLAGER_CAP_RANGE * VILLAGER_CAP_RANGE;
         int nearby = level.getEntitiesOfClass(PlusSpirit.class, villager.getBoundingBox().inflate(VILLAGER_CAP_RANGE),
                 plus -> plus.distanceToSqr(villager) <= rangeSqr).size();

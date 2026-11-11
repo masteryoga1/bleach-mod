@@ -30,11 +30,12 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * Death and the Chain of Fate: an aware Human who dies lingers as a Plus where they fell, their
- * chain wears away (more slowly with a Shinigami nearby), Encroachment sets in near the end, and a
- * Plus whose chain runs out becomes a Hollow, or, if it is an awakened Quincy, is torn apart (see
- * {@link QuincyEvents#destroySoul}). A Plus can also gnaw at its own chain with the Devour key, and it
- * wears away many times faster while it does (see {@link DevourLogic#gnawSpeed}). Konsō, from a
- * Shinigami, sends a Plus on before that (see {@link ShinigamiEvents#konso}).
+ * chain wears away in the Human World and the Dangai (more slowly with a Shinigami nearby),
+ * Encroachment sets in near the end, and a Plus whose chain runs out becomes a Hollow, or, if it is
+ * an awakened Quincy, is torn apart (see {@link QuincyEvents#destroySoul}). A Plus can also gnaw at
+ * its own chain with the Devour key, and it wears away many times faster while it does, in any world
+ * (see {@link DevourLogic#gnawSpeed}). Konsō, from a Shinigami, sends a Plus on before that (see
+ * {@link ShinigamiEvents#konso}).
  */
 public final class ChainEvents {
     public static final ResourceKey<DamageType> ENCROACHMENT =
@@ -70,6 +71,10 @@ public final class ChainEvents {
 
         if (player.tickCount % 20 == 0) {
             data.nearShinigami = shinigamiNearby(player);
+        }
+        // The chain holds where it does not wear (see SoulLogic#chainWearsIn), unless the Plus gnaws at it.
+        if (!SoulLogic.chainWearsIn(player.level().dimension()) && !DevourLogic.gnawing(data)) {
+            return;
         }
         double speed = 1.0;
         if (player.getHealth() < player.getMaxHealth() * LOW_HEALTH_FRACTION) {

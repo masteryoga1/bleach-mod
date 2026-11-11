@@ -21,8 +21,8 @@ import net.minecraft.world.phys.Vec3;
  * The way to the Shin'ō Academy, which stands in Seireitei (see {@link SeireiteiPlan} and {@link AcademySite}). In Soul
  * Society a soul senses which way it lies and how far, by the nearest of Seireitei's gates from outside its wall (see
  * {@link Rukongai}); anywhere else, only that it is in Soul Society. Konsō sends a soul to its gates where the server
- * takes that shortcut (see {@link io.github.masteryoga1.bleach.soul.KonsoTarget}), and dying with no spawn of one's own
- * wakes a passed-on soul there (see {@link io.github.masteryoga1.bleach.soul.HomeWorldRespawn}).
+ * takes that shortcut (see {@link io.github.masteryoga1.bleach.soul.KonsoTarget}), and a student who dies with no spawn
+ * of its own wakes there (see {@link io.github.masteryoga1.bleach.soul.HomeWorldRespawn}).
  */
 public final class AcademyLocator {
     /** The middle of the Academy's gate, which a soul's sense points at: (-192, 73, 231). */

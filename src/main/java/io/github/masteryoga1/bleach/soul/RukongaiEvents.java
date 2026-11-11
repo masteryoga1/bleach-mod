@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.world.AcademyLocator;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -153,6 +154,17 @@ public final class RukongaiEvents {
             }
         }
         return null;
+    }
+
+    /**
+     * Where this soul's Rukongai home lets it stand now, or, if it has none or its ground no longer holds it, a new home
+     * drawn as Konsō draws one, and saved. Null if no column will hold it.
+     */
+    @Nullable
+    public static Vec3 home(ServerPlayer soul, ServerLevel soulSociety) {
+        Optional<BlockPos> home = soul.getData(SoulAttachments.TRAVEL).rukongaiHome();
+        Vec3 spot = home.map(pos -> groundAt(soul, soulSociety, pos.getX(), pos.getZ())).orElse(null);
+        return spot != null ? spot : drawHome(soul, soulSociety, soul.getRandom());
     }
 
     /**
