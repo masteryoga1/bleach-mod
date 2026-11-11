@@ -725,6 +725,11 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SENKAIMON_MIN_COST;
     public static final ModConfigSpec.IntValue SENKAIMON_COOLDOWN_SECONDS;
     public static final ModConfigSpec.IntValue BUTTERFLY_REISSUE_DAYS;
+    public static final ModConfigSpec.DoubleValue GARGANTA_HOLD_SECONDS;
+    public static final ModConfigSpec.IntValue GARGANTA_OPEN_SECONDS;
+    public static final ModConfigSpec.DoubleValue GARGANTA_COST_SHARE;
+    public static final ModConfigSpec.DoubleValue GARGANTA_MIN_COST;
+    public static final ModConfigSpec.IntValue GARGANTA_COOLDOWN_SECONDS;
     public static final ModConfigSpec.IntValue DANGAI_KOTOTSU_DELAY_SECONDS;
     public static final ModConfigSpec.DoubleValue DANGAI_KOTOTSU_SPEED;
     public static final ModConfigSpec.DoubleValue DANGAI_KORYU_HOLD_SECONDS;
@@ -2937,6 +2942,24 @@ public final class BleachConfig {
                 .comment("Game days before the Academy instructor hands the same soul another Jigokuchō (a new day comes"
                         + " each morning, or every 20 minutes of play). 0 hands one whenever none is carried.")
                 .defineInRange("butterfly_reissue_days", 1, 0, 30);
+        builder.pop();
+        builder.push("garganta");
+        GARGANTA_HOLD_SECONDS = builder
+                .comment("Seconds the Gate key is held, tearing at the air, before a Garganta opens. A Gillian, Adjuchas or"
+                        + " Vasto Lorde Hollow or an Arrancar opens one.")
+                .defineInRange("hold_seconds", 1.0, 0.05, 10.0);
+        GARGANTA_OPEN_SECONDS = builder
+                .comment("Seconds a Garganta stays, from the moment it starts to open.")
+                .defineInRange("open_seconds", 20, 5, 300);
+        GARGANTA_COST_SHARE = builder
+                .comment("Share of maximum reiryoku a Garganta costs its opener as it opens (0.05 is 5%).")
+                .defineInRange("cost_share", 0.05, 0.0, 1.0);
+        GARGANTA_MIN_COST = builder
+                .comment("The least reiryoku a Garganta costs.")
+                .defineInRange("min_cost", 5.0, 0.0, 10_000.0);
+        GARGANTA_COOLDOWN_SECONDS = builder
+                .comment("Seconds before the same soul can open another Garganta. Creative mode never waits or pays.")
+                .defineInRange("cooldown_seconds", 30, 0, 3_600);
         builder.pop();
         builder.push("dangai");
         DANGAI_KOTOTSU_DELAY_SECONDS = builder

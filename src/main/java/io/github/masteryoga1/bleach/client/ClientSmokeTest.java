@@ -283,6 +283,8 @@ public final class ClientSmokeTest {
     private static final double LANE_END_Z = DangaiPlan.EXIT_Z - 1.5;
     /** Where the player stands in Hueco Mundo: on Las Noches' level ground, 4.5 blocks inside its edge, due south. */
     private static final double HUECO_MUNDO_X = 0.5, HUECO_MUNDO_Z = HuecoMundoPlan.LEVEL_RADIUS - 4.5;
+    /** How far south of an Arrancar its Garganta stands, and how far back it steps to see the whole tear. */
+    private static final double RIFT_AHEAD = 0.3 + 1.0 + GargantaRift.PASSAGE_GAP, RIFT_STEP_BACK = 6.0;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
     /**
@@ -1585,10 +1587,32 @@ public final class ClientSmokeTest {
                 shot(minecraft, "hueco_mundo_moon");
                 minecraft.options.hideGui = false;
             }
-            // Home to the Overworld, to the block the first gate was taken from.
-            case 8590 -> command(minecraft, String.format(Locale.ROOT,
+            // A Garganta: facing south again on Las Noches' level ground, the soul becomes an Arrancar (a person's size, no
+            // soul hunger, drawing no Hollow), full for the tear's cost. The last action-bar line is forgotten, so the
+            // window from 8602 needs a new one.
+            case 8590 -> {
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                command(minecraft, "bleach soul @s arrancar");
+                command(minecraft, "bleach reiryoku @s 800 800");
+                actionBar = null;
+            }
+            // Pressed about 8601, the air is torn at for 20 ticks and the Garganta opens on the server about 8621, 1.8
+            // blocks south, at (0.5, 96, 197.3) on the level ground.
+            case 8600 -> GateKeys.OPEN.setDown(true);
+            // Let go well after it opens, which the server ignores.
+            case 8640 -> GateKeys.OPEN.setDown(false);
+            // Six blocks back, still on the level ground, so the whole tear stands in view against the dunes. The hand
+            // and the HUD are hidden for the shot, as in the blocks beat.
+            case 8645 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~-%.1f", RIFT_STEP_BACK));
+            case 8650 -> minecraft.options.hideGui = true;
+            case 8655 -> {
+                shot(minecraft, "garganta_passage");
+                minecraft.options.hideGui = false;
+            }
+            // Home to the Overworld by command, to the block the first gate was taken from: no Garganta takes a soul yet.
+            case 8660 -> command(minecraft, String.format(Locale.ROOT,
                     "execute in minecraft:overworld run tp @s %.3f %.3f %.3f", returnTo.x, returnTo.y, returnTo.z));
-            case 8695 -> {
+            case 8765 -> {
                 holdHuecoMundo(minecraft, false);
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
@@ -2298,7 +2322,10 @@ public final class ClientSmokeTest {
         return true;
     }
 
-    /** The checks of the trip to Hueco Mundo, each window from the step it follows: on its level ground, and home again. */
+    /**
+     * The checks of the trip to Hueco Mundo, each window from the step it follows: on its level ground, the Garganta an
+     * Arrancar tears open there, and home again.
+     */
     private static void checkHuecoMundo(Minecraft minecraft, LocalPlayer player) {
         // The sky is chosen as the client makes the level on arrival, and the moon reads the day time sent with it.
         expectWithin(minecraft, 8387, 8555, () -> minecraft.level.dimension() == BleachWorlds.HUECO_MUNDO
@@ -2312,7 +2339,14 @@ public final class ClientSmokeTest {
                         + " cloudless sky with the moon full (it is in " + minecraft.level.dimension().location() + " at "
                         + player.position() + ", under " + minecraft.level.effects().getClass().getSimpleName()
                         + " in moon phase " + minecraft.level.getMoonPhase() + ")");
-        expectWithin(minecraft, 8592, 8685, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
+        // The tear's line comes back a tick or two after the press reaches the server.
+        expectWithin(minecraft, 8602, 8620, () -> actionBarShows(Component.translatable("message.bleach.garganta.turning")),
+                "on Las Noches' level ground, holding the Gate key never tore at the air (the action bar's last lines: "
+                        + recentActionBar() + ")");
+        expectWithin(minecraft, 8623, 8644, () -> riftAhead(minecraft, player),
+                "the torn air never opened a Garganta 1.8 blocks south of the Arrancar (the action bar's last lines: "
+                        + recentActionBar() + ")");
+        expectWithin(minecraft, 8662, 8755, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
                         && player.onGround() && player.position().distanceTo(returnTo) < 1.5,
                 "the tp back never brought the player home to the Overworld (it is in "
                         + minecraft.level.dimension().location() + " at " + player.position() + ")");
@@ -2342,6 +2376,14 @@ public final class ClientSmokeTest {
         int lane = Mth.floor(player.getX()) >> 4;
         return minecraft.level.getBlockState(laneWall(lane, DangaiPlan.WEST_WALL, player)) + " and "
                 + minecraft.level.getBlockState(laneWall(lane, DangaiPlan.EAST_WALL, player));
+    }
+
+    /** Whether a Garganta of size 1 stands fully open 1.8 blocks south of the player, seen and level with its feet. */
+    private static boolean riftAhead(Minecraft minecraft, LocalPlayer player) {
+        GargantaRift rift = nearest(minecraft, GargantaRift.class, 4.0, seen -> !ClientSouls.isHiddenFromViewer(seen));
+        return rift != null && rift.openness(0.0F) >= 1.0F && Math.abs(rift.size() - 1.0F) < 0.01
+                && Math.abs(rift.getX() - player.getX()) < 0.3 && Math.abs(rift.getZ() - (player.getZ() + RIFT_AHEAD)) < 0.3
+                && Math.abs(rift.getY() - player.getY()) < 0.3;
     }
 
     /**

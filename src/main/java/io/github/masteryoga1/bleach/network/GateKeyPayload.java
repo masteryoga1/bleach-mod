@@ -13,7 +13,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * Client to server: the Gate key went down, came up, or a screen opened while it was held. The server decides
- * everything ({@link TravelEvents#onKey}), and a later Garganta can use the same three.
+ * everything ({@link TravelEvents#onKey}), and the Garganta uses the same three.
  */
 public record GateKeyPayload(GateKey key) implements CustomPacketPayload {
     public static final Type<GateKeyPayload> TYPE = new Type<>(BleachMod.id("gate_key"));

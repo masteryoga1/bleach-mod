@@ -12,11 +12,13 @@ import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -47,6 +49,9 @@ import net.neoforged.neoforge.event.EventHooks;
  * <p>
  * An arrival tear may also carry mobs made ready elsewhere ({@link #carrying}), such as Arrancar. They drop
  * after its Hollows, and like them never come if the tear is gone first.
+ * <p>
+ * A passage ({@link #passage}) is the Garganta a Menos or an Arrancar tears open, sized to its opener and standing
+ * before it. It drops nothing and takes no one. Known as one on the server only; a client draws it as any tear.
  */
 public class GargantaRift extends Entity {
     private static final EntityDataAccessor<Long> DATA_OPEN_AT =
@@ -79,6 +84,12 @@ public class GargantaRift extends Entity {
     private static final double DRAWN_HEIGHT = 4.0;
     /** The sky's tear opens at least this far below the top of the world. */
     private static final int SKY_TOP_MARGIN = 8;
+    /** A passage is drawn this many blocks tall at size 1, and half as wide. */
+    public static final double PASSAGE_HEIGHT = DRAWN_HEIGHT;
+    /** The gap a passage leaves before its opener's body. */
+    public static final double PASSAGE_GAP = 0.5;
+    /** How far past a box to look for passages whose own box meets it, as a passage's box outgrows its hitbox. */
+    private static final double PASSAGE_SEARCH = 32.0;
 
     private final List<HollowKind> pending = new ArrayList<>();
     /**
@@ -99,6 +110,12 @@ public class GargantaRift extends Entity {
     private UUID baitSite;
     /** Whether the tear opens without sounding to pagers or to the Quincy senses. Server only. */
     private boolean quiet;
+    /** The world a passage leads to; null for every other tear. Server only. */
+    @Nullable
+    private ResourceKey<Level> leadsTo;
+    /** Who tore a passage open. Server only. */
+    @Nullable
+    private UUID opener;
 
     public GargantaRift(EntityType<? extends GargantaRift> type, Level level) {
         super(type, level);
@@ -143,6 +160,59 @@ public class GargantaRift extends Entity {
         rift.entityData.set(DATA_SIZE, DEPARTURE_SIZE);
         rift.leaving = leaving.getUUID();
         return rift;
+    }
+
+    /**
+     * A passage this soul tears open now to that world, {@code size} times a small tear, standing before it
+     * ({@link #passageStanding}). It stays {@code openTicks} in all, drops nothing, and is quiet: no pager or Quincy
+     * hears it. It is not yet in the world: the caller adds it.
+     */
+    public static GargantaRift passage(ServerLevel level, Entity opener, long now, ResourceKey<Level> leadsTo, float size,
+                                       int openTicks) {
+        GargantaRift rift = new GargantaRift(ModEntities.GARGANTA.get(), level);
+        Vec3 at = passageStanding(opener, size);
+        rift.moveTo(at.x, at.y, at.z, 0.0F, 0.0F);
+        rift.entityData.set(DATA_OPEN_AT, now);
+        rift.entityData.set(DATA_SIZE, size);
+        rift.entityData.set(DATA_HOLD, Math.max(0, openTicks - END_AGE));
+        rift.leadsTo = leadsTo;
+        rift.opener = opener.getUUID();
+        rift.quiet = true;
+        return rift;
+    }
+
+    /**
+     * Where a passage of this size torn by this soul stands: level with its feet, square before it on the nearest
+     * compass point, its near edge {@link #PASSAGE_GAP} from the soul's body.
+     */
+    public static Vec3 passageStanding(Entity opener, float size) {
+        Direction facing = opener.getDirection();
+        double distance = opener.getBbWidth() / 2.0 + size + PASSAGE_GAP;
+        return opener.position().add(facing.getStepX() * distance, 0.0, facing.getStepZ() * distance);
+    }
+
+    /** The box a passage of this size standing here fills: as wide and as tall as it is drawn. */
+    public static AABB passBoxAt(Vec3 at, float size) {
+        double halfWidth = DRAWN_WIDTH * size / 2.0;
+        return new AABB(at.x - halfWidth, at.y, at.z - halfWidth,
+                at.x + halfWidth, at.y + PASSAGE_HEIGHT * size, at.z + halfWidth);
+    }
+
+    /**
+     * Whether a passage of this size this soul tore open now would stand within reach of a gate already open, a
+     * Senkaimon or another passage: its box grown by its own width and height, so no soul could stand in both.
+     */
+    public static boolean crowded(Entity opener, float size) {
+        AABB reach = passBoxAt(passageStanding(opener, size), size)
+                .inflate(DRAWN_WIDTH * size, PASSAGE_HEIGHT * size, DRAWN_WIDTH * size);
+        Level level = opener.level();
+        return !level.getEntitiesOfClass(Senkaimon.class, reach).isEmpty() || !passagesMeeting(level, reach).isEmpty();
+    }
+
+    /** The passages open in this level whose box meets this one. Server side only. */
+    public static List<GargantaRift> passagesMeeting(Level level, AABB box) {
+        return level.getEntitiesOfClass(GargantaRift.class, box.inflate(PASSAGE_SEARCH),
+                rift -> rift.isPassage() && rift.passBox().intersects(box));
     }
 
     /**
@@ -238,6 +308,28 @@ public class GargantaRift extends Entity {
     @Nullable
     public UUID drawer() {
         return drawer;
+    }
+
+    /** Whether this is a passage a soul tore open. Known on the server only. */
+    public boolean isPassage() {
+        return leadsTo != null;
+    }
+
+    /** The world a passage leads to; null for any other tear. Known on the server only. */
+    @Nullable
+    public ResourceKey<Level> leadsTo() {
+        return leadsTo;
+    }
+
+    /** Who tore a passage open. Known on the server only. */
+    @Nullable
+    public UUID opener() {
+        return opener;
+    }
+
+    /** The box this passage fills ({@link #passBoxAt}). */
+    public AABB passBox() {
+        return passBoxAt(position(), size());
     }
 
     /**
