@@ -174,11 +174,14 @@ public final class DutyTests {
         unchained.clearChain();
         helper.assertFalse(DutyEvents.due(unchained, never, now), "a Plus with no chain was due a visit");
 
-        // In the Overworld none could reach it, in another world none comes, and in Soul Society nothing is said.
+        // In the Overworld none could reach it, in the Dangai none comes, elsewhere its chain holds, and in Soul Society
+        // nothing is said.
         helper.assertTrue(DutyEvents.UNREACHABLE_KEY.equals(DutyEvents.unreachedKey(Level.OVERWORLD)),
                 "a Plus in the Overworld would be told " + DutyEvents.unreachedKey(Level.OVERWORLD));
-        for (ResourceKey<Level> world : List.of(Level.NETHER, Level.END, BleachWorlds.DANGAI, BleachWorlds.HUECO_MUNDO)) {
-            helper.assertTrue(DutyEvents.ELSEWHERE_KEY.equals(DutyEvents.unreachedKey(world)),
+        helper.assertTrue(DutyEvents.ELSEWHERE_KEY.equals(DutyEvents.unreachedKey(BleachWorlds.DANGAI)),
+                "a Plus in the Dangai would be told " + DutyEvents.unreachedKey(BleachWorlds.DANGAI));
+        for (ResourceKey<Level> world : List.of(Level.NETHER, Level.END, BleachWorlds.HUECO_MUNDO)) {
+            helper.assertTrue(DutyEvents.HOLDS_KEY.equals(DutyEvents.unreachedKey(world)),
                     "a Plus in " + world.location() + " would be told " + DutyEvents.unreachedKey(world));
         }
         helper.assertTrue(DutyEvents.unreachedKey(BleachWorlds.SOUL_SOCIETY) == null,

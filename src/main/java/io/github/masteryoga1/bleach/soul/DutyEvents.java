@@ -41,9 +41,13 @@ public final class DutyEvents {
     private static final double FLOOR_MAX_DISTANCE = 10.0;
     private static final int FLOOR_RISE = 4;
     private static final String ARRIVES_KEY = "message.bleach.duty_arrives";
-    /** What a due Plus is told when none can reach it, and when none comes to its world. Public for game tests. */
+    /**
+     * What a due Plus is told when none can reach it, when none comes to its world, and when none comes but its chain
+     * holds there. Public for game tests.
+     */
     public static final String UNREACHABLE_KEY = "message.bleach.duty_unreachable";
     public static final String ELSEWHERE_KEY = "message.bleach.duty_elsewhere";
+    public static final String HOLDS_KEY = "message.bleach.duty_holds";
 
     private DutyEvents() {
     }
@@ -78,14 +82,18 @@ public final class DutyEvents {
 
     /**
      * What a due Plus that no Shinigami on duty came to is told in this world: in the Overworld that none could reach
-     * it, and elsewhere that none comes there; in Soul Society, the Shinigami's own world, nothing. Public for tests.
+     * it; in Soul Society, the Shinigami's own world, nothing; in the Dangai that none comes there; and in any other
+     * world that its chain holds there. Public for tests.
      */
     @Nullable
     public static String unreachedKey(ResourceKey<Level> world) {
         if (world == Level.OVERWORLD) {
             return UNREACHABLE_KEY;
         }
-        return world == BleachWorlds.SOUL_SOCIETY ? null : ELSEWHERE_KEY;
+        if (world == BleachWorlds.SOUL_SOCIETY) {
+            return null;
+        }
+        return SoulLogic.chainWearsIn(world) ? ELSEWHERE_KEY : HOLDS_KEY;
     }
 
     /**
@@ -105,6 +113,10 @@ public final class DutyEvents {
         DutyShinigami duty = world == Level.OVERWORLD ? comeDown(player) : null;
         if (duty == null) {
             String key = unreachedKey(world);
+            // A Plus gnawing at its chain wears it even where it would hold.
+            if (HOLDS_KEY.equals(key) && DevourLogic.gnawing(data)) {
+                key = ELSEWHERE_KEY;
+            }
             if (key != null && now - data.dutyToldAt >= revisitTicks()) {
                 data.dutyToldAt = now;
                 player.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));

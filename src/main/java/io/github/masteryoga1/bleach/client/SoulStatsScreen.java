@@ -538,8 +538,8 @@ public final class SoulStatsScreen extends Screen {
     /**
      * What this soul can do next. In Soul Society a Plus, a soul that may enrol and a student are shown the
      * way to the Academy, unless they are already there; a Plus in another world but the Overworld is told
-     * that no Shinigami on duty comes there, and a Plus who could gnaw its own chain is told it can, with the
-     * Devour key. A Hollow is told how to feed with
+     * that its chain holds there, or in the Dangai that no Shinigami on duty comes there, and a Plus who could
+     * gnaw its own chain is told it can, with the Devour key. A Hollow is told how to feed with
      * that key and, once it has, how many souls are within it. A Menos
      * is told its form, the Cero key, and how far it has come towards the next form; an Adjuchas also
      * how long it may go without a Hollow before it sinks back, wherever the server lets it, and a Gillian how
@@ -587,9 +587,12 @@ public final class SoulStatsScreen extends Screen {
         boolean duty = BleachConfig.get(BleachConfig.KONSO_DUTY_SHINIGAMI) && !player.isCreative() && !player.isSpectator();
         boolean overworld = player.level().dimension() == Level.OVERWORLD;
         Component plus;
-        // No Shinigami on duty comes to Soul Society: there the Academy itself is the way.
+        // No Shinigami on duty comes to Soul Society, where the chain holds: there the Academy itself is the way.
         if (player.level().dimension() == BleachWorlds.SOUL_SOCIETY) {
             plus = withWay(Component.translatable("screen.bleach.soul.next.plus.academy"), player);
+        } else if (!SoulLogic.chainWearsIn(player.level().dimension())) {
+            plus = Component.translatable(
+                    duty ? "screen.bleach.soul.next.plus.holds.duty" : "screen.bleach.soul.next.plus.holds");
         } else if (!overworld && duty) {
             plus = Component.translatable("screen.bleach.soul.next.plus.elsewhere");
         } else {

@@ -59,6 +59,7 @@ import io.github.masteryoga1.bleach.soul.TravelLogic;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.DangaiPlan;
+import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
@@ -238,7 +239,8 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * bring the player home. Then, its Jigokuchō taken, a third gate must take it into the Dangai, set on a lane's floor
  * between its walls of Kōryū, which the action bar must say, with the lane's Kōtotsu waiting at its start; it looks
  * back at the Kōtotsu, then, moved near the lane's end, it walks out and must come out over the Rukongai, falling
- * slowly, before the run quits.
+ * slowly. Last, as a soul that has passed on, it is killed, and a new player must wake at a Rukongai home drawn for it,
+ * at least 32 blocks from where it died, with the district named on the action bar, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -320,6 +322,13 @@ public final class ClientSmokeTest {
     private static int heldLane = -1;
     /** The tick the player was first seen over the Rukongai out of the Dangai, or -1 before then. */
     private static int skyFrom = -1;
+    /** The player as the last beat killed it, to tell it from the one that wakes in its place, or null before then. */
+    @Nullable
+    private static LocalPlayer killed;
+    /** Where the player stood as the last beat killed it. */
+    private static Vec3 diedAt = Vec3.ZERO;
+    /** The tick the player that woke in the killed one's place was first seen, or -1 before then. */
+    private static int wokeAt = -1;
     /** What the current step acts on: the Hollow to strike, the Plus to send on, or the Quincy to talk to. */
     @Nullable
     private static Entity subject;
@@ -383,6 +392,10 @@ public final class ClientSmokeTest {
             return;
         }
 
+        // The last beat's respawn makes a new player under its loading screen, during which the place line can come.
+        if (killed != null && wokeAt < 0 && minecraft.player != killed) {
+            wokeAt = ticksInWorld;
+        }
         // Nothing counts while the world is still arriving, which no other screen shows over.
         if (minecraft.screen instanceof ReceivingLevelScreen) {
             return;
@@ -508,6 +521,7 @@ public final class ClientSmokeTest {
         checkKido(minecraft, player, soul);
         checkSoulSociety(minecraft, player);
         checkDangai(minecraft, player);
+        checkWaking(minecraft, player);
         if (finished) {
             return;
         }
@@ -1495,7 +1509,20 @@ public final class ClientSmokeTest {
             // out over the Rukongai. Coming out lets go of the key anyway, as the loading screen releases every key.
             case 7645 -> minecraft.options.keyUp.setDown(true);
             case 7665 -> minecraft.options.keyUp.setDown(false);
-            case 7890 -> {
+            // Last: as a soul that has passed on, it dies where it stands and wakes at a Rukongai home drawn for it as
+            // it dies. Immediate respawn needs no click; the inventory is kept so the screenshot is the soul's own.
+            case 7880 -> {
+                command(minecraft, "bleach soul @s rukongai");
+                command(minecraft, "gamerule keepInventory true");
+                command(minecraft, "gamerule doImmediateRespawn true");
+            }
+            case 7885 -> {
+                killed = player;
+                diedAt = player.position();
+                command(minecraft, "kill @s");
+            }
+            case 8205 -> shot(minecraft, "rukongai_home");
+            case 8210 -> {
                 holdLane(minecraft, heldLane, false);
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
@@ -2158,6 +2185,23 @@ public final class ClientSmokeTest {
         if (skyFrom >= 0 && ticksInWorld == skyFrom + 20) {
             shot(minecraft, "rukongai_sky");
         }
+    }
+
+    /** The check of the last beat: a new player must wake at a Rukongai home, away from where it died, and be told so. */
+    private static void checkWaking(Minecraft minecraft, LocalPlayer player) {
+        // From the kill: the server draws a home (a column or more made, about a second each) while the client counts
+        // on, then the respawn's loading screen, which does not count; the district's line comes within a second of
+        // waking. A home within 32 blocks of the death would fail it: about 1 in 450 runs (spec7e 18.12).
+        int district = Rukongai.district(player.getBlockX(), player.getBlockZ());
+        double moved = horizontalDistance(player.position(), diedAt);
+        expectWithin(minecraft, 7890, 8200, () -> wokeAt >= 0 && player != killed && player.isAlive()
+                        && minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY && player.onGround()
+                        && moved >= 32.0 && district >= 1 && district <= SeireiteiPlan.DISTRICTS && actionBarAt >= wokeAt
+                        && actionBarShows(Rukongai.placeName(player.getBlockX(), player.getBlockZ())),
+                "the soul never woke as a new player at a Rukongai home with its district named (woken " + (wokeAt >= 0)
+                        + ", in " + minecraft.level.dimension().location() + " at " + player.position() + ", "
+                        + Math.round(moved) + " blocks from where it died, district " + district
+                        + "; the action bar's last lines: " + recentActionBar() + ")");
     }
 
     /**

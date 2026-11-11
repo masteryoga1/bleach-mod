@@ -174,7 +174,7 @@ public final class TravelTests {
      * The real Soul Society, its 5×5 chunks round the court loaded now and held entity-ticking, so a gate there ticks at
      * once. Never released: every test landing at the court shares the ticket, and the test server ends with the run.
      */
-    private static ServerLevel holdCourt(GameTestHelper helper) {
+    static ServerLevel holdCourt(GameTestHelper helper) {
         ServerLevel soul = helper.getLevel().getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
         helper.assertTrue(soul != null, "the test server has no Soul Society");
         ChunkPos court = new ChunkPos(BlockPos.containing(TravelLogic.COURT));

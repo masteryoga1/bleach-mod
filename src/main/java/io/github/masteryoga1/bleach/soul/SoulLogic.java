@@ -3,8 +3,10 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.quincy.BlutMode;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -16,6 +18,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 
 /** The rules for spiritual energy and stats. Kept apart from the events so game tests can call them directly. */
 public final class SoulLogic {
@@ -292,6 +295,14 @@ public final class SoulLogic {
         data.chainErosion -= whole;
         data.setChainTicks(Math.max(floor, data.chainTicks() - whole));
         return data.chainTicks() <= 0;
+    }
+
+    /**
+     * Whether a Plus's chain wears away in this world: in the Human World and the Dangai between the worlds, not in Soul
+     * Society or any world no Shinigami on duty visits, where it holds until the Plus comes back.
+     */
+    public static boolean chainWearsIn(ResourceKey<Level> world) {
+        return world == Level.OVERWORLD || world == BleachWorlds.DANGAI;
     }
 
     /**

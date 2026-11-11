@@ -588,10 +588,10 @@ public final class AcademyTests {
     }
 
     /**
-     * Who wakes at the Academy on dying: a soul that has passed on with no Shinigami power and no spawn of its own, and
-     * no one else. Then the real respawn event for a real player, once the Academy's chunks have built it: such a soul
-     * wakes at the gate, facing the hall, unless it is back from the End's fight, has a spawn of its own, or is a
-     * Shinigami. The player is never killed.
+     * Where each soul wakes on dying, read as it died, with no spawn of its own and with one: the table for every soul.
+     * Then the real respawn event for a real player, once the Academy's chunks have built it: a student at the Academy,
+     * at its gate facing the hall, unless it is back from the End's fight, the server has the rule off, or it has a
+     * spawn of its own; a Hollow where vanilla puts it. The player is never killed.
      */
     @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 100)
     public static void respawnWakesAtTheAcademy(GameTestHelper helper) {
@@ -599,25 +599,34 @@ public final class AcademyTests {
         withPower.setTier(PowerPath.SHINIGAMI, 1);
         SoulData torn = ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F);
         torn.markSoulDestroyed();
-        List<SoulData> wake = List.of(ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F), ShinigamiTests.student(40.0F),
-                QuincyTests.in(SoulState.RUKONGAI, QuincyTests.quincy(Bloodline.ECHT, 1, 400.0F)));
-        List<SoulData> stay = List.of(withPower, torn, ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F),
-                ShinigamiTests.soul(SoulState.PLUS, 40.0F), ShinigamiTests.soul(SoulState.HUMAN, 400.0F),
-                ShinigamiTests.substitute(60.0F), ShinigamiTests.soul(SoulState.HOLLOW, 40.0F),
-                ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F));
-        for (SoulData data : wake) {
-            helper.assertTrue(HomeWorldRespawn.wakesAtAcademy(data, false), "a " + data.state() + " would not wake there");
-            helper.assertFalse(HomeWorldRespawn.wakesAtAcademy(data, true),
-                    "the Academy beat a " + data.state() + "'s own spawn");
-        }
-        for (SoulData data : stay) {
-            helper.assertFalse(HomeWorldRespawn.wakesAtAcademy(data, false), "a " + data.state() + " would wake there");
+        SoulData diedOnce = SoulLogic.afterDeath(ShinigamiTests.substitute(60.0F));
+        helper.assertTrue(diedOnce.state() == SoulState.SHINIGAMI, "a Substitute's first death left a " + diedOnce.state());
+        assertHome(helper, "a Rukongai soul", ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F), HomeWorldRespawn.Home.RUKONGAI);
+        assertHome(helper, "a Rukongai soul with a Shinigami tier", withPower, HomeWorldRespawn.Home.RUKONGAI);
+        assertHome(helper, "a Quincy who passed on", QuincyTests.in(SoulState.RUKONGAI,
+                QuincyTests.quincy(Bloodline.ECHT, 1, 400.0F)), HomeWorldRespawn.Home.RUKONGAI);
+        assertHome(helper, "a student", ShinigamiTests.student(40.0F), HomeWorldRespawn.Home.ACADEMY);
+        assertHome(helper, "a Rukongai soul being torn apart", torn, HomeWorldRespawn.Home.VANILLA);
+        assertHome(helper, "a Shinigami", ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F), HomeWorldRespawn.Home.COURT);
+        assertHome(helper, "a Substitute that has died once", diedOnce, HomeWorldRespawn.Home.COURT);
+        assertHome(helper, "a Plus", ShinigamiTests.soul(SoulState.PLUS, 40.0F), HomeWorldRespawn.Home.VANILLA);
+        assertHome(helper, "a Human", ShinigamiTests.soul(SoulState.HUMAN, 400.0F), HomeWorldRespawn.Home.VANILLA);
+        assertHome(helper, "a living Substitute", ShinigamiTests.substitute(60.0F), HomeWorldRespawn.Home.VANILLA);
+        assertHome(helper, "a Hollow", ShinigamiTests.soul(SoulState.HOLLOW, 40.0F), HomeWorldRespawn.Home.VANILLA);
+        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F), HomeWorldRespawn.Home.VANILLA);
+        KonsoTarget sendsTo = BleachConfig.get(BleachConfig.KONSO_SENDS_TO);
+        try {
+            BleachConfig.KONSO_SENDS_TO.set(KonsoTarget.ACADEMY);
+            assertHome(helper, "a Rukongai soul where Konsō sends souls to the Academy",
+                    ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F), HomeWorldRespawn.Home.ACADEMY);
+        } finally {
+            BleachConfig.KONSO_SENDS_TO.set(sendsTo);
         }
 
         ServerLevel level = helper.getLevel();
         ServerLevel soul = SiteTests.holdAcademy(helper);
         ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
-        player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F));
+        player.setData(SoulAttachments.SOUL, ShinigamiTests.student(40.0F));
         helper.startSequence()
                 .thenWaitUntil(() -> assertAcademyStands(helper, soul))
                 .thenExecute(() -> {
@@ -626,8 +635,15 @@ public final class AcademyTests {
                     DimensionTransition woken = respawn(player, spawn, false);
                     helper.assertTrue(woken.newLevel() == soul && woken.pos().distanceTo(AcademyLocator.LANDING) < 0.01
                                     && woken.yRot() == AcademyLocator.LANDING_YAW,
-                            "the Rukongai soul wakes in " + woken.newLevel().dimension().location() + " at " + woken.pos());
+                            "the student wakes in " + woken.newLevel().dimension().location() + " at " + woken.pos());
                     helper.assertTrue(respawn(player, spawn, true) == spawn, "a soul back from the End's fight was moved");
+                    boolean rule = BleachConfig.get(BleachConfig.HOME_WORLD_RESPAWN);
+                    try {
+                        BleachConfig.HOME_WORLD_RESPAWN.set(false);
+                        helper.assertTrue(respawn(player, spawn, false) == spawn, "a soul was moved with the rule off");
+                    } finally {
+                        BleachConfig.HOME_WORLD_RESPAWN.set(rule);
+                    }
                     player.setRespawnPosition(Level.OVERWORLD, helper.absolutePos(new BlockPos(1, 1, 3)), 0.0F, true, false);
                     helper.assertTrue(respawn(player, spawn, false) == spawn, "the Academy beat the soul's own spawn");
                     DimensionTransition missing = new DimensionTransition(level, player.position(), Vec3.ZERO, 0.0F, 0.0F,
@@ -635,14 +651,24 @@ public final class AcademyTests {
                     helper.assertTrue(respawn(player, missing, false).newLevel() == soul,
                             "a soul whose bed is gone woke where it was");
                     player.setRespawnPosition(Level.OVERWORLD, null, 0.0F, false, false);
-                    player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F));
-                    helper.assertTrue(respawn(player, spawn, false) == spawn, "a Shinigami was moved to the Academy");
+                    player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.HOLLOW, 40.0F));
+                    helper.assertTrue(respawn(player, spawn, false) == spawn, "a Hollow was moved to Soul Society");
                 })
                 .thenSucceed();
     }
 
+    /**
+     * Asserts where this soul wakes with no spawn of its own, and that a spawn of its own beats any home but vanilla's.
+     */
+    private static void assertHome(GameTestHelper helper, String who, SoulData data, HomeWorldRespawn.Home expected) {
+        HomeWorldRespawn.Home home = HomeWorldRespawn.homeOf(data, false);
+        helper.assertTrue(home == expected, who + " would wake at " + home + ", not " + expected);
+        helper.assertTrue(HomeWorldRespawn.homeOf(data, true) == HomeWorldRespawn.Home.VANILLA,
+                who + "'s home beat its own spawn");
+    }
+
     /** Where the real respawn event, posted for this soul, wakes it. */
-    private static DimensionTransition respawn(ServerPlayer player, DimensionTransition original, boolean fromEndFight) {
+    static DimensionTransition respawn(ServerPlayer player, DimensionTransition original, boolean fromEndFight) {
         PlayerRespawnPositionEvent event = new PlayerRespawnPositionEvent(player, original, fromEndFight);
         return NeoForge.EVENT_BUS.post(event).getDimensionTransition();
     }
