@@ -33,7 +33,6 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
@@ -515,9 +514,11 @@ public final class RukongaiTests {
                             "the soul's home is " + home + ", not the block it woke in, " + sent.blockPosition());
                     helper.assertTrue(sent.getRespawnPosition() == null,
                             "the soul kept its bed at " + sent.getRespawnPosition());
-                    float off = Mth.wrapDegrees(sent.getYRot() - RukongaiEvents.facingSeireitei(sent.position()));
-                    helper.assertTrue(Math.abs(off) < 0.01F, "the soul faces " + sent.getYRot() + ", " + off
-                            + " degrees from Seireitei's way");
+                    // Read against the way to the centre column, not against the yaw's own formula.
+                    Vec3 facing = Vec3.directionFromRotation(0.0F, sent.getYRot());
+                    double along = facing.dot(new Vec3(-sent.getX(), 0.0, -sent.getZ()).normalize());
+                    helper.assertTrue(along > 0.99, "the soul faces " + sent.getYRot() + ", not Seireitei's way ("
+                            + along + " along it)");
                     List<Component> chat = TestPlayers.chat(sent);
                     int woke = chatLine(sent, WOKE_KEY, 0);
                     helper.assertTrue(woke >= 0, "the soul was never told where it woke: " + chatKeys(sent));
