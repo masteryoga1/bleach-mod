@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:smelting",
+  "category": "blocks",
+  "cookingtime": 200,
+  "experience": 0.1,
+  "ingredient": {
+    "item": "bleach:white_sandstone"
+  },
+  "result": {
+    "id": "bleach:smooth_white_sandstone"
+  }
+}

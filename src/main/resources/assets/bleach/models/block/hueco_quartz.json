@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "bleach:block/hueco_quartz_top",
+    "side": "bleach:block/hueco_quartz"
+  }
+}

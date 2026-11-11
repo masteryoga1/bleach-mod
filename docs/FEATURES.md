@@ -142,7 +142,7 @@ The first playable slice: become a Shinigami, awaken your zanpakutō and hunt Ho
 - [ ] **Hueco Mundo dimension** [Canon+KD]: white sand dunes under a black sky, quartz-like trees, no water, and a moon whose phase is opposite the Overworld's.
 - [ ] **Forest of Menos** [Canon+KD]: the vast cavern under the sand where Gillian roam and the quartz trees take root.
 - [ ] **Las Noches** [Canon]: the all-white fortress with a central dome, five towers and an artificial blue sky inside.
-- [ ] **White sand and quartz blocks** [Canon+KD]: the Hueco Mundo building palette.
+- [x] **White sand and quartz blocks** [Canon+KD]: the Hueco Mundo building palette. *White sand, which falls as sand does and smelts to glass; white sandstone and smooth white sandstone, crafted and smelted from it as their vanilla kin are; Hueco quartz, a pillar; and Hueco quartz bricks, crafted from it. Hueco Mundo, where they are found, comes in the next part of this round; until then they come only from the creative menu or a command.*
 
 **Human World**
 
