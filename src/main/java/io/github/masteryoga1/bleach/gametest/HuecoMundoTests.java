@@ -88,7 +88,8 @@ public final class HuecoMundoTests {
 
     /**
      * White sand over a block of air falls onto the white sandstone below it, and white sand laid on white sandstone stays.
-     * Both columns stand on the template's floor, relative y 1, since y 0 holds its structure block.
+     * Both columns start in the template's lowest layer, relative y 1, since y 0 is the layer of its structure block; the
+     * sandstone there stands over air, as sandstone does not fall.
      */
     @GameTest(template = "empty")
     public static void whiteSandFalls(GameTestHelper helper) {
