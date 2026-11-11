@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "bleach:block/hueco_quartz_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "bleach:block/hueco_quartz"
+    },
+    "axis=z": {
+      "model": "bleach:block/hueco_quartz_horizontal",
+      "x": 90
+    }
+  }
+}

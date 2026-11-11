@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "bleach:white_sandstone",
+    "bleach:smooth_white_sandstone",
+    "bleach:hueco_quartz",
+    "bleach:hueco_quartz_bricks"
+  ]
+}

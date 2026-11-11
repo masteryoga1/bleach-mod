@@ -89,6 +89,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -240,15 +241,16 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * between its walls of Kōryū, which the action bar must say, with the lane's Kōtotsu waiting at its start; it looks
  * back at the Kōtotsu, then, moved near the lane's end, it walks out and must come out over the Rukongai, falling
  * slowly. Last, as a soul that has passed on, it is killed, and a new player must wake at a Rukongai home drawn for it,
- * at least 32 blocks from where it died, with the district named on the action bar, before the run quits.
+ * at least 32 blocks from where it died, with the district named on the action bar, and Hueco Mundo's five blocks, set
+ * down before it, must reach the client before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, and HUD are drawn, and screenshots of the main moments are saved
- * for review. Any crash in the mod's client code fails the run, and so does anything that did not reach the client as
- * expected.
+ * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, and HUD are drawn, and screenshots of the
+ * main moments are saved for review. Any crash in the mod's client code fails the run, and so does anything that did
+ * not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -322,11 +324,14 @@ public final class ClientSmokeTest {
     private static int heldLane = -1;
     /** The tick the player was first seen over the Rukongai out of the Dangai, or -1 before then. */
     private static int skyFrom = -1;
-    /** The player as the last beat killed it, to tell it from the one that wakes in its place, or null before then. */
+    /** The player as the death beat killed it, to tell it from the one that wakes in its place, or null before then. */
     @Nullable
     private static LocalPlayer killed;
-    /** Where the player stood as the last beat killed it. */
+    /** Where the player stood as the death beat killed it. */
     private static Vec3 diedAt = Vec3.ZERO;
+    /** Where the player stood as Hueco Mundo's blocks were set down before it, or null before then. */
+    @Nullable
+    private static BlockPos blocksAt;
     /** The tick the player that woke in the killed one's place was first seen, or -1 before then. */
     private static int wokeAt = -1;
     /** What the current step acts on: the Hollow to strike, the Plus to send on, or the Quincy to talk to. */
@@ -392,7 +397,7 @@ public final class ClientSmokeTest {
             return;
         }
 
-        // The last beat's respawn makes a new player under its loading screen, during which the place line can come.
+        // The death beat's respawn makes a new player under its loading screen, during which the place line can come.
         if (killed != null && wokeAt < 0 && minecraft.player != killed) {
             wokeAt = ticksInWorld;
         }
@@ -522,6 +527,7 @@ public final class ClientSmokeTest {
         checkSoulSociety(minecraft, player);
         checkDangai(minecraft, player);
         checkWaking(minecraft, player);
+        checkHuecoMundoBlocks(minecraft);
         if (finished) {
             return;
         }
@@ -1509,7 +1515,7 @@ public final class ClientSmokeTest {
             // out over the Rukongai. Coming out lets go of the key anyway, as the loading screen releases every key.
             case 7645 -> minecraft.options.keyUp.setDown(true);
             case 7665 -> minecraft.options.keyUp.setDown(false);
-            // Last: as a soul that has passed on, it dies where it stands and wakes at a Rukongai home drawn for it as
+            // Then, as a soul that has passed on, it dies where it stands and wakes at a Rukongai home drawn for it as
             // it dies. Immediate respawn needs no click; the inventory is kept so the screenshot is the soul's own.
             case 7880 -> {
                 command(minecraft, "bleach soul @s rukongai");
@@ -1522,8 +1528,31 @@ public final class ClientSmokeTest {
                 command(minecraft, "kill @s");
             }
             case 8205 -> shot(minecraft, "rukongai_home");
+            // Last, Hueco Mundo's five blocks in a row 3 blocks south of where the soul woke, seen through its own eyes
+            // looking a little down: facing south, white sand at the row's west end is on the right and the bricks at its
+            // east end on the left. A home is drawn by chance, so a floor of stone and a room cleared from the block before
+            // the soul make the view the same whatever stands there: a slope, a trunk or tall grass. The hand and the HUD
+            // are hidden, as the F1 key hides them, so whatever the right hand holds does not cover the white sand.
             case 8210 -> {
                 holdLane(minecraft, heldLane, false);
+                minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+                minecraft.options.hideGui = true;
+                command(minecraft, "tp @s ~ ~ ~ 0 15");
+                command(minecraft, "fill ~-3 ~-1 ~1 ~3 ~-1 ~4 minecraft:stone");
+                command(minecraft, "fill ~-3 ~ ~1 ~3 ~2 ~4 minecraft:air");
+                List<Block> blocks = huecoMundoBlocks();
+                for (int i = 0; i < blocks.size(); i++) {
+                    command(minecraft, String.format(Locale.ROOT, "setblock ~%d ~ ~3 %s", i - 2,
+                            BuiltInRegistries.BLOCK.getKey(blocks.get(i))));
+                }
+                blocksAt = player.blockPosition();
+            }
+            // The shot reads the frame already drawn, so the HUD can come back at once for whatever follows.
+            case 8230 -> {
+                shot(minecraft, "hueco_mundo_blocks");
+                minecraft.options.hideGui = false;
+            }
+            case 8235 -> {
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -2187,7 +2216,7 @@ public final class ClientSmokeTest {
         }
     }
 
-    /** The check of the last beat: a new player must wake at a Rukongai home, away from where it died, and be told so. */
+    /** The check of the death beat: a new player must wake at a Rukongai home, away from where it died, and be told so. */
     private static void checkWaking(Minecraft minecraft, LocalPlayer player) {
         // From the kill: the server draws a home (a column or more made, about a second each) while the client counts
         // on, then the respawn's loading screen, which does not count; the district's line comes within a second of
@@ -2202,6 +2231,34 @@ public final class ClientSmokeTest {
                         + ", in " + minecraft.level.dimension().location() + " at " + player.position() + ", "
                         + Math.round(moved) + " blocks from where it died, district " + district
                         + "; the action bar's last lines: " + recentActionBar() + ")");
+    }
+
+    /** The check of the blocks beat: Hueco Mundo's five blocks must reach the client where they were set down. */
+    private static void checkHuecoMundoBlocks(Minecraft minecraft) {
+        // The commands run on the server's next tick, and the changed blocks reach the client a tick or two later.
+        expectWithin(minecraft, 8212, 8228, () -> huecoMundoBlocksShown(minecraft),
+                "Hueco Mundo's five blocks never reached the client in their row before the soul (it stands at "
+                        + minecraft.player.position() + ", the row 3 blocks south of " + blocksAt + ")");
+    }
+
+    /** Hueco Mundo's five blocks, in the order the blocks beat sets them down from west to east. */
+    private static List<Block> huecoMundoBlocks() {
+        return List.of(ModBlocks.WHITE_SAND.get(), ModBlocks.WHITE_SANDSTONE.get(), ModBlocks.SMOOTH_WHITE_SANDSTONE.get(),
+                ModBlocks.HUECO_QUARTZ.get(), ModBlocks.HUECO_QUARTZ_BRICKS.get());
+    }
+
+    /** Whether the client holds Hueco Mundo's five blocks in their row, 3 blocks south of where the soul stood. */
+    private static boolean huecoMundoBlocksShown(Minecraft minecraft) {
+        if (blocksAt == null) {
+            return false;
+        }
+        List<Block> blocks = huecoMundoBlocks();
+        for (int i = 0; i < blocks.size(); i++) {
+            if (!minecraft.level.getBlockState(blocksAt.offset(i - 2, 0, 3)).is(blocks.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

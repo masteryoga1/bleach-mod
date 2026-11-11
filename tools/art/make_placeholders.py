@@ -159,6 +159,16 @@ SEKKISEKI_SEAM = rgb(176, 176, 170)
 KORYU = (112, 64, 196, 120)
 KORYU_STREAK = (176, 132, 255, 170)
 KORYU_GLINT = (226, 208, 255, 200)
+# Hueco Mundo's white sand, its sandstone and Hueco quartz: bone white, the sand a shade warm and the quartz a shade
+# cold, so the two read apart.
+WHITE_SAND = rgb(236, 234, 226)
+WHITE_SAND_GRAIN = rgb(218, 215, 204)
+WHITE_SAND_GLINT = rgb(248, 247, 243)
+WHITE_SANDSTONE = rgb(226, 223, 212)
+WHITE_SANDSTONE_BAND = rgb(208, 204, 191)
+HUECO_QUARTZ = rgb(240, 241, 238)
+HUECO_QUARTZ_GRAIN = rgb(218, 220, 218)
+HUECO_QUARTZ_SEAM = rgb(196, 198, 196)
 
 
 class Canvas:
@@ -1640,6 +1650,77 @@ def koryu():
     return c
 
 
+def white_sand():
+    """White sand: bone-pale grains, flecked darker and lighter in a fixed scatter."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, WHITE_SAND)
+    mottle(c, 0, 0, 16, 16, WHITE_SAND_GRAIN, 11, seed=1)
+    mottle(c, 0, 0, 16, 16, WHITE_SAND_GLINT, 17, seed=4)
+    return c
+
+
+def pressed_white_sand():
+    """White sand pressed level: the sandstone's ground, faintly flecked."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, WHITE_SANDSTONE)
+    mottle(c, 0, 0, 16, 16, WHITE_SAND_GRAIN, 11, seed=2)
+    return c
+
+
+def white_sandstone():
+    """White sandstone's side: pressed sand in three layers, a darker band under each, its top rim smooth."""
+    c = pressed_white_sand()
+    for y in (3, 9, 15):
+        c.rect(0, y, 16, y + 1, WHITE_SANDSTONE_BAND)
+    c.rect(0, 0, 16, 2, WHITE_SAND)
+    return c
+
+
+def white_sandstone_top():
+    """White sandstone's ends, and smooth white sandstone all over: level pressed sand with a rim on two edges."""
+    c = pressed_white_sand()
+    c.rect(0, 0, 16, 1, WHITE_SANDSTONE_BAND)
+    c.rect(0, 0, 1, 16, WHITE_SANDSTONE_BAND)
+    return c
+
+
+def hueco_quartz():
+    """Hueco quartz's side: a white mineral grained lengthways like wood, darker at its two edges."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, HUECO_QUARTZ)
+    for x in (3, 7, 12):
+        for y in range(16):
+            if (y + x) % 7 != 0:
+                c.put(x + (1 if (y // 4 + x) % 3 == 0 else 0), y, HUECO_QUARTZ_GRAIN)
+    c.rect(0, 0, 1, 16, HUECO_QUARTZ_SEAM)
+    c.rect(15, 0, 16, 16, HUECO_QUARTZ_SEAM)
+    return c
+
+
+def hueco_quartz_top():
+    """Hueco quartz's ends: rings of growth like a cut trunk's, white on white."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, HUECO_QUARTZ)
+    for inset, colour in ((0, HUECO_QUARTZ_SEAM), (3, HUECO_QUARTZ_GRAIN), (6, HUECO_QUARTZ_GRAIN)):
+        c.rect(inset, inset, 16 - inset, inset + 1, colour)
+        c.rect(inset, 15 - inset, 16 - inset, 16 - inset, colour)
+        c.rect(inset, inset, inset + 1, 16 - inset, colour)
+        c.rect(15 - inset, inset, 16 - inset, 16 - inset, colour)
+    return c
+
+
+def hueco_quartz_bricks():
+    """Hueco quartz bricks: four courses of white bricks, each course's joints half a brick from the last's."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, HUECO_QUARTZ)
+    mottle(c, 0, 0, 16, 16, HUECO_QUARTZ_GRAIN, 11, seed=6)
+    for y in (3, 7, 11, 15):
+        c.rect(0, y, 16, y + 1, HUECO_QUARTZ_SEAM)
+        x = 7 if y % 8 == 3 else 15
+        c.rect(x, y - 3, x + 1, y, HUECO_QUARTZ_SEAM)
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -1736,6 +1817,12 @@ TEXTURES = {
     "misc/hollow_mask_edge_cracked.png": hollow_mask_edge_cracked,
     "block/sekkiseki.png": sekkiseki,
     "block/koryu.png": koryu,
+    "block/white_sand.png": white_sand,
+    "block/white_sandstone.png": white_sandstone,
+    "block/white_sandstone_top.png": white_sandstone_top,
+    "block/hueco_quartz.png": hueco_quartz,
+    "block/hueco_quartz_top.png": hueco_quartz_top,
+    "block/hueco_quartz_bricks.png": hueco_quartz_bricks,
 }
 
 

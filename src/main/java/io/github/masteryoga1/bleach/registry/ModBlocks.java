@@ -4,8 +4,12 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.block.KoryuBlock;
 import io.github.masteryoga1.bleach.block.ReishiFootingBlock;
 import io.github.masteryoga1.bleach.block.TailoringTableBlock;
+import net.minecraft.util.ColorRGBA;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ColoredFallingBlock;
+import net.minecraft.world.level.block.RotatedPillarBlock;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.material.MapColor;
@@ -31,7 +35,35 @@ public final class ModBlocks {
                     .forceSolidOn().strength(-1.0F, 3600000.0F).noLootTable().pushReaction(PushReaction.BLOCK)
                     .lightLevel(state -> KoryuBlock.LIGHT).emissiveRendering((state, level, pos) -> true)
                     .isValidSpawn((state, level, pos, type) -> false)));
+    /** The colour of the dust white sand sheds when nothing holds it up: bone white, a shade warm. */
+    public static final int WHITE_SAND_DUST = 0xECE9E0;
+    /** Hueco Mundo's white sand, which falls as sand does. */
+    public static final DeferredBlock<ColoredFallingBlock> WHITE_SAND = BLOCKS.register("white_sand",
+            () -> new ColoredFallingBlock(new ColorRGBA(WHITE_SAND_DUST), BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.SNOW).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)));
+    /** White sand pressed to stone, as sandstone is sand pressed. */
+    public static final DeferredBlock<Block> WHITE_SANDSTONE = BLOCKS.registerSimpleBlock("white_sandstone",
+            sandstone(0.8F, 0.8F));
+    public static final DeferredBlock<Block> SMOOTH_WHITE_SANDSTONE = BLOCKS.registerSimpleBlock("smooth_white_sandstone",
+            sandstone(2.0F, 6.0F));
+    /** Hueco quartz, a white mineral laid as a pillar along an axis, as the quartz pillar is. */
+    public static final DeferredBlock<RotatedPillarBlock> HUECO_QUARTZ = BLOCKS.register("hueco_quartz",
+            () -> new RotatedPillarBlock(quartz()));
+    public static final DeferredBlock<Block> HUECO_QUARTZ_BRICKS =
+            BLOCKS.registerSimpleBlock("hueco_quartz_bricks", quartz());
 
     private ModBlocks() {
+    }
+
+    /** White sandstone's properties, as sandstone's are, at this hardness and blast resistance. */
+    private static BlockBehaviour.Properties sandstone(float hardness, float resistance) {
+        return BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).instrument(NoteBlockInstrument.BASEDRUM)
+                .requiresCorrectToolForDrops().strength(hardness, resistance);
+    }
+
+    /** Hueco quartz's properties, as the quartz block's are. */
+    private static BlockBehaviour.Properties quartz() {
+        return BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
+                .requiresCorrectToolForDrops().strength(0.8F);
     }
 }
