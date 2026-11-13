@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.item.HellButterflyItem;
 import io.github.masteryoga1.bleach.network.GateKeyPayload;
@@ -14,6 +15,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
@@ -35,13 +37,14 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
- * The Senkaimon in play: the Gate key's turn, the gate's opening and who it takes where, and the Jigokuchō handed to a
- * new Shinigami, or by the instructor to one that has lost its own. The rules are {@link TravelLogic}'s. The turn and
- * the wait before the next gate are transients in the soul, so a death or a relog starts them over. The key and the
- * Jigokuchō take any {@link Player}, so game tests can use mock players.
+ * The Senkaimon and the Garganta in play: the Gate key's turn, each gate's opening, who the Senkaimon takes where, and
+ * the Jigokuchō handed to a new Shinigami, or by the instructor to one that has lost its own. The rules are
+ * {@link TravelLogic}'s. The turn and the waits before the next gate are transients in the soul, so a death or a relog
+ * starts them over. The key and the Jigokuchō take any {@link Player}, so game tests can use mock players.
  */
 public final class TravelEvents {
     private static final String TURNING_KEY = "message.bleach.senkaimon.turning";
+    private static final String TEARING_KEY = "message.bleach.garganta.turning";
     private static final String NO_LANDING_KEY = "message.bleach.senkaimon.no_landing";
     private static final String RECEIVED_KEY = "message.bleach.hell_butterfly.received";
     private static final String ISSUED_KEY = "message.bleach.hell_butterfly.issued";
@@ -70,7 +73,8 @@ public final class TravelEvents {
 
     /**
      * The Gate key, as sent by {@link GateKeyPayload} (and called directly by game tests): PRESS begins the turn,
-     * RELEASE opens the gate if the turn is done or else ends it, and CANCEL ends it. Returns the refusal told, or null.
+     * RELEASE opens the gate, the turner's Senkaimon or Garganta, if the turn is done or else ends it, and CANCEL ends
+     * it. Returns the refusal told, or null.
      */
     @Nullable
     public static TravelLogic.Refusal onKey(Player player, GateKeyPayload.GateKey key, long now) {
@@ -91,34 +95,55 @@ public final class TravelEvents {
     /** The key alone: the turn begins, heard and told, or why not, told. Nothing is paid until the gate opens. */
     @Nullable
     private static TravelLogic.Refusal press(Player player, SoulData data, ServerLevel level, long now) {
-        TravelLogic.Refusal refusal = TravelLogic.mayOpenSenkaimon(player, data, level.dimension(), now);
+        TravelLogic.Gate gate = TravelLogic.gateFor(data);
+        TravelLogic.Refusal refusal = mayOpen(gate, player, data, level, now);
         if (refusal != null) {
-            tell(player, refusal, data, now);
+            tell(player, gate, refusal, data, now);
             return refusal;
         }
-        data.senkaimonOpensAt = now + TravelLogic.unlockTicks();
-        // Those nearby see the blade turn and hear it at most once a second, however often the key goes down.
+        data.senkaimonOpensAt = now + TravelLogic.turnTicks(gate);
+        // Those nearby see the turn and hear it at most once a second, however often the key goes down.
         if (data.senkaimonTurnShownAt == SoulData.NEVER || now - data.senkaimonTurnShownAt >= TURN_SHOWN_TICKS) {
             data.senkaimonTurnShownAt = now;
             player.swing(InteractionHand.MAIN_HAND, true);
-            SpiritSenses.play(player, SoundEvents.TRIAL_SPAWNER_OPEN_SHUTTER, SoundSource.PLAYERS, TURN_VOLUME,
-                    TURN_PITCH, false);
+            SoundEvent sound = gate == TravelLogic.Gate.GARGANTA
+                    ? SoundEvents.SCULK_CLICKING : SoundEvents.TRIAL_SPAWNER_OPEN_SHUTTER;
+            SpiritSenses.play(player, sound, SoundSource.PLAYERS, TURN_VOLUME, TURN_PITCH, false);
         }
-        player.displayClientMessage(Component.translatable(TURNING_KEY).withStyle(ChatFormatting.GRAY), true);
+        String line = gate == TravelLogic.Gate.GARGANTA ? TEARING_KEY : TURNING_KEY;
+        player.displayClientMessage(Component.translatable(line).withStyle(ChatFormatting.GRAY), true);
         return null;
     }
 
+    /** This gate's rules for this soul here and now. */
+    @Nullable
+    private static TravelLogic.Refusal mayOpen(TravelLogic.Gate gate, Player player, SoulData data, ServerLevel level,
+                                               long now) {
+        return gate == TravelLogic.Gate.GARGANTA
+                ? TravelLogic.mayOpenGarganta(player, data, level.dimension(), now)
+                : TravelLogic.mayOpenSenkaimon(player, data, level.dimension(), now);
+    }
+
     /**
-     * The turn done: every rule is checked again, and the gate opens, paid for and the wait begun outside creative. A
-     * refusal is told, with nothing paid. Returns it, or null.
+     * The turn done: every rule of the soul's gate now is checked again, and the gate opens, paid for and the wait begun
+     * outside creative. A refusal is told, with nothing paid. Returns it, or null.
      */
     @Nullable
     private static TravelLogic.Refusal open(Player player, SoulData data, ServerLevel level, long now) {
         data.senkaimonOpensAt = SoulData.NEVER;
-        TravelLogic.Refusal refusal = TravelLogic.mayOpenSenkaimon(player, data, level.dimension(), now);
+        TravelLogic.Gate gate = TravelLogic.gateFor(data);
+        TravelLogic.Refusal refusal = mayOpen(gate, player, data, level, now);
         if (refusal != null) {
-            tell(player, refusal, data, now);
+            tell(player, gate, refusal, data, now);
             return refusal;
+        }
+        if (gate == TravelLogic.Gate.GARGANTA) {
+            float cost = TravelLogic.gargantaCost(data);
+            if (openPassage(level, player, data, now) != null && !player.isCreative()) {
+                SoulLogic.trySpend(player, data, cost);
+                TravelLogic.startGargantaCooldown(data, now);
+            }
+            return null;
         }
         float cost = TravelLogic.openCost(data);
         if (Senkaimon.open(level, player, now) != null && !player.isCreative()) {
@@ -128,26 +153,27 @@ public final class TravelEvents {
         return null;
     }
 
-    /** The turn ends before the gate opens, and the soul is told the lock slipped back. Returns that refusal. */
+    /** The turn ends before the gate opens, and the soul is told its gate stays shut. Returns that refusal. */
     private static TravelLogic.Refusal slip(Player player, SoulData data) {
         data.senkaimonOpensAt = SoulData.NEVER;
-        tell(player, TravelLogic.Refusal.SLIPPED, data, player.level().getGameTime());
+        tell(player, TravelLogic.gateFor(data), TravelLogic.Refusal.SLIPPED, data, player.level().getGameTime());
         return TravelLogic.Refusal.SLIPPED;
     }
 
     /** Tells the soul why on its action bar: a held soul by its holder, the wait with its seconds, and some not at all. */
-    private static void tell(Player player, TravelLogic.Refusal refusal, SoulData data, long now) {
+    private static void tell(Player player, TravelLogic.Gate gate, TravelLogic.Refusal refusal, SoulData data, long now) {
         if (refusal == TravelLogic.Refusal.HELD) {
             Negacion.refused(player);
             return;
         }
-        String key = refusal.messageKey();
+        String key = refusal.messageKey(gate);
         if (key == null) {
             return;
         }
+        long seconds = gate == TravelLogic.Gate.GARGANTA
+                ? TravelLogic.gargantaCooldownSeconds(data, now) : TravelLogic.cooldownSeconds(data, now);
         MutableComponent line = refusal == TravelLogic.Refusal.COOLDOWN
-                ? Component.translatable(key, TravelLogic.cooldownSeconds(data, now))
-                : Component.translatable(key);
+                ? Component.translatable(key, seconds) : Component.translatable(key);
         player.displayClientMessage(line.withStyle(ChatFormatting.GRAY), true);
     }
 
@@ -266,6 +292,28 @@ public final class TravelEvents {
                 false);
     }
 
+    // ---- The Garganta ----
+
+    /**
+     * Tears a Garganta open before this soul, to where it leads from here (Soul Society, when the soul sneaks in Hueco
+     * Mundo), sized to the soul. Null where no Garganta leads on, or if the level would not take it; crowding is the
+     * caller's rule. Its first tick sounds and shows it (see {@link GargantaEvents#onRiftOpened}). Public for game tests.
+     */
+    @Nullable
+    public static GargantaRift openPassage(ServerLevel level, Player opener, SoulData data, long now) {
+        ResourceKey<Level> to = TravelLogic.gargantaLeadsTo(level.dimension(), opener.isShiftKeyDown());
+        if (to == null) {
+            return null;
+        }
+        GargantaRift rift = GargantaRift.passage(level, opener, now, to, TravelLogic.passageSize(opener, data),
+                TravelLogic.gargantaOpenTicks());
+        if (!level.addFreshEntity(rift)) {
+            return null;
+        }
+        opener.swing(InteractionHand.MAIN_HAND, true);
+        return rift;
+    }
+
     // ---- The Jigokuchō ----
 
     /** At graduation: a Jigokuchō for a new Shinigami who carries none, and today marked as the day it was given. */
@@ -326,7 +374,7 @@ public final class TravelEvents {
     // ---- Listeners ----
 
     /**
-     * A turning soul's tick, before it moves: the gate opens once the turn is done, the key still held. A fault drops
+     * A turning soul's tick, before it moves: its gate opens once the turn is done, the key still held. A fault drops
      * the turn and is logged, as a throw here would kick the player.
      */
     private static void onPlayerTick(PlayerTickEvent.Pre event) {
@@ -343,7 +391,7 @@ public final class TravelEvents {
             open(player, data, level, now);
         } catch (RuntimeException e) {
             data.senkaimonOpensAt = SoulData.NEVER;
-            BleachMod.LOGGER.warn("Senkaimon: {}'s turn failed, and is dropped", player.getName().getString(), e);
+            BleachMod.LOGGER.warn("Gate: {}'s turn failed, and is dropped", player.getName().getString(), e);
         }
     }
 

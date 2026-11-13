@@ -10,7 +10,8 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * The Gate key (O): held with a zanpakutō in hand, it turns the blade like a key, and when the turn is done a Senkaimon
- * opens. This only sends the presses, and a screen opening while the key is held ends the turn; the server decides.
+ * opens; held by a Menos or an Arrancar, it tears at the air until a Garganta opens. This only sends the presses, and a
+ * screen opening while the key is held ends the turn; the server decides.
  */
 public final class GateKeys {
     public static final KeyMapping OPEN = new KeyMapping("key.bleach.gate", KeyConflictContext.IN_GAME,

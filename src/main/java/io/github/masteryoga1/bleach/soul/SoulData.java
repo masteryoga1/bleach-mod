@@ -314,12 +314,17 @@ public final class SoulData {
     long granReyCeroStartedAt = NEVER;
     /** Game time this Gillian last called down Negación, for the cooldown (see {@link Negacion}). */
     long lastNegacionAt = NEVER;
-    /** Game time this soul's Senkaimon turn opens its gate, or {@link #NEVER} (see {@link TravelEvents}). Not saved. */
+    /**
+     * Game time this soul's gate turn opens its gate, a Senkaimon or a Garganta, or {@link #NEVER} (see
+     * {@link TravelEvents}). Not saved.
+     */
     long senkaimonOpensAt = NEVER;
     /** Game time this soul may open its next Senkaimon. Not saved. */
     long senkaimonReadyAt = NEVER;
-    /** Game time this soul's Senkaimon turn was last seen and heard begun, or {@link #NEVER}. Not saved. */
+    /** Game time this soul's gate turn was last seen and heard begun, or {@link #NEVER}. Not saved. */
     long senkaimonTurnShownAt = NEVER;
+    /** Game time this soul may open its next Garganta. Not saved. */
+    long gargantaReadyAt = NEVER;
     /** Game time the Kōryū can next take hold of this soul. Not saved. */
     long koryuFreeAt = NEVER;
     /** Game time a way out of the Dangai that was refused is next tried for this soul. Not saved. */
