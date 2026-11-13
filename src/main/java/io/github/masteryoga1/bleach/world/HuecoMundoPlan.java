@@ -26,6 +26,8 @@ public final class HuecoMundoPlan {
     public static final int LAS_NOCHES_RADIUS = 64, DOME_TOP_Y = 144;
     /** The las_noches_grounds biome's outer edge: the cells sampled from here out are the dunes', which alone grow trees. */
     public static final int GROUNDS_RADIUS = 216;
+    /** A Garganta into Hueco Mundo sets a soul down about this far out at least: past Las Noches' wall, r 120 to 124. */
+    public static final int ARRIVAL_RADIUS = 136;
     /** The furthest a quartz tree's branch reaches sideways from its trunk. */
     public static final int TREE_REACH = 5;
     /** Blocks from the centre for each unit of the router's temperature, which chooses the biome, as in Soul Society. */

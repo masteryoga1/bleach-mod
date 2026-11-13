@@ -4,17 +4,22 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
+import io.github.masteryoga1.bleach.soul.MenosBody;
+import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.SpawnSpots;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
+import io.github.masteryoga1.bleach.soul.TravelEvents;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -30,7 +35,9 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Portal;
 import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.EventHooks;
@@ -51,9 +58,11 @@ import net.neoforged.neoforge.event.EventHooks;
  * after its Hollows, and like them never come if the tear is gone first.
  * <p>
  * A passage ({@link #passage}) is the Garganta a Menos or an Arrancar tears open, sized to its opener and standing
- * before it. It drops nothing and takes no one. Known as one on the server only; a client draws it as any tear.
+ * before it. It drops nothing, and takes each aware soul on foot that fits it to the world it leads to, as vanilla's
+ * portals take a soul ({@link TravelEvents#gargantaDestination}). Known as one on the server only; a client draws it as
+ * any tear.
  */
-public class GargantaRift extends Entity {
+public class GargantaRift extends Entity implements Portal {
     private static final EntityDataAccessor<Long> DATA_OPEN_AT =
             SynchedEntityData.defineId(GargantaRift.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Boolean> DATA_DEPARTURE =
@@ -88,8 +97,15 @@ public class GargantaRift extends Entity {
     public static final double PASSAGE_HEIGHT = DRAWN_HEIGHT;
     /** The gap a passage leaves before its opener's body. */
     public static final double PASSAGE_GAP = 0.5;
+    /** Ticks inside before a soul passes; vanilla's count makes it one more. */
+    public static final int PASS_TICKS = 10;
     /** How far past a box to look for passages whose own box meets it, as a passage's box outgrows its hitbox. */
     private static final double PASSAGE_SEARCH = 32.0;
+    /** A body this little over a passage's size still fits. */
+    private static final double FIT_SLACK = 1.0E-4;
+    private static final int TICKS_PER_SECOND = 20;
+    private static final String MOUNT_KEY = "message.bleach.garganta.mount";
+    private static final String TOO_BIG_KEY = "message.bleach.menos.too_big";
 
     private final List<HollowKind> pending = new ArrayList<>();
     /**
@@ -215,6 +231,11 @@ public class GargantaRift extends Entity {
                 rift -> rift.isPassage() && rift.passBox().intersects(box));
     }
 
+    /** Whether this body fits through a passage of this size: no taller than it is drawn, and no wider. */
+    public static boolean fits(Entity body, float size) {
+        return body.getBbHeight() <= PASSAGE_HEIGHT * size + FIT_SLACK && body.getBbWidth() <= DRAWN_WIDTH * size + FIT_SLACK;
+    }
+
     /**
      * This tear also drops these mobs, set up by the caller but not yet added to the world, after any Hollows.
      * Returns this.
@@ -327,15 +348,16 @@ public class GargantaRift extends Entity {
         return opener;
     }
 
-    /** The box this passage fills ({@link #passBoxAt}). */
+    /** The box this passage fills and takes souls from ({@link #passBoxAt}). */
     public AABB passBox() {
         return passBoxAt(position(), size());
     }
 
     /**
-     * Server side: waits while dormant, opens (an arrival tells {@link GargantaEvents#onRiftOpened}),
-     * takes its departing Hollow or drops its Hollows, and goes when it has closed. Ages are compared
-     * with at-least, so a tear that missed ticks in a chunk that stopped ticking catches up.
+     * Server side: waits while dormant, opens (an arrival or a passage tells {@link GargantaEvents#onRiftOpened}),
+     * takes its departing Hollow, takes the souls in it while a passage is open, or drops its Hollows, and goes when
+     * it has closed. Ages are compared with at-least, so a tear that missed ticks in a chunk that stopped ticking
+     * catches up.
      */
     @Override
     public void tick() {
@@ -364,6 +386,10 @@ public class GargantaRift extends Entity {
                     hollow.discard();
                 }
             }
+        } else if (isPassage()) {
+            if (age < closeAge()) {
+                admit(server);
+            }
         } else if (age >= DROP_AGE && !dropped) {
             dropped = true;
             drop(server);
@@ -371,6 +397,48 @@ public class GargantaRift extends Entity {
         if (age >= endAge()) {
             discard();
         }
+    }
+
+    /**
+     * A passage's tick: each aware soul in it is let in, or told once a second why not, that it rides or that its body
+     * is too big for this tear. A soul in a Senkaimon too is the Senkaimon's. A giant, whom {@link MenosBody} holds off
+     * every portal, is let in where it fits, its hold lifted first.
+     */
+    private void admit(ServerLevel level) {
+        boolean tell = tickCount % TICKS_PER_SECOND == 0;
+        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, passBox(), Senkaimon::mayEnter)) {
+            if (!level.getEntitiesOfClass(Senkaimon.class, player.getBoundingBox()).isEmpty()) {
+                continue;
+            }
+            if (player.isPassenger()) {
+                // A held soul's holder already speaks to it.
+                if (tell && !Negacion.held(player)) {
+                    player.displayClientMessage(Component.translatable(MOUNT_KEY).withStyle(ChatFormatting.GRAY), true);
+                }
+            } else if (!fits(player, size())) {
+                if (tell) {
+                    player.displayClientMessage(Component.translatable(TOO_BIG_KEY).withStyle(ChatFormatting.GRAY), true);
+                }
+            } else {
+                // The hold renews after each portal step, so lifting it here lets this tick's step count.
+                if (MenosBody.isGiant(player) && player.getPortalCooldown() <= MenosBody.GIANT_PORTAL_COOLDOWN) {
+                    player.setPortalCooldown(0);
+                }
+                player.setAsInsidePortal(this, blockPosition());
+            }
+        }
+    }
+
+    @Override
+    public int getPortalTransitionTime(ServerLevel level, Entity entity) {
+        return PASS_TICKS;
+    }
+
+    /** Where a passage takes this player, or null, the player told why, when it may not pass; any other tear, null. */
+    @Nullable
+    @Override
+    public DimensionTransition getPortalDestination(ServerLevel level, Entity entity, BlockPos pos) {
+        return isPassage() && entity instanceof ServerPlayer player ? TravelEvents.gargantaDestination(this, player) : null;
     }
 
     /**

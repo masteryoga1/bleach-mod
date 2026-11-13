@@ -9,10 +9,10 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
 /**
- * A soul's travel between the worlds: the block it last left the Human World from by a Senkaimon, the game day it was
- * last handed a Jigokuchō (-1 for never), the Dangai crossing it is on, if any, and the block of the Rukongai it calls
- * home, if any. Saved and kept through death but never sent, with every field lenient so that later steps can add
- * theirs and a bad field reads as its default.
+ * A soul's travel between the worlds: the block it last left the Human World from by a gate (a Senkaimon, the Dangai
+ * or a Garganta), the game day it was last handed a Jigokuchō (-1 for never), the Dangai crossing it is on, if any, and
+ * the block of the Rukongai it calls home, if any. Saved and kept through death but never sent, with every field
+ * lenient so that later steps can add theirs and a bad field reads as its default.
  */
 public record TravelRecord(Optional<GlobalPos> humanWorldReturn, long butterflyDay, Optional<Crossing> crossing,
                            Optional<BlockPos> rukongaiHome) {
