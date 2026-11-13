@@ -1,8 +1,23 @@
 package io.github.masteryoga1.bleach.gametest;
 
+import com.mojang.authlib.GameProfile;
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.Gillian;
+import io.github.masteryoga1.bleach.entity.Hollow;
+import io.github.masteryoga1.bleach.entity.Menos;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
+import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.HollowBody;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.HollowTier;
+import io.github.masteryoga1.bleach.soul.HuecoMundoSpawns;
+import io.github.masteryoga1.bleach.soul.MenosEvolution;
+import io.github.masteryoga1.bleach.soul.SoulAttachments;
+import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import io.github.masteryoga1.bleach.world.MoonPhases;
@@ -10,7 +25,10 @@ import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -26,8 +44,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.SpawnPlacementTypes;
+import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -36,7 +59,11 @@ import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
 import net.minecraft.world.level.block.BedBlock;
@@ -52,6 +79,7 @@ import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.NoiseRouter;
@@ -59,6 +87,7 @@ import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidType;
@@ -69,11 +98,14 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Hueco Mundo: its world on the test server, held at midnight on the Overworld's day count; its ground, read from its
  * own files and worked out by the generator's own code at three seeds, and as the real world generates it; its biomes
  * by radius and depth; its blocks, each with its item, drop, tool and tags, white sand's fall, and what is crafted and
- * smelted; and the moon its sky shows, half a cycle on from the Overworld's.
+ * smelted; the moon its sky shows, half a cycle on from the Overworld's; and the Hollows that live there, and what a
+ * Hollow player's hunger and an Adjuchas's clock do there.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class HuecoMundoTests {
+    /** How near two amounts of soul hunger must be: a float of 60 is good to a few millionths. */
+    private static final double HUNGER_SAME = 1.0E-5;
     /** How near a computed value must come to the plan's: rounding only. */
     private static final double EXACT = 1.0E-6;
     /** Three seeds, so that a check passed by one seed's luck would show. */
@@ -212,14 +244,18 @@ public final class HuecoMundoTests {
         Registry<Biome> registry = helper.getLevel().registryAccess().registryOrThrow(Registries.BIOME);
         for (String name : BIOMES) {
             Biome biome = registry.getOrThrow(ResourceKey.create(Registries.BIOME, BleachMod.id(name)));
-            // No rain or snow, no caves cut, nothing spawning, the dunes' quartz trees the only feature, a black sky, and
-            // a fog all but black, the cavern's a little warmer.
+            // No rain or snow, no caves cut, nothing spawning but the dunes' and the cavern's monsters (their lists are
+            // read in hollowsSpawnOnHuecoMundosGround), the dunes' quartz trees the only feature, a black sky, and a fog
+            // all but black, the cavern's a little warmer.
             helper.assertFalse(biome.hasPrecipitation(), name + " has rain or snow");
             for (GenerationStep.Carving step : GenerationStep.Carving.values()) {
                 helper.assertFalse(biome.getGenerationSettings().getCarvers(step).iterator().hasNext(), name + " is carved");
             }
+            boolean hollows = name.equals("hueco_mundo") || name.equals("forest_of_menos");
             for (MobCategory category : MobCategory.values()) {
-                helper.assertTrue(biome.getMobSettings().getMobs(category).isEmpty(), name + " has " + category + " spawns");
+                boolean none = biome.getMobSettings().getMobs(category).isEmpty();
+                helper.assertTrue(none != (hollows && category == MobCategory.MONSTER),
+                        name + (none ? " has no " : " has ") + category.getName() + " spawns");
             }
             List<String> features = biome.getGenerationSettings().features().stream().flatMap(HolderSet::stream)
                     .map(Holder::getRegisteredName).toList();
@@ -496,5 +532,284 @@ public final class HuecoMundoTests {
         ItemStack made = level.getRecipeManager().getRecipeFor(RecipeType.SMELTING, input, level)
                 .map(recipe -> recipe.value().assemble(input, level.registryAccess())).orElse(ItemStack.EMPTY);
         helper.assertTrue(made.is(expected) && made.getCount() == 1, stack + " smelts to " + made + ", not " + expected);
+    }
+
+    // ---- Hueco Mundo's Hollows ----
+
+    /** A survival mock player with this soul standing at this spot of this world, as the helper's own mocks are made. */
+    static Player mockIn(ServerLevel level, Vec3 at, SoulData data) {
+        Player player = new Player(level, BlockPos.containing(at), 0.0F,
+                new GameProfile(UUID.randomUUID(), "test-mock-player")) {
+            @Override
+            public boolean isSpectator() {
+                return false;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+        };
+        player.setData(SoulAttachments.SOUL, data);
+        player.moveTo(at.x, at.y, at.z, 0.0F, 0.0F);
+        return player;
+    }
+
+    /** Each spawner this biome lists for monsters, as "type weight least most", in its file's order. */
+    private static List<String> monsters(Registry<Biome> biomes, ResourceKey<Biome> key) {
+        return biomes.getOrThrow(key).getMobSettings().getMobs(MobCategory.MONSTER).unwrap().stream()
+                .map(data -> BuiltInRegistries.ENTITY_TYPE.getKey(data.type) + " " + data.getWeight().asInt() + " "
+                        + data.minCount + " " + data.maxCount)
+                .toList();
+    }
+
+    /** Whether a hound may spawn for this reason on the block above this ground of the test's. */
+    private static boolean houndSpawns(GameTestHelper helper, BlockPos ground, MobSpawnType reason) {
+        return SpawnPlacements.checkSpawnRules(ModEntities.HOUND_HOLLOW.get(), helper.getLevel(), reason,
+                helper.absolutePos(ground.above()), helper.getLevel().getRandom());
+    }
+
+    /**
+     * Runs this world's chunk tasks, within this one call, until this entity just added to it is listed. A chunk made
+     * with no ticket lists its entities only once the main thread has confirmed it whole, a task queued after it is made
+     * (ChunkHolder's full chunk promotion). Gives up after five seconds, which the caller's own count then shows.
+     */
+    private static void untilListed(ServerLevel level, Entity entity) {
+        long giveUp = Util.getMillis() + 5_000L;
+        while (level.getEntity(entity.getUUID()) != entity && Util.getMillis() < giveUp) {
+            if (!level.getChunkSource().pollTask()) {
+                LockSupport.parkNanos(100_000L);
+            }
+        }
+    }
+
+    /**
+     * Hueco Mundo's own Hollows: the dunes list the four basic Hollows and the Forest of Menos the Gillian and the
+     * Adjuchas, and no other biome lists one; each stands on the ground by its placement, which lets a natural spawn
+     * come only onto white sand or white sandstone and never in Peaceful, and leaves every other kind of spawn alone; a
+     * Hollow's own rule passes a natural spawn in full light, where it refuses a spawner's; and Hueco Mundo counts its
+     * Menos apart from the Human World's.
+     */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void hollowsSpawnOnHuecoMundosGround(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Registry<Biome> biomes = level.registryAccess().registryOrThrow(Registries.BIOME);
+        List<String> dunes = monsters(biomes, HuecoMundoSpawns.DUNES);
+        helper.assertTrue(dunes.equals(List.of("bleach:spider_hollow 5 1 3", "bleach:hexapodus 5 1 3",
+                "bleach:hound_hollow 5 1 3", "bleach:serpent_hollow 5 1 3")), "the dunes list " + dunes);
+        List<String> forest = monsters(biomes, HuecoMundoSpawns.FOREST_OF_MENOS);
+        helper.assertTrue(forest.equals(List.of("bleach:gillian 6 1 1", "bleach:adjuchas 2 1 1")),
+                "the Forest of Menos lists " + forest);
+        for (String name : List.of("las_noches", "las_noches_grounds", "rukongai", "rukongai_rough", "rukongai_wilds",
+                "seireitei", "seireitei_wall", "sokyoku_hill", "dangai")) {
+            List<String> listed = monsters(biomes, ResourceKey.create(Registries.BIOME, BleachMod.id(name)));
+            helper.assertTrue(listed.isEmpty(), "bleach:" + name + " lists " + listed);
+        }
+        List<String> plains = monsters(biomes, Biomes.PLAINS);
+        helper.assertTrue(plains.stream().noneMatch(entry -> entry.startsWith(BleachMod.MODID + ":")),
+                "the plains list " + plains);
+
+        for (EntityType<?> type : List.of(ModEntities.SPIDER_HOLLOW.get(), ModEntities.HEXAPODUS.get(),
+                ModEntities.HOUND_HOLLOW.get(), ModEntities.SERPENT_HOLLOW.get(), ModEntities.GILLIAN.get(),
+                ModEntities.ADJUCHAS.get())) {
+            helper.assertTrue(SpawnPlacements.getPlacementType(type) == SpawnPlacementTypes.ON_GROUND
+                            && SpawnPlacements.getHeightmapType(type) == Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    type + " is placed " + SpawnPlacements.getPlacementType(type) + " by "
+                            + SpawnPlacements.getHeightmapType(type));
+        }
+        for (EntityType<?> type : List.of(ModEntities.FISHBONE_D.get(), ModEntities.ARRANCAR.get())) {
+            helper.assertTrue(SpawnPlacements.getPlacementType(type) == SpawnPlacementTypes.NO_RESTRICTIONS,
+                    type + " was given a placement");
+        }
+
+        // The four corners of the box's lowest layer, the white sand on the structure block so that it cannot fall.
+        BlockPos sand = new BlockPos(0, 1, 0), sandstone = new BlockPos(2, 1, 0), stone = new BlockPos(0, 1, 2);
+        BlockPos smooth = new BlockPos(2, 1, 2);
+        helper.setBlock(sand, ModBlocks.WHITE_SAND.get());
+        helper.setBlock(sandstone, ModBlocks.WHITE_SANDSTONE.get());
+        helper.setBlock(stone, Blocks.STONE);
+        helper.setBlock(smooth, ModBlocks.SMOOTH_WHITE_SANDSTONE.get());
+        boolean open = level.getDifficulty() != Difficulty.PEACEFUL;
+        helper.assertTrue(houndSpawns(helper, sand, MobSpawnType.NATURAL) == open
+                        && houndSpawns(helper, sandstone, MobSpawnType.NATURAL) == open
+                        && !houndSpawns(helper, stone, MobSpawnType.NATURAL)
+                        && !houndSpawns(helper, smooth, MobSpawnType.NATURAL),
+                "a natural hound may come onto white sand " + houndSpawns(helper, sand, MobSpawnType.NATURAL)
+                        + ", white sandstone " + houndSpawns(helper, sandstone, MobSpawnType.NATURAL) + ", stone "
+                        + houndSpawns(helper, stone, MobSpawnType.NATURAL) + " and smooth white sandstone "
+                        + houndSpawns(helper, smooth, MobSpawnType.NATURAL));
+        helper.assertTrue(houndSpawns(helper, stone, MobSpawnType.SPAWNER), "a spawner's hound was refused on stone");
+        boolean natural = BleachConfig.get(BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS);
+        try {
+            BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS.set(false);
+            helper.assertTrue(!houndSpawns(helper, sand, MobSpawnType.NATURAL), "a hound came with Hueco Mundo's spawns off");
+        } finally {
+            BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS.set(natural);
+        }
+        // Peaceful within this one call, so no tick sees it: no natural Hollow may come, and a spawner's still may.
+        MinecraftServer server = level.getServer();
+        Difficulty difficulty = server.getWorldData().getDifficulty();
+        try {
+            server.setDifficulty(Difficulty.PEACEFUL, true);
+            boolean calmNatural = houndSpawns(helper, sand, MobSpawnType.NATURAL);
+            boolean calmSpawner = houndSpawns(helper, stone, MobSpawnType.SPAWNER);
+            helper.assertTrue(!calmNatural && calmSpawner, "in Peaceful a natural hound may come onto white sand "
+                    + calmNatural + " and a spawner's onto stone " + calmSpawner);
+        } finally {
+            server.setDifficulty(difficulty, true);
+        }
+        helper.assertTrue(HuecoMundoSpawns.allowed(Difficulty.NORMAL, true)
+                        && !HuecoMundoSpawns.allowed(Difficulty.PEACEFUL, true)
+                        && !HuecoMundoSpawns.allowed(Difficulty.NORMAL, false),
+                "Hueco Mundo's Hollows do not come only off Peaceful with mob spawning on");
+        // Past 30,000,000 blocks out a level reads full light without its light engine, whatever the hour, so there a
+        // spawner's hound is refused for the light and a natural one is not. The hound is never added to the level.
+        Hollow hound = ModEntities.HOUND_HOLLOW.get().create(level);
+        helper.assertTrue(hound != null, "no hound could be made");
+        hound.moveTo(30_000_000.5, 100.0, 0.5, 0.0F, 0.0F);
+        boolean byLight = hound.checkSpawnRules(level, MobSpawnType.SPAWNER);
+        boolean unread = hound.checkSpawnRules(level, MobSpawnType.NATURAL);
+        helper.assertTrue(!byLight && unread, "in full light a spawner's hound passes " + byLight + " and a natural one "
+                + unread);
+
+        ServerLevel hueco = level.getServer().getLevel(BleachWorlds.HUECO_MUNDO);
+        helper.assertTrue(hueco != null, "the test server has no Hueco Mundo");
+        // Made here and held by nothing past this call, with the Gillian gone again before it ends.
+        hueco.getChunk(0, 8);
+        int before = Menos.aliveCount(level.getServer());
+        int inHueco = Menos.aliveIn(hueco);
+        Gillian gillian = ModEntities.GILLIAN.get().create(hueco);
+        helper.assertTrue(gillian != null, "no Gillian could be made");
+        gillian.moveTo(0.5, HuecoMundoPlan.LEVEL_Y, 136.5, 0.0F, 0.0F);
+        try {
+            helper.assertTrue(hueco.addFreshEntity(gillian), "Hueco Mundo would not take the Gillian");
+            untilListed(hueco, gillian);
+            int after = Menos.aliveCount(level.getServer());
+            int counted = Menos.aliveIn(hueco);
+            helper.assertTrue(after == before && counted == inHueco + 1, "with a Gillian in Hueco Mundo the server counts "
+                    + after + " Menos, not " + before + ", and Hueco Mundo " + counted + ", not " + (inHueco + 1));
+            boolean near = Menos.mayRiseIn(hueco, new Vec3(0.5, HuecoMundoPlan.LEVEL_Y, 200.5));
+            boolean far = Menos.mayRiseIn(hueco, new Vec3(0.5, HuecoMundoPlan.LEVEL_Y, 400.5));
+            helper.assertTrue(!near && far == (counted < BleachConfig.get(BleachConfig.MENOS_MAX_ALIVE)),
+                    "a Menos may rise 64 blocks from the Gillian " + near + " and 264 from it " + far);
+        } finally {
+            gillian.discard();
+        }
+        helper.succeed();
+    }
+
+    /** Runs one tick of this Hollow's body, its hunger begun, and asserts the soul hunger it spent, the debt included. */
+    private static void assertTick(GameTestHelper helper, Player player, double expected, String what) {
+        SoulData data = SoulLogic.get(player);
+        HollowBody.ensureHunger(data);
+        float start = HollowBody.satiety(data);
+        player.tickCount = 1;
+        HollowBody.tickBody(player, data, HollowPlayerTests.now(helper));
+        double spent = start - HollowBody.satiety(data);
+        helper.assertTrue(Math.abs(spent - expected) < HUNGER_SAME, what + " spent " + spent + ", not " + expected);
+    }
+
+    /** Spends 4 exhaustion through this Hollow's food bar and asserts the soul hunger that took. */
+    private static void assertEffort(GameTestHelper helper, Player player, double expected, String what) {
+        SoulData data = SoulLogic.get(player);
+        float start = HollowBody.satiety(data);
+        player.getFoodData().addExhaustion(4.0F);
+        HollowBody.feedsOnSouls(player, player.getFoodData());
+        double spent = start - HollowBody.satiety(data);
+        helper.assertTrue(Math.abs(spent - expected) < HUNGER_SAME, what + " spent " + spent + ", not " + expected);
+    }
+
+    /** Asserts whether an Adjuchas's clock runs for this player. */
+    private static void assertClock(GameTestHelper helper, Player player, boolean expected, String where) {
+        helper.assertTrue(MenosEvolution.clockRuns(player) == expected,
+                "an Adjuchas's clock runs " + where + ": " + MenosEvolution.clockRuns(player) + ", not " + expected);
+    }
+
+    /**
+     * A Hollow player's soul hunger falls at half its rate in Hueco Mundo, standing still and in effort alike, at the
+     * whole rate elsewhere, and not at all in Peaceful. An Adjuchas's clock runs there on the dunes and in the Forest of
+     * Menos while Hueco Mundo's Hollows spawn (in the forest, while any Menos may rise), never on Las Noches' level
+     * ground, its grounds or in Soul Society.
+     */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void hollowHungerHalvesInHuecoMundo(GameTestHelper helper) {
+        MinecraftServer server = helper.getLevel().getServer();
+        ServerLevel hueco = server.getLevel(BleachWorlds.HUECO_MUNDO);
+        ServerLevel society = server.getLevel(BleachWorlds.SOUL_SOCIETY);
+        helper.assertTrue(hueco != null && society != null, "the test server lacks Hueco Mundo or Soul Society");
+        double there = HollowPlayerLogic.hungerShare(BleachWorlds.HUECO_MUNDO);
+        double human = HollowPlayerLogic.hungerShare(Level.OVERWORLD);
+        double soul = HollowPlayerLogic.hungerShare(BleachWorlds.SOUL_SOCIETY);
+        helper.assertTrue(there == 0.5 && human == 1.0 && soul == 1.0, "a Hollow's hunger falls at " + there
+                + " in Hueco Mundo, " + human + " in the Human World and " + soul + " in Soul Society");
+        double share = BleachConfig.get(BleachConfig.HUECO_MUNDO_HUNGER_SHARE);
+        try {
+            BleachConfig.HUECO_MUNDO_HUNGER_SHARE.set(0.25);
+            helper.assertTrue(HollowPlayerLogic.hungerShare(BleachWorlds.HUECO_MUNDO) == 0.25,
+                    "the share did not follow the config");
+        } finally {
+            BleachConfig.HUECO_MUNDO_HUNGER_SHARE.set(share);
+        }
+
+        // Peaceful refills on the second's tick and drains nothing; tick 1 is no second's.
+        Vec3 levelGround = new Vec3(0.5, HuecoMundoPlan.LEVEL_Y, 136.5);
+        double drain = hueco.getDifficulty() == Difficulty.PEACEFUL ? 0.0 : HollowPlayerLogic.drainPerTick();
+        double effort = hueco.getDifficulty() == Difficulty.PEACEFUL ? 0.0 : HollowPlayerLogic.satietyFromExhaustion(4.0F);
+        Player inHueco = mockIn(hueco, levelGround, ShinigamiTests.soul(SoulState.HOLLOW, 90.0F));
+        assertTick(helper, inHueco, drain * 0.5, "a tick in Hueco Mundo");
+        assertEffort(helper, inHueco, effort * 0.5, "effort in Hueco Mundo");
+        Player home = helper.makeMockPlayer(GameType.SURVIVAL);
+        home.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.HOLLOW, 90.0F));
+        assertTick(helper, home, drain, "a tick in the Human World");
+        assertEffort(helper, home, effort, "effort in the Human World");
+
+        // Game rules are the server's: mob spawning is on only within this one call, so nothing spawns meanwhile.
+        GameRules.BooleanValue spawning = hueco.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING);
+        boolean was = spawning.get();
+        boolean open = hueco.getDifficulty() != Difficulty.PEACEFUL;
+        SoulData adjuchas = GargantaTests.menos(HollowTier.ADJUCHAS, 400.0F);
+        Player dunes = mockIn(hueco, new Vec3(-1000.5, 100.0, 0.5), adjuchas);
+        try {
+            spawning.set(true, server);
+            assertClock(helper, dunes, open, "on the dunes");
+            Player forest = mockIn(hueco, new Vec3(0.5, 50.0, 136.5), adjuchas);
+            assertClock(helper, forest, open, "in the Forest of Menos");
+            assertClock(helper, mockIn(hueco, levelGround, adjuchas), false, "on Las Noches' level ground");
+            assertClock(helper, mockIn(hueco, new Vec3(0.5, HuecoMundoPlan.LEVEL_Y, 0.5), adjuchas), false,
+                    "where Las Noches will stand");
+            assertClock(helper, mockIn(society, new Vec3(0.5, 72.0, 544.5), adjuchas), false, "in the Rukongai");
+            boolean natural = BleachConfig.get(BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS);
+            try {
+                BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS.set(false);
+                assertClock(helper, dunes, false, "on the dunes with Hueco Mundo's spawns off");
+            } finally {
+                BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS.set(natural);
+            }
+            // The forest lists only Menos, so with none allowed nothing comes there to eat; the dunes are unchanged.
+            int most = BleachConfig.get(BleachConfig.MENOS_MAX_ALIVE);
+            try {
+                BleachConfig.MENOS_MAX_ALIVE.set(0);
+                assertClock(helper, forest, false, "in the Forest of Menos with no Menos allowed");
+                assertClock(helper, dunes, open, "on the dunes with no Menos allowed");
+            } finally {
+                BleachConfig.MENOS_MAX_ALIVE.set(most);
+            }
+            // Peaceful within this one call, so no tick sees it: nothing drains, and no clock runs where none can come.
+            Difficulty difficulty = server.getWorldData().getDifficulty();
+            try {
+                server.setDifficulty(Difficulty.PEACEFUL, true);
+                assertClock(helper, dunes, false, "on the dunes in Peaceful");
+                Player calm = mockIn(hueco, levelGround, ShinigamiTests.soul(SoulState.HOLLOW, 90.0F));
+                assertTick(helper, calm, 0.0, "a tick in Hueco Mundo in Peaceful");
+                assertEffort(helper, calm, 0.0, "effort in Hueco Mundo in Peaceful");
+            } finally {
+                server.setDifficulty(difficulty, true);
+            }
+            spawning.set(false, server);
+            assertClock(helper, dunes, false, "on the dunes with mob spawning off");
+        } finally {
+            spawning.set(was, server);
+        }
+        helper.succeed();
     }
 }

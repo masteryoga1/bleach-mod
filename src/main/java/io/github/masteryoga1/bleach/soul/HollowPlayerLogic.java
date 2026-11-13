@@ -2,13 +2,16 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.BleachTags;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 /**
  * The rules for playing as a Hollow: the bands of soul hunger, what the claws, hide and regeneration
@@ -227,6 +230,11 @@ public final class HollowPlayerLogic {
     /** Soul hunger lost each tick doing nothing. */
     public static float drainPerTick() {
         return (float) (BleachConfig.get(BleachConfig.SATIETY_DRAIN_PER_MINUTE) / 1200.0);
+    }
+
+    /** The share of its usual soul hunger a Hollow player loses in this world: Hueco Mundo's share there, all elsewhere. */
+    public static double hungerShare(ResourceKey<Level> world) {
+        return world == BleachWorlds.HUECO_MUNDO ? BleachConfig.get(BleachConfig.HUECO_MUNDO_HUNGER_SHARE) : 1.0;
     }
 
     /** Soul hunger the effort behind this much vanilla exhaustion costs. */

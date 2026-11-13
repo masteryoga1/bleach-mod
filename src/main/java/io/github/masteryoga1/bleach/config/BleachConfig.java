@@ -740,6 +740,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue KONSO_INNER_BIAS;
     public static final ModConfigSpec.BooleanValue HOME_WORLD_RESPAWN;
     public static final ModConfigSpec.BooleanValue DISTRICT_NAMES;
+    public static final ModConfigSpec.DoubleValue HUECO_MUNDO_HUNGER_SHARE;
+    public static final ModConfigSpec.BooleanValue HUECO_MUNDO_NATURAL_SPAWNS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -1057,7 +1059,8 @@ public final class BleachConfig {
                 .comment("Whether Hollows hunt players who are Hollows or Arrancar themselves.")
                 .define("hunt_hollow_players", false);
         HOLLOW_LEAVE_AFTER_MINUTES = builder
-                .comment("Minutes a Hollow with no prey near an aware soul waits before it leaves through a tear. 0 means they never leave.")
+                .comment("Minutes a Hollow with no prey near an aware soul waits before it leaves through a tear. 0 means"
+                        + " they never leave; in Hueco Mundo, their home, none ever does.")
                 .defineInRange("leave_after_minutes", 2, 0, 1_440);
         HOLLOW_HIT_STAT_XP = builder
                 .comment("Zanjutsu or Hakuda XP for a landed hit on a Hollow.")
@@ -1075,10 +1078,12 @@ public final class BleachConfig {
                 .comment("Soul hunger a Hollow starts at, out of 100.")
                 .defineInRange("satiety_start", 60.0, 0.0, 100.0);
         SATIETY_DRAIN_PER_MINUTE = builder
-                .comment("Soul hunger a Hollow loses each minute, doing nothing.")
+                .comment("Soul hunger a Hollow loses each minute, doing nothing; in Hueco Mundo, [hueco_mundo] hunger_share"
+                        + " of it.")
                 .defineInRange("drain_per_minute", 2.0, 0.0, 100.0);
         SATIETY_PER_EXHAUSTION = builder
-                .comment("Soul hunger lost per point of vanilla exhaustion (sprinting, jumping, fighting).")
+                .comment("Soul hunger lost per point of vanilla exhaustion (sprinting, jumping, fighting); in Hueco Mundo,"
+                        + " [hueco_mundo] hunger_share of it.")
                 .defineInRange("satiety_per_exhaustion", 0.6, 0.0, 10.0);
         SATIETY_RESPAWN_FLOOR = builder
                 .comment("A Hollow comes back from death with at least this much soul hunger.")
@@ -2071,7 +2076,8 @@ public final class BleachConfig {
                 .comment("Maximum reiryoku at which a pack brings one Adjuchas more.")
                 .defineInRange("adjuchas_extra_at_reiatsu", 800.0, 0.0, 10_000.0);
         MENOS_MAX_ALIVE = builder
-                .comment("Most Menos alive in the world at once. 0 brings none.")
+                .comment("Most Menos alive at once outside Hueco Mundo; Hueco Mundo, counted apart, holds as many of its"
+                        + " own. 0 brings none.")
                 .defineInRange("max_alive", 4, 0, 32);
         MENOS_SPACING = builder
                 .comment("No Menos comes within this many blocks of another.")
@@ -2259,7 +2265,8 @@ public final class BleachConfig {
                 .comment("What an Adjuchas risks when it goes without devouring a Hollow: SOFT, it sinks back into a Gillian"
                         + " and may rise again for more Hollows; CANON, it sinks back for good; OFF, nothing. The clock runs"
                         + " only where Hollows come for it: in the Overworld, off Peaceful, with mob spawning and Garganta"
-                        + " arrivals on.")
+                        + " arrivals on, or on Hueco Mundo's dunes and in its Forest of Menos while its own Hollows spawn"
+                        + " there.")
                 .defineEnum("regression", HollowTier.Regression.SOFT);
         REGRESS_MINUTES = builder
                 .comment("Minutes of play without devouring a Hollow before an Adjuchas sinks back into a Gillian.")
@@ -2995,14 +3002,27 @@ public final class BleachConfig {
                         + " has it; at 2, half land in the first 20.")
                 .defineInRange("konso_inner_bias", 2.0, 1.0, 10.0);
         HOME_WORLD_RESPAWN = builder
-                .comment("Whether a soul with no spawn of its own can wake in Soul Society when it dies, at the place that"
-                        + " is home to a soul of its kind; off, every soul wakes where vanilla puts it.")
+                .comment("Whether a soul with no spawn of its own can wake in its home world when it dies: in Soul Society,"
+                        + " at the place that is home to a soul of its kind, or in Hueco Mundo for a Gillian, Adjuchas or"
+                        + " Vasto Lorde Hollow or an Arrancar; off, every soul wakes where vanilla puts it.")
                 .define("home_world_respawn", true);
         DISTRICT_NAMES = builder
                 .comment("Whether the action bar names the place a soul comes into in Soul Society: Seireitei, the"
                         + " Seireiheki, or the Rukongai's district and region, with the name canon gives it where it has"
                         + " one.")
                 .define("district_names", true);
+        builder.pop();
+
+        builder.push("hueco_mundo");
+        HUECO_MUNDO_HUNGER_SHARE = builder
+                .comment("Share of its usual soul hunger a Hollow player loses in Hueco Mundo, standing still and in effort"
+                        + " alike (0.5 is half). Healing costs the same everywhere.")
+                .defineInRange("hunger_share", 0.5, 0.0, 1.0);
+        HUECO_MUNDO_NATURAL_SPAWNS = builder
+                .comment("Whether Hollows spawn in Hueco Mundo by themselves, in any light: basic Hollows on the dunes'"
+                        + " white sand, Gillian and Adjuchas on the Forest of Menos's white sandstone, none in Peaceful."
+                        + " Hueco Mundo holds at most [menos] max_alive Menos of its own, apart from the Human World's.")
+                .define("natural_spawns", true);
         builder.pop();
 
         SPEC = builder.build();

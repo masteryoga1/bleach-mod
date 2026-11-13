@@ -17,6 +17,7 @@ import io.github.masteryoga1.bleach.registry.ModMenus;
 import io.github.masteryoga1.bleach.registry.ModRecipes;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.registry.ModWorldgen;
+import io.github.masteryoga1.bleach.soul.HuecoMundoSpawns;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
@@ -55,6 +56,7 @@ public final class BleachMod {
         modContainer.registerConfig(ModConfig.Type.SERVER, BleachConfig.SPEC);
         modEventBus.addListener(BleachNetwork::register);
         modEventBus.addListener(ModEntities::onAttributes);
+        modEventBus.addListener(HuecoMundoSpawns::registerPlacements);
         modEventBus.addListener(ZanpakutoSpirits::register);
         modEventBus.addListener(KidoSpell::register);
 

@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.EnumSet;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
@@ -223,13 +224,30 @@ public abstract class Menos extends Hollow implements CeroBeam.Caster {
         return level.getEntities(ANY_MENOS, menos -> menos.isAlive() && menos.distanceToSqr(at) < spacingSqr).isEmpty();
     }
 
-    /** The Menos alive in every world of the server. */
+    /** The Menos alive in every world of the server but Hueco Mundo, which keeps its own count ({@link #mayRiseIn}). */
     public static int aliveCount(MinecraftServer server) {
         int count = 0;
         for (ServerLevel level : server.getAllLevels()) {
-            count += level.getEntities(ANY_MENOS, Entity::isAlive).size();
+            if (level.dimension() != BleachWorlds.HUECO_MUNDO) {
+                count += aliveIn(level);
+            }
         }
         return count;
+    }
+
+    /** The Menos alive in this world. */
+    public static int aliveIn(ServerLevel level) {
+        return level.getEntities(ANY_MENOS, Entity::isAlive).size();
+    }
+
+    /** Whether a Menos may rise here by itself: this world holds fewer than the server allows, none within the spacing. */
+    public static boolean mayRiseIn(ServerLevel level, Vec3 at) {
+        if (aliveIn(level) >= BleachConfig.get(BleachConfig.MENOS_MAX_ALIVE)) {
+            return false;
+        }
+        double spacing = BleachConfig.get(BleachConfig.MENOS_SPACING);
+        double spacingSqr = spacing * spacing;
+        return level.getEntities(ANY_MENOS, menos -> menos.isAlive() && menos.distanceToSqr(at) < spacingSqr).isEmpty();
     }
 
     /** The first step starts the wait for a first Cero; past its lifetime, a Menos nobody keeps goes back. */

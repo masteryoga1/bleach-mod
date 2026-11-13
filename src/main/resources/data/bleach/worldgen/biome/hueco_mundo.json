@@ -6,6 +6,10 @@
     "mood_sound": {"sound": "minecraft:ambient.cave", "tick_delay": 6000, "block_search_extent": 8, "offset": 2.0}},
   "carvers": {},
   "features": [[], [], [], [], [], [], [], [], [], ["bleach:quartz_tree"]],
-  "spawners": {},
+  "spawners": {"monster": [
+    {"type": "bleach:spider_hollow", "weight": 5, "minCount": 1, "maxCount": 3},
+    {"type": "bleach:hexapodus", "weight": 5, "minCount": 1, "maxCount": 3},
+    {"type": "bleach:hound_hollow", "weight": 5, "minCount": 1, "maxCount": 3},
+    {"type": "bleach:serpent_hollow", "weight": 5, "minCount": 1, "maxCount": 3}]},
   "spawn_costs": {}
 }

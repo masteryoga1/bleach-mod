@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -258,16 +259,25 @@ public final class MenosEvolution {
 
     /**
      * Whether an Adjuchas's clock may run for this player now: alive, under survival's rules, while the
-     * game runs, and where Hollows come for it (the Overworld, off Peaceful, with mob spawning, Garganta
-     * arrivals and Hollow players' arrivals on), so it is never punished where there is nothing to eat.
+     * game runs, and where Hollows come for it: the Overworld, off Peaceful, with mob spawning, Garganta
+     * arrivals and Hollow players' arrivals on, or Hueco Mundo's dunes and Forest of Menos while its own
+     * Hollows spawn there. So it is never punished where there is nothing to eat.
      */
     public static boolean clockRuns(Player player) {
         Level level = player.level();
-        return HollowPlayerLogic.survivalRules(player) && player.isAlive()
-                && HollowLogic.worldAllowsArrivals(level.getDifficulty(),
-                        level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING), level.dimension() == Level.OVERWORLD)
-                && BleachConfig.get(BleachConfig.HOLLOW_ARRIVAL_MULTIPLIER) > 0.0
-                && level.tickRateManager().runsNormally();
+        if (!HollowPlayerLogic.survivalRules(player) || !player.isAlive() || !level.tickRateManager().runsNormally()) {
+            return false;
+        }
+        boolean mobSpawning = level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING);
+        if (level.dimension() == BleachWorlds.HUECO_MUNDO) {
+            // A server that spawns no monsters (Peaceful, or its spawn-monsters property off) spawns none there either.
+            MinecraftServer server = level.getServer();
+            return HuecoMundoSpawns.allowed(level.getDifficulty(), mobSpawning)
+                    && server != null && server.isSpawningMonsters()
+                    && HuecoMundoSpawns.hollowsLiveAt(level, player.blockPosition());
+        }
+        return HollowLogic.worldAllowsArrivals(level.getDifficulty(), mobSpawning, level.dimension() == Level.OVERWORLD)
+                && BleachConfig.get(BleachConfig.HOLLOW_ARRIVAL_MULTIPLIER) > 0.0;
     }
 
     /**
