@@ -386,16 +386,23 @@ public final class TravelEvents {
      * Where this body set down on this column by a Garganta would stand: on the highest ground its box covers, so a
      * giant's wide body clears a step or a slope beside its column, the chunks under it loaded (and made) first; null
      * where that ground will not hold it (see {@link SafeLanding#landingSpot}). A person's box covers only its own
-     * column, so it stands where {@link RukongaiEvents#groundAt} would set it.
+     * column, so it stands where {@link RukongaiEvents#groundAt} would set it, under any leaves; a wider body could not
+     * stand under them, so it stands on them.
      */
     @Nullable
     public static Vec3 groundUnder(Entity body, ServerLevel level, int x, int z) {
         double half = body.getDimensions(Pose.STANDING).width() / 2.0;
+        int west = Mth.floor(x + 0.5 - half);
+        int east = Mth.floor(x + 0.5 + half);
+        int north = Mth.floor(z + 0.5 - half);
+        int south = Mth.floor(z + 0.5 + half);
+        Heightmap.Types ground = west == east && north == south
+                ? Heightmap.Types.MOTION_BLOCKING_NO_LEAVES : Heightmap.Types.MOTION_BLOCKING;
         int top = level.getMinBuildHeight();
-        for (int column = Mth.floor(x + 0.5 - half); column <= Mth.floor(x + 0.5 + half); column++) {
-            for (int row = Mth.floor(z + 0.5 - half); row <= Mth.floor(z + 0.5 + half); row++) {
+        for (int column = west; column <= east; column++) {
+            for (int row = north; row <= south; row++) {
                 level.getChunk(column >> 4, row >> 4);
-                top = Math.max(top, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, column, row));
+                top = Math.max(top, level.getHeight(ground, column, row));
             }
         }
         return SafeLanding.landingSpot(body, level, new Vec3(x + 0.5, top, z + 0.5));

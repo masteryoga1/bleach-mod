@@ -368,8 +368,9 @@ public final class GargantaTests {
     /**
      * A real Arrancar holds the Gate key a second and a Garganta opens 1.8 blocks south; walked into, it passes on its
      * 11th tick inside into the real Hueco Mundo, on the ground outside Las Noches, remembering the block it left. A
-     * Garganta torn there, once its chunk ticks, takes it home to that block, where the first still stands open and only
-     * renews its wait. It runs in a batch of its own, so no other test's tear, Hollow or player ticks beside its trip.
+     * Garganta torn there, once its chunk ticks, opens round it and leaves it be until it steps out and in again, then
+     * takes it home to that block, where the first still stands open and only renews its wait. It runs in a batch of its
+     * own, so no other test's tear, Hollow or player ticks beside its trip.
      */
     @GameTest(template = "empty", batch = "garganta_trip", timeoutTicks = 400)
     public static void anArrancarTearsAGargantaThereAndBack(GameTestHelper helper) {
@@ -443,6 +444,7 @@ public final class GargantaTests {
             helper.assertTrue(middle != null, "nowhere in the held chunk holds the Arrancar");
             player.teleportTo(hueco, middle.x, middle.y, middle.z, 0.0F, 0.0F);
             BlockPos home = BlockPos.containing(GargantaRift.passageStanding(player, 1.0F));
+            GargantaRift[] tearHome = new GargantaRift[1];
             helper.startSequence()
                     .thenWaitUntil(() -> helper.assertTrue(hueco.isPositionEntityTicking(home),
                             "the chunk the tear home would stand in never ticked"))
@@ -453,9 +455,20 @@ public final class GargantaTests {
                         cleanup.spawned().add(back);
                         helper.assertTrue(back != null && back.leadsTo() == Level.OVERWORLD, "the Garganta home leads to "
                                 + (back == null ? "nowhere" : back.leadsTo()));
+                        tearHome[0] = back;
+                        // In it before its first tick, as if it had opened round the Arrancar.
                         player.teleportTo(hueco, back.getX(), back.getY(), back.getZ(), 0.0F, 0.0F);
                     })
-                    // The tear home first ticks on the next tick, and the Arrancar passes ten after that.
+                    // Past the tick it would have passed on had it stepped in, it stands there still.
+                    .thenExecuteAfter(15, () -> {
+                        helper.assertTrue(player.level() == hueco, "the Garganta home took the Arrancar it opened round, to "
+                                + TravelTests.where(player));
+                        player.teleportTo(hueco, middle.x, middle.y, middle.z, 0.0F, 0.0F);
+                    })
+                    // Out of it for a tick, then back in: the tear home counts it from the next tick, and it passes ten
+                    // after that.
+                    .thenExecuteAfter(1, () -> player.teleportTo(hueco, tearHome[0].getX(), tearHome[0].getY(),
+                            tearHome[0].getZ(), 0.0F, 0.0F))
                     .thenExecuteAfter(7, () -> helper.assertTrue(player.level() == hueco,
                             "the Arrancar passed home after 7 ticks in the Garganta, to " + TravelTests.where(player)))
                     .thenExecuteAfter(18, () -> {

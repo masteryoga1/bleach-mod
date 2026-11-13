@@ -11,7 +11,9 @@ import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import io.github.masteryoga1.bleach.soul.TravelEvents;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -132,6 +134,12 @@ public class GargantaRift extends Entity implements Portal {
     /** Who tore a passage open. Server only. */
     @Nullable
     private UUID opener;
+    /**
+     * The souls standing in a passage as it opened, none taken until it has stepped out once; null until its first
+     * tick. Server only, never saved.
+     */
+    @Nullable
+    private Set<UUID> openedRound;
 
     public GargantaRift(EntityType<? extends GargantaRift> type, Level level) {
         super(type, level);
@@ -401,13 +409,21 @@ public class GargantaRift extends Entity implements Portal {
 
     /**
      * A passage's tick: each aware soul in it is let in, or told once a second why not, that it rides or that its body
-     * is too big for this tear. A soul in a Senkaimon too is the Senkaimon's. A giant, whom {@link MenosBody} holds off
-     * every portal, is let in where it fits, its hold lifted first.
+     * is too big for this tear. A soul the tear opened round did not step in, so it is passed over until it has stepped
+     * out once, and no tear torn on a soul sends it away. A soul in a Senkaimon too is the Senkaimon's. A giant, whom
+     * {@link MenosBody} holds off every portal, is let in where it fits, its hold lifted first.
      */
     private void admit(ServerLevel level) {
         boolean tell = tickCount % TICKS_PER_SECOND == 0;
-        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, passBox(), Senkaimon::mayEnter)) {
-            if (!level.getEntitiesOfClass(Senkaimon.class, player.getBoundingBox()).isEmpty()) {
+        List<ServerPlayer> inside = level.getEntitiesOfClass(ServerPlayer.class, passBox());
+        if (openedRound == null) {
+            openedRound = new HashSet<>();
+            inside.forEach(player -> openedRound.add(player.getUUID()));
+        }
+        openedRound.removeIf(id -> inside.stream().noneMatch(player -> player.getUUID().equals(id)));
+        for (ServerPlayer player : inside) {
+            if (openedRound.contains(player.getUUID()) || !Senkaimon.mayEnter(player)
+                    || !level.getEntitiesOfClass(Senkaimon.class, player.getBoundingBox()).isEmpty()) {
                 continue;
             }
             if (player.isPassenger()) {

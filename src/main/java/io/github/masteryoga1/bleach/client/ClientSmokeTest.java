@@ -1601,7 +1601,8 @@ public final class ClientSmokeTest {
             // drawn. The hand and the HUD are hidden for the shot, as in the blocks beat, so the held item covers none of
             // the plain.
             // "Into Hueco Mundo", granted on arrival about 8486, is the one advancement new since the soul became an
-            // Arrancar; its toast is long gone, and is cleared anyway, as hiding the GUI hides no toast.
+            // Arrancar. Its toast is long gone, but toasts are cleared anyway: hiding the GUI only stops them being drawn,
+            // and one still queued would show again once the GUI returns.
             case 8665 -> {
                 minecraft.getToasts().clear();
                 minecraft.options.hideGui = true;
