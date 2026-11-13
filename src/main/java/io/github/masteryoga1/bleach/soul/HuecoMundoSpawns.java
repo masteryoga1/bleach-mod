@@ -89,9 +89,12 @@ public final class HuecoMundoSpawns {
         return BleachConfig.get(BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS) && mobSpawning && difficulty != Difficulty.PEACEFUL;
     }
 
-    /** Whether this spot lies where Hueco Mundo's Hollows spawn: on the dunes or in the Forest of Menos. */
+    /**
+     * Whether this spot lies where Hueco Mundo's Hollows spawn: on the dunes, or in the Forest of Menos while the server
+     * lets any Menos rise, since only Menos are listed there.
+     */
     public static boolean hollowsLiveAt(Level level, BlockPos pos) {
         Holder<Biome> biome = level.getBiome(pos);
-        return biome.is(DUNES) || biome.is(FOREST_OF_MENOS);
+        return biome.is(DUNES) || (biome.is(FOREST_OF_MENOS) && BleachConfig.get(BleachConfig.MENOS_MAX_ALIVE) > 0);
     }
 }

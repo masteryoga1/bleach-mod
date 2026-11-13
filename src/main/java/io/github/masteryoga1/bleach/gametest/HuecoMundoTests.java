@@ -722,7 +722,8 @@ public final class HuecoMundoTests {
     /**
      * A Hollow player's soul hunger falls at half its rate in Hueco Mundo, standing still and in effort alike, at the
      * whole rate elsewhere, and not at all in Peaceful. An Adjuchas's clock runs there on the dunes and in the Forest of
-     * Menos while Hueco Mundo's Hollows spawn, never on Las Noches' level ground, its grounds or in Soul Society.
+     * Menos while Hueco Mundo's Hollows spawn (in the forest, while any Menos may rise), never on Las Noches' level
+     * ground, its grounds or in Soul Society.
      */
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void hollowHungerHalvesInHuecoMundo(GameTestHelper helper) {
@@ -765,7 +766,8 @@ public final class HuecoMundoTests {
         try {
             spawning.set(true, server);
             assertClock(helper, dunes, open, "on the dunes");
-            assertClock(helper, mockIn(hueco, new Vec3(0.5, 50.0, 136.5), adjuchas), open, "in the Forest of Menos");
+            Player forest = mockIn(hueco, new Vec3(0.5, 50.0, 136.5), adjuchas);
+            assertClock(helper, forest, open, "in the Forest of Menos");
             assertClock(helper, mockIn(hueco, levelGround, adjuchas), false, "on Las Noches' level ground");
             assertClock(helper, mockIn(hueco, new Vec3(0.5, HuecoMundoPlan.LEVEL_Y, 0.5), adjuchas), false,
                     "where Las Noches will stand");
@@ -776,6 +778,15 @@ public final class HuecoMundoTests {
                 assertClock(helper, dunes, false, "on the dunes with Hueco Mundo's spawns off");
             } finally {
                 BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS.set(natural);
+            }
+            // The forest lists only Menos, so with none allowed nothing comes there to eat; the dunes are unchanged.
+            int most = BleachConfig.get(BleachConfig.MENOS_MAX_ALIVE);
+            try {
+                BleachConfig.MENOS_MAX_ALIVE.set(0);
+                assertClock(helper, forest, false, "in the Forest of Menos with no Menos allowed");
+                assertClock(helper, dunes, open, "on the dunes with no Menos allowed");
+            } finally {
+                BleachConfig.MENOS_MAX_ALIVE.set(most);
             }
             // Peaceful within this one call, so no tick sees it: nothing drains, and no clock runs where none can come.
             Difficulty difficulty = server.getWorldData().getDifficulty();
