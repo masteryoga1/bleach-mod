@@ -332,6 +332,34 @@ public final class GargantaTests {
         Vec3 far = TravelEvents.huecoMundoLanding(soul, hueco, soul.getX(), soul.getZ());
         helper.assertTrue(far != null, "Hueco Mundo holds nothing on the soul's own bearing");
         at(helper, TravelEvents.gargantaLanding(soul, hueco, BleachWorlds.HUECO_MUNDO), far, "the way into Hueco Mundo");
+        helper.assertTrue(Rukongai.district(326, 435) == 1, "(3, 4)'s Rukongai is in district "
+                + Rukongai.district(326, 435));
+        // Torn sneaking at Hueco Mundo's centre, the way leads to the Rukongai column the centre's soul came out on.
+        soul.moveTo(0.0, soul.getY(), 0.0);
+        at(helper, TravelEvents.gargantaLanding(soul, society, BleachWorlds.SOUL_SOCIETY), rukongai,
+                "the way into Soul Society from the centre");
+        helper.succeed();
+    }
+
+    /**
+     * A giant set down by a Garganta stands on the highest ground its wide body covers, so a step beside its column
+     * does not turn it away, while a person stands on its own column. It runs in the field, open to the sky, so no
+     * barrier roof counts as ground.
+     */
+    @GameTest(template = "field", skyAccess = true)
+    public static void aGiantLandsOnTheHighestGroundUnderIt(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        // A step a block high one column east of the middle: under a Gillian's 3.6 blocks, beside a person's 0.6.
+        helper.setBlock(9, 2, 8, Blocks.STONE);
+        Player soul = mock(helper, GameType.SURVIVAL, arrancar());
+        Player giant = mock(helper, GameType.SURVIVAL, arrancar());
+        giant.getAttribute(Attributes.SCALE).setBaseValue(6.0);
+        giant.refreshDimensions();
+        BlockPos middle = helper.absolutePos(new BlockPos(8, 2, 8));
+        Vec3 floor = Vec3.atBottomCenterOf(middle);
+        at(helper, TravelEvents.groundUnder(soul, level, middle.getX(), middle.getZ()), floor, "a person beside the step");
+        at(helper, TravelEvents.groundUnder(giant, level, middle.getX(), middle.getZ()), floor.add(0.0, 1.0, 0.0),
+                "a Gillian over the step");
         helper.succeed();
     }
 

@@ -372,14 +372,33 @@ public final class TravelEvents {
     @Nullable
     public static Vec3 huecoMundoLanding(Entity soul, ServerLevel huecoMundo, double x, double z) {
         Vec3 at = TravelLogic.outsideLasNoches(x, z);
-        return RukongaiEvents.groundAt(soul, huecoMundo, Mth.floor(at.x), Mth.floor(at.z));
+        return groundUnder(soul, huecoMundo, Mth.floor(at.x), Mth.floor(at.z));
     }
 
     /** Where a soul from this x and z in Hueco Mundo comes out in Soul Society: the Rukongai on its bearing, grounded. */
     @Nullable
     public static Vec3 rukongaiLanding(Entity soul, ServerLevel soulSociety, double x, double z) {
         Vec3 at = TravelLogic.rukongaiOnBearing(x, z);
-        return RukongaiEvents.groundAt(soul, soulSociety, Mth.floor(at.x), Mth.floor(at.z));
+        return groundUnder(soul, soulSociety, Mth.floor(at.x), Mth.floor(at.z));
+    }
+
+    /**
+     * Where this body set down on this column by a Garganta would stand: on the highest ground its box covers, so a
+     * giant's wide body clears a step or a slope beside its column, the chunks under it loaded (and made) first; null
+     * where that ground will not hold it (see {@link SafeLanding#landingSpot}). A person's box covers only its own
+     * column, so it stands where {@link RukongaiEvents#groundAt} would set it.
+     */
+    @Nullable
+    public static Vec3 groundUnder(Entity body, ServerLevel level, int x, int z) {
+        double half = body.getDimensions(Pose.STANDING).width() / 2.0;
+        int top = level.getMinBuildHeight();
+        for (int column = Mth.floor(x + 0.5 - half); column <= Mth.floor(x + 0.5 + half); column++) {
+            for (int row = Mth.floor(z + 0.5 - half); row <= Mth.floor(z + 0.5 + half); row++) {
+                level.getChunk(column >> 4, row >> 4);
+                top = Math.max(top, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, column, row));
+            }
+        }
+        return SafeLanding.landingSpot(body, level, new Vec3(x + 0.5, top, z + 0.5));
     }
 
     /**
@@ -392,7 +411,7 @@ public final class TravelEvents {
                 .filter(at -> at.dimension() == Level.OVERWORLD);
         Vec3 spot = back.map(at -> landing(passer, target, Vec3.atBottomCenterOf(at.pos()))).orElse(null);
         if (spot == null) {
-            spot = RukongaiEvents.groundAt(passer, target, passer.getBlockX(), passer.getBlockZ());
+            spot = groundUnder(passer, target, passer.getBlockX(), passer.getBlockZ());
         }
         return spot != null ? spot
                 : landing(passer, target, new DimensionTransition(target, passer, DimensionTransition.DO_NOTHING).pos());
