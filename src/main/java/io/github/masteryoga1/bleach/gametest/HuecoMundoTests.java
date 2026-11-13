@@ -586,8 +586,9 @@ public final class HuecoMundoTests {
     /**
      * Hueco Mundo's own Hollows: the dunes list the four basic Hollows and the Forest of Menos the Gillian and the
      * Adjuchas, and no other biome lists one; each stands on the ground by its placement, which lets a natural spawn
-     * come only onto white sand or white sandstone, in any light, and leaves every other kind of spawn alone; and Hueco
-     * Mundo counts its Menos apart from the Human World's.
+     * come only onto white sand or white sandstone and never in Peaceful, and leaves every other kind of spawn alone; a
+     * Hollow's own rule passes a natural spawn without reading the light; and Hueco Mundo counts its Menos apart from
+     * the Human World's.
      */
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void hollowsSpawnOnHuecoMundosGround(GameTestHelper helper) {
@@ -644,6 +645,18 @@ public final class HuecoMundoTests {
             helper.assertTrue(!houndSpawns(helper, sand, MobSpawnType.NATURAL), "a hound came with Hueco Mundo's spawns off");
         } finally {
             BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS.set(natural);
+        }
+        // Peaceful within this one call, so no tick sees it: no natural Hollow may come, and a spawner's still may.
+        MinecraftServer server = level.getServer();
+        Difficulty difficulty = server.getWorldData().getDifficulty();
+        try {
+            server.setDifficulty(Difficulty.PEACEFUL, true);
+            boolean calmNatural = houndSpawns(helper, sand, MobSpawnType.NATURAL);
+            boolean calmSpawner = houndSpawns(helper, stone, MobSpawnType.SPAWNER);
+            helper.assertTrue(!calmNatural && calmSpawner, "in Peaceful a natural hound may come onto white sand "
+                    + calmNatural + " and a spawner's onto stone " + calmSpawner);
+        } finally {
+            server.setDifficulty(difficulty, true);
         }
         helper.assertTrue(HuecoMundoSpawns.allowed(Difficulty.NORMAL, true)
                         && !HuecoMundoSpawns.allowed(Difficulty.PEACEFUL, true)
@@ -707,9 +720,9 @@ public final class HuecoMundoTests {
     }
 
     /**
-     * A Hollow player's soul hunger falls at half its rate in Hueco Mundo, standing still and in effort alike, and at
-     * the whole rate elsewhere. An Adjuchas's clock runs there on the dunes and in the Forest of Menos while Hueco
-     * Mundo's Hollows spawn, never on Las Noches' level ground, its grounds or in Soul Society.
+     * A Hollow player's soul hunger falls at half its rate in Hueco Mundo, standing still and in effort alike, at the
+     * whole rate elsewhere, and not at all in Peaceful. An Adjuchas's clock runs there on the dunes and in the Forest of
+     * Menos while Hueco Mundo's Hollows spawn, never on Las Noches' level ground, its grounds or in Soul Society.
      */
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void hollowHungerHalvesInHuecoMundo(GameTestHelper helper) {
@@ -763,6 +776,17 @@ public final class HuecoMundoTests {
                 assertClock(helper, dunes, false, "on the dunes with Hueco Mundo's spawns off");
             } finally {
                 BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS.set(natural);
+            }
+            // Peaceful within this one call, so no tick sees it: nothing drains, and no clock runs where none can come.
+            Difficulty difficulty = server.getWorldData().getDifficulty();
+            try {
+                server.setDifficulty(Difficulty.PEACEFUL, true);
+                assertClock(helper, dunes, false, "on the dunes in Peaceful");
+                Player calm = mockIn(hueco, levelGround, ShinigamiTests.soul(SoulState.HOLLOW, 90.0F));
+                assertTick(helper, calm, 0.0, "a tick in Hueco Mundo in Peaceful");
+                assertEffort(helper, calm, 0.0, "effort in Hueco Mundo in Peaceful");
+            } finally {
+                server.setDifficulty(difficulty, true);
             }
             spawning.set(false, server);
             assertClock(helper, dunes, false, "on the dunes with mob spawning off");
