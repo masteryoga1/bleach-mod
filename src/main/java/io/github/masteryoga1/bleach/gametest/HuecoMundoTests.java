@@ -587,8 +587,8 @@ public final class HuecoMundoTests {
      * Hueco Mundo's own Hollows: the dunes list the four basic Hollows and the Forest of Menos the Gillian and the
      * Adjuchas, and no other biome lists one; each stands on the ground by its placement, which lets a natural spawn
      * come only onto white sand or white sandstone and never in Peaceful, and leaves every other kind of spawn alone; a
-     * Hollow's own rule passes a natural spawn without reading the light; and Hueco Mundo counts its Menos apart from
-     * the Human World's.
+     * Hollow's own rule passes a natural spawn in full light, where it refuses a spawner's; and Hueco Mundo counts its
+     * Menos apart from the Human World's.
      */
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void hollowsSpawnOnHuecoMundosGround(GameTestHelper helper) {
@@ -662,9 +662,15 @@ public final class HuecoMundoTests {
                         && !HuecoMundoSpawns.allowed(Difficulty.PEACEFUL, true)
                         && !HuecoMundoSpawns.allowed(Difficulty.NORMAL, false),
                 "Hueco Mundo's Hollows do not come only off Peaceful with mob spawning on");
+        // Past 30,000,000 blocks out a level reads full light without its light engine, whatever the hour, so there a
+        // spawner's hound is refused for the light and a natural one is not. The hound is never added to the level.
         Hollow hound = ModEntities.HOUND_HOLLOW.get().create(level);
-        helper.assertTrue(hound != null && hound.checkSpawnRules(level, MobSpawnType.NATURAL),
-                "a natural hound minded the light");
+        helper.assertTrue(hound != null, "no hound could be made");
+        hound.moveTo(30_000_000.5, 100.0, 0.5, 0.0F, 0.0F);
+        boolean byLight = hound.checkSpawnRules(level, MobSpawnType.SPAWNER);
+        boolean unread = hound.checkSpawnRules(level, MobSpawnType.NATURAL);
+        helper.assertTrue(!byLight && unread, "in full light a spawner's hound passes " + byLight + " and a natural one "
+                + unread);
 
         ServerLevel hueco = level.getServer().getLevel(BleachWorlds.HUECO_MUNDO);
         helper.assertTrue(hueco != null, "the test server has no Hueco Mundo");

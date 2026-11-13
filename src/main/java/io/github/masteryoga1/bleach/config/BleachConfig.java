@@ -3015,8 +3015,8 @@ public final class BleachConfig {
 
         builder.push("hueco_mundo");
         HUECO_MUNDO_HUNGER_SHARE = builder
-                .comment("Share of its usual soul hunger a Hollow player loses in Hueco Mundo, where it feeds by breathing"
-                        + " the air (0.5 is half). Healing costs the same everywhere.")
+                .comment("Share of its usual soul hunger a Hollow player loses in Hueco Mundo, standing still and in effort"
+                        + " alike (0.5 is half). Healing costs the same everywhere.")
                 .defineInRange("hunger_share", 0.5, 0.0, 1.0);
         HUECO_MUNDO_NATURAL_SPAWNS = builder
                 .comment("Whether Hollows spawn in Hueco Mundo by themselves, in any light: basic Hollows on the dunes'"
