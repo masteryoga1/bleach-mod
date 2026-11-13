@@ -354,6 +354,12 @@ public final class GargantaTests {
         player.setData(SoulAttachments.SOUL, arrancar());
         Cleanup cleanup = new Cleanup(hueco, new ArrayList<>(), new ChunkPos[1]);
         helper.testInfo.addListener(cleanup);
+        // The far side's chunks within 2 of the held one, made a row a tick from tick 26, so the tear home there ticks
+        // at once: the test server never waits between ticks, far outrunning chunks made in the background.
+        for (int row = -2; row <= 2; row++) {
+            int dz = row;
+            helper.runAtTickTime(28 + dz, () -> cleanup.load(dz));
+        }
         BlockPos[] inside = new BlockPos[1];
         Vec3[] riftAt = new Vec3[1];
         refuses(helper, TravelEvents.onKey(player, GateKeyPayload.GateKey.PRESS, HollowPlayerTests.now(helper)), null,
@@ -447,6 +453,19 @@ public final class GargantaTests {
         void hold(ChunkPos chunk) {
             held[0] = chunk;
             huecoMundo.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 2, chunk);
+        }
+
+        /**
+         * Makes the five chunks this many rows from the held one, south positive, as a chunk's entities tick only once
+         * every chunk within 2 of it is whole. Nothing is made before a chunk is held.
+         */
+        void load(int row) {
+            if (held[0] == null) {
+                return;
+            }
+            for (int x = -2; x <= 2; x++) {
+                huecoMundo.getChunk(held[0].x + x, held[0].z + row);
+            }
         }
 
         @Override
