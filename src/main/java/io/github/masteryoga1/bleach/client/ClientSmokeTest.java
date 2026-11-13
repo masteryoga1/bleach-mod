@@ -244,11 +244,12 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * back at the Kōtotsu, then, moved near the lane's end, it walks out and must come out over the Rukongai, falling
  * slowly. Last, as a soul that has passed on, it is killed, and a new player must wake at a Rukongai home drawn for it,
  * at least 32 blocks from where it died, with the district named on the action bar, and Hueco Mundo's five blocks, set
- * down before it, must reach the client. A tp must then stand it on white sand on Las Noches' level ground in Hueco
- * Mundo at exactly y 96, under a black sky with the moon full overhead where the Overworld's is new. Made an Arrancar
- * there, it holds the Gate key: the action bar must say the air is torn at, and a Garganta of a person's size must open
- * 1.8 blocks ahead, level with its feet. Another tp must then bring it to the Overworld, to the block it left by its
- * first gate, before the run quits.
+ * down before it, must reach the client. Made an Arrancar by command on Seireitei's plateau, it holds the Gate key: the
+ * action bar must say the air is torn at, and a Garganta of a person's size must open 1.8 blocks ahead, level with its
+ * feet. Moved into it, it must come out on white sand on Las Noches' level ground in Hueco Mundo at exactly y 96, under
+ * a black sky with the moon full overhead where the Overworld's is new. There, in creative, the key must tear a second
+ * Garganta open the same way, and moved into it in survival, the soul must come out in the Overworld on the block it
+ * last left the Overworld from by a gate, the third, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -287,6 +288,8 @@ public final class ClientSmokeTest {
     private static final double HUECO_MUNDO_X = 0.5, HUECO_MUNDO_Z = HuecoMundoPlan.LEVEL_RADIUS - 4.5;
     /** How far south of an Arrancar its Garganta stands, and how far back it steps to see the whole tear. */
     private static final double RIFT_AHEAD = 0.3 + 1.0 + GargantaRift.PASSAGE_GAP, RIFT_STEP_BACK = 6.0;
+    /** Where on Seireitei's plateau the Arrancar tears its Garganta: its tear stands over Hueco Mundo's arrival spot. */
+    private static final double TEAR_FROM_Z = HUECO_MUNDO_Z - RIFT_AHEAD;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
     /**
@@ -1563,58 +1566,82 @@ public final class ClientSmokeTest {
                 shot(minecraft, "hueco_mundo_blocks");
                 minecraft.options.hideGui = false;
             }
-            // Hueco Mundo's arrival chunk and the Overworld's chunk home asked for 150 ticks before the tp, as Soul
-            // Society's arrival chunks were, so both are made or loaded in the background first.
+            // Seireitei's chunk where the Garganta is torn, Hueco Mundo's arrival chunk and the Overworld's chunk home
+            // asked for 150 ticks before the tp, as Soul Society's arrival chunks were, so all are made or loaded in the
+            // background first.
             case 8235 -> {
                 holdHuecoMundo(minecraft, true);
                 // Day 4, whose new moon stands full over Hueco Mundo.
                 command(minecraft, "time set 97000");
             }
-            // To Hueco Mundo, by command as only an operator can go there yet: onto Las Noches' level ground at y 96 for
-            // any seed, 4.5 blocks inside its edge, facing south over the slope to the dunes.
-            case 8385 -> command(minecraft, String.format(Locale.ROOT, "execute in %s run tp @s %.1f %d %.1f 0 0",
-                    BleachWorlds.HUECO_MUNDO.location(), HUECO_MUNDO_X, HuecoMundoPlan.LEVEL_Y, HUECO_MUNDO_Z));
-            // The slope and the dunes beyond have had a hundred ticks or more to reach the client and be drawn. The hand
-            // and the HUD are hidden for the shot, as in the blocks beat, so the held item covers none of the plain.
-            case 8560 -> minecraft.options.hideGui = true;
-            case 8565 -> {
+            // To Seireitei's plateau, facing south, on a floor of stone in a room cleared for the tear, as an Arrancar (a
+            // person's size, no soul hunger, drawing no Hollow), full for the tear's cost. The Rukongai's place line
+            // names Seireitei within a second, before the key goes down.
+            case 8385 -> {
+                command(minecraft, "fill -2 71 192 2 71 198 minecraft:stone");
+                command(minecraft, "fill -2 72 192 2 76 198 minecraft:air");
+                command(minecraft, String.format(Locale.ROOT, "execute in %s run tp @s %.1f %d %.1f 0 0",
+                        BleachWorlds.SOUL_SOCIETY.location(), HUECO_MUNDO_X, SeireiteiPlan.PLATEAU_Y, TEAR_FROM_Z));
+                command(minecraft, "bleach soul @s arrancar");
+                command(minecraft, "bleach reiryoku @s 800 800");
+            }
+            // Pressed about 8431, the air is torn at for 20 ticks and the Garganta opens on the server about 8451, 1.8
+            // blocks south, at (0.5, 72, 195.5).
+            case 8430 -> GateKeys.OPEN.setDown(true);
+            // Let go well after it opens, which the server ignores.
+            case 8470 -> GateKeys.OPEN.setDown(false);
+            // Into it: 11 ticks inside pass it, about 8486, into Hueco Mundo at the same x and z, beyond the radius a soul
+            // is pushed out to past Las Noches' wall: onto Las Noches' level ground at y 96 for any seed, 4.5 blocks
+            // inside its edge.
+            case 8475 -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f", HUECO_MUNDO_X,
+                    SeireiteiPlan.PLATEAU_Y, HUECO_MUNDO_Z));
+            // Facing south over the slope to the dunes, whatever rotation the landing kept.
+            case 8520 -> command(minecraft, "tp @s ~ ~ ~ 0 0");
+            // The slope and the dunes beyond have had a hundred and eighty ticks or more to reach the client and be
+            // drawn. The hand and the HUD are hidden for the shot, as in the blocks beat, so the held item covers none of
+            // the plain.
+            // "Into Hueco Mundo", granted on arrival about 8486, is the one advancement new since the soul became an
+            // Arrancar. Its toast is long gone, but toasts are cleared anyway: hiding the GUI only stops them being drawn,
+            // and one still queued would show again once the GUI returns.
+            case 8665 -> {
+                minecraft.getToasts().clear();
+                minecraft.options.hideGui = true;
+            }
+            case 8670 -> {
                 shot(minecraft, "hueco_mundo");
                 minecraft.options.hideGui = false;
             }
             // Looking straight up from the player's own eyes at the moon overhead, full here as the Overworld's is new.
             // The hand and the HUD are hidden for the shot again, so the held item covers none of the sky.
-            case 8570 -> command(minecraft, "tp @s ~ ~ ~ 0 -90");
-            case 8580 -> minecraft.options.hideGui = true;
-            case 8585 -> {
+            case 8675 -> command(minecraft, "tp @s ~ ~ ~ 0 -90");
+            case 8685 -> minecraft.options.hideGui = true;
+            case 8690 -> {
                 shot(minecraft, "hueco_mundo_moon");
                 minecraft.options.hideGui = false;
             }
-            // A Garganta: facing south again on Las Noches' level ground, the soul becomes an Arrancar (a person's size, no
-            // soul hunger, drawing no Hollow), full for the tear's cost. The last action-bar line is forgotten, so the
-            // window from 8602 needs a new one.
-            case 8590 -> {
+            // The tear home: facing south again, in creative, as the first tear's wait still runs and creative never
+            // waits or pays. The last action-bar line is forgotten, so the window from 8707 needs a new one.
+            case 8695 -> {
                 command(minecraft, "tp @s ~ ~ ~ 0 0");
-                command(minecraft, "bleach soul @s arrancar");
-                command(minecraft, "bleach reiryoku @s 800 800");
+                command(minecraft, "gamemode creative");
                 actionBar = null;
             }
-            // Pressed about 8601, the air is torn at for 20 ticks and the Garganta opens on the server about 8621, 1.8
-            // blocks south, at (0.5, 96, 197.3) on the level ground.
-            case 8600 -> GateKeys.OPEN.setDown(true);
-            // Let go well after it opens, which the server ignores.
-            case 8640 -> GateKeys.OPEN.setDown(false);
+            // Pressed about 8706, the Garganta opens about 8726, 1.8 blocks south, at (0.5, 96, 197.3).
+            case 8705 -> GateKeys.OPEN.setDown(true);
+            case 8745 -> GateKeys.OPEN.setDown(false);
             // Six blocks back, still on the level ground, so the whole tear stands in view against the dunes. The hand
             // and the HUD are hidden for the shot, as in the blocks beat.
-            case 8645 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~-%.1f", RIFT_STEP_BACK));
-            case 8650 -> minecraft.options.hideGui = true;
-            case 8655 -> {
+            case 8750 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~-%.1f", RIFT_STEP_BACK));
+            case 8755 -> minecraft.options.hideGui = true;
+            case 8760 -> {
                 shot(minecraft, "garganta_passage");
                 minecraft.options.hideGui = false;
             }
-            // Home to the Overworld by command, to the block the first gate was taken from: no Garganta takes a soul yet.
-            case 8660 -> command(minecraft, String.format(Locale.ROOT,
-                    "execute in minecraft:overworld run tp @s %.3f %.3f %.3f", returnTo.x, returnTo.y, returnTo.z));
-            case 8765 -> {
+            // Survival again before it steps in, so the pass runs by survival's rules.
+            case 8762 -> command(minecraft, "gamemode survival");
+            // Into it: 11 ticks inside pass it, about 8775, to the block the third gate was taken from.
+            case 8764 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~%.1f", RIFT_STEP_BACK + RIFT_AHEAD));
+            case 8875 -> {
                 holdHuecoMundo(minecraft, false);
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
@@ -2325,33 +2352,42 @@ public final class ClientSmokeTest {
     }
 
     /**
-     * The checks of the trip to Hueco Mundo, each window from the step it follows: on its level ground, the Garganta an
-     * Arrancar tears open there, and home again.
+     * The checks of the trip to Hueco Mundo by Garganta, each window from the step it follows: the tear in Seireitei, on
+     * Hueco Mundo's level ground, the tear there, and home again.
      */
     private static void checkHuecoMundo(Minecraft minecraft, LocalPlayer player) {
+        // The tear's line comes back a tick or two after the press reaches the server, after the place line.
+        expectWithin(minecraft, 8432, 8450, () -> actionBarShows(Component.translatable("message.bleach.garganta.turning")),
+                "in Seireitei, holding the Gate key never tore at the air (the action bar's last lines: "
+                        + recentActionBar() + ")");
+        expectWithin(minecraft, 8453, 8474, () -> riftAhead(minecraft, player),
+                "the torn air never opened a Garganta 1.8 blocks south of the Arrancar in Seireitei (the action bar's"
+                        + " last lines: " + recentActionBar() + ")");
         // The sky is chosen as the client makes the level on arrival, and the moon reads the day time sent with it.
-        expectWithin(minecraft, 8387, 8555, () -> minecraft.level.dimension() == BleachWorlds.HUECO_MUNDO
+        expectWithin(minecraft, 8480, 8660, () -> minecraft.level.dimension() == BleachWorlds.HUECO_MUNDO
                         && player.onGround() && Math.abs(player.getY() - HuecoMundoPlan.LEVEL_Y) < 0.01
                         && horizontalDistance(player.position(), new Vec3(HUECO_MUNDO_X, 0.0, HUECO_MUNDO_Z)) < 0.5
                         && minecraft.level.getBlockState(player.blockPosition().below()).is(ModBlocks.WHITE_SAND.get())
                         && minecraft.level.effects() instanceof HuecoMundoEffects
                         && Float.isNaN(minecraft.level.effects().getCloudHeight())
                         && MoonPhases.opposite(minecraft.level.getMoonPhase()) == MoonPhases.FULL,
-                "the tp never stood the player on white sand on Las Noches' level ground at y 96, under Hueco Mundo's"
+                "the Garganta never stood the player on white sand on Las Noches' level ground at y 96, under Hueco Mundo's"
                         + " cloudless sky with the moon full (it is in " + minecraft.level.dimension().location() + " at "
                         + player.position() + ", under " + minecraft.level.effects().getClass().getSimpleName()
                         + " in moon phase " + minecraft.level.getMoonPhase() + ")");
-        // The tear's line comes back a tick or two after the press reaches the server.
-        expectWithin(minecraft, 8602, 8620, () -> actionBarShows(Component.translatable("message.bleach.garganta.turning")),
+        expectWithin(minecraft, 8707, 8725, () -> actionBarShows(Component.translatable("message.bleach.garganta.turning")),
                 "on Las Noches' level ground, holding the Gate key never tore at the air (the action bar's last lines: "
                         + recentActionBar() + ")");
-        expectWithin(minecraft, 8623, 8644, () -> riftAhead(minecraft, player),
-                "the torn air never opened a Garganta 1.8 blocks south of the Arrancar (the action bar's last lines: "
-                        + recentActionBar() + ")");
-        expectWithin(minecraft, 8662, 8755, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
-                        && player.onGround() && player.position().distanceTo(returnTo) < 1.5,
-                "the tp back never brought the player home to the Overworld (it is in "
-                        + minecraft.level.dimension().location() + " at " + player.position() + ")");
+        expectWithin(minecraft, 8728, 8749, () -> riftAhead(minecraft, player),
+                "the torn air never opened a Garganta 1.8 blocks south of the Arrancar in Hueco Mundo (the action bar's"
+                        + " last lines: " + recentActionBar() + ")");
+        // Home to the bottom centre of the block the third gate was taken from, 2 blocks south of the first gate's.
+        Vec3 home = gargantaHome();
+        expectWithin(minecraft, 8768, 8865, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
+                        && player.onGround() && horizontalDistance(player.position(), home) < 0.01
+                        && Math.abs(player.getY() - home.y) < 0.01,
+                "the Garganta never brought the Arrancar home to where it last left the Overworld (it is in "
+                        + minecraft.level.dimension().location() + " at " + player.position() + ", not at " + home + ")");
     }
 
     /**
@@ -2378,6 +2414,14 @@ public final class ClientSmokeTest {
         int lane = Mth.floor(player.getX()) >> 4;
         return minecraft.level.getBlockState(laneWall(lane, DangaiPlan.WEST_WALL, player)) + " and "
                 + minecraft.level.getBlockState(laneWall(lane, DangaiPlan.EAST_WALL, player));
+    }
+
+    /**
+     * Where the Garganta home sets the soul down: the bottom centre of the block it last left the Overworld from by a
+     * gate, the third gate's, which stood 2 blocks south of where the gate home had set it.
+     */
+    private static Vec3 gargantaHome() {
+        return Vec3.atBottomCenterOf(BlockPos.containing(returnTo).south(2));
     }
 
     /**
@@ -2644,8 +2688,9 @@ public final class ClientSmokeTest {
     }
 
     /**
-     * Holds (or lets go of) the chunk the player arrives in on Hueco Mundo's level ground and the Overworld's chunk it
-     * comes home to, on the integrated server with a forced ticket each, as {@link #holdArrival} does for Soul Society.
+     * Holds (or lets go of) Seireitei's chunk where the Garganta is torn, the chunk the player arrives in on Hueco Mundo's
+     * level ground and the Overworld's chunk the Garganta brings it home to, on the integrated server with a forced ticket
+     * each, as {@link #holdArrival} does for Soul Society.
      */
     private static void holdHuecoMundo(Minecraft minecraft, boolean hold) {
         MinecraftServer server = minecraft.getSingleplayerServer();
@@ -2653,16 +2698,20 @@ public final class ClientSmokeTest {
             return;
         }
         ChunkPos there = new ChunkPos(BlockPos.containing(HUECO_MUNDO_X, HuecoMundoPlan.LEVEL_Y, HUECO_MUNDO_Z));
-        ChunkPos home = new ChunkPos(BlockPos.containing(returnTo));
+        ChunkPos torn = new ChunkPos(BlockPos.containing(HUECO_MUNDO_X, SeireiteiPlan.PLATEAU_Y, TEAR_FROM_Z));
+        ChunkPos home = new ChunkPos(BlockPos.containing(gargantaHome()));
         server.execute(() -> {
             ServerLevel level = server.getLevel(BleachWorlds.HUECO_MUNDO);
-            if (level == null) {
+            ServerLevel society = server.getLevel(BleachWorlds.SOUL_SOCIETY);
+            if (level == null || society == null) {
                 return;
             }
             if (hold) {
+                society.getChunkSource().addRegionTicket(TicketType.FORCED, torn, 1, torn);
                 level.getChunkSource().addRegionTicket(TicketType.FORCED, there, 1, there);
                 server.overworld().getChunkSource().addRegionTicket(TicketType.FORCED, home, 1, home);
             } else {
+                society.getChunkSource().removeRegionTicket(TicketType.FORCED, torn, 1, torn);
                 level.getChunkSource().removeRegionTicket(TicketType.FORCED, there, 1, there);
                 server.overworld().getChunkSource().removeRegionTicket(TicketType.FORCED, home, 1, home);
             }

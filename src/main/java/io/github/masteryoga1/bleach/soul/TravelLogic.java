@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.item.HellButterflyItem;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,9 +26,13 @@ public final class TravelLogic {
     /** Where every gate from the Human World comes out: the middle of the court's block, on Seireitei's lawn. */
     public static final Vec3 COURT = new Vec3(SeireiteiPlan.SENKAIMON_COURT_X + 0.5, SeireiteiPlan.PLATEAU_Y,
             SeireiteiPlan.SENKAIMON_COURT_Z + 0.5);
+    /** Where a Garganta into Soul Society comes out, from the centre: district 1, 16 blocks outside the Shakonmaku. */
+    public static final double RUKONGAI_LANDING_RADIUS = SeireiteiPlan.SHAKONMAKU_RADIUS + 16.0;
     private static final long TICKS_PER_SECOND = 20L;
     /** Room a Garganta leaves over the head of the tallest body it is torn for. */
     private static final double PASSAGE_HEADROOM = 1.2;
+    /** Nearer the centre column than this, a soul has no bearing of its own, and goes due south. */
+    private static final double CENTRE = 1.0E-6;
 
     private TravelLogic() {
     }
@@ -271,6 +276,29 @@ public final class TravelLogic {
      */
     public static float passageSize(double standingHeight) {
         return (float) Math.max(1.0, (standingHeight + PASSAGE_HEADROOM) / GargantaRift.PASSAGE_HEIGHT);
+    }
+
+    /**
+     * Where a Garganta into Hueco Mundo comes out for a soul at this x and z: there, or, nearer the centre column than
+     * {@link HuecoMundoPlan#ARRIVAL_RADIUS}, pushed straight out along its bearing to that radius; from the centre
+     * itself, due south. The y is 0: the landing finds the ground.
+     */
+    public static Vec3 outsideLasNoches(double x, double z) {
+        double r = Math.sqrt(x * x + z * z);
+        return r >= HuecoMundoPlan.ARRIVAL_RADIUS ? new Vec3(x, 0.0, z) : onBearing(x, z, r, HuecoMundoPlan.ARRIVAL_RADIUS);
+    }
+
+    /**
+     * Where a Garganta from Hueco Mundo into Soul Society comes out for a soul at this x and z: on its bearing from the
+     * centre, {@link #RUKONGAI_LANDING_RADIUS} out, in the Rukongai's first district; from the centre itself, due south.
+     * The y is 0.
+     */
+    public static Vec3 rukongaiOnBearing(double x, double z) {
+        return onBearing(x, z, Math.sqrt(x * x + z * z), RUKONGAI_LANDING_RADIUS);
+    }
+
+    private static Vec3 onBearing(double x, double z, double r, double radius) {
+        return r < CENTRE ? new Vec3(0.0, 0.0, radius) : new Vec3(x * radius / r, 0.0, z * radius / r);
     }
 
     /**

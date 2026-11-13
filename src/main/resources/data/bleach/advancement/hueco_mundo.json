@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:garganta",
+  "display": {
+    "icon": {
+      "id": "bleach:white_sand"
+    },
+    "title": {
+      "translate": "advancements.bleach.hueco_mundo.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.hueco_mundo.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "hueco_mundo": {
+      "trigger": "minecraft:changed_dimension",
+      "conditions": {
+        "to": "bleach:hueco_mundo"
+      }
+    }
+  }
+}

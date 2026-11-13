@@ -5,7 +5,9 @@ import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.item.HellButterflyItem;
 import io.github.masteryoga1.bleach.network.GateKeyPayload;
+import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Direction;
@@ -37,8 +39,8 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
- * The Senkaimon and the Garganta in play: the Gate key's turn, each gate's opening, who the Senkaimon takes where, and
- * the Jigokuchō handed to a new Shinigami, or by the instructor to one that has lost its own. The rules are
+ * The Senkaimon and the Garganta in play: the Gate key's turn, each gate's opening and who it takes where, and the
+ * Jigokuchō handed to a new Shinigami, or by the instructor to one that has lost its own. The rules are
  * {@link TravelLogic}'s. The turn and the waits before the next gate are transients in the soul, so a death or a relog
  * starts them over. The key and the Jigokuchō take any {@link Player}, so game tests can use mock players.
  */
@@ -46,6 +48,7 @@ public final class TravelEvents {
     private static final String TURNING_KEY = "message.bleach.senkaimon.turning";
     private static final String TEARING_KEY = "message.bleach.garganta.turning";
     private static final String NO_LANDING_KEY = "message.bleach.senkaimon.no_landing";
+    private static final String GARGANTA_NO_LANDING_KEY = "message.bleach.garganta.no_landing";
     private static final String RECEIVED_KEY = "message.bleach.hell_butterfly.received";
     private static final String ISSUED_KEY = "message.bleach.hell_butterfly.issued";
     private static final String ALREADY_KEY = "message.bleach.hell_butterfly.already";
@@ -55,6 +58,9 @@ public final class TravelEvents {
     private static final float TURN_PITCH = 1.2F;
     private static final float ARRIVAL_VOLUME = 1.0F;
     private static final float ARRIVAL_PITCH = 1.6F;
+    /** The rift heard closing behind a soul that came through a Garganta. */
+    private static final float TORN_VOLUME = 1.0F;
+    private static final float TORN_PITCH = 1.2F;
     /** Ticks after a turn is seen and heard begun before another is, so a key pressed again and again stays quiet. */
     private static final int TURN_SHOWN_TICKS = 20;
 
@@ -285,11 +291,16 @@ public final class TravelEvents {
      * run as a soul comes into or out of the Dangai.
      */
     static void arrived(Entity entity, GlobalPos left) {
+        rememberLeaving(entity, left);
+        SpiritSenses.play(entity, SoundEvents.BEACON_POWER_SELECT, SoundSource.PLAYERS, ARRIVAL_VOLUME, ARRIVAL_PITCH,
+                false);
+    }
+
+    /** A soul that left the Human World by a gate remembers the block it left from. */
+    private static void rememberLeaving(Entity entity, GlobalPos left) {
         if (left.dimension() == Level.OVERWORLD && entity instanceof Player player) {
             player.setData(SoulAttachments.TRAVEL, player.getData(SoulAttachments.TRAVEL).withHumanWorldReturn(left));
         }
-        SpiritSenses.play(entity, SoundEvents.BEACON_POWER_SELECT, SoundSource.PLAYERS, ARRIVAL_VOLUME, ARRIVAL_PITCH,
-                false);
     }
 
     // ---- The Garganta ----
@@ -312,6 +323,114 @@ public final class TravelEvents {
         }
         opener.swing(InteractionHand.MAIN_HAND, true);
         return rift;
+    }
+
+    /**
+     * Where this Garganta takes this soul, or null, telling it why, when it may not pass: a soul whose Hollow holds its
+     * body is turned away as at a Senkaimon, and any soul is if nowhere on the far side will hold it. The far side's
+     * chunk loads here.
+     */
+    @Nullable
+    public static DimensionTransition gargantaDestination(GargantaRift rift, ServerPlayer passer) {
+        if (SoulLogic.hasSoul(passer) && VisoredLogic.takenOver(SoulLogic.get(passer))) {
+            passer.displayClientMessage(Component.translatable(TravelLogic.Refusal.TAKEN.messageKey())
+                    .withStyle(ChatFormatting.GRAY), true);
+            return null;
+        }
+        ResourceKey<Level> to = rift.leadsTo();
+        ServerLevel target = to == null ? null : BleachWorlds.level(passer.server, to);
+        if (target == null) {
+            return null;
+        }
+        Vec3 spot = gargantaLanding(passer, target, to);
+        if (spot == null) {
+            passer.displayClientMessage(Component.translatable(GARGANTA_NO_LANDING_KEY).withStyle(ChatFormatting.GRAY),
+                    true);
+            return null;
+        }
+        GlobalPos left = GlobalPos.of(passer.level().dimension(), passer.blockPosition());
+        return new DimensionTransition(target, spot, Vec3.ZERO, passer.getYRot(), passer.getXRot(),
+                entity -> tornThrough(entity, left));
+    }
+
+    /** Where a Garganta to this world sets down a soul passing where it stands now; null if nowhere will hold it. */
+    @Nullable
+    public static Vec3 gargantaLanding(Entity passer, ServerLevel target, ResourceKey<Level> to) {
+        if (to == BleachWorlds.HUECO_MUNDO) {
+            return huecoMundoLanding(passer, target, passer.getX(), passer.getZ());
+        }
+        if (to == BleachWorlds.SOUL_SOCIETY) {
+            return rukongaiLanding(passer, target, passer.getX(), passer.getZ());
+        }
+        return gargantaHomeward(passer, target);
+    }
+
+    /**
+     * Where a soul from this x and z comes out in Hueco Mundo: on the ground of its own column, or of the column it is
+     * pushed out to, clear of Las Noches ({@link TravelLogic#outsideLasNoches}). Never in the Forest of Menos below.
+     */
+    @Nullable
+    public static Vec3 huecoMundoLanding(Entity soul, ServerLevel huecoMundo, double x, double z) {
+        Vec3 at = TravelLogic.outsideLasNoches(x, z);
+        return groundUnder(soul, huecoMundo, Mth.floor(at.x), Mth.floor(at.z));
+    }
+
+    /** Where a soul from this x and z in Hueco Mundo comes out in Soul Society: the Rukongai on its bearing, grounded. */
+    @Nullable
+    public static Vec3 rukongaiLanding(Entity soul, ServerLevel soulSociety, double x, double z) {
+        Vec3 at = TravelLogic.rukongaiOnBearing(x, z);
+        return groundUnder(soul, soulSociety, Mth.floor(at.x), Mth.floor(at.z));
+    }
+
+    /**
+     * Where this body set down on this column by a Garganta would stand: on the highest ground its box covers, so a
+     * giant's wide body clears a step or a slope beside its column, the chunks under it loaded (and made) first; null
+     * where that ground will not hold it (see {@link SafeLanding#landingSpot}). A person's box covers only its own
+     * column, so it stands where {@link RukongaiEvents#groundAt} would set it, under any leaves; a wider body could not
+     * stand under them, so it stands on them.
+     */
+    @Nullable
+    public static Vec3 groundUnder(Entity body, ServerLevel level, int x, int z) {
+        double half = body.getDimensions(Pose.STANDING).width() / 2.0;
+        int west = Mth.floor(x + 0.5 - half);
+        int east = Mth.floor(x + 0.5 + half);
+        int north = Mth.floor(z + 0.5 - half);
+        int south = Mth.floor(z + 0.5 + half);
+        Heightmap.Types ground = west == east && north == south
+                ? Heightmap.Types.MOTION_BLOCKING_NO_LEAVES : Heightmap.Types.MOTION_BLOCKING;
+        int top = level.getMinBuildHeight();
+        for (int column = west; column <= east; column++) {
+            for (int row = north; row <= south; row++) {
+                level.getChunk(column >> 4, row >> 4);
+                top = Math.max(top, level.getHeight(ground, column, row));
+            }
+        }
+        return SafeLanding.landingSpot(body, level, new Vec3(x + 0.5, top, z + 0.5));
+    }
+
+    /**
+     * Where a soul comes out of Hueco Mundo into the Human World: where it last left the Human World by a gate, else on
+     * the ground at its own x and z, else at world spawn; null if none will hold it.
+     */
+    @Nullable
+    public static Vec3 gargantaHomeward(Entity passer, ServerLevel target) {
+        Optional<GlobalPos> back = passer.getData(SoulAttachments.TRAVEL).humanWorldReturn()
+                .filter(at -> at.dimension() == Level.OVERWORLD);
+        Vec3 spot = back.map(at -> landing(passer, target, Vec3.atBottomCenterOf(at.pos()))).orElse(null);
+        if (spot == null) {
+            spot = groundUnder(passer, target, passer.getBlockX(), passer.getBlockZ());
+        }
+        return spot != null ? spot
+                : landing(passer, target, new DimensionTransition(target, passer, DimensionTransition.DO_NOTHING).pos());
+    }
+
+    /**
+     * After a Garganta: a soul that left the Human World remembers the block it left from, and the tear is heard behind
+     * it on the far side.
+     */
+    static void tornThrough(Entity entity, GlobalPos left) {
+        rememberLeaving(entity, left);
+        SpiritSenses.play(entity, ModSounds.GARGANTA_OPEN.get(), SoundSource.PLAYERS, TORN_VOLUME, TORN_PITCH, false);
     }
 
     // ---- The Jigokuchō ----

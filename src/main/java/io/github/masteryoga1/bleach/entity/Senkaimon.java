@@ -222,8 +222,8 @@ public final class Senkaimon extends Entity implements Portal {
         }
     }
 
-    /** Alive, no spectator, and aware: the unaware walk through it as if it were not there. */
-    private static boolean mayEnter(ServerPlayer player) {
+    /** Alive, no spectator, and aware: the unaware walk through it as if it were not there. A Garganta's rule too. */
+    static boolean mayEnter(ServerPlayer player) {
         return player.isAlive() && !player.isSpectator() && SoulLogic.hasSoul(player)
                 && SoulLogic.isAware(SoulLogic.get(player));
     }

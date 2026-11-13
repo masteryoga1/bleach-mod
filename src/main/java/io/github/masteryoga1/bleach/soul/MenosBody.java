@@ -62,8 +62,8 @@ public final class MenosBody {
     /** The box is tested a hair inside its faces, so standing on the ground or against a wall is not inside them. */
     private static final double FIT_MARGIN = 1.0E-5;
     private static final double SQUEEZE_MARGIN = 1.0E-3;
-    /** The portal cooldown a giant is held at, which keeps any portal from starting to take it. */
-    private static final int GIANT_PORTAL_COOLDOWN = 2;
+    /** The portal cooldown a giant is held at, which keeps any portal but a Garganta it fits from starting to take it. */
+    public static final int GIANT_PORTAL_COOLDOWN = 2;
 
     // The extra depth for the entity lookups, one for each side, as a single player game runs both in one
     // process: each is the tallest giant's height above the vanilla margin, or 0 with none online.
