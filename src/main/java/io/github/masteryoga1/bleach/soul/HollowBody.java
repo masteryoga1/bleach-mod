@@ -149,7 +149,8 @@ public final class HollowBody {
         boolean survival = HollowPlayerLogic.survivalRules(player);
         if (survival && player.level().getDifficulty() != Difficulty.PEACEFUL
                 && player.level().tickRateManager().runsNormally()) {
-            addDebt(data, HollowPlayerLogic.satietyFromExhaustion(food.getExhaustionLevel()));
+            addDebt(data, (float) (HollowPlayerLogic.satietyFromExhaustion(food.getExhaustionLevel())
+                    * HollowPlayerLogic.hungerShare(player.level().dimension())));
         }
         food.setExhaustion(0.0F);
         boolean starving = survival && HollowPlayerLogic.band(satiety(data)) == HollowPlayerLogic.Band.STARVING;
@@ -227,7 +228,8 @@ public final class HollowBody {
                 addSatiety(data, (float) BleachConfig.get(BleachConfig.PEACEFUL_SATIETY_PER_SECOND));
             }
         } else {
-            addDebt(data, HollowPlayerLogic.drainPerTick());
+            addDebt(data, (float) (HollowPlayerLogic.drainPerTick()
+                    * HollowPlayerLogic.hungerShare(player.level().dimension())));
         }
         if (data.hollowSatietyDebt >= FLUSH_AT || player.tickCount % FLUSH_INTERVAL_TICKS == 0) {
             flushDebt(data);

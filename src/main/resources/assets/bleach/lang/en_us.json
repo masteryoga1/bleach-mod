@@ -651,6 +651,7 @@
   "message.bleach.respawn.academy": "Your soul finds its way back to Soul Society, to the gates of the Academy.",
   "message.bleach.respawn.rukongai": "Your soul finds its way back to Soul Society, to %s.",
   "message.bleach.respawn.court": "Your soul finds its way back to Soul Society, to the Senkaimon court.",
+  "message.bleach.respawn.hueco_mundo": "Your soul finds its way back to Hueco Mundo.",
   "message.bleach.academy_sensed.gate": "You feel the reiatsu of Shinigami: the Academy lies in Seireitei, by the gate %s %s, about %s blocks away.",
   "message.bleach.academy_direction.gate": "The Academy, in Seireitei: gate %s %s, %s blocks away",
   "message.bleach.academy_way": "The Academy lies %s, about %s blocks away.",

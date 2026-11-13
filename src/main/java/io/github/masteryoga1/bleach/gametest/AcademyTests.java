@@ -591,7 +591,7 @@ public final class AcademyTests {
      * Where each soul wakes on dying, read as it died, with no spawn of its own and with one: the table for every soul.
      * Then the real respawn event for a real player, once the Academy's chunks have built it: a student at the Academy,
      * at its gate facing the hall, unless it is back from the End's fight, the server has the rule off, or it has a
-     * spawn of its own; a Hollow where vanilla puts it. The player is never killed.
+     * spawn of its own; a basic Hollow where vanilla puts it. The player is never killed.
      */
     @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 100)
     public static void respawnWakesAtTheAcademy(GameTestHelper helper) {
@@ -613,7 +613,7 @@ public final class AcademyTests {
         assertHome(helper, "a Human", ShinigamiTests.soul(SoulState.HUMAN, 400.0F), HomeWorldRespawn.Home.VANILLA);
         assertHome(helper, "a living Substitute", ShinigamiTests.substitute(60.0F), HomeWorldRespawn.Home.VANILLA);
         assertHome(helper, "a Hollow", ShinigamiTests.soul(SoulState.HOLLOW, 40.0F), HomeWorldRespawn.Home.VANILLA);
-        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F), HomeWorldRespawn.Home.VANILLA);
+        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F), HomeWorldRespawn.Home.HUECO_MUNDO);
         KonsoTarget sendsTo = BleachConfig.get(BleachConfig.KONSO_SENDS_TO);
         try {
             BleachConfig.KONSO_SENDS_TO.set(KonsoTarget.ACADEMY);

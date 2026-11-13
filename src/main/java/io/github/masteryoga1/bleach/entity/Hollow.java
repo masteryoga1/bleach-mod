@@ -13,6 +13,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
@@ -56,6 +57,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -325,11 +327,17 @@ public abstract class Hollow extends Monster {
 
     /**
      * Hollows someone wants kept stay: named ones, persistent ones, ones without AI, and ones a Hollow
-     * Bait still holds.
+     * Bait still holds. So does any in Hueco Mundo, which is home: it goes only as any monster does.
      */
     private boolean mayLeave() {
         return !departing && !isPurifying() && !isPersistenceRequired() && !hasCustomName() && !isNoAi()
-                && !isBaitHeld();
+                && !isBaitHeld() && level().dimension() != BleachWorlds.HUECO_MUNDO;
+    }
+
+    /** A Hollow comes in any light: a natural spawn answers to its placement's ground rule alone (HuecoMundoSpawns). */
+    @Override
+    public boolean checkSpawnRules(LevelAccessor level, MobSpawnType reason) {
+        return reason == MobSpawnType.NATURAL || super.checkSpawnRules(level, reason);
     }
 
     /** Leaves for lack of prey. */

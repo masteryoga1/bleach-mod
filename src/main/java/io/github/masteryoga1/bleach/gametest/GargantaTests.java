@@ -1,12 +1,14 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.network.GateKeyPayload;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.soul.HollowTier;
+import io.github.masteryoga1.bleach.soul.HomeWorldRespawn;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.RukongaiEvents;
@@ -32,6 +34,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestInfo;
 import net.minecraft.gametest.framework.GameTestListener;
 import net.minecraft.gametest.framework.GameTestRunner;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -45,13 +48,14 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Garganta a Menos or an Arrancar tears open with the Gate key: who may open one, what it costs, the tear,
- * where it sets a soul down, and a real Arrancar's trip there and back.
+ * where it sets a soul down, a real Arrancar's trip there and back, and waking in Hueco Mundo.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -483,6 +487,79 @@ public final class GargantaTests {
                             "the first Garganta took the Arrancar again, to " + TravelTests.where(player)))
                     .thenSucceed();
         });
+    }
+
+    // ---- Waking in Hueco Mundo ----
+
+    /**
+     * Where a Menos or an Arrancar wakes on dying with no spawn of its own: in Hueco Mundo, unless a purifying blow frees
+     * it or it is being torn apart. Then the real respawn event for a real Arrancar: in Hueco Mundo where it died, pushed
+     * out past Las Noches, facing south and told so, unless it is back from the End's fight, the server has the rule off,
+     * or it has a spawn of its own. The player is never killed.
+     */
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 100)
+    public static void aMenosOrAnArrancarWakesInHuecoMundo(GameTestHelper helper) {
+        SoulData freed = menos(HollowTier.ADJUCHAS, 400.0F);
+        freed.setHollow(freed.hollow().withPurifiedOnDeath(true));
+        SoulData torn = menos(HollowTier.ADJUCHAS, 400.0F);
+        torn.markSoulDestroyed();
+        HomeWorldRespawn.Home home = HomeWorldRespawn.Home.HUECO_MUNDO;
+        HomeWorldRespawn.Home vanilla = HomeWorldRespawn.Home.VANILLA;
+        assertHome(helper, "a Gillian", menos(HollowTier.GILLIAN, 400.0F), home);
+        assertHome(helper, "an Adjuchas", menos(HollowTier.ADJUCHAS, 400.0F), home);
+        assertHome(helper, "a Vasto Lorde", menos(HollowTier.VASTO_LORDE, 400.0F), home);
+        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 400.0F), home);
+        assertHome(helper, "a basic Hollow", ShinigamiTests.soul(SoulState.HOLLOW, 40.0F), vanilla);
+        assertHome(helper, "an Adjuchas a purifying blow killed", freed,
+                BleachConfig.get(BleachConfig.PURIFICATION_FREES) ? vanilla : home);
+        assertHome(helper, "an Adjuchas being torn apart", torn, vanilla);
+
+        ServerLevel level = helper.getLevel();
+        ServerLevel hueco = level.getServer().getLevel(BleachWorlds.HUECO_MUNDO);
+        helper.assertTrue(hueco != null, "the test server has no Hueco Mundo");
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, SPOT);
+        player.setData(SoulAttachments.SOUL, arrancar());
+        DimensionTransition spawn = new DimensionTransition(level, player.position(), Vec3.ZERO, 0.0F, 0.0F,
+                DimensionTransition.DO_NOTHING);
+        DimensionTransition woken = AcademyTests.respawn(player, spawn, false);
+        Vec3 there = TravelEvents.huecoMundoLanding(player, hueco, player.getX(), player.getZ());
+        helper.assertTrue(there != null && woken.newLevel() == hueco && woken.pos().distanceTo(there) < 0.01
+                        && woken.yRot() == 0.0F, "the Arrancar wakes in " + woken.newLevel().dimension().location()
+                        + " at " + woken.pos() + " facing " + woken.yRot() + ", not in Hueco Mundo at " + there);
+        helper.assertTrue(AcademyTests.respawn(player, spawn, true) == spawn,
+                "an Arrancar back from the End's fight was moved");
+        boolean rule = BleachConfig.get(BleachConfig.HOME_WORLD_RESPAWN);
+        try {
+            BleachConfig.HOME_WORLD_RESPAWN.set(false);
+            helper.assertTrue(AcademyTests.respawn(player, spawn, false) == spawn, "an Arrancar was moved with the rule off");
+        } finally {
+            BleachConfig.HOME_WORLD_RESPAWN.set(rule);
+        }
+        try {
+            player.setRespawnPosition(Level.OVERWORLD, helper.absolutePos(new BlockPos(1, 1, 3)), 0.0F, true, false);
+            helper.assertTrue(AcademyTests.respawn(player, spawn, false) == spawn,
+                    "Hueco Mundo beat the Arrancar's own spawn");
+        } finally {
+            player.setRespawnPosition(Level.OVERWORLD, null, 0.0F, false, false);
+        }
+        // The line is sent by a task the first waking left, which the server runs once this tick is done, or four ticks
+        // on at the latest (MinecraftServer.shouldRun); only that one woke it.
+        helper.runAfterDelay(5, () -> {
+            long told = TestPlayers.chat(player).stream()
+                    .filter(line -> line.getContents() instanceof TranslatableContents words
+                            && words.getKey().equals("message.bleach.respawn.hueco_mundo"))
+                    .count();
+            helper.assertTrue(told == 1L, "the Arrancar was told it woke in Hueco Mundo " + told + " times, not once");
+            helper.succeed();
+        });
+    }
+
+    /** Asserts where a soul would wake with no spawn of its own, and that a spawn of its own always wins. */
+    private static void assertHome(GameTestHelper helper, String who, SoulData data, HomeWorldRespawn.Home expected) {
+        HomeWorldRespawn.Home home = HomeWorldRespawn.homeOf(data, false);
+        helper.assertTrue(home == expected, who + " would wake at " + home + ", not " + expected);
+        helper.assertTrue(HomeWorldRespawn.homeOf(data, true) == HomeWorldRespawn.Home.VANILLA,
+                who + "'s home beat its own spawn");
     }
 
     /**
