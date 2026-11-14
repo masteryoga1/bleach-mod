@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {"#": {"item": "minecraft:stick"}, "P": {"item": "minecraft:paper"}},
+  "pattern": ["#P#", "#P#", "#P#"],
+  "result": {"count": 6, "id": "bleach:shoji"}
+}

@@ -59,6 +59,7 @@ public final class BleachMod {
         modEventBus.addListener(HuecoMundoSpawns::registerPlacements);
         modEventBus.addListener(ZanpakutoSpirits::register);
         modEventBus.addListener(KidoSpell::register);
+        modEventBus.addListener(ModBlocks::onCommonSetup);
 
         SoulEvents.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(BleachCommand::register);

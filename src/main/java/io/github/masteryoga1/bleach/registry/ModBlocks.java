@@ -4,18 +4,25 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.block.KoryuBlock;
 import io.github.masteryoga1.bleach.block.ReishiFootingBlock;
 import io.github.masteryoga1.bleach.block.TailoringTableBlock;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.ColorRGBA;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ColoredFallingBlock;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FireBlock;
+import net.minecraft.world.level.block.GlazedTerracottaBlock;
+import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.properties.BlockSetType;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -68,8 +75,37 @@ public final class ModBlocks {
                     BlockBehaviour.Properties.ofFullCopy(ROOF_TILES.get())));
     public static final DeferredBlock<SlabBlock> ROOF_TILE_SLAB = BLOCKS.register("roof_tile_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofFullCopy(ROOF_TILES.get())));
+    /** Shōji, paper on a wooden lattice: a pane that joins panes, walls and full faces as glass does, and takes water. */
+    public static final DeferredBlock<IronBarsBlock> SHOJI = BLOCKS.register("shoji", () -> new IronBarsBlock(paper(1.0F)));
+    /** The shōji door's set: opened by hand, by redstone and by a wind charge, with bamboo's sounds. */
+    public static final BlockSetType SHOJI_SET = new BlockSetType("bleach:shoji", true, true, true,
+            BlockSetType.PressurePlateSensitivity.EVERYTHING, SoundType.BAMBOO_WOOD, SoundEvents.BAMBOO_WOOD_DOOR_CLOSE,
+            SoundEvents.BAMBOO_WOOD_DOOR_OPEN, SoundEvents.BAMBOO_WOOD_TRAPDOOR_CLOSE, SoundEvents.BAMBOO_WOOD_TRAPDOOR_OPEN,
+            SoundEvents.BAMBOO_WOOD_PRESSURE_PLATE_CLICK_OFF, SoundEvents.BAMBOO_WOOD_PRESSURE_PLATE_CLICK_ON,
+            SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_OFF, SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON);
+    /**
+     * The shōji door, a shōji panel hung as a door: it swings on its hinge as any door does. Its set is registered as
+     * the block is made, on the one thread NeoForge registers blocks on, as the set's map is not safe to share.
+     */
+    public static final DeferredBlock<DoorBlock> SHOJI_DOOR = BLOCKS.register("shoji_door",
+            () -> new DoorBlock(BlockSetType.register(SHOJI_SET), paper(2.0F).pushReaction(PushReaction.DESTROY)));
+    /** Tatami, a straw mat laid as a block, its weave turned along the look of whoever laid it. */
+    public static final DeferredBlock<GlazedTerracottaBlock> TATAMI = BLOCKS.register("tatami",
+            () -> new GlazedTerracottaBlock(BlockBehaviour.Properties.of().mapColor(MapColor.SAND)
+                    .instrument(NoteBlockInstrument.BANJO).strength(0.5F).sound(SoundType.GRASS).ignitedByLava()));
 
     private ModBlocks() {
+    }
+
+    /** Lets fire take the paper and straw blocks, with vanilla's odds for their kin. Run on the main thread. */
+    public static void onCommonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> {
+            FireBlock fire = (FireBlock) Blocks.FIRE;
+            // Paper catches and burns as wool does; straw as a hay bale does.
+            fire.setFlammable(SHOJI.get(), 30, 60);
+            fire.setFlammable(SHOJI_DOOR.get(), 30, 60);
+            fire.setFlammable(TATAMI.get(), 60, 20);
+        });
     }
 
     /** White sandstone's properties, as sandstone's are, at this hardness and blast resistance. */
@@ -88,5 +124,11 @@ public final class ModBlocks {
     private static BlockBehaviour.Properties plaster(MapColor colour) {
         return BlockBehaviour.Properties.of().mapColor(colour).instrument(NoteBlockInstrument.BASEDRUM)
                 .requiresCorrectToolForDrops().strength(1.8F);
+    }
+
+    /** Shōji's properties and its door's: paper on thin wood, at this hardness, lit by lava. */
+    private static BlockBehaviour.Properties paper(float hardness) {
+        return BlockBehaviour.Properties.of().mapColor(MapColor.WOOL).instrument(NoteBlockInstrument.BASS)
+                .strength(hardness).sound(SoundType.BAMBOO_WOOD).noOcclusion().ignitedByLava();
     }
 }

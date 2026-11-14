@@ -162,13 +162,15 @@ def academy():
     """
     t = Template(15, 9, 17)
     log = dict(block="minecraft:stripped_dark_oak_log", axis="y")
-    slab = dict(block="minecraft:deepslate_tile_slab", type="bottom", waterlogged="false")
+    slab = dict(block="bleach:roof_tile_slab", type="bottom", waterlogged="false")
 
-    # Ground: a calcite courtyard with a stone path, the hall on stone with tatami inside.
+    # Ground: a calcite courtyard with a stone path, the hall on stone with tatami inside, their weave crossed.
     t.fill(0, 0, 0, 14, 0, 5, "minecraft:calcite")
     t.fill(6, 0, 0, 8, 0, 5, "minecraft:stone_bricks")
     t.fill(0, 0, 6, 14, 0, 16, "minecraft:stone_bricks")
-    t.fill(2, 0, 8, 12, 0, 14, "minecraft:bamboo_mosaic")
+    for x in range(2, 13):
+        for z in range(8, 15):
+            t.set(x, 0, z, "bleach:tatami", facing="north" if (x + z) % 2 == 0 else "east")
 
     # The gate: two posts, a lintel and a tiled cap.
     for x in (5, 9):
@@ -178,7 +180,8 @@ def academy():
     for x in (3, 11):
         t.set(x, 1, 3, "minecraft:lantern", hanging="false", waterlogged="false")
 
-    # Hall walls: plaster between pillars, with shōji in the middle two rows of each bay.
+    # Hall walls: white plaster on a black base between pillars, with shōji in the middle two rows of each bay, each
+    # joined to its neighbours along the wall but not to the door.
     for y in range(1, 5):
         for x in range(1, 14):
             for z in range(7, 16):
@@ -190,10 +193,13 @@ def academy():
                 if pillar:
                     t.set(x, y, z, **log)
                 elif y in (2, 3):
-                    t.set(x, y, z, "minecraft:white_stained_glass")
+                    beside_door = z == 7 and y == 2
+                    t.set(x, y, z, "bleach:shoji", east=str(on_z_wall and not (beside_door and x == 6)).lower(),
+                          north=str(on_x_wall).lower(), south=str(on_x_wall).lower(),
+                          waterlogged="false", west=str(on_z_wall and not (beside_door and x == 8)).lower())
                 else:
-                    t.set(x, y, z, "minecraft:white_concrete")
-    door = dict(block="minecraft:bamboo_door", facing="south", hinge="left", open="false", powered="false")
+                    t.set(x, y, z, "bleach:black_plaster" if y == 1 else "bleach:white_plaster")
+    door = dict(block="bleach:shoji_door", facing="south", hinge="left", open="false", powered="false")
     t.set(7, 1, 7, half="lower", **door)
     t.set(7, 2, 7, half="upper", **door)
 
@@ -205,9 +211,9 @@ def academy():
 
     # The roof, stepping in over the veranda.
     ring(t, 6, 0, 6, 14, 16, **slab)
-    t.fill(1, 6, 7, 13, 6, 15, "minecraft:deepslate_tiles")
+    t.fill(1, 6, 7, 13, 6, 15, "bleach:roof_tiles")
     ring(t, 7, 2, 8, 12, 14, **slab)
-    t.fill(3, 7, 9, 11, 7, 13, "minecraft:deepslate_tiles")
+    t.fill(3, 7, 9, 11, 7, 13, "bleach:roof_tiles")
     t.fill(4, 8, 10, 10, 8, 12, **slab)
 
     t.add_entity(7.5, 1.0, 12.5, id=string("bleach:academy_instructor"), Rotation=floats(180.0, 0.0),

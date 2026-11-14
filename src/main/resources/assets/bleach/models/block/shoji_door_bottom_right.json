@@ -1,0 +1,5 @@
+{
+  "parent": "minecraft:block/door_bottom_right",
+  "render_type": "minecraft:translucent",
+  "textures": {"bottom": "bleach:block/shoji_door_bottom", "top": "bleach:block/shoji_door_top"}
+}
