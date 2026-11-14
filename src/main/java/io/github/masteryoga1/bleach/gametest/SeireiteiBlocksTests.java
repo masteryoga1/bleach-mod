@@ -1,8 +1,13 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.block.DivisionBannerBlock;
+import io.github.masteryoga1.bleach.block.DivisionBannerBlock.Division;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
+import io.github.masteryoga1.bleach.registry.ModCreativeTabs;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +26,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -82,7 +88,9 @@ public final class SeireiteiBlocksTests {
                     "redstone", 2, Collections.nCopies(6, ModItems.SHOJI), 3, 0),
             // A wool carpet of any colour edges a bale of straw, through vanilla's tag.
             "tatami", new Kin(Set.of("mineable/hoe"), 60, 20, "building_blocks", 2,
-                    List.of(Items.HAY_BLOCK, Items.RED_CARPET), 2, 0));
+                    List.of(Items.HAY_BLOCK, Items.RED_CARPET), 2, 0),
+            "division_banner", new Kin(Set.of("mineable/axe"), 30, 60, "decorations", 1,
+                    List.of(Items.WHITE_WOOL, Items.BLACK_DYE, Items.WHITE_WOOL), 1, 0));
 
     private SeireiteiBlocksTests() {
     }
@@ -217,6 +225,70 @@ public final class SeireiteiBlocksTests {
             Direction second = helper.getBlockState(new BlockPos(10, 2, 2)).getValue(HorizontalDirectionalBlock.FACING);
             helper.assertTrue(first == Direction.NORTH && second == Direction.EAST,
                     "tatami was laid facing " + first + " and " + second);
+        } finally {
+            laid.forEach(pos -> helper.setBlock(pos, Blocks.AIR));
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "lane")
+    public static void divisionBanners(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        // Sixteen, by their final names: the thirteen divisions in order, then the Kidō Corps, the Onmitsukidō and Zero.
+        List<String> names = Arrays.stream(Division.values()).map(Division::getSerializedName).toList();
+        helper.assertTrue(names.equals(List.of("first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+                "eighth", "ninth", "tenth", "eleventh", "twelfth", "thirteenth", "kido_corps", "onmitsukido", "zero")),
+                "the divisions are named " + names);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setYRot(0.0F);
+        // Every spot the test sets, set back to air however it ends: the stone and the two banners.
+        List<BlockPos> laid = List.of(new BlockPos(3, 2, 1), new BlockPos(4, 2, 1), new BlockPos(6, 2, 1));
+        try {
+            // The Ninth's, set on a stone's east side by a player looking south, hangs there facing out of it, not at them.
+            helper.setBlock(new BlockPos(3, 2, 1), Blocks.STONE);
+            placeOn(helper, player, DivisionBannerBlock.stack(Division.NINTH), new BlockPos(3, 2, 1), Direction.EAST);
+            BlockPos hung = helper.absolutePos(new BlockPos(4, 2, 1));
+            BlockState banner = level.getBlockState(hung);
+            helper.assertTrue(banner.is(ModBlocks.DIVISION_BANNER.get())
+                            && banner.getValue(HorizontalDirectionalBlock.FACING) == Direction.EAST
+                            && banner.getValue(DivisionBannerBlock.DIVISION) == Division.NINTH,
+                    "the Ninth's banner was hung as " + banner);
+            // Broken by a bare hand, it drops the Ninth's banner and nothing more.
+            List<ItemStack> drops = Block.getDrops(banner, level, hung, null);
+            helper.assertTrue(drops.size() == 1 && ItemStack.matches(drops.get(0), DivisionBannerBlock.stack(Division.NINTH)),
+                    "the Ninth's banner drops " + drops);
+            // Picked, it gives a banner that sets down the Ninth's again; set on a floor, it faces back at the player.
+            BlockHitResult touch = new BlockHitResult(Vec3.atCenterOf(hung), Direction.EAST, hung, false);
+            ItemStack clone = banner.getCloneItemStack(touch, level, hung, player);
+            placeOn(helper, player, clone, new BlockPos(6, 1, 1), Direction.UP);
+            BlockState copy = helper.getBlockState(new BlockPos(6, 2, 1));
+            helper.assertTrue(copy.is(ModBlocks.DIVISION_BANNER.get())
+                            && copy.getValue(HorizontalDirectionalBlock.FACING) == Direction.NORTH
+                            && copy.getValue(DivisionBannerBlock.DIVISION) == Division.NINTH,
+                    "the picked Ninth's banner was set down as " + copy);
+            // Used where it hangs, it turns to the next division, the Tenth's.
+            helper.assertTrue(banner.useWithoutItem(level, player, touch).consumesAction()
+                            && level.getBlockState(hung).getValue(DivisionBannerBlock.DIVISION) == Division.TENTH,
+                    "the used Ninth's banner is " + level.getBlockState(hung));
+            // Zero's turns to the First's, and that one picked is a plain banner, with nothing of its own set on it.
+            BlockState zero = banner.setValue(DivisionBannerBlock.DIVISION, Division.ZERO);
+            helper.setBlock(new BlockPos(4, 2, 1), zero);
+            zero.useWithoutItem(level, player, touch);
+            BlockState turned = level.getBlockState(hung);
+            ItemStack picked = turned.getCloneItemStack(touch, level, hung, player);
+            helper.assertTrue(turned.getValue(DivisionBannerBlock.DIVISION) == Division.FIRST
+                            && ItemStack.matches(picked, ModItems.DIVISION_BANNER.toStack()),
+                    "the used Zero's banner is " + turned + ", and picked it gives " + picked);
+            // The tab's own list, run into the test's: every item once, but the banner once for each division, in order.
+            List<ItemStack> listed = new ArrayList<>();
+            CreativeModeTab.ItemDisplayParameters parameters =
+                    new CreativeModeTab.ItemDisplayParameters(level.enabledFeatures(), false, level.registryAccess());
+            ModCreativeTabs.fill(parameters, (stack, visibility) -> listed.add(stack));
+            List<Division> banners = listed.stream().filter(stack -> stack.is(ModItems.DIVISION_BANNER.get()))
+                    .map(DivisionBannerBlock::divisionOf).toList();
+            helper.assertTrue(listed.size() == ModItems.ITEMS.getEntries().size() + 15
+                            && banners.equals(List.of(Division.values())),
+                    "the tab lists " + listed.size() + " stacks, with the banners of " + banners);
         } finally {
             laid.forEach(pos -> helper.setBlock(pos, Blocks.AIR));
         }

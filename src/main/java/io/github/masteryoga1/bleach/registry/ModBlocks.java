@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.block.DivisionBannerBlock;
 import io.github.masteryoga1.bleach.block.KoryuBlock;
 import io.github.masteryoga1.bleach.block.ReishiFootingBlock;
 import io.github.masteryoga1.bleach.block.TailoringTableBlock;
@@ -93,17 +94,23 @@ public final class ModBlocks {
     public static final DeferredBlock<GlazedTerracottaBlock> TATAMI = BLOCKS.register("tatami",
             () -> new GlazedTerracottaBlock(BlockBehaviour.Properties.of().mapColor(MapColor.SAND)
                     .instrument(NoteBlockInstrument.BANJO).strength(0.5F).sound(SoundType.GRASS).ignitedByLava()));
+    /** A division's banner: cloth hung on the side of a block, as a wall banner is, with cloth's colour and sound. */
+    public static final DeferredBlock<DivisionBannerBlock> DIVISION_BANNER = BLOCKS.register("division_banner",
+            () -> new DivisionBannerBlock(BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).forceSolidOn()
+                    .instrument(NoteBlockInstrument.BASS).noCollission().strength(1.0F).sound(SoundType.WOOL)
+                    .ignitedByLava().pushReaction(PushReaction.DESTROY)));
 
     private ModBlocks() {
     }
 
-    /** Lets fire take the paper and straw blocks, with vanilla's odds for their kin. Run on the main thread. */
+    /** Lets fire take the paper, cloth and straw blocks, with vanilla's odds for their kin. Run on the main thread. */
     public static void onCommonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             FireBlock fire = (FireBlock) Blocks.FIRE;
-            // Paper catches and burns as wool does; straw as a hay bale does.
+            // Paper and cloth catch and burn as wool does; straw as a hay bale does.
             fire.setFlammable(SHOJI.get(), 30, 60);
             fire.setFlammable(SHOJI_DOOR.get(), 30, 60);
+            fire.setFlammable(DIVISION_BANNER.get(), 30, 60);
             fire.setFlammable(TATAMI.get(), 60, 20);
         });
     }

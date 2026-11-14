@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:block",
+  "pools": [{"bonus_rolls": 0.0, "conditions": [{"condition": "minecraft:survives_explosion"}],
+    "entries": [{"type": "minecraft:item", "functions": [{"function": "minecraft:copy_state",
+    "block": "bleach:division_banner", "properties": ["division"]}], "name": "bleach:division_banner"}], "rolls": 1.0}],
+  "random_sequence": "bleach:blocks/division_banner"
+}

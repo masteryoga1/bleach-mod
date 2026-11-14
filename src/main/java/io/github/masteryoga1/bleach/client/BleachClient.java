@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.block.DivisionBannerBlock;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.DutyShinigami;
@@ -22,6 +23,7 @@ import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModMenus;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -33,6 +35,8 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.renderer.item.ClampedItemPropertyFunction;
+import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -43,6 +47,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
@@ -89,6 +94,7 @@ public final class BleachClient {
         modEventBus.addListener(BleachModelLayers::register);
         modEventBus.addListener(HuecoMundoEffects::register);
         modEventBus.addListener(BleachClient::registerClientExtensions);
+        modEventBus.addListener(BleachClient::onClientSetup);
         QuincyClient.register(modEventBus);
         HollowPlayerClient.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(MenosPlayerRenderer::onRenderPlayer);
@@ -150,6 +156,17 @@ public final class BleachClient {
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.TAILORING.get(), TailoringScreen::new);
+    }
+
+    /**
+     * Gives the division banner's item its division's place in order over 16, by which the item model's overrides draw
+     * that division's banner in the hand and the tab. Run on the main thread, as the property map is not safe to fill
+     * from the parallel setup.
+     */
+    private static void onClientSetup(FMLClientSetupEvent event) {
+        ClampedItemPropertyFunction division = (stack, level, entity, seed) ->
+                DivisionBannerBlock.divisionOf(stack).ordinal() / 16.0F;
+        event.enqueueWork(() -> ItemProperties.register(ModItems.DIVISION_BANNER.get(), BleachMod.id("division"), division));
     }
 
     /**

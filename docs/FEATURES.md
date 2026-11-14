@@ -129,7 +129,7 @@ The first playable slice: become a Shinigami, awaken your zanpakutō and hunt Ho
 - [ ] **Sekkiseki** [Canon+KD]: stone that nullifies reiryoku; spiritual projectiles fizzle against it. *So far: the block, which no survival tool, blast, Wither or dragon breaks, and of which the Seireiheki is built; it does not yet touch reiryoku.*
 - [ ] **Sōkyoku Hill and the Senzaikyū** [Canon]: the central mesa with the white tower and the hidden training ground beneath.
 - [ ] **Gotei 13 barracks** [Canon]: thirteen division barracks with banners, sharing a white-plaster and dark-roof palette.
-- [ ] **Seireitei building blocks** [Canon+KD]: plaster, roof tiles, shōji, sliding doors and tatami. *So far: white and black plaster, roof tiles with their stairs and slab, shōji, the shōji door (which swings on its hinge like any door) and tatami, each crafted from vanilla materials; the Academy is built of them. The division banners come next.*
+- [x] **Seireitei building blocks** [Canon+KD]: plaster, roof tiles, shōji, shōji doors and tatami. *White and black plaster, roof tiles with their stairs and slab, shōji, the shōji door (which swings on its hinge like any door) and tatami, each crafted from vanilla materials; the Academy is built of them. The division banner (two white wool with black dye between, in a column) hangs on the side of a block and shows its division's kanji (placeholder glyphs), one of sixteen: the thirteen divisions, the Kidō Corps, the Onmitsukidō and the Zero Division. Used where it hangs, it turns to the next division, and broken or picked, it keeps its division.*
 
 **Travel**
 

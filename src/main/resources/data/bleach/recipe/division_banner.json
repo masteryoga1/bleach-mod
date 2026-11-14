@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {"D": {"item": "minecraft:black_dye"}, "W": {"item": "minecraft:white_wool"}},
+  "pattern": ["W", "D", "W"],
+  "result": {"count": 1, "id": "bleach:division_banner"}
+}

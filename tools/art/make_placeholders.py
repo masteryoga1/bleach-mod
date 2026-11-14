@@ -184,6 +184,10 @@ SHOJI_PANEL = rgb(98, 76, 56)
 TATAMI = rgb(198, 192, 124)
 TATAMI_WEAVE = rgb(178, 172, 106)
 TATAMI_EDGE = rgb(40, 44, 42)
+# The division banner: white cloth hung from a dark wooden rod, its division's glyph in black ink.
+BANNER_CLOTH = rgb(242, 240, 234)
+BANNER_INK = rgb(26, 24, 28)
+BANNER_ROD = rgb(62, 46, 34)
 
 
 class Canvas:
@@ -1826,6 +1830,50 @@ def tatami_side():
     return c
 
 
+# Each division's glyph, in the divisions' order, as straight strokes (x0, y0, x1, y1), both ends included, in the
+# 9 by 12 box inside the banner's cloth: the numerals 一 to 十; 十一 to 十三 written 十 over the units, as a hanging
+# banner reads top to bottom; 鬼 for the Kidō Corps, 隠 for the Onmitsukidō and 〇 for Zero.
+DIVISION_GLYPHS = {
+    "first": [(0, 5, 8, 5)],  # 一
+    "second": [(1, 3, 7, 3), (0, 8, 8, 8)],  # 二
+    "third": [(1, 2, 7, 2), (2, 5, 6, 5), (0, 8, 8, 8)],  # 三
+    "fourth": [(0, 2, 8, 2), (0, 2, 0, 9), (8, 2, 8, 9), (0, 9, 8, 9),
+               (3, 2, 3, 5), (3, 5, 1, 7), (5, 2, 5, 7), (5, 7, 7, 7)],  # 四
+    "fifth": [(1, 2, 7, 2), (3, 2, 3, 9), (3, 5, 7, 5), (7, 5, 7, 9), (0, 9, 8, 9)],  # 五
+    "sixth": [(4, 1, 5, 2), (0, 4, 8, 4), (3, 6, 0, 9), (5, 6, 8, 9)],  # 六
+    "seventh": [(0, 4, 8, 4), (3, 1, 3, 9), (4, 10, 7, 10), (8, 10, 8, 9)],  # 七
+    "eighth": [(3, 1, 3, 4), (3, 4, 0, 9), (5, 1, 6, 4), (6, 4, 8, 9)],  # 八
+    "ninth": [(3, 1, 3, 4), (3, 4, 0, 10), (0, 3, 5, 3), (5, 3, 5, 9), (6, 10, 7, 10), (8, 10, 8, 8)],  # 九
+    "tenth": [(4, 1, 4, 9), (0, 4, 8, 4)],  # 十
+    "eleventh": [(4, 0, 4, 4), (0, 2, 8, 2), (0, 9, 8, 9)],  # 十一
+    "twelfth": [(4, 0, 4, 4), (0, 2, 8, 2), (1, 7, 7, 7), (0, 11, 8, 11)],  # 十二
+    "thirteenth": [(4, 0, 4, 4), (0, 2, 8, 2), (1, 7, 7, 7), (2, 9, 6, 9), (0, 11, 8, 11)],  # 十三
+    "kido_corps": [(4, 0, 3, 1), (0, 2, 6, 2), (0, 4, 6, 4), (0, 6, 6, 6), (0, 2, 0, 6), (3, 2, 3, 6), (6, 2, 6, 6),
+                   (2, 7, 0, 11), (4, 7, 4, 10), (5, 11, 8, 11), (7, 7, 6, 8), (8, 8, 8, 8), (6, 9, 8, 9)],  # 鬼
+    "onmitsukido": [(0, 0, 0, 11), (0, 0, 2, 0), (2, 1, 1, 2), (2, 3, 2, 4), (1, 5, 1, 5),
+                    (5, 0, 8, 0), (4, 1, 4, 1), (6, 1, 6, 1), (8, 1, 8, 1),
+                    (4, 3, 8, 3), (8, 3, 8, 7), (5, 5, 8, 5), (4, 7, 8, 7),
+                    (6, 9, 6, 9), (8, 9, 8, 10), (4, 10, 5, 10), (5, 11, 7, 11)],  # 隠
+    "zero": [(2, 1, 6, 1), (6, 1, 8, 3), (8, 3, 8, 7), (8, 7, 6, 9),
+             (6, 9, 2, 9), (2, 9, 0, 7), (0, 7, 0, 3), (0, 3, 2, 1)],  # 〇
+}
+
+
+def division_banner(name):
+    """A division's banner, for its block and its item: white cloth eleven pixels wide on a dark rod a pixel longer
+    each side, the division's glyph in black inside a pixel's margin of cloth, and clear around them so the wall
+    behind shows."""
+    def draw():
+        c = Canvas(16, 16)
+        c.rect(1, 0, 14, 2, BANNER_ROD)
+        c.rect(2, 2, 13, 16, BANNER_CLOTH)
+        for x0, y0, x1, y1 in DIVISION_GLYPHS[name]:
+            line(c, 3 + x0, 3 + y0, 3 + x1, 3 + y1, BANNER_INK)
+        return c
+    draw.__name__ = "division_banner_" + name
+    return draw
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -1939,6 +1987,7 @@ TEXTURES = {
     "item/shoji_door.png": shoji_door_icon,
     "block/tatami.png": tatami,
     "block/tatami_side.png": tatami_side,
+    **{"block/division_banner_%s.png" % name: division_banner(name) for name in DIVISION_GLYPHS},
 }
 
 
