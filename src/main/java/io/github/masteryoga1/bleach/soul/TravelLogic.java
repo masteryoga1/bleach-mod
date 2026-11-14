@@ -60,6 +60,8 @@ public final class TravelLogic {
         /** Told with the seconds left. */
         COOLDOWN("message.bleach.senkaimon.cooldown", "message.bleach.garganta.cooldown"),
         TOO_WEAK("message.bleach.senkaimon.too_weak", "message.bleach.garganta.too_weak"),
+        /** The new gate would stand in a block that undoes reiryoku (see {@link SpiritClip#meets}). */
+        SEKKISEKI("message.bleach.senkaimon.sekkiseki", "message.bleach.garganta.sekkiseki"),
         /** The new gate would stand within a soul's reach of an open one. */
         CROWDED("message.bleach.senkaimon.crowded", "message.bleach.garganta.crowded"),
         /** The turn ended before the gate opened. */
@@ -143,7 +145,8 @@ public final class TravelLogic {
 
     /**
      * Null if this soul may open a Senkaimon in this world now; otherwise the first rule it fails. Creative skips the
-     * wait and the cost; the last rule looks at the gates already open in the opener's own level.
+     * wait and the cost, not the rule that no gate opens into Sekkiseki; the last rule looks at the gates already open
+     * in the opener's own level.
      */
     @Nullable
     public static Refusal mayOpenSenkaimon(Player player, SoulData data, ResourceKey<Level> world, long now) {
@@ -179,13 +182,17 @@ public final class TravelLogic {
                 return Refusal.TOO_WEAK;
             }
         }
+        if (SpiritClip.meets(player.level(), Senkaimon.boxFor(player))) {
+            return Refusal.SEKKISEKI;
+        }
         // Last, so the entity search runs only when every other rule passes.
         return Senkaimon.crowded(player) ? Refusal.CROWDED : null;
     }
 
     /**
      * Null if this soul may open a Garganta in this world now; otherwise the first rule it fails. Creative skips the wait
-     * and the cost; the last rule looks at the gates already open in the opener's own level.
+     * and the cost, not the rule that no gate opens into Sekkiseki; the last rule looks at the gates already open in the
+     * opener's own level.
      */
     @Nullable
     public static Refusal mayOpenGarganta(Player player, SoulData data, ResourceKey<Level> world, long now) {
@@ -212,8 +219,12 @@ public final class TravelLogic {
                 return Refusal.TOO_WEAK;
             }
         }
+        float size = passageSize(player, data);
+        if (SpiritClip.meets(player.level(), GargantaRift.passBoxAt(GargantaRift.passageStanding(player, size), size))) {
+            return Refusal.SEKKISEKI;
+        }
         // Last, so the entity search runs only when every other rule passes.
-        return GargantaRift.crowded(player, passageSize(player, data)) ? Refusal.CROWDED : null;
+        return GargantaRift.crowded(player, size) ? Refusal.CROWDED : null;
     }
 
     /** The reiryoku a gate costs this soul: a share of its maximum, at least the least cost. */

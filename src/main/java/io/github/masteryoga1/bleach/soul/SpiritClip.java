@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -11,6 +12,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -18,9 +20,12 @@ import net.minecraft.world.phys.shapes.Shapes;
 
 /**
  * Where a spirit art meets a block that undoes reiryoku (Sekkiseki, or whatever {@link BleachTags#NEGATES_REIRYOKU}
- * holds). Every art that traces blocks asks here, and one that meets such a block comes undone there ({@link #fizzle}).
+ * holds). Every art that traces blocks asks here, and one that meets such a block comes undone there ({@link #fizzle});
+ * Pesquisa and the gates ask here too.
  */
 public final class SpiritClip {
+    /** How far a box is shrunk before its blocks are read, so one it only touches from outside does not count. */
+    private static final double EDGE = 1.0E-7;
     /** How many motes of pale light a fizzle sprays. */
     private static final int SPRAY_COUNT = 12;
     /** How far about the spot, in blocks, the motes start. */
@@ -62,6 +67,12 @@ public final class SpiritClip {
                 (world, pos) -> world.isLoaded(pos) && negates(world.getBlockState(pos))
                         ? Shapes.block().clip(from, to, pos.immutable()) : null,
                 world -> null);
+    }
+
+    /** Whether a loaded block that undoes reiryoku lies in this box; one the box only touches from outside does not. */
+    public static boolean meets(Level level, AABB box) {
+        return BlockPos.betweenClosedStream(box.deflate(EDGE))
+                .anyMatch(pos -> level.isLoaded(pos) && negates(level.getBlockState(pos)));
     }
 
     /** An art coming undone here: a spray of pale light and a hiss, for those who see spirits. Server side. */

@@ -5,10 +5,13 @@ import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
+import io.github.masteryoga1.bleach.network.GateKeyPayload;
 import io.github.masteryoga1.bleach.quincy.GintoSpell;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
+import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.Bala;
 import io.github.masteryoga1.bleach.soul.GintoSpells;
@@ -17,14 +20,19 @@ import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
+import io.github.masteryoga1.bleach.soul.Pesquisa;
+import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.TravelEvents;
+import io.github.masteryoga1.bleach.soul.TravelLogic;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.gametest.framework.GameTest;
@@ -39,14 +47,17 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -57,8 +68,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for Sekkiseki's rules: a spirit art comes undone at the first Sekkiseki block it meets, in a spray of pale
- * light and a hiss, and at stone does as it always has. They use the {@code field} template, a 16 by 16 stone floor at
- * relative y 1, and run in a batch of their own, so no other test's sprays, arrows or creatures share their run.
+ * light and a hiss, and at stone does as it always has; Pesquisa feels no soul through it, and no gate opens into it.
+ * They use the {@code field} template, a 16 by 16 stone floor at relative y 1, and run in a batch of their own, so no
+ * other test's sprays, arrows, creatures or pulses share their run.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -73,6 +85,8 @@ public final class SekkisekiTests {
     private static final int COUNT_AT = 8;
     /** Room for the float steps of a position. */
     private static final double EPSILON = 1.0E-3;
+    /** Where the gate tests' openers stand (relative), facing south. */
+    private static final Vec3 GATE_SPOT = new Vec3(8.5, 2.0, 2.5);
 
     private SekkisekiTests() {
     }
@@ -417,5 +431,88 @@ public final class SekkisekiTests {
             helper.assertFalse(level.getEntitiesOfClass(ItemEntity.class, helper.getBounds(),
                     item -> item.getItem().is(ModItems.SEELE_SCHNEIDER.get())).isEmpty(), "the Seele Schneider left no hilt");
         });
+    }
+
+    // ---- Sensing and gates ----
+
+    /**
+     * Pesquisa does not feel a Plus with Sekkiseki on the line from the caster's eyes, and still feels one behind stone;
+     * stone set where the Sekkiseki stood hides nothing.
+     */
+    @GameTest(template = "field", batch = "sekkiseki")
+    public static void pesquisaFeelsNoSoulThroughSekkiseki(GameTestHelper helper) {
+        Restore restore = Restore.on(helper);
+        long now = HollowPlayerTests.now(helper);
+        Player caster = ArrancarTests.arrancar(helper, HollowTier.VASTO_LORDE, 400.0F, new Vec3(8.5, 2.0, 2.5));
+        restore.fill(0, 2, 7, 7, 5, 7, ModBlocks.SEKKISEKI.get());
+        restore.fill(8, 2, 7, 15, 5, 7, Blocks.STONE);
+        // From the eyes at (8.5, 3.62, 2.5) the line to the hidden one crosses the wall at x 6.0 to 5.4, to the felt
+        // one at x 11.0 to 11.6.
+        PlusSpirit hidden = HollowPlayerTests.placed(helper, ModEntities.PLUS.get(), 3, 11);
+        hidden.soul();
+        PlusSpirit felt = HollowPlayerTests.placed(helper, ModEntities.PLUS.get(), 13, 11);
+        felt.soul();
+        List<LivingEntity> sensed = Pesquisa.sense(caster, now).sensed();
+        helper.assertTrue(sensed.contains(felt) && !sensed.contains(hidden), "Pesquisa felt " + sensed);
+        helper.assertFalse(Pesquisa.senses(caster, hidden, now), "Pesquisa felt the Plus behind Sekkiseki");
+        restore.fill(0, 2, 7, 7, 5, 7, Blocks.STONE);
+        helper.assertTrue(Pesquisa.senses(caster, hidden, now), "Pesquisa missed the Plus behind stone");
+        helper.succeed();
+    }
+
+    /** A mock in this game mode with this soul at the gate spot, facing south, a nameless Asauchi in hand. */
+    private static Player opener(GameTestHelper helper, GameType mode, SoulData data) {
+        Player player = helper.makeMockPlayer(mode);
+        player.setData(SoulAttachments.SOUL, data);
+        Vec3 at = helper.absoluteVec(GATE_SPOT);
+        player.moveTo(at.x, at.y, at.z, 0.0F, 0.0F);
+        player.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
+        return player;
+    }
+
+    /** Asserts the rules' answers at the gate spot now: a Shinigami's Senkaimon, in survival and creative, and a Garganta. */
+    private static void gates(GameTestHelper helper, long now, String here, @Nullable TravelLogic.Refusal senkaimon,
+                              @Nullable TravelLogic.Refusal garganta) {
+        for (GameType mode : List.of(GameType.SURVIVAL, GameType.CREATIVE)) {
+            Player shinigami = opener(helper, mode, ShinigamiTests.soul(SoulState.SHINIGAMI, 800.0F));
+            GargantaTests.refuses(helper, TravelLogic.mayOpenSenkaimon(shinigami, SoulLogic.get(shinigami),
+                    Level.OVERWORLD, now), senkaimon, "a " + mode.getName() + " Senkaimon with " + here);
+        }
+        Player arrancar = opener(helper, GameType.SURVIVAL, GargantaTests.arrancar());
+        GargantaTests.refuses(helper, TravelLogic.mayOpenGarganta(arrancar, SoulLogic.get(arrancar), Level.OVERWORLD,
+                now), garganta, "a Garganta with " + here);
+    }
+
+    /**
+     * No Senkaimon or Garganta opens where its box would hold Sekkiseki, creative or not, and a real Shinigami's turn is
+     * refused with its line; stone there, or Sekkiseki only under the gate or against its face, refuses nothing.
+     */
+    @GameTest(template = "field", batch = "sekkiseki")
+    public static void noGateOpensIntoSekkiseki(GameTestHelper helper) {
+        Restore restore = Restore.on(helper);
+        long now = HollowPlayerTests.now(helper);
+        // The Senkaimon would fill x 7 to 10, y 2 to 6, z 4 to 5; the Garganta x 7.5 to 9.5, y 2 to 6, z 3.3 to 5.3.
+        gates(helper, now, "nothing there", null, null);
+        restore.fill(8, 4, 4, 8, 4, 4, ModBlocks.SEKKISEKI.get());
+        gates(helper, now, "Sekkiseki in both", TravelLogic.Refusal.SEKKISEKI, TravelLogic.Refusal.SEKKISEKI);
+        restore.fill(8, 4, 4, 8, 4, 4, Blocks.STONE);
+        gates(helper, now, "stone in both", null, null);
+        restore.fill(8, 4, 4, 8, 4, 4, Blocks.AIR);
+        restore.fill(8, 4, 5, 8, 4, 5, ModBlocks.SEKKISEKI.get());
+        gates(helper, now, "Sekkiseki against the Senkaimon's face", null, TravelLogic.Refusal.SEKKISEKI);
+        restore.fill(8, 4, 5, 8, 4, 5, Blocks.AIR);
+        restore.fill(8, 1, 4, 8, 1, 4, ModBlocks.SEKKISEKI.get());
+        gates(helper, now, "a Sekkiseki floor", null, null);
+
+        restore.fill(8, 4, 4, 8, 4, 4, ModBlocks.SEKKISEKI.get());
+        ServerPlayer joined = TestPlayers.join(helper, GameType.SURVIVAL, GATE_SPOT);
+        joined.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, 800.0F));
+        joined.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
+        GargantaTests.refuses(helper, TravelEvents.onKey(joined, GateKeyPayload.GateKey.PRESS, now),
+                TravelLogic.Refusal.SEKKISEKI, "a real Shinigami's turn");
+        helper.assertTrue(TravelTests.lines(joined, "message.bleach.senkaimon.sekkiseki") == 1, "the Shinigami was not told");
+        helper.assertTrue("message.bleach.garganta.sekkiseki".equals(
+                TravelLogic.Refusal.SEKKISEKI.messageKey(TravelLogic.Gate.GARGANTA)), "the Garganta's line");
+        helper.succeed();
     }
 }
