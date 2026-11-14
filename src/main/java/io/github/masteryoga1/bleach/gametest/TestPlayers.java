@@ -2,6 +2,8 @@ package io.github.masteryoga1.bleach.gametest;
 
 import com.mojang.authlib.GameProfile;
 import io.netty.channel.embedded.EmbeddedChannel;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,7 +21,9 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket;
 import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
 import net.minecraft.server.MinecraftServer;
@@ -34,13 +38,16 @@ import net.neoforged.neoforge.network.registration.NetworkRegistry;
 /**
  * Real server players for game tests. Vanilla's mock server player cannot take the mod's payloads, so this joins one
  * the way NeoForge's own test framework does: on an in-memory connection that has every channel, answers teleports and
- * keep-alives as a client would, and keeps what its action bar and chat show for the test to read.
+ * keep-alives as a client would, and keeps what its action bar and chat show (and, for one a test watches, the
+ * particles and sounds it is sent) for the test to read.
  */
 final class TestPlayers {
     /** What each joined player has been shown on its action bar, for its test to read. */
     private static final Map<UUID, List<Component>> ACTION_BAR = new ConcurrentHashMap<>();
     /** What each joined player has been shown in chat, for its test to read. */
     private static final Map<UUID, List<Component>> CHAT = new ConcurrentHashMap<>();
+    /** The particle and sound packets sent to each player a test watches ({@link #watchEffects}), oldest first. */
+    private static final Map<UUID, List<Packet<?>>> EFFECTS = new ConcurrentHashMap<>();
 
     private TestPlayers() {
     }
@@ -77,6 +84,11 @@ final class TestPlayers {
                 } else if (packet instanceof ClientboundSystemChatPacket chat) {
                     (chat.overlay() ? ACTION_BAR : CHAT).computeIfAbsent(player.getUUID(),
                             id -> new CopyOnWriteArrayList<>()).add(chat.content());
+                } else if (packet instanceof ClientboundLevelParticlesPacket || packet instanceof ClientboundSoundPacket) {
+                    List<Packet<?>> effects = EFFECTS.get(player.getUUID());
+                    if (effects != null) {
+                        effects.add(packet);
+                    }
                 }
             }
         };
@@ -101,6 +113,21 @@ final class TestPlayers {
         return CHAT.getOrDefault(player.getUUID(), List.of());
     }
 
+    /** From now on keeps the particle and sound packets this joined player is sent, for {@link #takeEffects}. */
+    static void watchEffects(ServerPlayer player) {
+        EFFECTS.put(player.getUUID(), Collections.synchronizedList(new ArrayList<>()));
+    }
+
+    /** The particle and sound packets this watched player has been sent since the last take, oldest first. */
+    static List<Packet<?>> takeEffects(ServerPlayer player) {
+        List<Packet<?>> effects = EFFECTS.getOrDefault(player.getUUID(), new ArrayList<>());
+        synchronized (effects) {
+            List<Packet<?>> taken = List.copyOf(effects);
+            effects.clear();
+            return taken;
+        }
+    }
+
     /** Takes the player off the server when its test ends; the server drops it on its next tick. */
     private record Leaver(ServerPlayer player) implements GameTestListener {
         @Override
@@ -121,10 +148,11 @@ final class TestPlayers {
         public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
         }
 
-        /** Forgets the player's action bar and chat and disconnects it, unless it has already gone. */
+        /** Forgets the player's action bar, chat and effects and disconnects it, unless it has already gone. */
         private void leave() {
             ACTION_BAR.remove(player.getUUID());
             CHAT.remove(player.getUUID());
+            EFFECTS.remove(player.getUUID());
             if (!player.hasDisconnected()) {
                 player.connection.disconnect(Component.literal("Test finished"));
             }

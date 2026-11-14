@@ -9,6 +9,7 @@ import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.KidoWard;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -125,7 +126,8 @@ public class CeroBeam extends Entity {
     private static final float MAX_REACH = 128.0F;
     private static final float CHARGE_VOLUME = 2.0F;
     private static final float FIRE_VOLUME = 2.5F;
-    private static final float FIZZLE_PITCH = 1.6F;
+    /** The pitch of the hiss of a Cero that fizzles, which {@link SpiritClip#fizzle} shares. */
+    public static final float FIZZLE_PITCH = 1.6F;
     private static final int FIZZLE_SMOKE = 6;
     private static final float BLAST_VOLUME = 2.0F;
     private static final float BLAST_PITCH = 1.2F;
@@ -224,12 +226,18 @@ public class CeroBeam extends Entity {
      * What one Cero did: where it started and where it stopped, whether it burst on a block (not when a
      * shield, or the last creature its {@link Kind} may strike, took it first; see {@link #burstAt} to burst
      * there) and whether it stopped at a shield or a Dankū, the creatures the beam struck, nearest first (not those
-     * only the blast caught), and how many blocks the blast broke.
+     * only the blast caught), how many blocks the blast broke, and whether it came undone at a block that undoes
+     * reiryoku ({@link SpiritClip}), bursting nothing (then {@code hitBlock} is false).
      */
     public record Shot(Vec3 from, Vec3 to, boolean hitBlock, boolean blocked, List<LivingEntity> struck,
-                       int blocksBroken) {
+                       int blocksBroken, boolean negated) {
         public Shot {
             struck = List.copyOf(struck);
+        }
+
+        /** A shot that met no block that undoes reiryoku. */
+        public Shot(Vec3 from, Vec3 to, boolean hitBlock, boolean blocked, List<LivingEntity> struck, int blocksBroken) {
+            this(from, to, hitBlock, blocked, struck, blocksBroken, false);
         }
     }
 
@@ -476,8 +484,9 @@ public class CeroBeam extends Entity {
      * it. If it then meets a block, it bursts: what it may strike within the blast radius and in the open from there
      * takes the blast's share of the damage, and soft blocks about the struck one are blasted away, nearest first,
      * where the spec, the server config, mob griefing and the shooter's rights allow (see
-     * {@link GetsugaTensho#cuttable} and {@link GetsugaTensho#permitted}). A quiet kind makes no Cero sound, and leaves
-     * only a puff of smoke where a wall or a shield stops it. {@code direct} is what fired it,
+     * {@link GetsugaTensho#cuttable} and {@link GetsugaTensho#permitted}). At a block that undoes reiryoku
+     * ({@link SpiritClip}) it comes undone instead, with no blast, carving or burst. A quiet kind makes no Cero sound,
+     * and leaves only a puff of smoke where a wall or a shield stops it. {@code direct} is what fired it,
      * which a shield faces: the Cero, or the shooter itself when null. A shot with no beam of its own should
      * pass a stand-in rather than null, as a living direct entity makes a blocked hit a blow from its hand.
      */
@@ -489,10 +498,10 @@ public class CeroBeam extends Entity {
             return new Shot(from, from, false, false, List.of(), 0);
         }
         Vec3 far = loadedEnd(level, from, from.add(heading.scale(spec.range())), heading);
-        BlockHitResult clip = level.clip(new ClipContext(from, far, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
-                CollisionContext.empty()));
-        boolean wall = clip.getType() == HitResult.Type.BLOCK;
-        Vec3 end = wall ? clip.getLocation() : far;
+        SpiritClip.Hit clip = SpiritClip.clip(level, new ClipContext(from, far, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, CollisionContext.empty()));
+        boolean wall = clip.block().getType() == HitResult.Type.BLOCK;
+        Vec3 end = wall ? clip.block().getLocation() : far;
         double radius = spec.radius();
 
         List<Entry> entries = new ArrayList<>();
@@ -575,23 +584,27 @@ public class CeroBeam extends Entity {
             }
         }
 
-        boolean hitBlock = wall && !blocked && !stopped;
+        // Reaching a block that undoes reiryoku, the beam comes undone there: nothing bursts, blasts or breaks.
+        boolean negated = wall && clip.negated() && !blocked && !stopped;
+        boolean hitBlock = wall && !clip.negated() && !blocked && !stopped;
         int broken = 0;
         if (hitBlock) {
             blast(level, shooter, source, end, heading, spec, struck, kind);
             if (spec.breaksBlocks() && BleachConfig.get(BleachConfig.CERO_BREAKS_BLOCKS)) {
-                broken = carve(level, shooter, clip.getBlockPos(), spec);
+                broken = carve(level, shooter, clip.block().getBlockPos(), spec);
             }
         }
         SoundSource category = shooter != null ? shooter.getSoundSource() : SoundSource.HOSTILE;
-        if (hitBlock || blocked) {
+        if (negated) {
+            SpiritClip.fizzle(level, to, category);
+        } else if (hitBlock || blocked) {
             burstLook(level, to, kind, category);
         }
         if (!kind.quiet()) {
             SpiritSenses.play(level, from.x, from.y, from.z, ModSounds.CERO_FIRE.get(), category, FIRE_VOLUME, 1.0F,
                     false);
         }
-        return new Shot(from, to, hitBlock, blocked, struck, broken);
+        return new Shot(from, to, hitBlock, blocked, struck, broken, negated);
     }
 
     /**
@@ -745,8 +758,8 @@ public class CeroBeam extends Entity {
         Vec3 eye = shooter.getEyePosition(partialTick);
         Vec3 view = shooter.getViewVector(partialTick);
         Vec3 ahead = eye.add(view.scale(LOOK_MUZZLE_AHEAD * shooter.getScale()));
-        BlockHitResult wall = shooter.level().clip(new ClipContext(eye, ahead, ClipContext.Block.COLLIDER,
-                ClipContext.Fluid.NONE, CollisionContext.empty()));
+        BlockHitResult wall = SpiritClip.clip(shooter.level(), new ClipContext(eye, ahead, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, CollisionContext.empty())).block();
         if (wall.getType() == HitResult.Type.MISS) {
             return ahead;
         }
@@ -1007,16 +1020,17 @@ public class CeroBeam extends Entity {
         if (!(distance <= reach) || !(distance < APEX_EPSILON || offset.dot(heading) >= edge * distance)) {
             return null;
         }
-        return level.clip(new ClipContext(apex, centre, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
-                CollisionContext.empty())).getType() == HitResult.Type.MISS ? new Entry(target, at, box) : null;
+        return SpiritClip.clip(level, new ClipContext(apex, centre, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
+                CollisionContext.empty())).block().getType() == HitResult.Type.MISS ? new Entry(target, at, box) : null;
     }
 
     /** Whether nothing solid stands between this point and the nearest point of the box. */
     private static boolean inTheOpen(Level level, Vec3 at, AABB box) {
         Vec3 nearest = new Vec3(Mth.clamp(at.x, box.minX, box.maxX), Mth.clamp(at.y, box.minY, box.maxY),
                 Mth.clamp(at.z, box.minZ, box.maxZ));
-        return nearest.distanceToSqr(at) < 1.0E-6 || level.clip(new ClipContext(at, nearest, ClipContext.Block.COLLIDER,
-                ClipContext.Fluid.NONE, CollisionContext.empty())).getType() == HitResult.Type.MISS;
+        return nearest.distanceToSqr(at) < 1.0E-6 || SpiritClip.clip(level, new ClipContext(at, nearest,
+                ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty())).block().getType()
+                == HitResult.Type.MISS;
     }
 
     /**
@@ -1063,9 +1077,10 @@ public class CeroBeam extends Entity {
                 target -> !struck.contains(target) && mayStrike(shooter, target))) {
             AABB box = nearestBox(target, at);
             // A wall only shelters here: a blast it cannot hold off passes it without shattering it.
-            if (box.distanceToSqr(at) <= radius * radius && level.clip(new ClipContext(clear, box.getCenter(),
-                    ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty())).getType()
-                    == HitResult.Type.MISS && !DankuWall.shelters(level, clear, box.getCenter(), shooter, art)) {
+            if (box.distanceToSqr(at) <= radius * radius && SpiritClip.clip(level, new ClipContext(clear,
+                    box.getCenter(), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty()))
+                    .block().getType() == HitResult.Type.MISS
+                    && !DankuWall.shelters(level, clear, box.getCenter(), shooter, art)) {
                 target.hurt(source, damage);
             }
         }

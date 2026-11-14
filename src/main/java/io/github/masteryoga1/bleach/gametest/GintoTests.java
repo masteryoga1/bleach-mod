@@ -64,14 +64,14 @@ public final class GintoTests {
     // ---- Helpers ----
 
     /** A stack of filled Gintō in the player's main hand, as a cast takes them. */
-    private static ItemStack tubes(Player player, int count) {
+    static ItemStack tubes(Player player, int count) {
         ItemStack stack = new ItemStack(ModItems.GINTO.get(), count);
         player.setItemInHand(InteractionHand.MAIN_HAND, stack);
         return stack;
     }
 
     /** The same soul with this spell chosen for its Gintō. */
-    private static SoulData choosing(SoulData data, GintoSpell spell) {
+    static SoulData choosing(SoulData data, GintoSpell spell) {
         QuincyArtsLogic.setArts(data, QuincyArtsLogic.arts(data).withGinto(spell));
         return data;
     }
