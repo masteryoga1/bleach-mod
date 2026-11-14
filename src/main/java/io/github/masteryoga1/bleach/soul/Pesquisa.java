@@ -36,7 +36,8 @@ import org.joml.Vector3f;
  * <p>The press and letting go come through {@link DevourEvents#onKey}, and {@link ArrancarEvents#tick} keeps
  * the focus. Letting go, or a step of more than a block, ends it for free; the reiryoku is paid when the
  * pulse goes out, and the cooldown starts then. Mundane creatures, the caster, players in creative or
- * spectator mode and an Arrancar fresh from a Sonído ({@link Sonido#unsensed}) are not felt. The focus and
+ * spectator mode and an Arrancar fresh from a Sonído ({@link Sonido#unsensed}) are not felt, nor is a soul
+ * with a block that undoes reiryoku ({@link SpiritClip}) between, though stone hides nothing. The focus and
  * the cooldown are transients in the soul, so nothing is saved. Everything takes a {@link Player}, so game
  * tests can use mock players; the milestone and the outlines need a real one.
  */
