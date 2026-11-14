@@ -68,6 +68,11 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> HUECO_QUARTZ = ITEMS.registerSimpleBlockItem(ModBlocks.HUECO_QUARTZ);
     public static final DeferredItem<BlockItem> HUECO_QUARTZ_BRICKS =
             ITEMS.registerSimpleBlockItem(ModBlocks.HUECO_QUARTZ_BRICKS);
+    public static final DeferredItem<BlockItem> WHITE_PLASTER = ITEMS.registerSimpleBlockItem(ModBlocks.WHITE_PLASTER);
+    public static final DeferredItem<BlockItem> BLACK_PLASTER = ITEMS.registerSimpleBlockItem(ModBlocks.BLACK_PLASTER);
+    public static final DeferredItem<BlockItem> ROOF_TILES = ITEMS.registerSimpleBlockItem(ModBlocks.ROOF_TILES);
+    public static final DeferredItem<BlockItem> ROOF_TILE_STAIRS = ITEMS.registerSimpleBlockItem(ModBlocks.ROOF_TILE_STAIRS);
+    public static final DeferredItem<BlockItem> ROOF_TILE_SLAB = ITEMS.registerSimpleBlockItem(ModBlocks.ROOF_TILE_SLAB);
 
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",

@@ -4,6 +4,11 @@
     "bleach:white_sandstone",
     "bleach:smooth_white_sandstone",
     "bleach:hueco_quartz",
-    "bleach:hueco_quartz_bricks"
+    "bleach:hueco_quartz_bricks",
+    "bleach:white_plaster",
+    "bleach:black_plaster",
+    "bleach:roof_tiles",
+    "bleach:roof_tile_stairs",
+    "bleach:roof_tile_slab"
   ]
 }

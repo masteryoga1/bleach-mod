@@ -129,7 +129,7 @@ The first playable slice: become a Shinigami, awaken your zanpakutō and hunt Ho
 - [ ] **Sekkiseki** [Canon+KD]: stone that nullifies reiryoku; spiritual projectiles fizzle against it. *So far: the block, which no survival tool, blast, Wither or dragon breaks, and of which the Seireiheki is built; it does not yet touch reiryoku.*
 - [ ] **Sōkyoku Hill and the Senzaikyū** [Canon]: the central mesa with the white tower and the hidden training ground beneath.
 - [ ] **Gotei 13 barracks** [Canon]: thirteen division barracks with banners, sharing a white-plaster and dark-roof palette.
-- [ ] **Seireitei building blocks** [Canon+KD]: plaster, roof tiles, shōji, sliding doors and tatami.
+- [ ] **Seireitei building blocks** [Canon+KD]: plaster, roof tiles, shōji, sliding doors and tatami. *So far: white and black plaster and dark roof tiles with their stairs and slab, each crafted from vanilla materials. Shōji, the shōji door, tatami and the division banners come next.*
 
 **Travel**
 

@@ -1,0 +1,5 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {"item": "bleach:roof_tiles"},
+  "result": {"count": 1, "id": "bleach:roof_tile_stairs"}
+}

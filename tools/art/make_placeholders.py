@@ -169,6 +169,14 @@ WHITE_SANDSTONE_BAND = rgb(208, 204, 191)
 HUECO_QUARTZ = rgb(240, 241, 238)
 HUECO_QUARTZ_GRAIN = rgb(218, 220, 218)
 HUECO_QUARTZ_SEAM = rgb(196, 198, 196)
+# Seireitei's building blocks: white plaster; black plaster, a dark grey; and blue-grey fired roof tiles.
+PLASTER = rgb(240, 238, 230)
+PLASTER_GRAIN = rgb(230, 228, 219)
+BLACK_PLASTER = rgb(58, 58, 63)
+BLACK_PLASTER_GRAIN = rgb(67, 67, 72)
+ROOF_TILE = rgb(80, 87, 99)
+ROOF_TILE_RIDGE = rgb(106, 113, 126)
+ROOF_TILE_SHADOW = rgb(48, 52, 62)
 
 
 class Canvas:
@@ -1721,6 +1729,27 @@ def hueco_quartz_bricks():
     return c
 
 
+def white_plaster():
+    """White plaster: one flat white with a faint grain in a fixed scatter."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, PLASTER)
+    mottle(c, 0, 0, 16, 16, PLASTER_GRAIN, 11, seed=3)
+    return c
+
+
+def roof_tiles():
+    """Roof tiles: rounded tiles in columns, each with a lit ridge and a dark channel, laid in four courses, each
+    course's lower edge throwing a shadow on the next."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, ROOF_TILE)
+    for x in (0, 4, 8, 12):
+        c.rect(x + 1, 0, x + 2, 16, ROOF_TILE_RIDGE)
+        c.rect(x + 3, 0, x + 4, 16, ROOF_TILE_SHADOW)
+    for y in (3, 7, 11, 15):
+        c.rect(0, y, 16, y + 1, ROOF_TILE_SHADOW)
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -1823,6 +1852,10 @@ TEXTURES = {
     "block/hueco_quartz.png": hueco_quartz,
     "block/hueco_quartz_top.png": hueco_quartz_top,
     "block/hueco_quartz_bricks.png": hueco_quartz_bricks,
+    "block/white_plaster.png": white_plaster,
+    "block/black_plaster.png": recoloured(white_plaster, {PLASTER: BLACK_PLASTER, PLASTER_GRAIN: BLACK_PLASTER_GRAIN},
+                                          "black_plaster"),
+    "block/roof_tiles.png": roof_tiles,
 }
 
 
