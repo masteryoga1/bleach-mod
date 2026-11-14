@@ -221,13 +221,16 @@ public final class GintoSpells {
 
     /**
      * What the player looks at within {@code range}: the first living creature they may strike, else
-     * the block, else a miss at the end of the range.
+     * the block, else a miss at the end of the range. The Shakonmaku ends the look as a block would.
      */
     @Nullable
     static HitResult look(Player p, double range) {
-        return ProjectileUtil.getHitResultOnViewVector(p,
+        HitResult hit = ProjectileUtil.getHitResultOnViewVector(p,
                 e -> e instanceof LivingEntity living && living != p && living.isAlive() && SpiritProjectiles.mayStrike(p, living),
                 range);
+        SpiritClip.Membrane membrane = hit == null ? null : SpiritClip.membrane(p.level(), p.getEyePosition(),
+                hit.getLocation());
+        return membrane != null ? membrane : hit;
     }
 
     /** Gritz for this long, with no swirl and with its icon shown. */

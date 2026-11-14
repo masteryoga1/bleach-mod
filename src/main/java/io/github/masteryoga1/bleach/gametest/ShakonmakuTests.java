@@ -2,10 +2,13 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.soul.DangaiLogic;
+import io.github.masteryoga1.bleach.soul.FlashStep;
 import io.github.masteryoga1.bleach.soul.ShakonmakuEvents;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.soul.TravelLogic;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
@@ -14,6 +17,8 @@ import io.github.masteryoga1.bleach.world.Shakonmaku.Side;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -22,6 +27,7 @@ import net.minecraft.gametest.framework.GameTestListener;
 import net.minecraft.gametest.framework.GameTestRunner;
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundMoveVehiclePacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
@@ -29,18 +35,24 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.projectile.ThrownEnderpearl;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Shakonmaku in the real Soul Society, in a batch of their own at places on the wall's ring far enough apart
- * that no test sees another's ripples, each letting go of all it set down when it ends. Souls move by move packets the
- * server handles as a client's own, so only the server's rules are in the way.
+ * that no test sees another's ripples, each letting go of every creature, boat and arrow it set down when it ends. Souls
+ * move by move packets the server handles as a client's own, so only the server's rules are in the way.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -186,6 +198,71 @@ public final class ShakonmakuTests {
     }
 
     /**
+     * Over the south gate at y 120, a soul steering a boat across the sphere goes back with it, still aboard, its fall
+     * kept and told why, and so does a soul a friend in creative mode steers; a creative soul's own boat crosses, as do
+     * souls in creative and spectator mode flying.
+     */
+    @GameTest(template = "empty", batch = BATCH, timeoutTicks = 200)
+    public static void aMountGoesBackWithItsRider(GameTestHelper helper) {
+        Cleanup held = hold(helper, 0, 32);
+        ServerLevel soul = held.soul;
+        Vec3 from = new Vec3(0.5, 120.0, 524.5), out = new Vec3(0.5, 120.0, 526.9), aside = new Vec3(3.0, 0.0, 0.0);
+        Vec3[] rows = {Vec3.ZERO, aside, aside.scale(2.0), aside.scale(-1.0), aside.scale(-2.0)};
+        for (Vec3 row : rows) {
+            on(helper, Side.INSIDE, from.add(row));
+            on(helper, Side.OUTSIDE, out.add(row));
+        }
+        ServerPlayer rider = soulAt(helper, soul, GameType.SURVIVAL, from);
+        ServerPlayer creative = soulAt(helper, soul, GameType.CREATIVE, from.add(rows[1]));
+        ServerPlayer friend = soulAt(helper, soul, GameType.CREATIVE, from.add(rows[2]));
+        ServerPlayer carried = soulAt(helper, soul, GameType.SURVIVAL, from.add(rows[2]));
+        ServerPlayer flier = soulAt(helper, soul, GameType.CREATIVE, from.add(rows[3]));
+        ServerPlayer spectator = soulAt(helper, soul, GameType.SPECTATOR, from.add(rows[4]));
+        Boat boat = held.add(boat(soul, from));
+        Boat other = held.add(boat(soul, from.add(rows[1])));
+        Boat shared = held.add(boat(soul, from.add(rows[2])));
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> helper.assertTrue(rider.startRiding(boat, true) && creative.startRiding(other, true)
+                        && friend.startRiding(shared, true) && carried.startRiding(shared, true), "a soul would not board"))
+                // Aboard, and steering once the connection's tick has seen it so.
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    // 10 blocks into a fall, which the refused move neither adds to nor forgives.
+                    boat.fallDistance = 10.0F;
+                    rider.connection.handleMoveVehicle(new ServerboundMoveVehiclePacket(boat(soul, out)));
+                    creative.connection.handleMoveVehicle(new ServerboundMoveVehiclePacket(boat(soul, out.add(rows[1]))));
+                    friend.connection.handleMoveVehicle(new ServerboundMoveVehiclePacket(boat(soul, out.add(rows[2]))));
+                    move(flier, out.add(rows[3]));
+                    move(spectator, out.add(rows[4]));
+                })
+                .thenExecute(() -> {
+                    at(helper, boat, from, "the boat steered out");
+                    at(helper, shared, from.add(rows[2]), "the boat a friend in creative steered out");
+                    helper.assertTrue(boat.fallDistance >= 10.0F && boat.fallDistance < 11.0F, "the boat has fallen "
+                            + boat.fallDistance + " (kept at about 10)");
+                    helper.assertTrue(rider.getVehicle() == boat && told(rider) == 1 && told(carried) == 1, "the rider is on "
+                            + rider.getVehicle() + ", told " + TravelTests.said(rider) + " and " + TravelTests.said(carried));
+                    helper.assertTrue(rider.distanceTo(boat) < 1.0F && friend.distanceTo(shared) < 1.0F, "the pilots are at "
+                            + rider.position() + " and " + friend.position() + ", off their boats");
+                    at(helper, other, out.add(rows[1]), "the boat steered by a soul in creative");
+                    at(helper, flier, out.add(rows[3]), "the soul in creative");
+                    at(helper, spectator, out.add(rows[4]), "the spectator");
+                    helper.assertTrue(told(creative) + told(friend) + told(flier) + told(spectator) == 0,
+                            "a soul free to cross was told");
+                })
+                .thenSucceed();
+    }
+
+    /** A boat that floats where it is put: here, made but not yet set down. */
+    private static Boat boat(ServerLevel soul, Vec3 at) {
+        Boat boat = new Boat(EntityType.BOAT, soul);
+        boat.setNoGravity(true);
+        boat.moveTo(at.x, at.y, at.z, 0.0F, 0.0F);
+        return boat;
+    }
+
+    /**
      * Through the north gate's gap at y 95 a soul flies out and back in, each step let be, the gap between; then, out
      * in front of the gate, rising past the wall's top into the membrane over the strip, it is turned back.
      */
@@ -319,6 +396,121 @@ public final class ShakonmakuTests {
         }
         sequence.thenExecute(() -> helper.assertTrue(told(player) == 0, "the soul was told " + TravelTests.said(player)))
                 .thenSucceed();
+    }
+
+    // ---- Leaps, arts, thrown things and flash steps ----
+
+    /**
+     * From Seireitei's lawn, a soul's ender pearl landing on the strip outside takes it nowhere, and it is told why; a
+     * chorus fruit's leap that would drop it on the strip is refused, and leaps that land on the lawn are not.
+     */
+    @GameTest(template = "empty", batch = BATCH, timeoutTicks = 200)
+    public static void noLeapCrossesTheMembrane(GameTestHelper helper) {
+        Cleanup held = hold(helper, -23, 22);
+        ServerLevel soul = held.soul;
+        Vec3 lawn = new Vec3(-356.5, SeireiteiPlan.PLATEAU_Y, 356.5), onLawn = new Vec3(-350.5, 76.0, 350.5);
+        int ground = soul.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, -371, 370);
+        Vec3 strip = new Vec3(-370.5, ground + 1.5, 370.5);
+        on(helper, Side.INSIDE, lawn, onLawn);
+        on(helper, Side.OUTSIDE, strip, new Vec3(strip.x, ground, strip.z));
+        ServerPlayer player = soulAt(helper, soul, GameType.SURVIVAL, lawn);
+        ThrownEnderpearl[] pearl = new ThrownEnderpearl[1];
+        helper.startSequence()
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    pearl[0] = new ThrownEnderpearl(soul, player);
+                    pearl[0].moveTo(strip.x, strip.y, strip.z, 0.0F, 0.0F);
+                    pearl[0].setDeltaMovement(0.0, -0.6, 0.0);
+                    held.add(pearl[0]);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(pearl[0].isRemoved(), "the pearl has not landed"))
+                .thenExecute(() -> {
+                    at(helper, player, lawn, "the soul whose pearl landed outside");
+                    helper.assertTrue(told(player) == 1, "the soul was told " + TravelTests.said(player));
+                    helper.assertTrue(EventHooks.onChorusFruitTeleport(player, strip.x, 80.0, strip.z).isCanceled(),
+                            "a chorus fruit's leap onto the strip was let be");
+                    helper.assertFalse(EventHooks.onChorusFruitTeleport(player, onLawn.x, onLawn.y, onLawn.z).isCanceled(),
+                            "a chorus fruit's leap across the lawn was refused");
+                    BlockHitResult hit = BlockHitResult.miss(onLawn, Direction.UP, BlockPos.containing(onLawn));
+                    helper.assertFalse(EventHooks.onEnderPearlLand(player, onLawn.x, onLawn.y, onLawn.z, pearl[0], 5.0F, hit)
+                            .isCanceled(), "a pearl landing on the lawn was refused");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Out of Seireitei at y 120 over the east gate: a Cero comes undone where it meets the membrane, breaking nothing;
+     * Pesquisa's line meets it there too, though no gate's box would. A vanilla arrow stops there, short of it, and
+     * falls; one with no weight comes undone.
+     */
+    @GameTest(template = "empty", batch = BATCH, timeoutTicks = 200)
+    public static void artsComeUndoneAndArrowsFallAtTheMembrane(GameTestHelper helper) {
+        Cleanup held = hold(helper, 32, 0);
+        ServerLevel soul = held.soul;
+        double face = 526.0;
+        on(helper, Side.INSIDE, new Vec3(face - 0.01, 120.5, 0.5), new Vec3(face - 0.01, 120.5, 6.5));
+        on(helper, Side.OUTSIDE, new Vec3(face + 0.01, 120.5, 0.5), new Vec3(face + 0.01, 120.5, 6.5));
+        ServerPlayer watcher = soulAt(helper, soul, GameType.SURVIVAL, new Vec3(516.5, 120.0, 9.5));
+        TestPlayers.watchEffects(watcher);
+        CeroBeam.Spec spec = new CeroBeam.Spec(10.0F, 16.0, 0.5F, 3.0F, 0.5F, 8, 0.0F, 0xFFFFFF, 1, 0, true);
+        Vec3 east = new Vec3(1.0, 0.0, 0.0);
+        Arrow[] arrows = new Arrow[2];
+        helper.startSequence()
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    CeroBeam.Shot shot = CeroBeam.fire(soul, null, null, new Vec3(520.5, 120.5, 0.5), east, spec);
+                    helper.assertTrue(shot.negated() && !shot.hitBlock() && shot.blocksBroken() == 0
+                            && Math.abs(shot.to().x - face) < 1.0E-3, "the Cero over the gate: " + shot);
+                    BlockHitResult line = SpiritClip.firstOn(soul, new Vec3(520.5, 120.5, 0.5), new Vec3(530.5, 120.5, 0.5));
+                    helper.assertTrue(line instanceof SpiritClip.Membrane && Math.abs(line.getLocation().x - face) < 1.0E-3,
+                            "Pesquisa's line met " + line);
+                    helper.assertFalse(SpiritClip.meets(soul, new AABB(524.0, 120.0, 0.0, 528.0, 124.0, 2.0)),
+                            "a gate's box across the membrane meets Sekkiseki");
+                    for (int i = 0; i < 2; i++) {
+                        arrows[i] = new Arrow(EntityType.ARROW, soul);
+                        arrows[i].setNoGravity(i == 1);
+                        arrows[i].moveTo(524.3, 120.5, 3.5 + 3.0 * i, 0.0F, 0.0F);
+                        arrows[i].setDeltaMovement(1.5, 0.0, 0.0);
+                        held.add(arrows[i]);
+                    }
+                    ripples(watcher);
+                })
+                // Long enough for the stopped arrow to have fallen well below where it stopped.
+                .thenIdle(12)
+                .thenExecute(() -> {
+                    Arrow fell = arrows[0];
+                    helper.assertTrue(!fell.isRemoved() && fell.getX() > face - 0.02 && fell.getX() < face
+                                    && Math.abs(fell.getDeltaMovement().x) < SAME && fell.getY() < 120.0
+                                    && fell.getPersistentData().getBoolean("bleach:shakonmaku_fallen"),
+                            "the arrow is at " + fell.position() + ", moving " + fell.getDeltaMovement());
+                    helper.assertTrue(arrows[1].isRemoved() && arrows[1].getX() < face, "the weightless arrow is at "
+                            + arrows[1].position() + (arrows[1].isRemoved() ? ", gone" : ""));
+                    helper.assertTrue(ripples(watcher) >= 2, "the arrows showed no ripple");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Beside the north gate at y 130, a soul's flash step outward ends short of the membrane (within one of its quarter
+     * steps), on its own side; in creative mode it goes its whole way.
+     */
+    @GameTest(template = "empty", batch = BATCH)
+    public static void aFlashStepStopsShortOfTheMembrane(GameTestHelper helper) {
+        ServerLevel soul = hold(helper, -1, -33).soul;
+        Vec3 start = new Vec3(-5.5, 130.0, -520.5), north = new Vec3(0.0, 0.0, -1.0), face = new Vec3(-5.5, 130.0, -525.0);
+        on(helper, Side.INSIDE, start, face);
+        on(helper, Side.OUTSIDE, face.add(0.0, 0.0, -0.01));
+        for (GameType mode : List.of(GameType.SURVIVAL, GameType.CREATIVE)) {
+            Player body = helper.makeMockPlayer(mode);
+            AABB box = body.getBoundingBox().move(start.subtract(body.position()));
+            Vec3 end = FlashStep.sweep(soul, body, box, north, 8.0, false).end();
+            boolean whole = end.distanceTo(start.add(north.scale(8.0))) < 1.0E-3;
+            boolean stopped = Shakonmaku.side(end) == Side.INSIDE && end.distanceTo(face) <= 0.25 + 1.0E-3
+                    && Math.abs(end.x - face.x) < 1.0E-3 && end.z >= face.z - 1.0E-3;
+            helper.assertTrue(mode == GameType.CREATIVE ? whole : stopped, "a " + mode.getName() + " flash step ended at "
+                    + end);
+        }
+        helper.succeed();
     }
 
     // ---- Where souls are sent ----

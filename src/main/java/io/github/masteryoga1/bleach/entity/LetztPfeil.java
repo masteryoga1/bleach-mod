@@ -85,9 +85,11 @@ public class LetztPfeil extends HeiligPfeil {
         // Every block a path this long can pass through, even on a slant, at whatever speed it was set to.
         int mostBlocks = Mth.ceil(to.subtract(from).length() * Math.sqrt(3.0)) + 3;
         for (int i = 0; i < mostBlocks && carveLeft > 0; i++) {
-            BlockHitResult hit = SpiritClip.clip(level(), new ClipContext(from, to, ClipContext.Block.COLLIDER,
-                    ClipContext.Fluid.NONE, this)).block();
-            if (hit.getType() != HitResult.Type.BLOCK) {
+            SpiritClip.Hit clip = SpiritClip.clip(level(), new ClipContext(from, to, ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE, this));
+            BlockHitResult hit = clip.block();
+            // Nothing past the Shakonmaku is carved: the flight comes undone at it.
+            if (hit.getType() != HitResult.Type.BLOCK || clip.negated()) {
                 return;
             }
             BlockPos pos = hit.getBlockPos();

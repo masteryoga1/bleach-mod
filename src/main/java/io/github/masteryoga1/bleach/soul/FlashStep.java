@@ -208,7 +208,7 @@ public final class FlashStep {
 
     /**
      * Follows the path a flash step would take from {@code start}, in steps of {@link #STEP}, and
-     * stops at the last place the body fits safely.
+     * stops at the last place the body fits safely, short of the Shakonmaku.
      *
      * @param grounded whether the step runs along the ground, climbing and dropping a block at a
      *                 time; otherwise it flies straight
@@ -258,10 +258,19 @@ public final class FlashStep {
                     }
                 }
             }
+            // The Shakonmaku turns a body back as walking would, so the step ends short of it.
+            if (ShakonmakuEvents.stops(level, entity, feet(box), feet(next))) {
+                break;
+            }
             box = next;
         }
-        Vec3 end = new Vec3(box.getCenter().x, box.minY, box.getCenter().z);
+        Vec3 end = feet(box);
         return new DashPath(end, !level.noCollision(entity, box.move(0.0, -0.01, 0.0)));
+    }
+
+    /** Where a body in this box stands: the middle of its bottom. */
+    private static Vec3 feet(AABB box) {
+        return new Vec3(box.getCenter().x, box.minY, box.getCenter().z);
     }
 
     /** How far the box sticks out past the world border, or 0 if it is inside. */

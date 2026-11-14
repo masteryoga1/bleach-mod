@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
+import io.github.masteryoga1.bleach.soul.ShakonmakuEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
@@ -671,7 +672,8 @@ public class Gillian extends Menos {
 
     /**
      * The nearest lesser Hollow within reach across the ground and in sight: no Menos, none held (in jaws or
-     * in Negación's light), dissolving or leaving, and none stronger than this Gillian. One a bait holds will do.
+     * in Negación's light), dissolving, leaving or across the Shakonmaku, and none stronger than this Gillian. One a
+     * bait holds will do.
      */
     @Nullable
     private Hollow nearestMeal() {
@@ -682,7 +684,8 @@ public class Gillian extends Menos {
         List<Hollow> meals = new ArrayList<>(level().getEntitiesOfClass(Hollow.class, box,
                 hollow -> !(hollow instanceof Menos) && hollow.isAlive() && !hollow.isSeized() && !hollow.isPurifying()
                         && !hollow.isDeparting() && !Negacion.held(hollow) && horizontalDistanceSqr(hollow) <= reach * reach
-                        && SoulLogic.reiatsu(hollow) <= own));
+                        && SoulLogic.reiatsu(hollow) <= own
+                        && !ShakonmakuEvents.stops(level(), hollow, hollow.position(), position())));
         meals.sort(Comparator.comparingDouble(this::distanceToSqr));
         for (Hollow meal : meals) {
             if (hasLineOfSight(meal)) {
@@ -711,6 +714,11 @@ public class Gillian extends Menos {
         }
         // Moved, not pushed: a held or NoAI Hollow does not move by its own speed.
         Vec3 step = toward.scale(Math.min(FEED_PULL_SPEED, distance) / distance);
+        // The tongue lets go at the Shakonmaku: a prey's own tick never sees a pull, so it is judged here.
+        if (ShakonmakuEvents.stops(level, prey, prey.position(), prey.position().add(step))) {
+            letGo(now);
+            return;
+        }
         prey.setPos(prey.getX() + step.x, prey.getY() + step.y, prey.getZ() + step.z);
         prey.setDeltaMovement(Vec3.ZERO);
         if ((now - feedStart) % 2 == 0) {
