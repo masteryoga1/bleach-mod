@@ -123,12 +123,17 @@ public final class Senkaimon extends Entity implements Portal {
         return gate;
     }
 
+    /** The box a gate this opener opened now would fill: {@link #DISTANCE} before its feet, facing its way. */
+    public static AABB boxFor(Entity opener) {
+        Direction facing = opener.getDirection();
+        return boxAt(standing(opener, facing), facing);
+    }
+
     /** Whether a gate this opener opened now would stand within one soul's reach of a gate already open. */
     public static boolean crowded(Entity opener) {
-        Direction facing = opener.getDirection();
         // Grown by a player's size, so no soul's box could meet both gates at once.
-        AABB reach = boxAt(standing(opener, facing), facing)
-                .inflate(EntityType.PLAYER.getWidth(), EntityType.PLAYER.getHeight(), EntityType.PLAYER.getWidth());
+        AABB reach = boxFor(opener).inflate(EntityType.PLAYER.getWidth(), EntityType.PLAYER.getHeight(),
+                EntityType.PLAYER.getWidth());
         return !opener.level().getEntitiesOfClass(Senkaimon.class, reach).isEmpty();
     }
 

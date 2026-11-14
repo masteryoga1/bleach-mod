@@ -238,7 +238,9 @@ public final class Pesquisa {
      * Whether this caster's pulse would feel this creature now. Another living one in the same world, within
      * reach (its nearest part counts for a giant), with at least the least reiatsu felt: a player only by
      * survival's rules, with a soul and not fresh from a Sonído; anything else only with a soul, or being a
-     * spirit or a creature that sees them. So mundane animals and monsters are never felt.
+     * spirit or a creature that sees them; and never with a block that undoes reiryoku ({@link SpiritClip}) between
+     * the caster's eyes and the middle of its box (or part) nearest the caster, though stone hides nothing. So mundane
+     * animals and monsters are never felt.
      */
     public static boolean senses(Player caster, LivingEntity target, long now) {
         if (!SoulLogic.hasSoul(caster)) {
@@ -353,17 +355,33 @@ public final class Pesquisa {
                 && !target.getType().is(SoulLogic.SPIRIT_SIGHTED)) {
             return false;
         }
-        return SoulLogic.reiatsu(target) >= minReiatsu && distanceSqr(caster.position(), target) <= rangeSqr;
+        return SoulLogic.reiatsu(target) >= minReiatsu && distanceSqr(caster.position(), target) <= rangeSqr
+                && !walledOff(caster, target);
+    }
+
+    /**
+     * Whether a block that undoes reiryoku lies on the straight line from the caster's eyes to the middle of the soul's
+     * box nearest the caster's feet. Asked last, as the costliest rule: a walk of the cells on the line, loading none.
+     */
+    private static boolean walledOff(Player caster, LivingEntity target) {
+        Vec3 soul = nearestBox(caster.position(), target).getCenter();
+        return SpiritClip.firstOn(caster.level(), caster.getEyePosition(), soul) != null;
     }
 
     /** The squared distance from this point to the nearest of the creature's box and its parts' boxes. */
     private static double distanceSqr(Vec3 at, LivingEntity target) {
-        double nearest = target.getBoundingBox().distanceToSqr(at);
+        return nearestBox(at, target).distanceToSqr(at);
+    }
+
+    /** The nearest to this point of the creature's box and its parts' boxes. */
+    private static AABB nearestBox(Vec3 at, LivingEntity target) {
+        AABB nearest = target.getBoundingBox();
         PartEntity<?>[] parts = target.isMultipartEntity() ? target.getParts() : null;
         if (parts != null) {
             for (PartEntity<?> part : parts) {
-                AABB box = part.getBoundingBox();
-                nearest = Math.min(nearest, box.distanceToSqr(at));
+                if (part.getBoundingBox().distanceToSqr(at) < nearest.distanceToSqr(at)) {
+                    nearest = part.getBoundingBox();
+                }
             }
         }
         return nearest;
