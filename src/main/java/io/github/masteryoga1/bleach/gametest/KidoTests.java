@@ -226,7 +226,7 @@ public final class KidoTests {
     // ---- Helpers ----
 
     /** A mock player in this game mode with this soul, on the ground at {@link #LANE}, facing east, a while in the world. */
-    private static Player caster(GameTestHelper helper, GameType mode, SoulData data) {
+    static Player caster(GameTestHelper helper, GameType mode, SoulData data) {
         Player player = helper.makeMockPlayer(mode);
         player.setData(SoulAttachments.SOUL, data);
         Vec3 at = helper.absoluteVec(LANE);
@@ -237,14 +237,14 @@ public final class KidoTests {
     }
 
     /** A Shinigami full of this much reiryoku, at this Kidō level. */
-    private static SoulData shinigami(float maxReiryoku, int kido) {
+    static SoulData shinigami(float maxReiryoku, int kido) {
         SoulData data = ShinigamiTests.soul(SoulState.SHINIGAMI, maxReiryoku);
         data.setLevel(Stat.KIDO, kido);
         return data;
     }
 
     /** The world's spells. */
-    private static Registry<KidoSpell> spells(GameTestHelper helper) {
+    static Registry<KidoSpell> spells(GameTestHelper helper) {
         return KidoSpell.registry(helper.getLevel()).orElseThrow();
     }
 

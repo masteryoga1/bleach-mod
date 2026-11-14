@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.KidoWard;
+import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.Comparator;
@@ -17,6 +18,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
@@ -35,6 +37,7 @@ import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.EventHooks;
@@ -69,6 +72,8 @@ public class GetsugaTensho extends Projectile {
     private static final int DEFAULT_LIFE_TICKS = 25;
     /** How far apart, in blocks, the crescent looks for blocks to carve along its path. */
     private static final double CARVE_STEP = 0.5;
+    /** How far short of a block that undoes reiryoku the carve stops, so nothing over that block is cut. */
+    private static final double STONE_GAP = 1.0E-4;
     /** Drawn out to the distance it is tracked at: eight chunks. */
     private static final double RENDER_DISTANCE = 128.0;
 
@@ -157,11 +162,11 @@ public class GetsugaTensho extends Projectile {
 
     /**
      * Whether the crescent can cut this block: soft enough (between 0 and {@code maxHardness}, so
-     * never an unbreakable one), holding nothing (no block entity) and not one even a Wither leaves
-     * alone.
+     * never an unbreakable one), holding nothing (no block entity), not one even a Wither leaves
+     * alone and not one that undoes reiryoku ({@link SpiritClip}).
      */
     public static boolean cuttable(BlockState state, BlockGetter level, BlockPos pos, double maxHardness) {
-        if (state.isAir() || state.hasBlockEntity() || state.is(BlockTags.WITHER_IMMUNE)) {
+        if (state.isAir() || state.hasBlockEntity() || state.is(BlockTags.WITHER_IMMUNE) || SpiritClip.negates(state)) {
             return false;
         }
         float hardness = state.getDestroySpeed(level, pos);
@@ -251,7 +256,8 @@ public class GetsugaTensho extends Projectile {
     /**
      * Server side, each tick: the crescent goes once its owner has gone or left this level, its time
      * is up or its path runs into unloaded ground. Otherwise it sweeps its path for projectiles and
-     * creatures, carves along it, and moves on. A client just moves it along its course.
+     * creatures, carves along it, and moves on; at a block that undoes reiryoku ({@link SpiritClip}) it comes
+     * undone instead, touching nothing past it. A client just moves it along its course.
      */
     @Override
     public void tick() {
@@ -272,11 +278,24 @@ public class GetsugaTensho extends Projectile {
             discard();
             return;
         }
-        if (!sweep(owner, from, motion) || !carve(owner, from, to)) {
+        // The first block that undoes reiryoku on the crescent's middle, from the root on the first tick: the crescent
+        // comes undone there, and nothing past it is swept, weighed or carved.
+        Vec3 start = age == 0 && root != null ? root : from;
+        BlockHitResult stone = SpiritClip.firstOn(level(), start, to);
+        double stop = stone == null ? Double.MAX_VALUE : stone.getLocation().distanceTo(start);
+        // Carved to just short of it, unless it lies between the root and where the crescent appeared. A path that ends
+        // exactly on its face, or starts inside it, is stopped by the carve alone, with no fizzle: a single point.
+        Vec3 end = stone == null ? to : stone.getLocation().subtract(motion.normalize().scale(STONE_GAP));
+        if (!sweep(owner, from, motion, start, stop) || (stop > start.distanceTo(from) && !carve(owner, from, end))) {
             return;
         }
-        setPos(to);
-        age++;
+        if (stone == null) {
+            setPos(to);
+            age++;
+            return;
+        }
+        SpiritClip.fizzle((ServerLevel) level(), stone.getLocation(), owner.getSoundSource());
+        discard();
     }
 
     /**
@@ -285,10 +304,11 @@ public class GetsugaTensho extends Projectile {
      * each costing one of its pierces. It never touches what is at the back of the one who fired it
      * (see {@link #clearOfWielder}), yet still cuts what is pressed against their front. A shield or a
      * Kidō shield that stops it ({@link KidoWard#covers}), or the last pierce, ends it. A Dankū that holds ends it,
-     * after what stands before the wall; one it outweighs shatters as it passes. Returns whether the crescent is still
-     * flying.
+     * after what stands before the wall; one it outweighs shatters as it passes. Nothing whose middle lies {@code stop}
+     * or more along the path from {@code start}, where a block that undoes reiryoku stands, is touched. Returns whether
+     * the crescent is still flying.
      */
-    private boolean sweep(Entity owner, Vec3 from, Vec3 motion) {
+    private boolean sweep(Entity owner, Vec3 from, Vec3 motion, Vec3 start, double stop) {
         float charge = charge();
         double halfWidth = halfWidthFor(charge);
         double halfHeight = halfHeightFor(charge);
@@ -297,9 +317,8 @@ public class GetsugaTensho extends Projectile {
         Vec3 heading = motion.normalize();
         // The Dankū on the crescent's middle this tick, from the root on the first sweep so a wielder against a wall does
         // not cut through it; the first that holds is as far as it reaches (see DankuWall). Nothing shatters yet.
-        Vec3 start = age == 0 && root != null ? root : from;
         DankuWall.Along wards = DankuWall.along(level(), start, from.add(motion));
-        double reach = wards.holdsAt(owner, DankuWall.Art.GETSUGA);
+        double reach = Math.min(wards.holdsAt(owner, DankuWall.Art.GETSUGA), stop);
         Predicate<Entity> before = other -> other.getBoundingBox().getCenter().subtract(start).dot(heading) < reach;
         Vec3 rear = root != null ? root : from;
         // As far along the path from the root as the first sweep reaches: the swing itself.
@@ -319,7 +338,7 @@ public class GetsugaTensho extends Projectile {
                 target -> !struck.contains(target.getId()) && affects(target)
                         && clearOfWielder(target, rear, heading, beside) && before.test(target));
         if (targets.isEmpty()) {
-            return flies(wards, owner);
+            return flies(wards, owner, stop);
         }
         targets.sort(Comparator.comparingDouble(target -> target.distanceToSqr(from)));
         DamageSource source = new DamageSource(level().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
@@ -337,15 +356,15 @@ public class GetsugaTensho extends Projectile {
                 return false;
             }
         }
-        return flies(wards, owner);
+        return flies(wards, owner, stop);
     }
 
     /**
-     * Whether the crescent flies on past this sweep. Only now are the walls it reached weighed: those it outweighs shatter,
-     * and one that holds ends it as a shield does.
+     * Whether the crescent flies on past this sweep. Only now are the walls it reached up to {@code stop} weighed: those
+     * it outweighs shatter, and one that holds ends it as a shield does.
      */
-    private boolean flies(DankuWall.Along wards, Entity owner) {
-        if (wards.upTo(Double.MAX_VALUE, owner, DankuWall.Art.GETSUGA) == null) {
+    private boolean flies(DankuWall.Along wards, Entity owner, double stop) {
+        if (wards.upTo(stop, owner, DankuWall.Art.GETSUGA) == null) {
             return true;
         }
         discard();

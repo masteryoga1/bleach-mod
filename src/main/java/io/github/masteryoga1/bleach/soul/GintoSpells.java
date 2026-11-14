@@ -30,7 +30,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -113,12 +112,19 @@ public final class GintoSpells {
         return true;
     }
 
-    /** Wolke: a cloud on the ground straight below (or at the feet, with none in reach) that breaks every fall onto it. */
+    /**
+     * Wolke: a cloud on the ground straight below (or at the feet, with none in reach) that breaks every fall onto it.
+     * On a block that undoes reiryoku ({@link SpiritClip}) it comes undone instead, and the tubes are spent all the same.
+     */
     private static boolean castWolke(ServerLevel level, Player p, float strength) {
         Vec3 feet = p.position();
-        BlockHitResult below = level.clip(new ClipContext(feet, feet.subtract(0.0, range(), 0.0), ClipContext.Block.COLLIDER,
-                ClipContext.Fluid.ANY, p));
-        Vec3 centre = below.getType() == HitResult.Type.MISS ? feet : below.getLocation();
+        SpiritClip.Hit below = SpiritClip.clip(level, new ClipContext(feet, feet.subtract(0.0, range(), 0.0),
+                ClipContext.Block.COLLIDER, ClipContext.Fluid.ANY, p));
+        if (below.negated()) {
+            SpiritClip.fizzle(level, below.block().getLocation(), SoundSource.PLAYERS);
+            return true;
+        }
+        Vec3 centre = below.block().getType() == HitResult.Type.MISS ? feet : below.block().getLocation();
         GintoCast.spawn(level, p, GintoSpell.WOLKE, centre, (float) BleachConfig.get(BleachConfig.WOLKE_RADIUS), 0,
                 BleachConfig.get(BleachConfig.WOLKE_TICKS), strength, null, List.of());
         if (!p.onGround()) {
@@ -127,12 +133,18 @@ public final class GintoSpells {
         return true;
     }
 
-    /** Heizen: a pillar rises under the creature looked at, or where the look meets a block. */
+    /**
+     * Heizen: a pillar rises under the creature looked at, or where the look meets a block. At a block that undoes
+     * reiryoku ({@link SpiritClip}) it comes undone instead, and the tubes are spent all the same.
+     */
     private static boolean castHeizen(ServerLevel level, Player p, float strength) {
         HitResult hit = look(p, range());
         Vec3 centre;
         if (hit instanceof EntityHitResult entityHit) {
             centre = entityHit.getEntity().position();
+        } else if (SpiritClip.negates(level, hit)) {
+            SpiritClip.fizzle(level, hit.getLocation(), SoundSource.PLAYERS);
+            return true;
         } else if (hit != null && hit.getType() == HitResult.Type.BLOCK) {
             centre = hit.getLocation();
         } else {

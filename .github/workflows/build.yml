@@ -61,6 +61,15 @@ jobs:
             exit 1
           fi
 
+      # Every spirit art traces blocks through SpiritClip, so none passes Sekkiseki by asking the level alone. A trace by
+      # another route is not seen here: Heizen's ProjectileUtil look (GintoSpells) asks SpiritClip.negates by hand.
+      - name: Check that spirit arts trace blocks through SpiritClip
+        run: |
+          if grep -rnP '(?<!SpiritClip)\.clip\((new ClipContext|\s*$)' src/main/java --include=*.java | grep -v "/soul/SpiritClip.java"; then
+            echo "These lines trace blocks without SpiritClip"
+            exit 1
+          fi
+
       - name: Build the mod jar
         run: ./gradlew build --stacktrace
 

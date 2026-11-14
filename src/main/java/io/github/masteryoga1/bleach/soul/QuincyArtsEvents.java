@@ -867,8 +867,8 @@ public final class QuincyArtsEvents {
             double across = (p.getRandom().nextDouble() * 2.0 - 1.0) * LICHT_SPREAD;
             Vec3 origin = eye.add(0.0, LICHT_RISE, 0.0).subtract(facing.scale(LICHT_BACK)).add(left.scale(across));
             // Never from inside a wall or ceiling: then from the eyes.
-            if (level.clip(new ClipContext(eye, origin, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p)).getType()
-                    != HitResult.Type.MISS) {
+            if (SpiritClip.clip(level, new ClipContext(eye, origin, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p))
+                    .block().getType() != HitResult.Type.MISS) {
                 origin = eye;
             }
             HeiligPfeil.launchVolley(level, p, origin, aim.subtract(origin), damage, QuincyArtsLogic.LICHT_SPEED,

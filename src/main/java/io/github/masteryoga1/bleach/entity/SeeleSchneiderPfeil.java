@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.GintoSpells;
 import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.UUID;
 import javax.annotation.Nullable;
@@ -118,6 +119,7 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
         if (!level.addFreshEntity(blade)) {
             return null;
         }
+        // Never on a block that undoes reiryoku (canPlantAt refused it), so this hit only sticks the blade.
         blade.onHitBlock(new BlockHitResult(blade.position(), Direction.UP, ground, false));
         // Sticking stilled it; the drift is kept for clients that start watching later.
         blade.setDeltaMovement(PLANT_SETTLE);
@@ -127,12 +129,13 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
     }
 
     /**
-     * Whether a blade can be planted in the top of this block: the block is solid enough to hold it
-     * and the space above it is free.
+     * Whether a blade can be planted in the top of this block: the block is solid enough to hold it, does not undo
+     * reiryoku ({@link SpiritClip}), and the space above it is free.
      */
     public static boolean canPlantAt(BlockGetter level, BlockPos ground) {
         BlockPos above = ground.above();
-        return !level.getBlockState(ground).getCollisionShape(level, ground).isEmpty()
+        return !SpiritClip.negates(level.getBlockState(ground))
+                && !level.getBlockState(ground).getCollisionShape(level, ground).isEmpty()
                 && level.getBlockState(above).getCollisionShape(level, above).isEmpty();
     }
 
@@ -312,6 +315,15 @@ public class SeeleSchneiderPfeil extends HeiligPfeil {
         } else if (++airTicks >= QuincyArtsLogic.SEELE_SPENT_AIR_TICKS) {
             dropHiltAndGo();
         }
+    }
+
+    /** Undone at a block that undoes reiryoku, it never sticks there: its hilt falls as a spent blade's does. */
+    @Override
+    protected void negated(Vec3 at) {
+        if (level() instanceof ServerLevel server) {
+            SpiritClip.fizzle(server, at, SoundSource.PLAYERS);
+        }
+        dropHiltAndGo();
     }
 
     private void dropHiltAndGo() {

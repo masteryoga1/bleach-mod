@@ -61,7 +61,7 @@ public final class BleachTags {
     /** Biomes where reishi runs thin, so a Quincy gathers it more slowly: deserts, badlands and the deepest caves. */
     public static final TagKey<Biome> REISHI_THIN = TagKey.create(Registries.BIOME, BleachMod.id("reishi_thin"));
 
-    /** Blocks that undo reiryoku, against which spirit shots are to fizzle: Sekkiseki. No rule reads it yet. */
+    /** Blocks that undo reiryoku (Sekkiseki): a spirit art comes undone at the first it meets (see {@code SpiritClip}). */
     public static final TagKey<Block> NEGATES_REIRYOKU = TagKey.create(Registries.BLOCK, BleachMod.id("negates_reiryoku"));
 
     /**

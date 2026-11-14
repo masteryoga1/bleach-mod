@@ -165,9 +165,10 @@ public final class KidoEvents {
 
     /**
      * Where a bind cast now goes: the first creature it may bind, or null, and where the ray ends, where it meets that
-     * creature or else at the first block in the way or the spell's reach.
+     * creature or else at the first block in the way or the spell's reach; and whether, with no creature, that block
+     * undoes reiryoku ({@link SpiritClip}), where the bind comes undone.
      */
-    public record BindAim(@Nullable LivingEntity target, Vec3 end) {
+    public record BindAim(@Nullable LivingEntity target, Vec3 end, boolean negated) {
     }
 
     /**
@@ -609,6 +610,9 @@ public final class KidoEvents {
             case BIND -> {
                 BindAim aim = bindAim(player, spell);
                 drawBind(level, player, spell, aim.end());
+                if (aim.negated()) {
+                    SpiritClip.fizzle(level, aim.end(), SoundSource.PLAYERS);
+                }
                 KidoLogic.BindResult result = aim.target() == null ? null
                         : bindOne(player, aim.target(), spell, share, now);
                 if (result == KidoLogic.BindResult.SHRUGGED) {
@@ -694,7 +698,7 @@ public final class KidoEvents {
      * damage and push (not of its reach, width or blast), stopping after the spell's pierce, breaking no blocks,
      * bursting about the last creature it strikes, and setting what it strikes alight for a spell that burns. Its
      * trace is drawn, the main hand thrusts, and the spell's sound and particles go off at the hand, and its particles
-     * again where it struck or met a wall. Returns the shot.
+     * again where it struck or met a wall, unless it came undone there (see {@link CeroBeam#fire}). Returns the shot.
      */
     private static CeroBeam.Shot beam(ServerLevel level, Player player, SoulData data, KidoSpell spell, float share) {
         KidoSpell.Effect effect = spell.effect();
@@ -722,7 +726,7 @@ public final class KidoEvents {
         if (particle != null) {
             SpiritSenses.particles(level, particle, from.x, from.y, from.z, HAND_PARTICLES, HAND_SPREAD, HAND_SPREAD,
                     HAND_SPREAD, PARTICLE_SPEED);
-            if (!shot.struck().isEmpty() || shot.hitBlock()) {
+            if ((!shot.struck().isEmpty() || shot.hitBlock()) && !shot.negated()) {
                 Vec3 to = shot.to();
                 SpiritSenses.particles(level, particle, to.x, to.y, to.z, IMPACT_PARTICLES, IMPACT_SPREAD, IMPACT_SPREAD,
                         IMPACT_SPREAD, PARTICLE_SPEED);
@@ -753,8 +757,9 @@ public final class KidoEvents {
      * angle over its range (at most {@link KidoSpell#GUST_MAX_RANGE}), at the form's share of its damage, push and
      * blindness (not of its reach or width). Every creature the caster may strike that stands in it, in the open from
      * the hand, takes its blow ({@link #gustBlow}), nearest first; a wall stops it, and it breaks no blocks. A pale
-     * streak is drawn down its middle to the first block, rings of the spell's particle widen along it, the main hand
-     * swings and the spell's sound goes off at the hand. Returns the creatures it hurt, nearest first.
+     * streak is drawn down its middle to the first block, where one that undoes reiryoku ({@link SpiritClip}) shows
+     * it come undone, rings of the spell's particle widen along it, the main hand swings and the spell's sound goes off
+     * at the hand. Returns the creatures it hurt, nearest first.
      */
     private static List<LivingEntity> gust(ServerLevel level, Player player, SoulData data, KidoSpell spell,
                                            float share) {
@@ -776,11 +781,14 @@ public final class KidoEvents {
             }
         }
         Vec3 far = apex.add(axis.scale(range));
-        HitResult wall = level.clip(new ClipContext(apex, far, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
-                CollisionContext.empty()));
-        Vec3 end = wall.getType() == HitResult.Type.BLOCK ? wall.getLocation() : far;
+        SpiritClip.Hit wall = SpiritClip.clip(level, new ClipContext(apex, far, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, CollisionContext.empty()));
+        Vec3 end = wall.block().getType() == HitResult.Type.BLOCK ? wall.block().getLocation() : far;
         CeroBeam.trace(level, player, new CeroBeam.Shot(apex, end, false, false, List.of(), 0), effect.radius(),
                 look.colour(), TRACE_TICKS);
+        if (wall.negated()) {
+            SpiritClip.fizzle(level, end, SoundSource.PLAYERS);
+        }
         SimpleParticleType particle = particleOf(look);
         if (particle != null) {
             // Capped, so a data pack's half-circle gust does not throw its puffs off to the horizon.
@@ -867,8 +875,9 @@ public final class KidoEvents {
         Vec3 eye = caster.getEyePosition();
         Vec3 look = caster.getViewVector(1.0F);
         Vec3 end = eye.add(look.scale(spell.effect().range()));
-        end = caster.level().clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster))
-                .getLocation();
+        SpiritClip.Hit wall = SpiritClip.clip(caster.level(), new ClipContext(eye, end, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, caster));
+        end = wall.block().getLocation();
         Entity met = null;
         Vec3 at = end;
         double nearest = Double.MAX_VALUE;
@@ -906,7 +915,7 @@ public final class KidoEvents {
                 at = meets;
             }
         }
-        return met == null ? new BindAim(null, end) : new BindAim(SpiritProjectiles.bodyOf(met), at);
+        return met == null ? new BindAim(null, end, wall.negated()) : new BindAim(SpiritProjectiles.bodyOf(met), at, false);
     }
 
     /** How far ahead of the eyes, along the look, this box reaches at its furthest corner: below 0 when wholly behind. */

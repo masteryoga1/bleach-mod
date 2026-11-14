@@ -21,6 +21,7 @@ import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -874,8 +875,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         Vec3 eye = getEyePosition(partialTick);
         Vec3 view = getViewVector(partialTick);
         Vec3 ahead = eye.add(view.scale(MUZZLE_AHEAD * getScale()));
-        BlockHitResult wall = level().clip(new ClipContext(eye, ahead, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
-                CollisionContext.empty()));
+        BlockHitResult wall = SpiritClip.clip(level(), new ClipContext(eye, ahead, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, CollisionContext.empty())).block();
         if (wall.getType() == HitResult.Type.MISS) {
             return ahead;
         }

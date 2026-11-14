@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
@@ -325,7 +326,8 @@ public class HeiligPfeil extends AbstractArrow {
     private boolean restoreAhead(Player shooter) {
         Vec3 from = position();
         Vec3 to = from.add(getDeltaMovement());
-        BlockHitResult wall = level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        BlockHitResult wall = SpiritClip.clip(level(), new ClipContext(from, to, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, this)).block();
         if (wall.getType() != HitResult.Type.MISS) {
             to = wall.getLocation();
         }
@@ -346,7 +348,8 @@ public class HeiligPfeil extends AbstractArrow {
         }
         Vec3 from = position();
         Vec3 to = from.add(getDeltaMovement());
-        BlockHitResult wall = level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        BlockHitResult wall = SpiritClip.clip(level(), new ClipContext(from, to, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, this)).block();
         if (wall.getType() != HitResult.Type.MISS) {
             to = wall.getLocation();
         }
@@ -605,8 +608,8 @@ public class HeiligPfeil extends AbstractArrow {
     protected void checkInsideBlocks() {
         if (metCreature && !isRemoved() && !level().isClientSide() && !isSpent()) {
             metCreature = false;
-            BlockHitResult wall = level().clip(new ClipContext(flightFrom, flightFrom.add(flightStep),
-                    ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+            BlockHitResult wall = SpiritClip.clip(level(), new ClipContext(flightFrom, flightFrom.add(flightStep),
+                    ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this)).block();
             if (wall.getType() == HitResult.Type.BLOCK && !EventHooks.onProjectileImpact(this, wall)) {
                 if (sticks()) {
                     setPos(flightFrom);
@@ -635,10 +638,18 @@ public class HeiligPfeil extends AbstractArrow {
     /**
      * The first block it meets still feels the hit (a target block, a bell), as with any projectile;
      * then, on the server, the arrow bursts and is gone. A client flies on until it hears so. One
-     * that {@link #sticks} sticks into the block as a vanilla arrow does, on both sides, instead.
+     * that {@link #sticks} sticks into the block as a vanilla arrow does, on both sides, instead; at a block that
+     * undoes reiryoku ({@link SpiritClip}) every arrow only comes undone ({@link #negated}).
      */
     @Override
     protected void onHitBlock(BlockHitResult result) {
+        // Before anything else, so the block itself feels nothing and a blade never sticks there.
+        if (SpiritClip.negates(level(), result)) {
+            if (!level().isClientSide()) {
+                negated(result.getLocation());
+            }
+            return;
+        }
         if (sticks()) {
             super.onHitBlock(result);
             onStuck(result);
@@ -650,6 +661,14 @@ public class HeiligPfeil extends AbstractArrow {
             burst(result.getLocation());
             discard();
         }
+    }
+
+    /** Comes undone where it met a block that undoes reiryoku: the fizzle, and it is gone. Server side. */
+    protected void negated(Vec3 at) {
+        if (level() instanceof ServerLevel server) {
+            SpiritClip.fizzle(server, at, SoundSource.PLAYERS);
+        }
+        discard();
     }
 
     /** A spray of reishi and the strike's sound, for those who can see spirits. Server side. */

@@ -283,8 +283,8 @@ public final class Negacion {
     public static LivingEntity aimed(Player caster) {
         Vec3 eye = caster.getEyePosition();
         Vec3 end = eye.add(caster.getViewVector(1.0F).scale(BleachConfig.get(BleachConfig.NEGACION_PLAYER_RANGE)));
-        end = caster.level().clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster))
-                .getLocation();
+        end = SpiritClip.clip(caster.level(), new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
+                caster)).block().getLocation();
         EntityHitResult hit = ProjectileUtil.getEntityHitResult(caster.level(), caster, eye, end,
                 new AABB(eye, end).inflate(1.0), entity -> !entity.isSpectator() && entity.isPickable()
                         && !(entity instanceof HoldingVehicle), AIM_MARGIN);
