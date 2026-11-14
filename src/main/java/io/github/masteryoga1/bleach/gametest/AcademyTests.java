@@ -58,6 +58,7 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CrossCollisionBlock;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.material.PushReaction;
@@ -403,8 +404,18 @@ public final class AcademyTests {
             // halves. Test positions sit one above the template's, which starts above the structure block.
             helper.assertBlockPresent(Blocks.LANTERN, 4, 5, 10);
             helper.assertBlockPresent(Blocks.LANTERN, 3, 2, 3);
-            helper.assertBlockPresent(Blocks.BAMBOO_DOOR, 7, 2, 7);
-            helper.assertBlockPresent(Blocks.BAMBOO_DOOR, 7, 3, 7);
+            helper.assertBlockPresent(ModBlocks.SHOJI_DOOR.get(), 7, 2, 7);
+            helper.assertBlockPresent(ModBlocks.SHOJI_DOOR.get(), 7, 3, 7);
+            // Seireitei's palette: white plaster on a black base, tatami underfoot, a tiled roof, and shōji joined to
+            // the pillar beside them but not to the door.
+            helper.assertBlockPresent(ModBlocks.BLACK_PLASTER.get(), 2, 2, 7);
+            helper.assertBlockPresent(ModBlocks.WHITE_PLASTER.get(), 2, 5, 7);
+            helper.assertBlockPresent(ModBlocks.TATAMI.get(), 7, 1, 12);
+            helper.assertBlockPresent(ModBlocks.ROOF_TILES.get(), 7, 7, 11);
+            BlockPos shoji = new BlockPos(6, 3, 7);
+            helper.assertBlockPresent(ModBlocks.SHOJI.get(), shoji);
+            helper.assertBlockProperty(shoji, CrossCollisionBlock.WEST, true);
+            helper.assertBlockProperty(shoji, CrossCollisionBlock.EAST, false);
             helper.assertEntityNotPresent(EntityType.FALLING_BLOCK);
         });
     }

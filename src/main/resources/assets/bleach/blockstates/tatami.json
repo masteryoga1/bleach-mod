@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=east": {"model": "bleach:block/tatami", "y": 90},
+    "facing=north": {"model": "bleach:block/tatami"},
+    "facing=south": {"model": "bleach:block/tatami", "y": 180},
+    "facing=west": {"model": "bleach:block/tatami", "y": 270}
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {"has_the_recipe": {"conditions": {"recipe": "bleach:shoji_door"}, "trigger": "minecraft:recipe_unlocked"},
+    "has_shoji": {"conditions": {"items": [{"items": "bleach:shoji"}]}, "trigger": "minecraft:inventory_changed"}},
+  "requirements": [["has_the_recipe", "has_shoji"]],
+  "rewards": {"recipes": ["bleach:shoji_door"]}
+}

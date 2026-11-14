@@ -25,6 +25,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.DoubleHighBlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
@@ -73,6 +74,11 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> ROOF_TILES = ITEMS.registerSimpleBlockItem(ModBlocks.ROOF_TILES);
     public static final DeferredItem<BlockItem> ROOF_TILE_STAIRS = ITEMS.registerSimpleBlockItem(ModBlocks.ROOF_TILE_STAIRS);
     public static final DeferredItem<BlockItem> ROOF_TILE_SLAB = ITEMS.registerSimpleBlockItem(ModBlocks.ROOF_TILE_SLAB);
+    public static final DeferredItem<BlockItem> SHOJI = ITEMS.registerSimpleBlockItem(ModBlocks.SHOJI);
+    /** The shōji door's item, which sets both halves down, as a door's does. */
+    public static final DeferredItem<DoubleHighBlockItem> SHOJI_DOOR = ITEMS.register("shoji_door",
+            () -> new DoubleHighBlockItem(ModBlocks.SHOJI_DOOR.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> TATAMI = ITEMS.registerSimpleBlockItem(ModBlocks.TATAMI);
 
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",

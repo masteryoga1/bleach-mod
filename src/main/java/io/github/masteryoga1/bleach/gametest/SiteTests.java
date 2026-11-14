@@ -292,7 +292,7 @@ public final class SiteTests {
                                 standing.size() + " instructors stand in the Academy, the first at "
                                         + (first == null ? "none" : first.position()) + ", not one at " + INSTRUCTOR);
                         BlockState door = soul.getBlockState(DOOR);
-                        helper.assertTrue(door.is(Blocks.BAMBOO_DOOR)
+                        helper.assertTrue(door.is(ModBlocks.SHOJI_DOOR.get())
                                         && door.getValue(BlockStateProperties.HORIZONTAL_FACING) == Direction.WEST,
                                 "the hall's door at " + DOOR.toShortString() + " is " + door + ", not a door facing west");
                         helper.assertFalse(AcademySite.ensureBuilt(soul), "the stamp built over an Academy that was whole");

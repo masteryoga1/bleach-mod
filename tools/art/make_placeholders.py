@@ -177,6 +177,13 @@ BLACK_PLASTER_GRAIN = rgb(67, 67, 72)
 ROOF_TILE = rgb(80, 87, 99)
 ROOF_TILE_RIDGE = rgb(106, 113, 126)
 ROOF_TILE_SHADOW = rgb(48, 52, 62)
+# Shōji, see-through paper on a dark wooden lattice; and tatami, woven straw with a dark cloth edge.
+SHOJI_PAPER = (238, 234, 220, 214)
+SHOJI_FRAME = rgb(74, 56, 40)
+SHOJI_PANEL = rgb(98, 76, 56)
+TATAMI = rgb(198, 192, 124)
+TATAMI_WEAVE = rgb(178, 172, 106)
+TATAMI_EDGE = rgb(40, 44, 42)
 
 
 class Canvas:
@@ -1750,6 +1757,75 @@ def roof_tiles():
     return c
 
 
+def shoji():
+    """Shōji: see-through paper on a dark wooden lattice of three by three panes, its frame on every edge, so shōji in a
+    row read as one screen through the pane's cut-out."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, SHOJI_PAPER)
+    for i in (0, 5, 10, 15):
+        c.rect(i, 0, i + 1, 16, SHOJI_FRAME)
+        c.rect(0, i, 16, i + 1, SHOJI_FRAME)
+    return c
+
+
+def shoji_top():
+    """The top and bottom edge of a shōji pane, and its post: the frame's bare wood."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, SHOJI_FRAME)
+    return c
+
+
+def shoji_door(lower):
+    """A half of the shōji door: a shōji panel in a frame two pixels wide, its lattice running on from half to half;
+    the lower half ends in a wooden kick panel, with the pull above it."""
+    def draw():
+        c = shoji()
+        c.rect(0, 0, 2, 16, SHOJI_FRAME)
+        c.rect(14, 0, 16, 16, SHOJI_FRAME)
+        if lower:
+            c.rect(0, 10, 16, 16, SHOJI_PANEL)
+            c.rect(0, 15, 16, 16, SHOJI_FRAME)
+            c.rect(12, 6, 13, 8, SHOJI_FRAME)
+        else:
+            c.rect(0, 0, 16, 2, SHOJI_FRAME)
+        return c
+    draw.__name__ = "shoji_door_" + ("bottom" if lower else "top")
+    return draw
+
+
+def shoji_door_icon():
+    """The shōji door's item: a narrow shōji panel with its kick panel."""
+    c = Canvas(16, 16)
+    c.rect(3, 0, 13, 16, SHOJI_FRAME)
+    c.rect(4, 1, 12, 11, SHOJI_PAPER)
+    for x in (6, 9):
+        c.rect(x, 1, x + 1, 11, SHOJI_FRAME)
+    for y in (4, 7):
+        c.rect(4, y, 12, y + 1, SHOJI_FRAME)
+    c.rect(4, 12, 12, 15, SHOJI_PANEL)
+    return c
+
+
+def tatami():
+    """Tatami's face: straw woven in rows across the mat, with a dark cloth edge down its two long sides."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, TATAMI)
+    for y in range(0, 16, 2):
+        c.rect(2, y, 14, y + 1, TATAMI_WEAVE)
+    c.rect(0, 0, 2, 16, TATAMI_EDGE)
+    c.rect(14, 0, 16, 16, TATAMI_EDGE)
+    return c
+
+
+def tatami_side():
+    """Tatami's sides: the pressed straw of its core, in layers."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, TATAMI_WEAVE)
+    for y in (1, 5, 9, 13):
+        c.rect(0, y, 16, y + 2, TATAMI)
+    return c
+
+
 TEXTURES = {
     "item/asauchi.png": asauchi,
     "item/zangetsu.png": zangetsu,
@@ -1856,6 +1932,13 @@ TEXTURES = {
     "block/black_plaster.png": recoloured(white_plaster, {PLASTER: BLACK_PLASTER, PLASTER_GRAIN: BLACK_PLASTER_GRAIN},
                                           "black_plaster"),
     "block/roof_tiles.png": roof_tiles,
+    "block/shoji.png": shoji,
+    "block/shoji_top.png": shoji_top,
+    "block/shoji_door_top.png": shoji_door(False),
+    "block/shoji_door_bottom.png": shoji_door(True),
+    "item/shoji_door.png": shoji_door_icon,
+    "block/tatami.png": tatami,
+    "block/tatami_side.png": tatami_side,
 }
 
 
