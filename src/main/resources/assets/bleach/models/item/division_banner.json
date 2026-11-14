@@ -1,0 +1,21 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {"layer0": "bleach:block/division_banner_first"},
+  "overrides": [
+    {"predicate": {"bleach:division": 0.0625}, "model": "bleach:item/division_banner_second"},
+    {"predicate": {"bleach:division": 0.125}, "model": "bleach:item/division_banner_third"},
+    {"predicate": {"bleach:division": 0.1875}, "model": "bleach:item/division_banner_fourth"},
+    {"predicate": {"bleach:division": 0.25}, "model": "bleach:item/division_banner_fifth"},
+    {"predicate": {"bleach:division": 0.3125}, "model": "bleach:item/division_banner_sixth"},
+    {"predicate": {"bleach:division": 0.375}, "model": "bleach:item/division_banner_seventh"},
+    {"predicate": {"bleach:division": 0.4375}, "model": "bleach:item/division_banner_eighth"},
+    {"predicate": {"bleach:division": 0.5}, "model": "bleach:item/division_banner_ninth"},
+    {"predicate": {"bleach:division": 0.5625}, "model": "bleach:item/division_banner_tenth"},
+    {"predicate": {"bleach:division": 0.625}, "model": "bleach:item/division_banner_eleventh"},
+    {"predicate": {"bleach:division": 0.6875}, "model": "bleach:item/division_banner_twelfth"},
+    {"predicate": {"bleach:division": 0.75}, "model": "bleach:item/division_banner_thirteenth"},
+    {"predicate": {"bleach:division": 0.8125}, "model": "bleach:item/division_banner_kido_corps"},
+    {"predicate": {"bleach:division": 0.875}, "model": "bleach:item/division_banner_onmitsukido"},
+    {"predicate": {"bleach:division": 0.9375}, "model": "bleach:item/division_banner_zero"}
+  ]
+}

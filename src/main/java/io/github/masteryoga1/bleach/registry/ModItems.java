@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.registry;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.block.DivisionBannerBlock;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CajaNegacion;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
@@ -32,6 +33,7 @@ import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tiers;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.item.component.Unbreakable;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -79,6 +81,11 @@ public final class ModItems {
     public static final DeferredItem<DoubleHighBlockItem> SHOJI_DOOR = ITEMS.register("shoji_door",
             () -> new DoubleHighBlockItem(ModBlocks.SHOJI_DOOR.get(), new Item.Properties()));
     public static final DeferredItem<BlockItem> TATAMI = ITEMS.registerSimpleBlockItem(ModBlocks.TATAMI);
+    /** The division banner's item: the First's, unless its block state names another division. */
+    public static final DeferredItem<BlockItem> DIVISION_BANNER = ITEMS.register("division_banner",
+            () -> new BlockItem(ModBlocks.DIVISION_BANNER.get(), new Item.Properties()
+                    .component(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY
+                            .with(DivisionBannerBlock.DIVISION, DivisionBannerBlock.Division.FIRST))));
 
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",
