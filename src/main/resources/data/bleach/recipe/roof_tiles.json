@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {"#": {"item": "minecraft:terracotta"}, "C": {"tag": "minecraft:coals"}},
+  "pattern": ["###", "#C#", "###"],
+  "result": {"count": 8, "id": "bleach:roof_tiles"}
+}

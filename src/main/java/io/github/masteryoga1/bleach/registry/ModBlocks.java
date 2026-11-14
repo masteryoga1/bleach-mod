@@ -9,7 +9,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ColoredFallingBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
+import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.material.MapColor;
@@ -51,6 +53,21 @@ public final class ModBlocks {
             () -> new RotatedPillarBlock(quartz()));
     public static final DeferredBlock<Block> HUECO_QUARTZ_BRICKS =
             BLOCKS.registerSimpleBlock("hueco_quartz_bricks", quartz());
+    /** Seireitei's white plaster, the walls of its halls and barracks: stone-like, as white concrete is. */
+    public static final DeferredBlock<Block> WHITE_PLASTER = BLOCKS.registerSimpleBlock("white_plaster",
+            plaster(MapColor.SNOW));
+    /** Black plaster, for the dark base of a white wall. */
+    public static final DeferredBlock<Block> BLACK_PLASTER = BLOCKS.registerSimpleBlock("black_plaster",
+            plaster(MapColor.COLOR_GRAY));
+    /** Dark fired roof tiles in overlapping courses, as hard as bricks. */
+    public static final DeferredBlock<Block> ROOF_TILES = BLOCKS.registerSimpleBlock("roof_tiles",
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_CYAN).instrument(NoteBlockInstrument.BASEDRUM)
+                    .requiresCorrectToolForDrops().strength(2.0F, 6.0F).sound(SoundType.DEEPSLATE_TILES));
+    public static final DeferredBlock<StairBlock> ROOF_TILE_STAIRS = BLOCKS.register("roof_tile_stairs",
+            () -> new StairBlock(ROOF_TILES.get().defaultBlockState(),
+                    BlockBehaviour.Properties.ofFullCopy(ROOF_TILES.get())));
+    public static final DeferredBlock<SlabBlock> ROOF_TILE_SLAB = BLOCKS.register("roof_tile_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofFullCopy(ROOF_TILES.get())));
 
     private ModBlocks() {
     }
@@ -65,5 +82,11 @@ public final class ModBlocks {
     private static BlockBehaviour.Properties quartz() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
                 .requiresCorrectToolForDrops().strength(0.8F);
+    }
+
+    /** Plaster's properties, as white concrete's are, in this colour on a map. */
+    private static BlockBehaviour.Properties plaster(MapColor colour) {
+        return BlockBehaviour.Properties.of().mapColor(colour).instrument(NoteBlockInstrument.BASEDRUM)
+                .requiresCorrectToolForDrops().strength(1.8F);
     }
 }

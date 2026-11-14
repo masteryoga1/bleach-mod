@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:block/stairs",
+  "textures": {"bottom": "bleach:block/roof_tiles", "side": "bleach:block/roof_tiles", "top": "bleach:block/roof_tiles"}
+}

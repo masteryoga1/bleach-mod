@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {"#": {"item": "bleach:roof_tiles"}},
+  "pattern": ["###"],
+  "result": {"count": 6, "id": "bleach:roof_tile_slab"}
+}
