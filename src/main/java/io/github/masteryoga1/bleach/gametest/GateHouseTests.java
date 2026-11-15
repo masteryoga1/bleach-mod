@@ -390,8 +390,9 @@ public final class GateHouseTests {
     /**
      * Test E. In an old world's open north gap, souls where the house goes are moved out on their own half as it is built:
      * a player in a pier into the doorway, a cow high on the lawn's half onto the roof and one high on the Rukongai's
-     * half into the doorway, and one in the doorway is let be. Then a cow joining in a pier, as one saved in the gap
-     * before the house stood comes back, is moved into the doorway once the tick is done, and the one there still is not.
+     * half into the doorway, while a cow in the doorway and a calf in the wicket's way, neither buried, are let be. Then a
+     * cow joining in a pier, as one saved in the gap before the house stood comes back, is moved into the doorway once
+     * its chunks are loaded, and the two let be still are.
      */
     @GameTest(template = "empty", batch = "gate_house", timeoutTicks = 200)
     public static void aSoulInAGapIsMovedOutOnItsOwnHalf(GameTestHelper helper) {
@@ -399,8 +400,8 @@ public final class GateHouseTests {
         ServerLevel soul = held.soul;
         Vec3 inPier = Vec3.atBottomCenterOf(at(NORTH, 1, 0, 3)), high = Vec3.atBottomCenterOf(at(NORTH, 6, 33, 2));
         Vec3 highOut = Vec3.atBottomCenterOf(at(NORTH, 6, 33, 5)), inDoor = Vec3.atBottomCenterOf(at(NORTH, 8, 0, 6));
-        Vec3 joins = Vec3.atBottomCenterOf(at(NORTH, 1, 10, 5));
-        Cow[] cows = new Cow[2];
+        Vec3 joins = Vec3.atBottomCenterOf(at(NORTH, 1, 10, 5)), inWicket = Vec3.atBottomCenterOf(at(NORTH, 14, 0, 4));
+        Cow[] cows = new Cow[3];
         helper.startSequence()
                 .thenWaitUntil(() -> assertPlaced(helper, soul, NORTH, "from its chunks' loads alone"))
                 .thenExecute(() -> {
@@ -410,6 +411,10 @@ public final class GateHouseTests {
                         ServerPlayer player = ShakonmakuTests.soulAt(helper, soul, GameType.SURVIVAL, inPier);
                         Cow up = held.add(cow(soul, high)), upOut = held.add(cow(soul, highOut));
                         cows[0] = held.add(cow(soul, inDoor));
+                        // Outside the doorway's columns: were every soul in a house's box moved, this one would be.
+                        Cow calf = cow(soul, inWicket);
+                        calf.setBaby(true);
+                        cows[2] = held.add(calf);
                         helper.assertTrue(GateHouses.STAMP.ensureBuilt(soul, NORTH), "the stamp built nothing in the gap");
                         assertHouse(helper, soul, NORTH, "built about the souls in its gap");
                         helper.assertTrue(soul.noCollision(player) && inDoorway(NORTH, player.position())
@@ -420,8 +425,9 @@ public final class GateHouseTests {
                         helper.assertTrue(soul.noCollision(upOut) && inDoorway(NORTH, upOut.position())
                                         && upOut.getZ() == highOut.z, "the cow high on the Rukongai's half is at "
                                         + upOut.position() + ", not in the doorway on its own half");
-                        helper.assertTrue(cows[0].position().equals(inDoor), "the cow in the doorway was moved to "
-                                + cows[0].position());
+                        helper.assertTrue(cows[0].position().equals(inDoor) && cows[2].position().equals(inWicket),
+                                "the cow in the doorway was moved to " + cows[0].position() + " and the calf in the wicket's"
+                                        + " way to " + cows[2].position());
                     } finally {
                         restore(helper, soul, NORTH);
                     }
@@ -429,8 +435,9 @@ public final class GateHouseTests {
                     helper.assertFalse(soul.noCollision(cows[1]), "the cow set in the pier at " + joins + " is not in it");
                 })
                 // A failed step above leaves the cows unset and runs this at once: it must fail, not throw.
-                .thenWaitUntil(() -> helper.assertTrue(cows[0] != null && cows[1] != null && soul.noCollision(cows[1])
-                        && inDoorway(NORTH, cows[1].position()) && cows[0].position().equals(inDoor),
+                .thenWaitUntil(() -> helper.assertTrue(cows[0] != null && cows[1] != null && cows[2] != null
+                        && soul.noCollision(cows[1]) && inDoorway(NORTH, cows[1].position())
+                        && cows[0].position().equals(inDoor) && cows[2].position().equals(inWicket),
                         "the cow that joined in the pier is at " + (cows[1] == null ? "nowhere" : cows[1].position())
                                 + " and the one in the doorway at " + (cows[0] == null ? "nowhere" : cows[0].position())))
                 .thenSucceed();
