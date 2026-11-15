@@ -1,8 +1,12 @@
 package io.github.masteryoga1.bleach.world;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
@@ -10,7 +14,6 @@ import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -45,6 +48,13 @@ public final class GateHouses {
             List.of(new SiteStamp.Marker(LEFT_POST, () -> Blocks.STRIPPED_DARK_OAK_LOG),
                     new SiteStamp.Marker(RIGHT_POST, () -> Blocks.STRIPPED_DARK_OAK_LOG)),
             GateHouses::freeAll);
+    /** How many ticks a soul that joined in a house's box waits for the chunks under it to load before it is let be. */
+    private static final int JOIN_WAIT = 600;
+    /**
+     * Souls that joined in a house's box, each with the ticks it may still wait: over a chunk not loaded nothing reads as
+     * solid, so one is judged only once every chunk under it is. Server thread only.
+     */
+    private static final Map<LivingEntity, Integer> JOINED = new HashMap<>();
 
     private GateHouses() {
     }
@@ -54,22 +64,51 @@ public final class GateHouses {
         STAMP.onChunkLoad(event);
     }
 
-    /** The one further try a stamp's check asked for. */
+    /** The one further try a stamp's check asked for, and the souls that joined in a house whose chunks have loaded. */
     public static void onServerTick(ServerTickEvent.Post event) {
         STAMP.onServerTick(event);
+        MinecraftServer server = event.getServer();
+        List<LivingEntity> due = new ArrayList<>();
+        for (Iterator<Map.Entry<LivingEntity, Integer>> each = JOINED.entrySet().iterator(); each.hasNext(); ) {
+            Map.Entry<LivingEntity, Integer> joined = each.next();
+            LivingEntity living = joined.getKey();
+            if (living.isRemoved() || living.level().getServer() != server
+                    || living.level().dimension() != BleachWorlds.SOUL_SOCIETY || joined.getValue() <= 0) {
+                each.remove();
+            } else if (loadedUnder((ServerLevel) living.level(), living)) {
+                each.remove();
+                due.add(living);
+            } else {
+                joined.setValue(joined.getValue() - 1);
+            }
+        }
+        due.forEach(living -> free((ServerLevel) living.level(), living));
     }
 
     /**
      * A soul or player joining Soul Society in a house's box, saved there before the house stood, is moved out of its
-     * blocks once the tick is done. One joining anywhere else costs a few comparisons.
+     * blocks at the end of a tick once the chunks under it have loaded, which for one logging in come after it. One joining
+     * anywhere else costs a few comparisons.
      */
     public static void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getEntity() instanceof LivingEntity living && nearGap(living)
                 && event.getLevel() instanceof ServerLevel level && level.dimension() == BleachWorlds.SOUL_SOCIETY
                 && house(living.getBoundingBox()) != null) {
-            MinecraftServer server = level.getServer();
-            server.tell(new TickTask(server.getTickCount(), () -> free(level, living)));
+            JOINED.put(living, JOIN_WAIT);
         }
+    }
+
+    /** Whether every chunk under this body's box is loaded, so that its blocks can be read. */
+    private static boolean loadedUnder(ServerLevel level, Entity entity) {
+        AABB box = entity.getBoundingBox();
+        for (int x = Mth.floor(box.minX) >> 4; x <= Mth.floor(box.maxX) >> 4; x++) {
+            for (int z = Mth.floor(box.minZ) >> 4; z <= Mth.floor(box.maxZ) >> 4; z++) {
+                if (level.getChunkSource().getChunkNow(x, z) == null) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /** Whether this body stands under the wall's top within a block of a gap's columns, by its feet and width alone. */

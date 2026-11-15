@@ -418,9 +418,11 @@ public final class GateHouseTests {
                     cows[1] = held.add(cow(soul, joins));
                     helper.assertFalse(soul.noCollision(cows[1]), "the cow set in the pier at " + joins + " is not in it");
                 })
-                .thenWaitUntil(() -> helper.assertTrue(soul.noCollision(cows[1]) && inDoorway(NORTH, cows[1].position())
-                        && cows[0].position().equals(inDoor), "the cow that joined in the pier is at " + cows[1].position()
-                        + " and the one in the doorway at " + cows[0].position()))
+                // A failed step above leaves the cows unset and runs this at once: it must fail, not throw.
+                .thenWaitUntil(() -> helper.assertTrue(cows[0] != null && cows[1] != null && soul.noCollision(cows[1])
+                        && inDoorway(NORTH, cows[1].position()) && cows[0].position().equals(inDoor),
+                        "the cow that joined in the pier is at " + (cows[1] == null ? "nowhere" : cows[1].position())
+                                + " and the one in the doorway at " + (cows[0] == null ? "nowhere" : cows[0].position())))
                 .thenSucceed();
     }
 }
