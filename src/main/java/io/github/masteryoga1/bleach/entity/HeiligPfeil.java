@@ -279,18 +279,20 @@ public class HeiligPfeil extends AbstractArrow {
      * flight forgets that block once it has met a creature, and would carry the arrow into or through
      * it (see {@link #checkInsideBlocks}).
      * After moving, the arrow ends once its time is up or its owner has gone. On the server, spent or not, a step
-     * that would cross the Shakonmaku ends where it meets it, and the arrow comes undone there ({@link #negated}).
+     * that would cross the Shakonmaku ends where it meets it, and the arrow comes undone there ({@link #negated}) unless
+     * it stuck in a block first.
      */
     @Override
     public void tick() {
-        SpiritClip.Membrane membrane = level().isClientSide() ? null
+        // An arrow in the ground does not move, though its motion still points the way it flew.
+        SpiritClip.Membrane membrane = level().isClientSide() || inGround ? null
                 : SpiritClip.membrane(level(), position(), position().add(getDeltaMovement()));
         if (membrane != null) {
             setDeltaMovement(membrane.getLocation().subtract(position()));
         }
         if (isSpent()) {
             super.tick();
-            if (membrane != null && !isRemoved()) {
+            if (membrane != null && !isRemoved() && !inGround) {
                 negated(membrane.getLocation());
             }
             return;
@@ -322,7 +324,7 @@ public class HeiligPfeil extends AbstractArrow {
         if (level().isClientSide() || isRemoved()) {
             return;
         }
-        if (membrane != null) {
+        if (membrane != null && !inGround) {
             negated(membrane.getLocation());
             return;
         }

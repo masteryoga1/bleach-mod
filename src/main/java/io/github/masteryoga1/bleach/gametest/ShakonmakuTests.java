@@ -206,7 +206,7 @@ public final class ShakonmakuTests {
     public static void aMountGoesBackWithItsRider(GameTestHelper helper) {
         Cleanup held = hold(helper, 0, 32);
         ServerLevel soul = held.soul;
-        Vec3 from = new Vec3(0.5, 120.0, 524.5), out = new Vec3(0.5, 120.0, 526.9), aside = new Vec3(3.0, 0.0, 0.0);
+        Vec3 from = new Vec3(0.5, 120.0, 524.5), out = new Vec3(0.5, 119.0, 526.9), aside = new Vec3(3.0, 0.0, 0.0);
         Vec3[] rows = {Vec3.ZERO, aside, aside.scale(2.0), aside.scale(-1.0), aside.scale(-2.0)};
         for (Vec3 row : rows) {
             on(helper, Side.INSIDE, from.add(row));
@@ -228,7 +228,7 @@ public final class ShakonmakuTests {
                 // Aboard, and steering once the connection's tick has seen it so.
                 .thenIdle(5)
                 .thenExecute(() -> {
-                    // 10 blocks into a fall, which the refused move neither adds to nor forgives.
+                    // 10 blocks into a fall: the refused move, a block down, neither adds to it nor forgives it.
                     boat.fallDistance = 10.0F;
                     rider.connection.handleMoveVehicle(new ServerboundMoveVehiclePacket(boat(soul, out)));
                     creative.connection.handleMoveVehicle(new ServerboundMoveVehiclePacket(boat(soul, out.add(rows[1]))));
@@ -239,7 +239,7 @@ public final class ShakonmakuTests {
                 .thenExecute(() -> {
                     at(helper, boat, from, "the boat steered out");
                     at(helper, shared, from.add(rows[2]), "the boat a friend in creative steered out");
-                    helper.assertTrue(boat.fallDistance >= 10.0F && boat.fallDistance < 11.0F, "the boat has fallen "
+                    helper.assertTrue(boat.fallDistance >= 10.0F && boat.fallDistance < 10.5F, "the boat has fallen "
                             + boat.fallDistance + " (kept at about 10)");
                     helper.assertTrue(rider.getVehicle() == boat && told(rider) == 1 && told(carried) == 1, "the rider is on "
                             + rider.getVehicle() + ", told " + TravelTests.said(rider) + " and " + TravelTests.said(carried));

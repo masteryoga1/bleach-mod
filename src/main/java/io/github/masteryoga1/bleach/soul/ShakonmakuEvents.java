@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
+import io.github.masteryoga1.bleach.mixin.FireworkRocketEntityAccessor;
 import io.github.masteryoga1.bleach.world.Shakonmaku;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +18,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.monster.Shulker;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.level.Level;
@@ -130,7 +132,7 @@ public final class ShakonmakuEvents {
      */
     private static void onTickPre(EntityTickEvent.Pre event) {
         if (!(event.getEntity() instanceof Projectile thrown) || !(thrown.level() instanceof ServerLevel level)
-                || !Shakonmaku.in(level) || isArt(thrown) || fallen(thrown)) {
+                || !Shakonmaku.in(level) || isArt(thrown) || carried(thrown) || fallen(thrown)) {
             return;
         }
         Vec3 from = thrown.position();
@@ -164,7 +166,7 @@ public final class ShakonmakuEvents {
         }
         Vec3 from = new Vec3(entity.xo, entity.yo, entity.zo);
         if (entity instanceof Projectile thrown) {
-            if (!isArt(thrown)) {
+            if (!isArt(thrown) && !carried(thrown)) {
                 stop(level, thrown, from);
             }
             return;
@@ -308,6 +310,12 @@ public final class ShakonmakuEvents {
     /** Spirit arts meet the membrane by their own rules ({@link SpiritClip}). */
     private static boolean isArt(Projectile thrown) {
         return thrown instanceof HeiligPfeil || thrown instanceof GetsugaTensho;
+    }
+
+    /** A rocket boosting a glider goes where the glider goes, and the glider is judged as a body instead. */
+    private static boolean carried(Projectile thrown) {
+        return thrown instanceof FireworkRocketEntity rocket
+                && ((FireworkRocketEntityAccessor) rocket).bleach$isAttachedToEntity();
     }
 
     /** Whether the membrane has stopped this thrown thing already, so it now falls where it will. */
