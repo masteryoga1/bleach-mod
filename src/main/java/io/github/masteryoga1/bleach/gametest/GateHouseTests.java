@@ -30,6 +30,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
@@ -118,6 +119,14 @@ public final class GateHouseTests {
         }
         Block sekkiseki = ModBlocks.SEKKISEKI.get();
         int width = GateHouses.SIZE.getX(), height = GateHouses.SIZE.getY();
+        // The roof is flat at the wall's top: a soul on its edge stands inside the membrane, not in the gate's cells.
+        for (int x = 0; x < width; x++) {
+            for (int z = 0; z < GateHouses.SIZE.getZ(); z++) {
+                BlockPos top = at(house, x, height - 1, z);
+                helper.assertTrue(soul.getBlockState(top).isFaceSturdy(soul, top, Direction.UP), "house " + house
+                        + "'s roof at " + top.toShortString() + " is not flat at the wall's top " + when);
+            }
+        }
         for (int x = -1; x <= width; x++) {
             for (int y = 0; y <= height; y++) {
                 for (int z = 0; z < GateHouses.SIZE.getZ(); z++) {
@@ -138,9 +147,10 @@ public final class GateHouseTests {
         helper.assertTrue(right.test(state), "house " + house + "'s " + place.toShortString() + " is " + state + " " + when);
     }
 
-    /** Whether a block is a roof stair facing this way. */
+    /** Whether a block is an upside-down roof stair facing this way. */
     private static Predicate<BlockState> stair(Direction facing) {
-        return state -> state.is(ModBlocks.ROOF_TILE_STAIRS.get()) && state.getValue(StairBlock.FACING) == facing;
+        return state -> state.is(ModBlocks.ROOF_TILE_STAIRS.get()) && state.getValue(StairBlock.FACING) == facing
+                && state.getValue(StairBlock.HALF) == Half.TOP;
     }
 
     /** Takes away what says this house was placed, its start and both chunks' references, and leaves its blocks. */

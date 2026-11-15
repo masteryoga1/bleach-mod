@@ -273,10 +273,11 @@ def gate_house():
                         t.set(x, y, z, "minecraft:dark_oak_planks")
                 else:
                     t.set(x, y, z, "bleach:black_plaster" if y < 2 else "bleach:white_plaster")
-            # The roof: tiles, and at each face a row of stairs stepping down outwards.
+            # The roof: tiles, and at each face a row of upside-down stairs, an eave under a top flat at the wall's:
+            # nowhere on the roof stands lower, in the gate's cells, as a way round the doorway.
             t.set(x, height - 2, z, "bleach:roof_tiles")
             if z in faces:
-                t.set(x, height - 1, z, "bleach:roof_tile_stairs", facing="south" if z == 0 else "north", half="bottom",
+                t.set(x, height - 1, z, "bleach:roof_tile_stairs", facing="south" if z == 0 else "north", half="top",
                       shape="straight", waterlogged="false")
             else:
                 t.set(x, height - 1, z, "bleach:roof_tiles")
