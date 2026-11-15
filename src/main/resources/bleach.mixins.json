@@ -11,6 +11,7 @@
     "GameTestServerMixin",
     "LivingEntityMixin",
     "PlayerMixin",
+    "ServerGamePacketListenerImplMixin",
     "ServerPlayerMixin",
     "TargetingConditionsMixin",
     "ThrownPotionMixin",
