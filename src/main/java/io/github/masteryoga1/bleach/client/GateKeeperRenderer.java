@@ -15,7 +15,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Draws a gatekeeper as a player's figure scaled to its 8 blocks, in its own placeholder skin by its gate, holding its
- * weapons; both arms go up for half a minute after it yields, and it kneels as a sneaking player stoops.
+ * weapons; both arms go up as it winds up a blow and for half a minute after it yields, and it kneels as a sneaking
+ * player stoops.
  */
 public class GateKeeperRenderer extends HumanoidMobRenderer<GateKeeper, PlayerModel<GateKeeper>> {
     /** How much larger than a player's figure, 1.8 blocks tall, a keeper is drawn. */

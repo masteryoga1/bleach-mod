@@ -301,7 +301,8 @@ public final class GateTests {
      * Hakutōmon's house with its gate's and wicket's cells open, as a house stood before the gates, and a post broken,
      * gains them when laid again, a cow they bury on each half moved out of the gate's row on that half, and a lift
      * frees a cow in the slot.
-     * The heights, targets and keepers saved read back, none laid by the reading, and a damaged entry reads within range.
+     * The heights, targets, keepers and timed drops saved read back, none laid by the reading, and a damaged entry reads
+     * within range.
      */
     @GameTest(template = "empty", batch = BATCH, timeoutTicks = 400)
     public static void aHouseWithItsGateCellsOpenGainsThemWhenLaid(GameTestHelper helper) {
@@ -353,6 +354,7 @@ public final class GateTests {
                     for (int gate = EAST; gate <= NORTH; gate++) {
                         helper.assertTrue(read.height(gate) == gates.height(gate) && read.target(gate) == gates.target(gate)
                                         && Objects.equals(read.keeper(gate), gates.keeper(gate))
+                                        && read.dropAt(gate) == gates.dropAt(gate)
                                         && read.status(gate) == GateState.Status.NOT_LAID,
                                 "gate " + gate + " was read back from " + saved + " as " + read.status(gate));
                     }
@@ -362,10 +364,12 @@ public final class GateTests {
                     ListTag list = saved.getList("Gates", Tag.TAG_COMPOUND);
                     list.getCompound(EAST).putInt("Height", 99);
                     list.getCompound(EAST).putInt("Target", 7);
+                    list.getCompound(EAST).putLong("DropAt", 600L);
                     list.remove(NORTH);
                     GateState lenient = GateState.load(saved, soul.registryAccess());
                     helper.assertTrue(lenient.height(EAST) == LIFT && lenient.target(EAST) == 0
-                                    && lenient.height(NORTH) == 0 && lenient.target(NORTH) == 0,
+                                    && lenient.dropAt(EAST) == 600L && lenient.height(NORTH) == 0
+                                    && lenient.target(NORTH) == 0 && lenient.dropAt(NORTH) == Long.MAX_VALUE,
                             "a damaged entry was read as " + lenient.height(EAST) + " to " + lenient.target(EAST));
                     cows[2] = cow(held, inSlot);
                     gates.lift(soul, WEST);
