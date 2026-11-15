@@ -223,14 +223,18 @@ public final class ShakonmakuTests {
         Boat shared = held.add(boat(soul, from.add(rows[2])));
         Cow cow = EntityType.COW.create(soul);
         helper.assertTrue(cow != null, "no cow");
-        Vec3 cowAt = from.add(rows[1]);
-        cow.moveTo(cowAt.x, cowAt.y, cowAt.z, 0.0F, 0.0F);
-        held.add(cow);
         helper.startSequence()
                 .thenIdle(3)
-                .thenExecute(() -> helper.assertTrue(rider.startRiding(boat, true) && creative.startRiding(other, true)
-                        && cow.startRiding(other, true) && friend.startRiding(shared, true)
-                        && carried.startRiding(shared, true), "a soul would not board"))
+                .thenExecute(() -> {
+                    helper.assertTrue(rider.startRiding(boat, true) && creative.startRiding(other, true)
+                            && friend.startRiding(shared, true) && carried.startRiding(shared, true),
+                            "a soul would not board");
+                    // Set down only once the creative soul is aboard: a boat no player steers takes a creature beside it.
+                    Vec3 cowAt = from.add(rows[1]);
+                    cow.moveTo(cowAt.x, cowAt.y, cowAt.z, 0.0F, 0.0F);
+                    held.add(cow);
+                    helper.assertTrue(cow.startRiding(other, true), "the cow would not board");
+                })
                 // Aboard, and steering once the connection's tick has seen it so.
                 .thenIdle(5)
                 .thenExecute(() -> {
