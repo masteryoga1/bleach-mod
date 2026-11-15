@@ -2657,9 +2657,9 @@ public final class ClientSmokeTest {
 
     /**
      * Holds (or lets go of) the arrival chunks in Soul Society, the Senkaimon court's, the lawn spot's and the Academy's,
-     * on the integrated server with a forced ticket each, which generates them in the background, as the forceload
-     * command would not. The Academy's landing lies in its hall's chunk, and a ticket reaches a chunk each way, so the
-     * gate's is held too.
+     * and the south gap's whose wall and gate house the lawn's wall check reads, on the integrated server with a forced
+     * ticket each, which generates them in the background, as the forceload command would not. A ticket reaches a chunk
+     * each way, so the Academy's gate and both sides of the gap are held too.
      */
     private static void holdArrival(Minecraft minecraft, boolean hold) {
         MinecraftServer server = minecraft.getSingleplayerServer();
@@ -2668,6 +2668,7 @@ public final class ClientSmokeTest {
         }
         List<ChunkPos> chunks = List.of(new ChunkPos(BlockPos.containing(TravelLogic.COURT)),
                 new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z)),
+                new ChunkPos(new BlockPos(0, SeireiteiPlan.PLATEAU_Y, SeireiteiPlan.SEIREITEI_RADIUS)),
                 new ChunkPos(BlockPos.containing(SeireiteiPlan.ACADEMY_LANDING_X, SeireiteiPlan.ACADEMY_FLOOR_Y,
                         SeireiteiPlan.ACADEMY_LANDING_Z)));
         server.execute(() -> {
