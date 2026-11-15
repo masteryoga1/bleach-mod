@@ -216,6 +216,8 @@ public final class ShakonmakuEvents {
     /** A thrown thing with weight stops dead at the membrane, which ripples, and falls where it will from then on. */
     private static void fell(ServerLevel level, Projectile thrown, Vec3 at) {
         thrown.setDeltaMovement(Vec3.ZERO);
+        // Sent at once, or watchers see it fly on through the membrane until its next timed update.
+        thrown.hasImpulse = true;
         thrown.getPersistentData().putBoolean(FALLEN_KEY, true);
         ripple(level, at, thrown);
     }
