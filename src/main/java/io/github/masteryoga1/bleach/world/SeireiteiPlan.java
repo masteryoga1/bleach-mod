@@ -25,6 +25,15 @@ public final class SeireiteiPlan {
     public static final int GATE_HALF_WIDTH = 8;
     /** How far along its axis each gate house stands: mid-wall. */
     public static final int GATE_RADIUS = SEIREITEI_RADIUS + WALL_THICKNESS / 2;
+    /** A gate house's doorway: its gap's columns nearer the axis than this, open from the plateau up to its head. */
+    public static final int GATE_DOOR_HALF_WIDTH = 5, GATE_DOOR_TOP_Y = PLATEAU_Y + 25;
+    /**
+     * The great gate's row in its house, counted from the wall's inner face (the outer of the two mid-wall rows), and how
+     * many rows it rises by, into the slot left open over the doorway in that row.
+     */
+    public static final int GATE_ROW = WALL_THICKNESS / 2, GATE_LIFT = 12;
+    /** The wicket's opening: this many rows from the ground through the right-hand pier, coming in from the Rukongai. */
+    public static final int GATE_WICKET_ROWS = 2;
     /** Sōkyoku Hill: a sheer mesa. */
     public static final int MESA_RADIUS = 64, MESA_TOP_Y = 136;
     /** The cavern inside the hill: air from its floor up to, not including, its ceiling. */
@@ -53,9 +62,19 @@ public final class SeireiteiPlan {
 
     /** Every planned site: a template set whole at its corner, turned, on the ground there, one structure for each group. */
     public static final List<Site> SITES = List.of(
-            new Site("academy", ACADEMY_X, ACADEMY_Z, BleachMod.id("academy/academy"), Rotation.CLOCKWISE_90));
+            new Site("academy", ACADEMY_X, ACADEMY_Z, BleachMod.id("academy/academy"), Rotation.CLOCKWISE_90),
+            // The gate houses in the order of the Rukongai's regions, each the south one turned about the centre column.
+            gateHouse(SEIREITEI_RADIUS, GATE_HALF_WIDTH - 1, Rotation.COUNTERCLOCKWISE_90),
+            gateHouse(-GATE_HALF_WIDTH, SEIREITEI_RADIUS, Rotation.NONE),
+            gateHouse(-SEIREITEI_RADIUS - 1, -GATE_HALF_WIDTH, Rotation.CLOCKWISE_90),
+            gateHouse(GATE_HALF_WIDTH - 1, -SEIREITEI_RADIUS - 1, Rotation.CLOCKWISE_180));
 
     private SeireiteiPlan() {
+    }
+
+    /** A gate house filling a gap of the wall, its template's corner at the gap's corner here, its front facing out. */
+    private static Site gateHouse(int x, int z, Rotation rotation) {
+        return new Site("gate", x, z, BleachMod.id("gate/house"), rotation);
     }
 
     /** How far this block's centre lies from the centre column. */

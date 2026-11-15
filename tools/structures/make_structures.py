@@ -12,6 +12,7 @@ box, air included, so placing one clears whatever was there.
 Uses only the standard library.
 """
 import gzip
+import math
 import struct
 import sys
 from pathlib import Path
@@ -221,6 +222,75 @@ def academy():
     return t
 
 
+# Soul Society's plan, as SeireiteiPlan.java has it; GateHouseTests checks a stamped house against the Java.
+PLATEAU_Y, WALL_TOP_Y = 72, 112
+SEIREITEI_RADIUS, WALL_THICKNESS, GATE_HALF_WIDTH = 512, 8, 8
+GATE_DOOR_HALF_WIDTH, GATE_DOOR_TOP_Y = 5, PLATEAU_Y + 25
+GATE_ROW, GATE_LIFT, GATE_WICKET_ROWS = WALL_THICKNESS // 2, 12, 2
+
+
+def in_wall(x, z):
+    """Whether this column is the Seireiheki's, not a gate's gap: SeireiteiPlan.inWall."""
+    r = math.hypot(x + 0.5, z + 0.5)
+    axis = min(abs(x + 0.5), abs(z + 0.5))
+    return SEIREITEI_RADIUS <= r < SEIREITEI_RADIUS + WALL_THICKNESS and axis >= GATE_HALF_WIDTH
+
+
+def gate_house():
+    """
+    A gate house of the Seireiheki, filling the south gate's gap from the lawn to the wall's top; the plan turns it
+    into the others. x runs west to east across the gap, z from the wall's inner face out to the Rukongai. Piers of
+    white plaster on a black plinth stand either side of one doorway, framed by dark posts, under a lintel and an
+    upper storey with a tiled roof. Left open for the great gate and its wicket (7j3): a slot in the gate's row over
+    the doorway, as tall as the gate's lift, and a passage through the right-hand pier, coming in, at the ground.
+    Every position is listed, so the box must be the gap alone: a column of the wall in it fails the build.
+    """
+    width, height, depth = 2 * GATE_HALF_WIDTH, WALL_TOP_Y - PLATEAU_Y, WALL_THICKNESS
+    walled = [(x, z) for x in range(width) for z in range(depth) if in_wall(x - GATE_HALF_WIDTH, SEIREITEI_RADIUS + z)]
+    if walled:
+        raise ValueError(f"the gate house would be built over the Seireiheki's columns {walled}")
+    t = Template(width, height, depth)
+    door_top = GATE_DOOR_TOP_Y - PLATEAU_Y
+    door = range(GATE_HALF_WIDTH - GATE_DOOR_HALF_WIDTH, GATE_HALF_WIDTH + GATE_DOOR_HALF_WIDTH)
+    posts = (door[0] - 1, door[-1] + 1)
+    wicket = (door[-1] + 1 + width - 1) // 2
+    post = dict(block="minecraft:stripped_dark_oak_log", axis="y")
+    beam = dict(block="minecraft:stripped_dark_oak_log", axis="x")
+    faces = (0, depth - 1)
+
+    for x in range(width):
+        for z in range(depth):
+            face_post = x in posts and z in faces
+            for y in range(height - 2):
+                if y < door_top and x in door:
+                    continue  # the doorway
+                if face_post and y not in (door_top, height - 3):
+                    t.set(x, y, z, **post)
+                elif y in (door_top, height - 3):
+                    if z in faces:
+                        t.set(x, y, z, **beam)
+                    else:
+                        t.set(x, y, z, "minecraft:dark_oak_planks")
+                else:
+                    t.set(x, y, z, "bleach:black_plaster" if y < 2 else "bleach:white_plaster")
+            # The roof: tiles, and at each face a row of stairs stepping down outwards.
+            t.set(x, height - 2, z, "bleach:roof_tiles")
+            if z in faces:
+                t.set(x, height - 1, z, "bleach:roof_tile_stairs", facing="south" if z == 0 else "north", half="bottom",
+                      shape="straight", waterlogged="false")
+            else:
+                t.set(x, height - 1, z, "bleach:roof_tiles")
+
+    # The slot the great gate rises into, and the wicket's passage.
+    for x in door:
+        for y in range(door_top, door_top + GATE_LIFT):
+            t.set(x, y, GATE_ROW, "minecraft:air")
+    for y in range(GATE_WICKET_ROWS):
+        for z in range(depth):
+            t.set(wicket, y, z, "minecraft:air")
+    return t
+
+
 def lane():
     """A game-test lane for flash steps: 12 long (+X), 3 wide, a stone floor and room above."""
     t = Template(12, 4, 3)
@@ -238,6 +308,7 @@ def field():
 TEMPLATES = {
     "academy/academy.nbt": academy,
     "field.nbt": field,
+    "gate/house.nbt": gate_house,
     "lane.nbt": lane,
 }
 

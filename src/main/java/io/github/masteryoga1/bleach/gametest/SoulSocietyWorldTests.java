@@ -61,7 +61,7 @@ public final class SoulSocietyWorldTests {
                 "the Seireiheki at (" + d + ", " + d + ") is not Sekkiseki from y 1 to " + (top - 1) + " on bedrock");
         helper.assertTrue(soul.getBlockState(gap).is(Blocks.GRASS_BLOCK) && soul.getBlockState(gap.above()).isAir()
                         && soul.getBlockState(new BlockPos(w, 90, g)).is(sekkiseki)
-                        && soul.getBlockState(new BlockPos(w - 1, 90, g)).isAir(),
+                        && soul.getBlockState(new BlockPos(0, 90, g)).isAir(),
                 "the south gate's gap is not open lawn between walls");
         helper.succeed();
     }

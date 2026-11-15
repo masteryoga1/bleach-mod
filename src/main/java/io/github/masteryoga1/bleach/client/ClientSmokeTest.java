@@ -2227,7 +2227,7 @@ public final class ClientSmokeTest {
                         + ", the lawn's block " + minecraft.level.getBlockState(BlockPos.containing(SOUL_SOCIETY_X,
                                 SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
         expectWithin(minecraft, 6850, 6985, () -> wallStands(minecraft.level),
-                "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a 16-block gap");
+                "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a gate house");
         expectWithin(minecraft, 7010, 7090, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
                         && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.ACADEMY_FLOOR_Y) < 0.01
                         && academyStands(minecraft.level) && !instructorsNear(minecraft, 32.0).isEmpty(),
@@ -2451,15 +2451,21 @@ public final class ClientSmokeTest {
                 && Math.abs(box.getYsize() - 4.0) < 0.01 && Math.abs(box.getZsize() - Senkaimon.THICKNESS) < 0.01;
     }
 
-    /** Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of an open gap. */
+    /**
+     * Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of the gap, and the
+     * gate house in it, a plaster pier against each side and its doorway open between dark posts.
+     */
     private static boolean wallStands(ClientLevel level) {
         int z = SeireiteiPlan.SEIREITEI_RADIUS, w = SeireiteiPlan.GATE_HALF_WIDTH, top = SeireiteiPlan.WALL_TOP_Y;
-        Block sekkiseki = ModBlocks.SEKKISEKI.get();
-        // Each pair lies in one chunk, so the Sekkiseki shows that the air beside it was sent, not missing.
+        int door = SeireiteiPlan.GATE_DOOR_HALF_WIDTH;
+        Block sekkiseki = ModBlocks.SEKKISEKI.get(), plaster = ModBlocks.WHITE_PLASTER.get();
+        // Each pair lies in one chunk, so the block beside the air shows that the air was sent, not missing.
         return level.getBlockState(new BlockPos(w, 90, z)).is(sekkiseki)
-                && level.getBlockState(new BlockPos(w - 1, 90, z)).isAir()
+                && level.getBlockState(new BlockPos(w - 1, 90, z)).is(plaster)
                 && level.getBlockState(new BlockPos(-w - 1, 90, z)).is(sekkiseki)
-                && level.getBlockState(new BlockPos(-w, 90, z)).isAir()
+                && level.getBlockState(new BlockPos(-w, 90, z)).is(plaster)
+                && level.getBlockState(new BlockPos(door, 90, z)).is(Blocks.STRIPPED_DARK_OAK_LOG)
+                && level.getBlockState(new BlockPos(door - 1, 90, z)).isAir()
                 && level.getBlockState(new BlockPos(16, top - 1, z)).is(sekkiseki)
                 && level.getBlockState(new BlockPos(16, top, z)).isAir();
     }
