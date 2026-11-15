@@ -58,7 +58,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Tests for Soul Society's sites: the placement that names the chunks they start in, the structure that sets each site's
  * template at its corner and turn, and the Academy in Seireitei, which a world whose chunks there were made before it, or
  * made with structures off as the test server's are, has built once both of its chunks are loaded. Test C changes the
- * test world's Academy, so the three run in a batch of their own.
+ * test world's Academy, so A to C run in a batch of their own; test D reads a stamp's numbers with no world, in any batch.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
