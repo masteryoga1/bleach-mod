@@ -37,9 +37,9 @@ import org.joml.Vector3f;
  * the focus. Letting go, or a step of more than a block, ends it for free; the reiryoku is paid when the
  * pulse goes out, and the cooldown starts then. Mundane creatures, the caster, players in creative or
  * spectator mode and an Arrancar fresh from a Sonído ({@link Sonido#unsensed}) are not felt, nor is a soul
- * with a block that undoes reiryoku ({@link SpiritClip}) between, though stone hides nothing. The focus and
- * the cooldown are transients in the soul, so nothing is saved. Everything takes a {@link Player}, so game
- * tests can use mock players; the milestone and the outlines need a real one.
+ * with a block that undoes reiryoku, or the Shakonmaku, between ({@link SpiritClip}), though stone hides
+ * nothing. The focus and the cooldown are transients in the soul, so nothing is saved. Everything takes a
+ * {@link Player}, so game tests can use mock players; the milestone and the outlines need a real one.
  */
 public final class Pesquisa {
     /** The most souls one pulse outlines: the nearest. */
@@ -239,9 +239,9 @@ public final class Pesquisa {
      * Whether this caster's pulse would feel this creature now. Another living one in the same world, within
      * reach (its nearest part counts for a giant), with at least the least reiatsu felt: a player only by
      * survival's rules, with a soul and not fresh from a Sonído; anything else only with a soul, or being a
-     * spirit or a creature that sees them; and never with a block that undoes reiryoku ({@link SpiritClip}) between
-     * the caster's eyes and the middle of its box (or part) nearest the caster, though stone hides nothing. So mundane
-     * animals and monsters are never felt.
+     * spirit or a creature that sees them; and never with a block that undoes reiryoku or the Shakonmaku
+     * ({@link SpiritClip}) between the caster's eyes and the middle of its box (or part) nearest the caster, though
+     * stone hides nothing. So mundane animals and monsters are never felt.
      */
     public static boolean senses(Player caster, LivingEntity target, long now) {
         if (!SoulLogic.hasSoul(caster)) {
@@ -361,8 +361,9 @@ public final class Pesquisa {
     }
 
     /**
-     * Whether a block that undoes reiryoku lies on the straight line from the caster's eyes to the middle of the soul's
-     * box nearest the caster's feet. Asked last, as the costliest rule: a walk of the cells on the line, loading none.
+     * Whether a block that undoes reiryoku, or the Shakonmaku, lies on the straight line from the caster's eyes to the
+     * middle of the soul's box nearest the caster's feet. Asked last, as the costliest rule: a walk of the cells on the
+     * line, loading none.
      */
     private static boolean walledOff(Player caster, LivingEntity target) {
         Vec3 soul = nearestBox(caster.position(), target).getCenter();

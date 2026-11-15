@@ -88,6 +88,11 @@ public final class Shakonmaku {
         return walk(start, end);
     }
 
+    /** Whether the line from {@code from} to {@code to} crosses the membrane anywhere. */
+    public static boolean crosses(Vec3 from, Vec3 to) {
+        return crossing(from, to) != null;
+    }
+
     /** The cell walk of {@link #crossing}, along a line that lies within the far sphere. */
     @Nullable
     private static BlockHitResult walk(Vec3 from, Vec3 to) {

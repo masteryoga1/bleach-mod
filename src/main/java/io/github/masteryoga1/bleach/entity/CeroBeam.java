@@ -227,7 +227,7 @@ public class CeroBeam extends Entity {
      * shield, or the last creature its {@link Kind} may strike, took it first; see {@link #burstAt} to burst
      * there) and whether it stopped at a shield or a Dankū, the creatures the beam struck, nearest first (not those
      * only the blast caught), how many blocks the blast broke, and whether it came undone at a block that undoes
-     * reiryoku ({@link SpiritClip}), bursting nothing (then {@code hitBlock} is false).
+     * reiryoku or at the Shakonmaku ({@link SpiritClip}), bursting nothing (then {@code hitBlock} is false).
      */
     public record Shot(Vec3 from, Vec3 to, boolean hitBlock, boolean blocked, List<LivingEntity> struck,
                        int blocksBroken, boolean negated) {
