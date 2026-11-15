@@ -199,8 +199,8 @@ public final class ShakonmakuTests {
 
     /**
      * Over the south gate at y 120, a soul steering a boat across the sphere goes back with it, still aboard, its fall
-     * kept and told why, and so does a soul a friend in creative mode steers; a creative soul's own boat crosses, as do
-     * souls in creative and spectator mode flying.
+     * kept and told why, and so does a soul a friend in creative mode steers; a creative soul's own boat crosses with
+     * the cow it carries, as do souls in creative and spectator mode flying.
      */
     @GameTest(template = "empty", batch = BATCH, timeoutTicks = 200)
     public static void aMountGoesBackWithItsRider(GameTestHelper helper) {
@@ -221,10 +221,16 @@ public final class ShakonmakuTests {
         Boat boat = held.add(boat(soul, from));
         Boat other = held.add(boat(soul, from.add(rows[1])));
         Boat shared = held.add(boat(soul, from.add(rows[2])));
+        Cow cow = EntityType.COW.create(soul);
+        helper.assertTrue(cow != null, "no cow");
+        Vec3 cowAt = from.add(rows[1]);
+        cow.moveTo(cowAt.x, cowAt.y, cowAt.z, 0.0F, 0.0F);
+        held.add(cow);
         helper.startSequence()
                 .thenIdle(3)
                 .thenExecute(() -> helper.assertTrue(rider.startRiding(boat, true) && creative.startRiding(other, true)
-                        && friend.startRiding(shared, true) && carried.startRiding(shared, true), "a soul would not board"))
+                        && cow.startRiding(other, true) && friend.startRiding(shared, true)
+                        && carried.startRiding(shared, true), "a soul would not board"))
                 // Aboard, and steering once the connection's tick has seen it so.
                 .thenIdle(5)
                 .thenExecute(() -> {
@@ -246,6 +252,8 @@ public final class ShakonmakuTests {
                     helper.assertTrue(rider.distanceTo(boat) < 1.0F && friend.distanceTo(shared) < 1.0F, "the pilots are at "
                             + rider.position() + " and " + friend.position() + ", off their boats");
                     at(helper, other, out.add(rows[1]), "the boat steered by a soul in creative");
+                    helper.assertTrue(cow.getVehicle() == other, "the cow a soul in creative carries is on "
+                            + cow.getVehicle());
                     at(helper, flier, out.add(rows[3]), "the soul in creative");
                     at(helper, spectator, out.add(rows[4]), "the spectator");
                     helper.assertTrue(told(creative) + told(friend) + told(flier) + told(spectator) == 0,

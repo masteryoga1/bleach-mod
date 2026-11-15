@@ -132,12 +132,13 @@ public final class ShakonmakuEvents {
      */
     private static void onTickPre(EntityTickEvent.Pre event) {
         if (!(event.getEntity() instanceof Projectile thrown) || !(thrown.level() instanceof ServerLevel level)
-                || !Shakonmaku.in(level) || isArt(thrown) || carried(thrown) || fallen(thrown)) {
+                || !Shakonmaku.in(level) || isArt(thrown) || carried(thrown)) {
             return;
         }
         Vec3 from = thrown.position();
         BlockHitResult at = Shakonmaku.crossing(from, from.add(thrown.getDeltaMovement()));
-        if (at == null) {
+        // The fallen mark is read only at the membrane: asking for it makes the entity's persistent data, which is saved.
+        if (at == null || fallen(thrown)) {
             return;
         }
         if (!weightless(thrown)) {
@@ -195,11 +196,11 @@ public final class ShakonmakuEvents {
     private static void stop(ServerLevel level, Projectile thrown, Vec3 from) {
         Vec3 now = thrown.position();
         Vec3 moved = now.subtract(from);
-        if (moved.lengthSqr() < 1.0E-12 || fallen(thrown)) {
+        if (moved.lengthSqr() < 1.0E-12) {
             return;
         }
         BlockHitResult at = Shakonmaku.crossing(from, now.add(moved.normalize().scale(2.0 * SHORT_OF)));
-        if (at == null) {
+        if (at == null || fallen(thrown)) {
             return;
         }
         if (weightless(thrown)) {
@@ -232,6 +233,10 @@ public final class ShakonmakuEvents {
     private static void onLeap(EntityTeleportEvent event) {
         Entity body = event.getEntity();
         if (!(body.level() instanceof ServerLevel level) || !Shakonmaku.in(level) || !isBody(body)) {
+            return;
+        }
+        // A pearl landing in another world than its thrower's moves it between worlds, which the membrane never stops.
+        if (event instanceof EntityTeleportEvent.EnderPearl pearl && pearl.getPearlEntity().level() != level) {
             return;
         }
         // A random leap drops onto the ground below the point drawn; a pearl, or a Shulker, lands on the point itself.
