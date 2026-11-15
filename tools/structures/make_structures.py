@@ -241,8 +241,9 @@ def gate_house():
     A gate house of the Seireiheki, filling the south gate's gap from the lawn to the wall's top; the plan turns it
     into the others. x runs west to east across the gap, z from the wall's inner face out to the Rukongai. Piers of
     white plaster on a black plinth stand either side of one doorway, framed by dark posts, under a lintel and an
-    upper storey with a tiled roof. Left open for the great gate and its wicket (7j3): a slot in the gate's row over
-    the doorway, as tall as the gate's lift, and a passage through the right-hand pier, coming in, at the ground.
+    upper storey with a tiled roof. Left open for the great gate (7j3) and its wicket (7j4): a slot in the gate's
+    row over the doorway, as tall as the gate's lift, and a passage through the right-hand pier, coming in, at the
+    ground.
     Every position is listed, so the box must be the gap alone: a column of the wall in it fails the build.
     """
     width, height, depth = 2 * GATE_HALF_WIDTH, WALL_TOP_Y - PLATEAU_Y, WALL_THICKNESS

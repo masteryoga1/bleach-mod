@@ -233,9 +233,31 @@ public final class SiteStamp {
         return any;
     }
 
+    /**
+     * Whether this site stands in every chunk it covers, each loaded already: the chunk holds its reference, as worldgen
+     * and the stamp leave it, or its markers stand about this corner, as a /place leaves them. Nothing is loaded for it.
+     */
+    public boolean stands(ServerLevel level, int index, BlockPos corner) {
+        Structure laid = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(structure);
+        long home = startChunk(index).toLong();
+        for (ChunkPos pos : covered.get(index)) {
+            ChunkAccess chunk = level.getChunkSource().getChunkNow(pos.x, pos.z);
+            if (chunk == null || !(laid != null && chunk.getReferencesForStructure(laid).contains(home))
+                    && !partStands(chunk, index, corner)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Where this marker stands in this site once its template is set at this corner and turned with the site. */
     public BlockPos markerAt(int index, Marker marker, BlockPos corner) {
-        return corner.offset(marker.at().rotate(sites.get(index).rotation()));
+        return turned(index, marker.at(), corner);
+    }
+
+    /** Where this place of the template stands in this site once it is set at this corner and turned with the site. */
+    public BlockPos turned(int index, BlockPos place, BlockPos corner) {
+        return corner.offset(place.rotate(sites.get(index).rotation()));
     }
 
     /** A block that only a site's own part puts here, in template coordinates before the turn. */

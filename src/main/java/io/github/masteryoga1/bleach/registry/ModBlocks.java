@@ -99,6 +99,14 @@ public final class ModBlocks {
             () -> new DivisionBannerBlock(BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).forceSolidOn()
                     .instrument(NoteBlockInstrument.BASS).noCollission().strength(1.0F).sound(SoundType.WOOL)
                     .ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /**
+     * A great gate of the Seireiheki, faced in Sekkiseki: as hard as the wall and as deaf to arts, and no piston moves
+     * it. It drops nothing; only GateState lays it.
+     */
+    public static final DeferredBlock<Block> GREAT_GATE = BLOCKS.registerSimpleBlock("great_gate",
+            BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
+                    .strength(-1.0F, 3600000.0F).noLootTable().pushReaction(PushReaction.BLOCK)
+                    .isValidSpawn((state, level, pos, type) -> false));
 
     private ModBlocks() {
     }

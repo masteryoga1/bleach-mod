@@ -30,8 +30,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * The Seireiheki's four gate houses, the structure {@code bleach:seireitei_gate} at the plan's gate sites: each fills its
- * gap from the lawn to the wall's top, with one doorway through it. Old worlds have them stamped as the Academy is, and a
- * soul or player a house is built over is moved out of its blocks.
+ * gap from the lawn to the wall's top, with one doorway through it, which {@link GateState} shuts with its great gate.
+ * Old worlds have them stamped as the Academy is, and a soul or player a house or a gate is built over is moved out of
+ * its blocks.
  */
 public final class GateHouses {
     public static final ResourceKey<Structure> STRUCTURE =
@@ -47,7 +48,7 @@ public final class GateHouses {
             "A gate house of the Seireiheki", SeireiteiPlan.sites("gate"), SIZE,
             List.of(new SiteStamp.Marker(LEFT_POST, () -> Blocks.STRIPPED_DARK_OAK_LOG),
                     new SiteStamp.Marker(RIGHT_POST, () -> Blocks.STRIPPED_DARK_OAK_LOG)),
-            GateHouses::freeAll);
+            GateHouses::placed);
     /** How many ticks a soul that joined in a house's box waits for the chunks under it to load before it is let be. */
     private static final int JOIN_WAIT = 600;
     /**
@@ -59,9 +60,15 @@ public final class GateHouses {
     private GateHouses() {
     }
 
-    /** Stamps a house whose chunks, and those beside them, have all loaded; see {@link SiteStamp#onChunkLoad}. */
+    /**
+     * Stamps a house whose chunks, and those beside them, have all loaded (see {@link SiteStamp#onChunkLoad}), and has a
+     * gate not yet laid looked at on the next tick once a chunk of its house loads.
+     */
     public static void onChunkLoad(ChunkEvent.Load event) {
         STAMP.onChunkLoad(event);
+        if (event.getLevel() instanceof ServerLevel level && level.dimension() == BleachWorlds.SOUL_SOCIETY) {
+            GateState.get(level).wake(event.getChunk().getPos());
+        }
     }
 
     /** The one further try a stamp's check asked for, and the souls that joined in a house whose chunks have loaded. */
@@ -135,14 +142,21 @@ public final class GateHouses {
         return null;
     }
 
-    /** Moves every soul or player in this part's column that a house's blocks now bury. */
-    private static void freeAll(ServerLevel level, BoundingBox part) {
+    /** A part of a house the stamp has just placed, its gate's cells left open: souls it buries move, the gate is laid. */
+    private static void placed(ServerLevel level, BoundingBox part) {
+        freeAll(level, part);
+        GateState.get(level).forget(part);
+    }
+
+    /** Moves every soul or player in this part's column, or this gate's box, that a house's blocks now bury. */
+    static void freeAll(ServerLevel level, BoundingBox part) {
         level.getEntitiesOfClass(LivingEntity.class, AABB.of(part)).forEach(living -> free(level, living));
     }
 
     /**
      * If a house's blocks bury this soul or player, moves it with what it rides out on its own half of the gap: to the
-     * doorway, or from the lawn's half to the roof if nearer, else, too big or blocked, to the ground beyond the house.
+     * doorway clear of its gate's row, or from the lawn's half to the roof if nearer, else, too big or blocked, to the
+     * ground beyond the house.
      */
     private static void free(ServerLevel level, LivingEntity living) {
         BoundingBox box = house(living.getBoundingBox());
@@ -156,14 +170,19 @@ public final class GateHouses {
             body = body.minmax(rider.getBoundingBox());
         }
         Vec3 at = moved.position();
-        double reach = SeireiteiPlan.GATE_DOOR_HALF_WIDTH - Math.max(body.getXsize(), body.getZsize()) / 2.0 - 0.01;
+        double half = Math.max(body.getXsize(), body.getZsize()) / 2.0;
+        double reach = SeireiteiPlan.GATE_DOOR_HALF_WIDTH - half - 0.01;
         double head = SeireiteiPlan.GATE_DOOR_TOP_Y - (body.maxY - at.y) - 0.01;
         // A north or south house runs across x, an east or west one across z: its doorway is the axis's middle.
         boolean acrossX = box.getXSpan() > box.getZSpan();
         boolean lawn = SeireiteiPlan.radius(Mth.floor(at.x), Mth.floor(at.z)) < SeireiteiPlan.GATE_RADIUS;
         double y = Mth.clamp(at.y, SeireiteiPlan.PLATEAU_Y, head);
-        Vec3 doorway = acrossX ? new Vec3(Mth.clamp(at.x, -reach, reach), y, at.z)
-                : new Vec3(at.x, y, Mth.clamp(at.z, -reach, reach));
+        // Through the house, out of the great gate's row on the body's own half: against the gate's face, as it fell.
+        double through = acrossX ? at.z : at.x, clear = Math.copySign(lawn
+                ? Math.min(Math.abs(through), SeireiteiPlan.GATE_RADIUS - half - 0.01)
+                : Math.max(Math.abs(through), SeireiteiPlan.GATE_RADIUS + 1 + half + 0.01), through);
+        Vec3 doorway = acrossX ? new Vec3(Mth.clamp(at.x, -reach, reach), y, clear)
+                : new Vec3(clear, y, Mth.clamp(at.z, -reach, reach));
         Vec3 roof = new Vec3(at.x, SeireiteiPlan.WALL_TOP_Y, at.z);
         // The roof is Seireitei's side of the membrane, so only a soul on the lawn's half of the gap may go up to it.
         List<Vec3> ways = reach < 0 || head < SeireiteiPlan.PLATEAU_Y ? List.of() : !lawn ? List.of(doorway)

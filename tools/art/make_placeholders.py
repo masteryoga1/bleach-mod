@@ -188,6 +188,9 @@ TATAMI_EDGE = rgb(40, 44, 42)
 BANNER_CLOTH = rgb(242, 240, 234)
 BANNER_INK = rgb(26, 24, 28)
 BANNER_ROD = rgb(62, 46, 34)
+# The great gates, faced in Sekkiseki and banded in dark iron.
+GATE_IRON = rgb(50, 50, 56)
+GATE_STUD = rgb(98, 98, 106)
 
 
 class Canvas:
@@ -1810,6 +1813,19 @@ def shoji_door_icon():
     return c
 
 
+def great_gate():
+    """A great gate's face: pale Sekkiseki slabs, a joint down the middle, crossed by an iron band with two studs, so a
+    gate ten blocks across reads as boards banded at every block."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, SEKKISEKI)
+    mottle(c, 0, 0, 16, 16, SEKKISEKI_FLECK, 7, seed=2)
+    c.rect(7, 0, 8, 16, SEKKISEKI_SEAM)
+    c.rect(0, 6, 16, 9, GATE_IRON)
+    for x in (3, 11):
+        c.put(x, 7, GATE_STUD)
+    return c
+
+
 def tatami():
     """Tatami's face: straw woven in rows across the mat, with a dark cloth edge down its two long sides."""
     c = Canvas(16, 16)
@@ -1988,6 +2004,7 @@ TEXTURES = {
     "block/tatami.png": tatami,
     "block/tatami_side.png": tatami_side,
     **{"block/division_banner_%s.png" % name: division_banner(name) for name in DIVISION_GLYPHS},
+    "block/great_gate.png": great_gate,
 }
 
 
