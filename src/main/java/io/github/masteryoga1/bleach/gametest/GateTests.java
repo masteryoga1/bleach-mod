@@ -12,6 +12,7 @@ import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.core.BlockPos;
@@ -79,7 +80,7 @@ public final class GateTests {
     // ---- Helpers ----
 
     /** Soul Society's chunks about this gate's house, held as the Shakonmaku's tests hold theirs, and the gate dropped. */
-    private static ShakonmakuTests.Cleanup hold(GameTestHelper helper, int gate) {
+    static ShakonmakuTests.Cleanup hold(GameTestHelper helper, int gate) {
         ChunkPos home = GateHouses.STAMP.startChunk(gate);
         return dropped(ShakonmakuTests.hold(helper, home.x, home.z), gate);
     }
@@ -300,7 +301,7 @@ public final class GateTests {
      * Hakutōmon's house with its gate's and wicket's cells open, as a house stood before the gates, and a post broken,
      * gains them when laid again, a cow they bury on each half moved out of the gate's row on that half, and a lift
      * frees a cow in the slot.
-     * The heights and targets saved read back, none laid by the reading, and a damaged entry reads within range.
+     * The heights, targets and keepers saved read back, none laid by the reading, and a damaged entry reads within range.
      */
     @GameTest(template = "empty", batch = BATCH, timeoutTicks = 400)
     public static void aHouseWithItsGateCellsOpenGainsThemWhenLaid(GameTestHelper helper) {
@@ -314,6 +315,7 @@ public final class GateTests {
         Cow[] cows = new Cow[3];
         helper.startSequence()
                 .thenWaitUntil(() -> assertDown(helper, gates, WEST))
+                .thenWaitUntil(() -> helper.assertTrue(gates.keeper(WEST) != null, "the west gate has no keeper yet"))
                 .thenExecute(() -> {
                     for (int row = 0; row < GateState.ROWS + LIFT; row++) {
                         for (BlockPos column : GateState.columns(WEST)) {
@@ -350,9 +352,12 @@ public final class GateTests {
                     GateState read = GateState.load(saved, soul.registryAccess());
                     for (int gate = EAST; gate <= NORTH; gate++) {
                         helper.assertTrue(read.height(gate) == gates.height(gate) && read.target(gate) == gates.target(gate)
+                                        && Objects.equals(read.keeper(gate), gates.keeper(gate))
                                         && read.status(gate) == GateState.Status.NOT_LAID,
                                 "gate " + gate + " was read back from " + saved + " as " + read.status(gate));
                     }
+                    helper.assertTrue(read.keeper(WEST) != null && read.keeper(WEST).equals(gates.keeper(WEST)),
+                            "the west gate's keeper was read back from " + saved + " as " + read.keeper(WEST));
                     // Damaged: the east entry out of range, the north one gone.
                     ListTag list = saved.getList("Gates", Tag.TAG_COMPOUND);
                     list.getCompound(EAST).putInt("Height", 99);

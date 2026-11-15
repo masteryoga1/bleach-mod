@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.FishboneD;
+import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
@@ -56,12 +57,13 @@ public final class ReiatsuEvents {
     /**
      * Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC,
      * a Quincy NPC, who stands their ground, Fishbone D, who has come for one soul and does not back
-     * down, an Arrancar NPC, who has come to fight, and an inner Hollow, which is its host's own power.
+     * down, an Arrancar NPC, who has come to fight, an inner Hollow, which is its host's own power, and a
+     * gatekeeper, who keeps his post.
      */
     private static void onEntityJoin(EntityJoinLevelEvent event) {
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob && !(mob instanceof ShinigamiNpc)
                 && !(mob instanceof QuincyNpc) && !(mob instanceof FishboneD) && !(mob instanceof ArrancarNpc)
-                && !(mob instanceof InnerHollow)
+                && !(mob instanceof InnerHollow) && !(mob instanceof GateKeeper)
                 && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
             mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
         }
@@ -151,7 +153,8 @@ public final class ReiatsuEvents {
             if (weight > 0) {
                 crushedSomeone = true;
             }
-            if (weight >= 2 && target instanceof PathfinderMob mob) {
+            // A gatekeeper is weighed down as any creature is, but keeps his post.
+            if (weight >= 2 && target instanceof PathfinderMob mob && !(mob instanceof GateKeeper)) {
                 frighten(mob, player, until);
             }
         }

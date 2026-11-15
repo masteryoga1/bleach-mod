@@ -1,8 +1,12 @@
 package io.github.masteryoga1.bleach.world;
 
+import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import java.util.List;
+import java.util.UUID;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -18,19 +22,23 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
- * The great gates of the four gate houses, in Soul Society's saved data: how many rows each stands above its doorway's
- * floor, from 0 (down) to {@link SeireiteiPlan#GATE_LIFT} (lifted), and which of the two it is moving to. Each gate is
- * laid from this, never by the template, once its house is seen standing and again after every start, so that its cells
- * come to match the height saved (server thread only).
+ * The great gates of the four gate houses, and their keepers, in Soul Society's saved data: how many rows each gate
+ * stands above its doorway's floor, from 0 (down) to {@link SeireiteiPlan#GATE_LIFT} (lifted), which of the two it is
+ * moving to, and the one UUID every keeper of it is made with. Each gate is laid from this, never by the template, once
+ * its house is seen standing and again after every start, so that its cells come to match the height saved (server
+ * thread only).
  */
 public final class GateState extends SavedData {
     public static final String NAME = "bleach_gates";
@@ -47,7 +55,11 @@ public final class GateState extends SavedData {
             LAST_X = SeireiteiPlan.GATE_HALF_WIDTH + SeireiteiPlan.GATE_DOOR_HALF_WIDTH - 1;
     /** The wicket's column in the template, the far side of the doorway's right-hand post. */
     private static final int WICKET_X = LAST_X + 2;
-    private static final String LIST = "Gates", HEIGHT = "Height", TARGET = "Target";
+    /** In the template, before its turn: the keeper's post, 4.5 blocks out from the house's face on its doorway's axis. */
+    private static final double POST_X = SeireiteiPlan.GATE_HALF_WIDTH, POST_Z = 12.5;
+    /** Where the keeper's feet may go in the template: its whole body on its ground and out of the gap. */
+    private static final double FOOT_NEAR = 9.5, FOOT_FAR = 14.5, FOOT_SIDE = 10.5;
+    private static final String LIST = "Gates", HEIGHT = "Height", TARGET = "Target", KEEPER = "Keeper";
     private static final SavedData.Factory<GateState> FACTORY =
             new SavedData.Factory<>(GateState::new, GateState::load, null);
     /** Each gate's columns at the plateau across its doorway, as the stamp turns them. */
@@ -56,6 +68,10 @@ public final class GateState extends SavedData {
     private static final BlockPos[] WICKETS = new BlockPos[GATES];
     /** Each gate's box: every cell it fills down or lifted, the pier beside it and its wicket. */
     private static final BoundingBox[] BOXES = new BoundingBox[GATES];
+    /** Each gate's keeper's post (its feet), facing and footing, as the stamp turns them. */
+    private static final Vec3[] POSTS = new Vec3[GATES];
+    private static final float[] YAWS = new float[GATES];
+    private static final AABB[] FOOTINGS = new AABB[GATES];
 
     static {
         for (int gate = 0; gate < GATES; gate++) {
@@ -68,6 +84,10 @@ public final class GateState extends SavedData {
             }
             WICKETS[gate] = GateHouses.STAMP.turned(gate, new BlockPos(WICKET_X, 0, SeireiteiPlan.GATE_ROW), corner);
             BOXES[gate] = BoundingBox.fromCorners(COLUMNS[gate][0], WICKETS[gate].above(ROWS + LIFT - 1));
+            POSTS[gate] = point(site, POST_X, 0.0, POST_Z);
+            YAWS[gate] = site.rotation().rotate(Direction.SOUTH).toYRot();
+            FOOTINGS[gate] = new AABB(point(site, POST_X - FOOT_SIDE, 0.0, FOOT_NEAR),
+                    point(site, POST_X + FOOT_SIDE, 0.0, FOOT_FAR));
         }
     }
 
@@ -75,6 +95,10 @@ public final class GateState extends SavedData {
     /** Not saved: whether this start has laid the gate, whether its last step was held up, and when it is next looked at. */
     private final boolean[] laid = new boolean[GATES], held = new boolean[GATES];
     private final int[] nextAt = new int[GATES];
+    /** Saved: each gate's keeper, the UUID every keeper of it is made with. */
+    private final UUID[] keeper = new UUID[GATES];
+    /** Not saved: the server tick at which each laid gate's keeper is next looked for. */
+    private final int[] keeperAt = new int[GATES];
 
     /** Where a gate stands and what it is doing: down, lifted, rising, falling, held up, or not laid since the start. */
     public enum Status {
@@ -94,6 +118,7 @@ public final class GateState extends SavedData {
             CompoundTag each = gates.getCompound(gate);
             state.height[gate] = Mth.clamp(each.getInt(HEIGHT), 0, LIFT);
             state.target[gate] = each.getInt(TARGET) == LIFT ? LIFT : 0;
+            state.keeper[gate] = each.hasUUID(KEEPER) ? each.getUUID(KEEPER) : null;
         }
         return state;
     }
@@ -105,6 +130,9 @@ public final class GateState extends SavedData {
             CompoundTag each = new CompoundTag();
             each.putInt(HEIGHT, height[gate]);
             each.putInt(TARGET, target[gate]);
+            if (keeper[gate] != null) {
+                each.putUUID(KEEPER, keeper[gate]);
+            }
             gates.add(each);
         }
         tag.put(LIST, gates);
@@ -119,6 +147,12 @@ public final class GateState extends SavedData {
     /** The height this gate is moving to, or stands at: 0 or the lift. */
     public int target(int gate) {
         return target[gate];
+    }
+
+    /** This gate's keeper, the UUID each keeper of it is made with, or null before the first. */
+    @Nullable
+    public UUID keeper(int gate) {
+        return keeper[gate];
     }
 
     /** Whether this gate's blocks have been laid since the server started, so they stand as its height says. */
@@ -139,7 +173,7 @@ public final class GateState extends SavedData {
 
     /**
      * Sets this gate (0 to 3, in the plan's order) rising to its lift, which no body stops, with a sound if it moves now.
-     * The command (7j4) and the keepers (7j5) lift and drop a gate by these two calls.
+     * The command (7j4) and the keepers (7j7) lift and drop a gate by these two calls.
      *
      * @return whether it was not already lifted or rising
      */
@@ -203,7 +237,32 @@ public final class GateState extends SavedData {
         return WICKETS[gate];
     }
 
-    /** Each tick, the gates due a look: one not laid tries to be, one moving steps. A still gate costs a comparison. */
+    /** Where this gate's keeper stands at its post, the bottom centre of its feet at the plateau. */
+    public static Vec3 post(int gate) {
+        return POSTS[gate];
+    }
+
+    /** The way this gate's keeper faces at its post: out of its gate, into the Rukongai. */
+    public static float yaw(int gate) {
+        return YAWS[gate];
+    }
+
+    /** This point brought within where this gate's keeper may set its feet, so that its body stays on its ground. */
+    public static Vec3 footing(int gate, Vec3 at) {
+        AABB room = FOOTINGS[gate];
+        return new Vec3(Mth.clamp(at.x, room.minX, room.maxX), at.y, Mth.clamp(at.z, room.minZ, room.maxZ));
+    }
+
+    /** This template point of a house, before its turn, where it lies in the world: the stamp's turn, about the corner. */
+    private static Vec3 point(SeireiteiPlan.Site site, double x, double y, double z) {
+        return StructureTemplate.transform(new Vec3(x, y, z), Mirror.NONE, site.rotation(), BlockPos.ZERO)
+                .add(site.x(), SeireiteiPlan.PLATEAU_Y, site.z());
+    }
+
+    /**
+     * Each tick, the gates due a look: one not laid tries to be, one moving steps, and a laid gate's keeper is looked for
+     * once a second. A still gate costs two comparisons.
+     */
     public static void onServerTick(ServerTickEvent.Post event) {
         ServerLevel level = event.getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
         if (level != null) {
@@ -214,6 +273,10 @@ public final class GateState extends SavedData {
     private void tick(ServerLevel level) {
         int now = level.getServer().getTickCount();
         for (int gate = 0; gate < GATES; gate++) {
+            if (laid[gate] && now >= keeperAt[gate]) {
+                keeperAt[gate] = now + LOOK_TICKS;
+                keep(level, gate);
+            }
             if (now < nextAt[gate]) {
                 continue;
             }
@@ -264,10 +327,38 @@ public final class GateState extends SavedData {
             level.setBlock(lower, wicket, Block.UPDATE_ALL);
             level.setBlock(lower.above(), wicket.setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER), Block.UPDATE_ALL);
         }
+        keeperAt[gate] = 0;
         laid[gate] = true;
         held[gate] = false;
         GateHouses.freeAll(level, BOXES[gate]);
         return true;
+    }
+
+    /**
+     * Puts this gate's keeper at its post if none stands, once the house's chunks are loaded and ticking with their saved
+     * entities in, so that a keeper saved there is found first. Every keeper of a gate takes its one UUID, so the level
+     * itself refuses a second.
+     */
+    private void keep(ServerLevel level, int gate) {
+        List<ChunkPos> covered = GateHouses.STAMP.covered(gate);
+        for (int each = 0; each < covered.size(); each++) {
+            ChunkPos pos = covered.get(each);
+            if (level.getChunkSource().getChunkNow(pos.x, pos.z) == null || !level.areEntitiesLoaded(pos.toLong())
+                    || !level.isNaturalSpawningAllowed(pos)) {
+                return;
+            }
+        }
+        if (keeper[gate] != null && level.getEntity(keeper[gate]) != null) {
+            return;
+        }
+        GateKeeper made = GateKeeper.at(level, gate);
+        if (keeper[gate] == null) {
+            keeper[gate] = made.getUUID();
+            setDirty();
+        } else {
+            made.setUUID(keeper[gate]);
+        }
+        level.addFreshEntity(made);
     }
 
     /** Whether this is the wicket's half named. */

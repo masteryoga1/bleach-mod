@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
@@ -33,6 +34,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -92,6 +94,8 @@ public final class ShinigamiEvents {
         bus.addListener(GateHouses::onEntityJoin);
         // The houses' great gates, laid once each house stands, and moved a row at a time.
         bus.addListener(GateState::onServerTick);
+        // The last change to a blow on a gatekeeper: none takes him below a tenth of his health.
+        bus.addListener(EventPriority.LOWEST, GateKeeper::onDamagePre);
     }
 
     /** A soul who left while standing on reishi is standing on it again. */

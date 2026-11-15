@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.entity.DankuWall;
 import io.github.masteryoga1.bleach.entity.DutyShinigami;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
+import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.GintoCast;
@@ -192,6 +193,22 @@ public final class ModEntities {
                     .eyeHeight(1.62F)
                     .clientTrackingRange(10)
                     .build(BleachMod.id("arrancar").toString()));
+
+    // ---- Seireitei ----
+
+    /**
+     * A gatekeeper, the giant before one of Seireitei's four great gates: about 8 blocks tall, saved, made only by its
+     * gate (see GateState), and never knocked back.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<GateKeeper>> GATE_KEEPER =
+            ENTITY_TYPES.register("gate_keeper", () -> EntityType.Builder
+                    .<GateKeeper>of(GateKeeper::new, MobCategory.MISC)
+                    .sized(GateKeeper.WIDTH, GateKeeper.HEIGHT)
+                    .eyeHeight(GateKeeper.EYE_HEIGHT)
+                    .fireImmune()
+                    .noSummon()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("gate_keeper").toString()));
 
     // ---- Visored ----
 
@@ -439,6 +456,7 @@ public final class ModEntities {
         event.put(GILLIAN.get(), Gillian.createAttributes().build());
         event.put(ADJUCHAS.get(), Adjuchas.createAttributes().build());
         event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
+        event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());
         event.put(PLUS.get(), PlusSpirit.createAttributes().build());
     }
