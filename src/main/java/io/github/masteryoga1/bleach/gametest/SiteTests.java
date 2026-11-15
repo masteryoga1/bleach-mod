@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.registry.ModWorldgen;
 import io.github.masteryoga1.bleach.world.AcademySite;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
+import io.github.masteryoga1.bleach.world.SiteStamp;
 import io.github.masteryoga1.bleach.world.gen.SitePiece;
 import io.github.masteryoga1.bleach.world.gen.SitePlacement;
 import io.github.masteryoga1.bleach.world.gen.SiteStructure;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -56,7 +58,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Tests for Soul Society's sites: the placement that names the chunks they start in, the structure that sets each site's
  * template at its corner and turn, and the Academy in Seireitei, which a world whose chunks there were made before it, or
  * made with structures off as the test server's are, has built once both of its chunks are loaded. Test C changes the
- * test world's Academy, so the three run in a batch of their own.
+ * test world's Academy, so A to C run in a batch of their own; test D reads a stamp's numbers with no world, in any batch.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -324,5 +326,54 @@ public final class SiteTests {
                     }
                 })
                 .thenSucceed();
+    }
+
+    // ---- Any site's stamp ----
+
+    /**
+     * Test D. A stamp reads each of its sites by its own corner and turn, as worked by hand: two made-up sites of one
+     * template, unturned and counter-clockwise, and the Academy clockwise. It needs no world, so it runs in any batch.
+     */
+    @GameTest(template = "empty")
+    public static void aStampTurnsEachSite(GameTestHelper helper) {
+        SiteStamp.Marker low = new SiteStamp.Marker(new BlockPos(3, 1, 6), () -> Blocks.STONE);
+        SiteStamp.Marker high = new SiteStamp.Marker(new BlockPos(12, 2, 1), () -> Blocks.STONE);
+        SiteStamp made = new SiteStamp(BleachWorlds.SOUL_SOCIETY, AcademySite.STRUCTURE, "A made-up site",
+                List.of(new SeireiteiPlan.Site("made", 100, -40, BleachMod.id("made"), Rotation.NONE),
+                        new SeireiteiPlan.Site("made", -50, 300, BleachMod.id("made"), Rotation.COUNTERCLOCKWISE_90)),
+                new Vec3i(16, 40, 8), List.of(low, high), SiteStamp.Placed.NOTHING);
+        // Unturned: x 100 to 115 and z -40 to -33, chunks 6 and 7 of row -3; a marker (x, y, z) lands at the corner plus it.
+        stampReads(helper, made, 0, List.of(new ChunkPos(6, -3), new ChunkPos(7, -3)), new ChunkPos(6, -3),
+                new BoundingBox(100, 72, -40, 115, 111, -33), new BlockPos(100, 72, -40), List.of(low, high),
+                List.of(new BlockPos(103, 73, -34), new BlockPos(112, 74, -39)));
+        // Counter-clockwise, (x, z) to (z, -x): x -50 to -43 and z 285 to 300, four chunks along x a row at a time.
+        stampReads(helper, made, 1, List.of(new ChunkPos(-4, 17), new ChunkPos(-3, 17), new ChunkPos(-4, 18),
+                        new ChunkPos(-3, 18)), new ChunkPos(-4, 18), new BoundingBox(-50, 72, 285, -43, 111, 300),
+                new BlockPos(-50, 72, 300), List.of(low, high),
+                List.of(new BlockPos(-44, 73, 297), new BlockPos(-49, 74, 288)));
+        // The Academy clockwise, (x, z) to (-z, x), 15 by 9 by 17: the chunks, box and marker blocks the tests above read.
+        SiteStamp.Marker table = new SiteStamp.Marker(new BlockPos(3, 1, 13), ModBlocks.TAILORING_TABLE);
+        SiteStamp.Marker post = new SiteStamp.Marker(new BlockPos(5, 1, 0), () -> Blocks.STRIPPED_DARK_OAK_LOG);
+        SiteStamp academy = new SiteStamp(BleachWorlds.SOUL_SOCIETY, AcademySite.STRUCTURE, "The Academy",
+                SeireiteiPlan.sites("academy"), new Vec3i(15, 9, 17), List.of(table, post), SiteStamp.Placed.NOTHING);
+        stampReads(helper, academy, 0, List.of(new ChunkPos(-13, 14), new ChunkPos(-12, 14)), HOME, BOX, CORNER,
+                List.of(table, post), List.of(TABLE, POST));
+        helper.assertTrue(AcademySite.COVERED.equals(academy.covered(0)),
+                "the Academy's own stamp covers " + AcademySite.COVERED + ", not " + academy.covered(0));
+        helper.succeed();
+    }
+
+    /** Asserts that this stamp reads this site as worked by hand: its chunks, its start's, its box and its markers. */
+    private static void stampReads(GameTestHelper helper, SiteStamp stamp, int index, List<ChunkPos> covered, ChunkPos start,
+                                   BoundingBox box, BlockPos corner, List<SiteStamp.Marker> markers, List<BlockPos> at) {
+        BoundingBox read = stamp.box(index, corner.getY());
+        helper.assertTrue(stamp.covered(index).equals(covered) && stamp.startChunk(index).equals(start) && read.equals(box),
+                "site " + index + " covers " + stamp.covered(index) + " from " + stamp.startChunk(index) + " over " + read
+                        + ", not " + covered + " from " + start + " over " + box);
+        for (int i = 0; i < markers.size(); i++) {
+            BlockPos landed = stamp.markerAt(index, markers.get(i), corner);
+            helper.assertTrue(landed.equals(at.get(i)), "site " + index + "'s marker " + i + " lands at "
+                    + landed.toShortString() + ", not " + at.get(i).toShortString());
+        }
     }
 }
