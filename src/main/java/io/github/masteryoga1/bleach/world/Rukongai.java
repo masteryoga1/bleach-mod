@@ -133,16 +133,16 @@ public final class Rukongai {
     }
 
     /**
-     * As {@link #place(int, int)}, but in a gate's gap below the wall's top, the Shakonmaku's gateway, that gate's own
-     * place: {@link #GATEWAY} less its region's order.
+     * As {@link #place(int, int)}, but in a gate's gap below the wall's top, that gate's own place: {@link #GATEWAY} less
+     * its region's order.
      */
     public static int place(int x, int y, int z) {
-        return Shakonmaku.side(x, y, z) == Shakonmaku.Side.GATEWAY ? GATEWAY - region(x, z).ordinal() : place(x, z);
+        return SeireiteiPlan.inGap(x, y, z) ? GATEWAY - region(x, z).ordinal() : place(x, z);
     }
 
     /** As {@link #placeName(int, int)}, but in a gate's gap below the wall's top, the gate's name, such as Shuwaimon. */
     public static MutableComponent placeName(int x, int y, int z) {
-        return Shakonmaku.side(x, y, z) == Shakonmaku.Side.GATEWAY ? region(x, z).gateName() : placeName(x, z);
+        return SeireiteiPlan.inGap(x, y, z) ? region(x, z).gateName() : placeName(x, z);
     }
 
     /** What a soul is told of where it is: Seireitei, the Seireiheki, a district of a region, or the wilds beyond one. */

@@ -61,7 +61,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Tests for the great gates and their wickets in the real Soul Society: four in a batch of their own each work one gate,
  * and the wicket's walk runs with the gate houses' batch on the east house, which none of those holds. Every test that
  * works a gate drops it, waits for it laid and down, and drops it again however it ends, so a gate left falling by one
- * batch is down before the next works it.
+ * batch is down before the next works it; the gates' rule at the wicket is the keepers' tests'.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -185,7 +185,7 @@ public final class GateTests {
     }
 
     /** Moves this player as its client would, and asserts where the server then has it. */
-    private static void step(GameTestHelper helper, ServerPlayer player, Vec3 to, Vec3 expected, String what) {
+    static void step(GameTestHelper helper, ServerPlayer player, Vec3 to, Vec3 expected, String what) {
         ShakonmakuTests.move(player, to);
         helper.assertTrue(player.position().distanceToSqr(expected) < 1.0E-6, what + " is at " + player.position()
                 + ", not " + expected);
@@ -454,7 +454,7 @@ public final class GateTests {
     }
 
     /** Shuts the wicket here if a test left it open, so that the houses' batch finds it as laid. */
-    private static void shut(ServerLevel soul, BlockPos wicket) {
+    static void shut(ServerLevel soul, BlockPos wicket) {
         for (BlockPos half : List.of(wicket, wicket.above())) {
             BlockState state = soul.getBlockState(half);
             if (state.is(ModBlocks.WICKET.get()) && state.getValue(DoorBlock.OPEN)) {
@@ -541,8 +541,8 @@ public final class GateTests {
     }
 
     /**
-     * The wicket as registered: as hard as Sekkiseki but not undoing reiryoku, and a wooden door any soul opens by hand,
-     * in no door tag, that no mob may break and that stands on air.
+     * The wicket as registered: as hard as Sekkiseki but not undoing reiryoku, and a wooden door opened by hand, in no
+     * door tag, that no mob may break and that stands on air.
      */
     @GameTest(template = "empty")
     public static void theWicketIsRegistered(GameTestHelper helper) {

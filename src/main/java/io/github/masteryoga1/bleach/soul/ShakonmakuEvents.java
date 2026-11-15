@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.mixin.FireworkRocketEntityAccessor;
+import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.world.Shakonmaku;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +23,7 @@ import net.minecraft.world.entity.projectile.FireworkRocketEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
@@ -31,9 +33,9 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 /**
  * The Shakonmaku's hold in Soul Society: a body (any creature, or a player in survival or adventure) that would cross it
- * anywhere but through a gate's gap is set back on its own side with whatever it rides or carries, its pearl or chorus
- * leaps across are refused, vanilla's thrown and shot things stop at it and fall (or come undone if weightless or homing),
- * and spirit arts meet it through {@link SpiritClip}. Commands and every other teleport never count.
+ * anywhere but by a gate's doorway or wicket is set back on its own side with whatever it rides or carries, its pearl or
+ * chorus leaps across are refused, vanilla's thrown and shot things stop at it and fall (or come undone if weightless or
+ * homing), and spirit arts meet it through {@link SpiritClip}. Commands and every other teleport never count.
  */
 public final class ShakonmakuEvents {
     /** The line a soul turned back is shown. */
@@ -82,7 +84,7 @@ public final class ShakonmakuEvents {
 
     /** Whether this body, moving from one point to the other in this level, would be turned back by the membrane. */
     public static boolean stops(Level level, Entity body, Vec3 from, Vec3 to) {
-        return Shakonmaku.in(level) && isBody(body) && Shakonmaku.crosses(from, to);
+        return Shakonmaku.in(level) && isBody(body) && Shakonmaku.bodyCrosses(from, to);
     }
 
     /**
@@ -94,7 +96,7 @@ public final class ShakonmakuEvents {
         if (player.isPassenger() || !Shakonmaku.in(player.level()) || !isBody(player)) {
             return false;
         }
-        BlockHitResult at = Shakonmaku.crossing(from, player.position());
+        BlockHitResult at = Shakonmaku.bodyCrossing(from, player.position());
         if (at == null) {
             return false;
         }
@@ -114,7 +116,7 @@ public final class ShakonmakuEvents {
         if (!Shakonmaku.in(vehicle.level()) || !heldBack(vehicle)) {
             return false;
         }
-        BlockHitResult at = Shakonmaku.crossing(from, vehicle.position());
+        BlockHitResult at = Shakonmaku.bodyCrossing(from, vehicle.position());
         if (at == null) {
             return false;
         }
@@ -176,7 +178,7 @@ public final class ShakonmakuEvents {
         if (!(entity instanceof LivingEntity) && !entity.isVehicle()) {
             return;
         }
-        BlockHitResult at = Shakonmaku.crossing(from, entity.position());
+        BlockHitResult at = Shakonmaku.bodyCrossing(from, entity.position());
         if (at != null && heldBack(entity)) {
             entity.setPos(from);
             entity.setDeltaMovement(Vec3.ZERO);
@@ -229,8 +231,9 @@ public final class ShakonmakuEvents {
     }
 
     /**
-     * A leap by ender pearl, chorus fruit or an Enderman's or Shulker's own art that would land a body on the other
-     * side of the membrane is refused where it stands; one into or out of a gate's gap is not.
+     * A leap by ender pearl, chorus fruit or an Enderman's or Shulker's own art that would land a body on the other half
+     * of the membrane is refused where it stands, a gate's gap counting as the half it lies on; so is one that would set
+     * it down in a great gate or a wicket, through which it could then walk.
      */
     private static void onLeap(EntityTeleportEvent event) {
         Entity body = event.getEntity();
@@ -244,9 +247,9 @@ public final class ShakonmakuEvents {
         // A random leap drops onto the ground below the point drawn; a pearl, or a Shulker, lands on the point itself.
         boolean drops = !(event instanceof EntityTeleportEvent.EnderPearl) && !(body instanceof Shulker);
         Vec3 landing = drops ? landing(level, event.getTarget()) : event.getTarget();
-        Shakonmaku.Side from = Shakonmaku.side(event.getPrev());
-        Shakonmaku.Side to = Shakonmaku.side(landing);
-        if (from != to && from != Shakonmaku.Side.GATEWAY && to != Shakonmaku.Side.GATEWAY) {
+        Shakonmaku.Side from = Shakonmaku.half(event.getPrev());
+        Shakonmaku.Side to = Shakonmaku.half(landing);
+        if (from != to || meetsGate(level, body, landing)) {
             event.setCanceled(true);
             turnedBack(body, event.getPrev());
         }
@@ -264,6 +267,14 @@ public final class ShakonmakuEvents {
             }
         }
         return target;
+    }
+
+    /** Whether a body set down here would meet a great gate's block or a wicket's, already part through it. */
+    private static boolean meetsGate(ServerLevel level, Entity body, Vec3 landing) {
+        AABB box = body.getDimensions(body.getPose()).makeBoundingBox(landing).deflate(1.0E-7);
+        return BlockPos.betweenClosedStream(box).anyMatch(pos -> level.isLoaded(pos)
+                && (level.getBlockState(pos).is(ModBlocks.GREAT_GATE.get())
+                || level.getBlockState(pos).is(ModBlocks.WICKET.get())));
     }
 
     /** Something turned back here: the ripple about it, and the line for every soul it held that the membrane holds. */
