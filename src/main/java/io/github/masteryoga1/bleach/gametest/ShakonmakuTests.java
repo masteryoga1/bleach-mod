@@ -288,9 +288,10 @@ public final class ShakonmakuTests {
                     move(player, player.position().subtract(0.0, 0.4, 0.0));
                 })
                 .thenExecute(() -> helper.assertTrue(!player.hasDisconnected() && player.getHealth() >= health[0]
-                        && player.fallDistance >= 10.0F && Shakonmaku.side(player.position()) == Side.INSIDE
-                        && told(player) > 0, "the soul is at " + player.position() + " with " + player.getHealth()
-                        + " health, fallen " + player.fallDistance + ", told " + TravelTests.said(player)))
+                        && player.fallDistance >= 10.0F && player.fallDistance < 11.0F
+                        && Shakonmaku.side(player.position()) == Side.INSIDE && told(player) > 0, "the soul is at "
+                        + player.position() + " with " + player.getHealth() + " health, fallen " + player.fallDistance
+                        + " (kept at about 10), told " + TravelTests.said(player)))
                 .thenSucceed();
     }
 
