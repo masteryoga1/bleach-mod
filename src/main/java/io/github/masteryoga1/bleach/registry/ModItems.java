@@ -87,6 +87,9 @@ public final class ModItems {
                     .component(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY
                             .with(DivisionBannerBlock.DIVISION, DivisionBannerBlock.Division.FIRST))));
     public static final DeferredItem<BlockItem> GREAT_GATE = ITEMS.registerSimpleBlockItem(ModBlocks.GREAT_GATE);
+    /** The wicket's item, which sets both halves down, as a door's does. */
+    public static final DeferredItem<DoubleHighBlockItem> WICKET = ITEMS.register("wicket",
+            () -> new DoubleHighBlockItem(ModBlocks.WICKET.get(), new Item.Properties()));
 
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",

@@ -24,6 +24,8 @@ public final class Rukongai {
     public static final int WILDS = SeireiteiPlan.DISTRICTS + 1;
     /** The place of a soul outside Soul Society, which no column has (see {@link #place}). */
     public static final int NOWHERE = Integer.MIN_VALUE;
+    /** What {@link #place(int, int, int)} gives in the East gate's gap below the wall's top; the others follow down. */
+    public static final int GATEWAY = -2;
 
     /**
      * The districts canon names at grade B, by place code, each to its lang key's last part. The sources disagree on
@@ -128,6 +130,19 @@ public final class Rukongai {
     public static int place(int x, int z) {
         int district = district(x, z);
         return district <= WALL ? district : code(region(x, z), Math.min(district, WILDS));
+    }
+
+    /**
+     * As {@link #place(int, int)}, but in a gate's gap below the wall's top, the Shakonmaku's gateway, that gate's own
+     * place: {@link #GATEWAY} less its region's order.
+     */
+    public static int place(int x, int y, int z) {
+        return Shakonmaku.side(x, y, z) == Shakonmaku.Side.GATEWAY ? GATEWAY - region(x, z).ordinal() : place(x, z);
+    }
+
+    /** As {@link #placeName(int, int)}, but in a gate's gap below the wall's top, the gate's name, such as Shuwaimon. */
+    public static MutableComponent placeName(int x, int y, int z) {
+        return Shakonmaku.side(x, y, z) == Shakonmaku.Side.GATEWAY ? region(x, z).gateName() : placeName(x, z);
     }
 
     /** What a soul is told of where it is: Seireitei, the Seireiheki, a district of a region, or the wilds beyond one. */

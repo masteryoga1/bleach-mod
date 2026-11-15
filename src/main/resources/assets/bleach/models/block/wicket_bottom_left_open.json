@@ -1,0 +1,5 @@
+{
+  "parent": "minecraft:block/door_bottom_left_open",
+  "render_type": "minecraft:cutout",
+  "textures": {"bottom": "bleach:block/wicket_bottom", "top": "bleach:block/wicket_top"}
+}

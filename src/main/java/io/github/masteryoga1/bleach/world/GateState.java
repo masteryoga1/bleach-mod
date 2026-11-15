@@ -17,7 +17,10 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.DoorHingeSide;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
@@ -31,6 +34,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  */
 public final class GateState extends SavedData {
     public static final String NAME = "bleach_gates";
+    /** The gates as a command names them, in the plan's order: Shōryūmon, Shuwaimon, Hakutōmon and Kokuryōmon. */
+    public static final List<String> NAMES = List.of("shoryumon", "shuwaimon", "hakutomon", "kokuryomon");
     /** Ticks a gate takes over each row, and between looks at one not yet laid or whose chunks are not loaded. */
     public static final int STEP_TICKS = 5, LOOK_TICKS = 20;
     /** The gate's rows, its doorway's from floor to head; it can stand in these and the slot's above. */
@@ -40,12 +45,16 @@ public final class GateState extends SavedData {
     /** In a house's template before its turn, in the gate's row: the doorway's first and last columns. */
     private static final int FIRST_X = SeireiteiPlan.GATE_HALF_WIDTH - SeireiteiPlan.GATE_DOOR_HALF_WIDTH,
             LAST_X = SeireiteiPlan.GATE_HALF_WIDTH + SeireiteiPlan.GATE_DOOR_HALF_WIDTH - 1;
+    /** The wicket's column in the template, the far side of the doorway's right-hand post. */
+    private static final int WICKET_X = LAST_X + 2;
     private static final String LIST = "Gates", HEIGHT = "Height", TARGET = "Target";
     private static final SavedData.Factory<GateState> FACTORY =
             new SavedData.Factory<>(GateState::new, GateState::load, null);
     /** Each gate's columns at the plateau across its doorway, as the stamp turns them. */
     private static final BlockPos[][] COLUMNS = new BlockPos[GATES][];
-    /** Each gate's box: every cell it fills down or lifted. */
+    /** Each house's wicket, its lower half, as the stamp turns it. */
+    private static final BlockPos[] WICKETS = new BlockPos[GATES];
+    /** Each gate's box: every cell it fills down or lifted, the pier beside it and its wicket. */
     private static final BoundingBox[] BOXES = new BoundingBox[GATES];
 
     static {
@@ -57,7 +66,8 @@ public final class GateState extends SavedData {
                 COLUMNS[gate][x - FIRST_X] =
                         GateHouses.STAMP.turned(gate, new BlockPos(x, 0, SeireiteiPlan.GATE_ROW), corner);
             }
-            BOXES[gate] = BoundingBox.fromCorners(COLUMNS[gate][0], COLUMNS[gate][LAST_X - FIRST_X].above(ROWS + LIFT - 1));
+            WICKETS[gate] = GateHouses.STAMP.turned(gate, new BlockPos(WICKET_X, 0, SeireiteiPlan.GATE_ROW), corner);
+            BOXES[gate] = BoundingBox.fromCorners(COLUMNS[gate][0], WICKETS[gate].above(ROWS + LIFT - 1));
         }
     }
 
@@ -188,6 +198,11 @@ public final class GateState extends SavedData {
         return List.of(COLUMNS[gate]);
     }
 
+    /** Where this gate's wicket stands, its lower half. Public for game tests. */
+    public static BlockPos wicket(int gate) {
+        return WICKETS[gate];
+    }
+
     /** Each tick, the gates due a look: one not laid tries to be, one moving steps. A still gate costs a comparison. */
     public static void onServerTick(ServerTickEvent.Post event) {
         ServerLevel level = event.getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
@@ -216,9 +231,9 @@ public final class GateState extends SavedData {
     }
 
     /**
-     * Lays this gate at its height, if its house stands in loaded chunks, and says whether it did: the gate's block over
-     * whatever stands in its rows, breaking what can be broken with its drops, and none of it in the rest. Any soul it
-     * buries is then moved out.
+     * Lays this gate at its height, and its wicket closed unless both halves stand, if its house stands in loaded chunks,
+     * and says whether it did: the gate's block over whatever stands in its rows, breaking what can be broken with its
+     * drops, and none of it in the rest. Any soul they bury is then moved out.
      */
     private boolean lay(ServerLevel level, int gate) {
         SeireiteiPlan.Site site = GateHouses.STAMP.sites().get(gate);
@@ -237,10 +252,27 @@ public final class GateState extends SavedData {
                 }
             }
         }
+        BlockPos lower = WICKETS[gate];
+        if (!isHalf(level.getBlockState(lower), DoubleBlockHalf.LOWER)
+                || !isHalf(level.getBlockState(lower.above()), DoubleBlockHalf.UPPER)) {
+            // As a soul coming in from the Rukongai would hang it, hinged on its right, turned with the house.
+            BlockState wicket = ModBlocks.WICKET.get().defaultBlockState().setValue(DoorBlock.HINGE, DoorHingeSide.RIGHT)
+                    .rotate(site.rotation());
+            // Both cells are cleared first, since a half set beside a block that is then broken would go with it.
+            fill(level, lower, Blocks.AIR.defaultBlockState());
+            fill(level, lower.above(), Blocks.AIR.defaultBlockState());
+            level.setBlock(lower, wicket, Block.UPDATE_ALL);
+            level.setBlock(lower.above(), wicket.setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER), Block.UPDATE_ALL);
+        }
         laid[gate] = true;
         held[gate] = false;
         GateHouses.freeAll(level, BOXES[gate]);
         return true;
+    }
+
+    /** Whether this is the wicket's half named. */
+    private static boolean isHalf(BlockState state, DoubleBlockHalf half) {
+        return state.is(ModBlocks.WICKET.get()) && state.getValue(DoorBlock.HALF) == half;
     }
 
     /**

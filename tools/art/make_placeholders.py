@@ -191,6 +191,9 @@ BANNER_ROD = rgb(62, 46, 34)
 # The great gates, faced in Sekkiseki and banded in dark iron.
 GATE_IRON = rgb(50, 50, 56)
 GATE_STUD = rgb(98, 98, 106)
+# The wickets, dark oak boards strapped in the gates' iron.
+WICKET_WOOD = rgb(68, 48, 32)
+WICKET_JOINT = rgb(48, 34, 24)
 
 
 class Canvas:
@@ -1826,6 +1829,37 @@ def great_gate():
     return c
 
 
+def wicket(lower):
+    """A half of the wicket: dark oak boards with joints between them and a darker frame at the sides, an iron strap
+    across each half; the lower one has a ring to pull it by."""
+    def draw():
+        c = Canvas(16, 16)
+        c.rect(0, 0, 16, 16, WICKET_WOOD)
+        for x in (0, 5, 10, 15):
+            c.rect(x, 0, x + 1, 16, WICKET_JOINT)
+        if lower:
+            c.rect(0, 11, 16, 13, GATE_IRON)
+            c.rect(0, 15, 16, 16, WICKET_JOINT)
+            c.rect(11, 3, 13, 5, GATE_STUD)
+        else:
+            c.rect(0, 3, 16, 5, GATE_IRON)
+            c.rect(0, 0, 16, 1, WICKET_JOINT)
+        return c
+    draw.__name__ = "wicket_" + ("bottom" if lower else "top")
+    return draw
+
+
+def wicket_icon():
+    """The wicket's item: a narrow door of dark boards with two iron straps and the ring."""
+    c = Canvas(16, 16)
+    c.rect(4, 0, 12, 16, WICKET_WOOD)
+    c.rect(7, 0, 8, 16, WICKET_JOINT)
+    for y in (3, 12):
+        c.rect(4, y, 12, y + 1, GATE_IRON)
+    c.put(10, 8, GATE_STUD)
+    return c
+
+
 def tatami():
     """Tatami's face: straw woven in rows across the mat, with a dark cloth edge down its two long sides."""
     c = Canvas(16, 16)
@@ -2005,6 +2039,9 @@ TEXTURES = {
     "block/tatami_side.png": tatami_side,
     **{"block/division_banner_%s.png" % name: division_banner(name) for name in DIVISION_GLYPHS},
     "block/great_gate.png": great_gate,
+    "block/wicket_top.png": wicket(False),
+    "block/wicket_bottom.png": wicket(True),
+    "item/wicket.png": wicket_icon,
 }
 
 

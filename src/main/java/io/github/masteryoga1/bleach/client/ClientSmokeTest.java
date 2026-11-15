@@ -59,6 +59,7 @@ import io.github.masteryoga1.bleach.soul.TravelLogic;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.DangaiPlan;
+import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import io.github.masteryoga1.bleach.world.MoonPhases;
 import io.github.masteryoga1.bleach.world.Rukongai;
@@ -2237,7 +2238,7 @@ public final class ClientSmokeTest {
                                 SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
         expectWithin(minecraft, 6850, WALL_BY_TICK, () -> wallStands(minecraft.level),
                 "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a gate house, its"
-                        + " great gate down (the client holds " + wallSeen(minecraft.level) + ")");
+                        + " great gate down by its wicket (the client holds " + wallSeen(minecraft.level) + ")");
         expectWithin(minecraft, 7010, 7090, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
                         && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.ACADEMY_FLOOR_Y) < 0.01
                         && academyStands(minecraft.level) && !instructorsNear(minecraft, 32.0).isEmpty(),
@@ -2464,8 +2465,8 @@ public final class ClientSmokeTest {
     /**
      * Whether the client holds the south wall as the plan lays it, on the gap's east side: Sekkiseki to its top, and the
      * gate house in the gap, a plaster pier against the wall and its doorway open by a dark post, closed further in by
-     * its great gate, down. The west side's chunk is some 40 chunks into what the client is sent from the lawn spot, too
-     * late for a slow runner; the game tests read both sides.
+     * its great gate, down, with the wicket beside it. The west side's chunk is some 40 chunks into what the client is
+     * sent from the lawn spot, too late for a slow runner; the game tests read both sides.
      */
     private static boolean wallStands(ClientLevel level) {
         Block sekkiseki = ModBlocks.SEKKISEKI.get(), plaster = ModBlocks.WHITE_PLASTER.get();
@@ -2474,13 +2475,14 @@ public final class ClientSmokeTest {
         return level.getBlockState(at.get(0)).is(sekkiseki) && level.getBlockState(at.get(1)).is(plaster)
                 && level.getBlockState(at.get(2)).is(Blocks.STRIPPED_DARK_OAK_LOG) && level.getBlockState(at.get(3)).isAir()
                 && level.getBlockState(at.get(4)).is(sekkiseki) && level.getBlockState(at.get(5)).isAir()
-                && level.getBlockState(at.get(6)).is(ModBlocks.GREAT_GATE.get());
+                && level.getBlockState(at.get(6)).is(ModBlocks.GREAT_GATE.get())
+                && level.getBlockState(at.get(7)).is(ModBlocks.WICKET.get());
     }
 
     /**
      * The blocks {@link #wallStands} reads: in pairs, the wall and the pier at the south gap's east side, the doorway's
      * east post and the air inside it, and the wall's top block east of the gap and the air over it; then the great gate
-     * in the gap's middle row, which GateState lays once the house stands.
+     * in the gap's middle row and its wicket's lower half, which GateState lays once the house stands.
      */
     private static List<BlockPos> wallPlaces() {
         int z = SeireiteiPlan.SEIREITEI_RADIUS, w = SeireiteiPlan.GATE_HALF_WIDTH, top = SeireiteiPlan.WALL_TOP_Y;
@@ -2488,7 +2490,7 @@ public final class ClientSmokeTest {
         return List.of(new BlockPos(w, 90, z), new BlockPos(w - 1, 90, z), new BlockPos(door, 90, z),
                 new BlockPos(door - 1, 90, z),
                 new BlockPos(16, top - 1, z), new BlockPos(16, top, z),
-                new BlockPos(0, 90, SeireiteiPlan.GATE_RADIUS));
+                new BlockPos(0, 90, SeireiteiPlan.GATE_RADIUS), GateState.wicket(Rukongai.Region.SOUTH.ordinal()));
     }
 
     /**

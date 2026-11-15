@@ -44,9 +44,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Seireiheki's gate houses in the real Soul Society, which the test server, making no structures, has only
- * from the stamp: A and B read all four houses and their gates, and C to E, in a batch of their own, each work on a
- * house no other test then holds, C lifting its gate and D and E taking theirs down. Every test lets go of its chunks
- * and what it set down however it ends, a gate it lifted is dropped, and a house taken down is built again.
+ * from the stamp: A and B read all four houses and their gates, and C to E, in a batch with GateTests' wicket walk, each
+ * work on a house no other test then holds, C lifting its gate and D and E taking theirs down. Every test lets go of its
+ * chunks and what it set down however it ends, a gate it lifted is dropped, and a house taken down is built again.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -113,10 +113,11 @@ public final class GateHouseTests {
         for (BlockPos post : List.of(GateHouses.LEFT_POST, GateHouses.RIGHT_POST)) {
             laid(helper, soul, house, post, state -> state.is(Blocks.STRIPPED_DARK_OAK_LOG), when);
         }
-        // The wicket's way at x 14: two rows open through the pier, from face to face, under a block.
+        // The wicket's way at x 14: two rows open through the pier, from face to face, under a block; the wicket in its row.
         for (int z = 0; z < GateHouses.SIZE.getZ(); z++) {
-            laid(helper, soul, house, new BlockPos(14, 0, z), BlockState::isAir, when);
-            laid(helper, soul, house, new BlockPos(14, 1, z), BlockState::isAir, when);
+            Predicate<BlockState> way = z == SeireiteiPlan.GATE_ROW ? GateHouseTests::gateOrOpen : BlockState::isAir;
+            laid(helper, soul, house, new BlockPos(14, 0, z), way, when);
+            laid(helper, soul, house, new BlockPos(14, 1, z), way, when);
             laid(helper, soul, house, new BlockPos(14, 2, z), state -> !state.isAir(), when);
         }
         Block sekkiseki = ModBlocks.SEKKISEKI.get();
@@ -143,9 +144,9 @@ public final class GateHouseTests {
         }
     }
 
-    /** Whether a cell GateState lays holds air or its great gate, laid yet or not. */
+    /** Whether a cell GateState lays holds air, its great gate or its wicket, laid yet or not. */
     private static boolean gateOrOpen(BlockState state) {
-        return state.isAir() || state.is(ModBlocks.GREAT_GATE.get());
+        return state.isAir() || state.is(ModBlocks.GREAT_GATE.get()) || state.is(ModBlocks.WICKET.get());
     }
 
     /** Asserts that this place of a house's template, turned and set, holds the block expected. */
@@ -293,7 +294,7 @@ public final class GateHouseTests {
 
     /**
      * Test B. All four houses stand once their chunks load, each as the plan lays it, turned to face the Rukongai, with
-     * the doorway, slot and wicket's way open, no Sekkiseki in them, the wall's on both sides, and its great gate down.
+     * the doorway, slot and wicket's way open, no Sekkiseki in them, the wall's on both sides, its gate down and wicket hung.
      */
     @GameTest(template = "empty", batch = "gate", timeoutTicks = 400)
     public static void theGateHousesStandAsThePlanLaysThem(GameTestHelper helper) {

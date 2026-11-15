@@ -61,6 +61,7 @@
   "block.bleach.division_banner.onmitsukido": "Onmitsukidō",
   "block.bleach.division_banner.zero": "Zero Division",
   "block.bleach.great_gate": "Great Gate",
+  "block.bleach.wicket": "Wicket",
   "container.bleach.tailoring": "Tailoring Table",
   "tooltip.bleach.shihakusho_set": "Full Shihakushō: +%s%% reiryoku regeneration for Shinigami and Academy students",
   "tooltip.bleach.tailoring.needs": "%s × %s",
@@ -1374,6 +1375,14 @@
   "commands.bleach.reset.success": "Reset the soul of %s player(s)",
   "commands.bleach.academy.success": "The Academy is in Soul Society, at %s",
   "commands.bleach.academy.none": "Soul Society does not exist on this server",
+  "commands.bleach.gate.lift": "Lifting %s",
+  "commands.bleach.gate.drop": "Dropping %s",
+  "commands.bleach.gate.status.down": "%s is down",
+  "commands.bleach.gate.status.lifted": "%s is lifted",
+  "commands.bleach.gate.status.rising": "%s is rising",
+  "commands.bleach.gate.status.falling": "%s is falling",
+  "commands.bleach.gate.status.waiting": "%s is waiting for its doorway to clear",
+  "commands.bleach.gate.status.not_laid": "%s is not yet laid",
   "commands.bleach.garganta.success": "Opened a Garganta near %s player(s)",
   "commands.bleach.garganta.failed": "There is no room for a Garganta near %s",
   "commands.bleach.garganta.peaceful": "Hollows cannot come on Peaceful",
@@ -1438,5 +1447,6 @@
   "commands.bleach.unknown_spirit": "Unknown zanpakutō spirit: %s",
   "commands.bleach.unknown_type": "Unknown zanpakutō type: %s",
   "commands.bleach.unknown_bloodline": "Unknown bloodline: %s",
-  "commands.bleach.unknown_blut": "Unknown Blut: %s"
+  "commands.bleach.unknown_blut": "Unknown Blut: %s",
+  "commands.bleach.unknown_gate": "Unknown gate: %s"
 }
