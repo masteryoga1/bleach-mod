@@ -11,10 +11,12 @@ box, air included, so placing one clears whatever was there.
 
 Uses only the standard library.
 """
+import functools
 import gzip
 import math
 import struct
 import sys
+import zlib
 from pathlib import Path
 
 STRUCTURES = Path("src/main/resources/data/bleach/structure")
@@ -307,12 +309,153 @@ def field():
     return t
 
 
+# The Gotei 13's divisions in DivisionBannerBlock.Division's order: the names a banner's division takes, and a file's.
+DIVISIONS = ("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh",
+             "twelfth", "thirteenth")
+# A compound's side, as SeireiteiPlan.BARRACKS_SIZE has it (2 by 2 chunks on the plan's chunk lines), and its height.
+BARRACKS_SIZE, BARRACKS_HEIGHT = 32, 10
+# The gateway's columns in the north wall; a banner hangs on the post either side of it.
+GATEWAY = range(14, 18)
+# Blocks full on every face: water stays beside them, and a shōji joins them.
+SOLID = frozenset({"bleach:black_plaster", "bleach:white_plaster", "bleach:roof_tiles", "minecraft:calcite",
+                   "minecraft:stone_bricks", "minecraft:mossy_stone_bricks", "minecraft:stripped_dark_oak_log",
+                   "minecraft:dark_oak_planks"})
+SIDES = {"north": (0, -1), "east": (1, 0), "south": (0, 1), "west": (-1, 0)}
+
+
+def hip_roof(t, x0, z0, x1, z1, y):
+    """A roof over the walls between two corners: tiles inside an eave of slabs one beyond, stepping in to a ridge."""
+    slab = dict(block="bleach:roof_tile_slab", type="bottom", waterlogged="false")
+    x0, z0, x1, z1 = x0 - 1, z0 - 1, x1 + 1, z1 + 1
+    while x0 <= x1 and z0 <= z1:
+        ring(t, y, x0, z0, x1, z1, **slab)
+        t.fill(x0 + 1, y, z0 + 1, x1 - 1, y, z1 - 1, "bleach:roof_tiles")
+        x0, z0, x1, z1, y = x0 + 2, z0 + 2, x1 - 2, z1 - 2, y + 1
+
+
+def hall(t, x0, z0, x1, z1, top, lanterns):
+    """
+    A building of the Academy's kind between two corners: tatami on stone, and walls of dark posts at the corners and
+    every fourth block in from them, black plaster at the foot, shōji above and white plaster under a ceiling at top + 1.
+    Shōji doors open in the middle bay of its north and south walls, lanterns hang at these x and a tiled roof tops it.
+    """
+    log = dict(block="minecraft:stripped_dark_oak_log", axis="y")
+    t.fill(x0, 0, z0, x1, 0, z1, "minecraft:stone_bricks")
+    for x in range(x0 + 1, x1):
+        for z in range(z0 + 1, z1):
+            t.set(x, 0, z, "bleach:tatami", facing="north" if (x + z) % 2 == 0 else "east")
+    for y in range(1, top + 1):
+        for x in range(x0, x1 + 1):
+            for z in range(z0, z1 + 1):
+                on_x, on_z = x in (x0, x1), z in (z0, z1)
+                if on_z and min(x - x0, x1 - x) % 4 == 0 or on_x and min(z - z0, z1 - z) % 4 == 0:
+                    t.set(x, y, z, **log)
+                elif on_x or on_z:
+                    t.set(x, y, z, "bleach:black_plaster" if y == 1 else "bleach:shoji" if y < top
+                          else "bleach:white_plaster")
+    doors = range((x0 + x1) // 2, (x0 + x1 + 1) // 2 + 1)
+    for z, facing in ((z0, "south"), (z1, "north")):
+        for x in doors:
+            hinge = "left" if len(doors) == 1 or (x == doors[-1]) == (facing == "south") else "right"
+            for y, half in ((1, "lower"), (2, "upper")):
+                t.set(x, y, z, "bleach:shoji_door", facing=facing, half=half, hinge=hinge, open="false", powered="false")
+    t.fill(x0, top + 1, z0, x1, top + 1, z1, "minecraft:dark_oak_planks")
+    for x in lanterns:
+        t.set(x, top, (z0 + z1) // 2, "minecraft:lantern", hanging="true", waterlogged="false")
+    hip_roof(t, x0, z0, x1, z1, top + 2)
+
+
+def join_panes(t):
+    """Joins each shōji to the shōji and full blocks beside it, as the game joins a pane it places."""
+    for (x, y, z), (block, _) in list(t.blocks.items()):
+        if block == "bleach:shoji":
+            joined = {side: str(t.get(x + dx, y, z + dz) in SOLID | {block}).lower() for side, (dx, dz) in SIDES.items()}
+            t.set(x, y, z, block, waterlogged="false", **joined)
+
+
+def barracks(number):
+    """
+    A division's barracks, 2 by 2 chunks where the plan sets it: a walled calcite yard entered through a roofed gate in
+    the north wall with the division's banner on each post, a main hall and two quarters, and the First's larger hall
+    with a dais, the Fourth's beds, the Twelfth's lab benches or the Thirteenth's pond. Row z 0 lies outside the wall,
+    and each bed and the pond lie in one chunk, so each stands whole or not at all where a compound meets older ground.
+    """
+    size, last, gate = BARRACKS_SIZE, BARRACKS_SIZE - 1, GATEWAY
+    t = Template(size, BARRACKS_HEIGHT, size)
+    log = "minecraft:stripped_dark_oak_log"
+    stair = dict(block="bleach:roof_tile_stairs", half="bottom", shape="straight", waterlogged="false")
+    slab = dict(type="bottom", waterlogged="false")
+
+    # The yard, the path from the gate to the quarters, and the step up to the gate from the lawn.
+    t.fill(1, 0, 2, last - 1, 0, last - 1, "minecraft:calcite")
+    t.fill(gate[0], 0, 2, gate[-1], 0, last - 1, "minecraft:stone_bricks")
+    t.fill(gate[0], 0, 0, gate[-1], 0, 0, "minecraft:stone_brick_slab", **slab)
+    # The wall from z 1 round: two courses of black plaster, two of white and one of tiles.
+    for y, block in enumerate(("bleach:black_plaster",) * 2 + ("bleach:white_plaster",) * 2 + ("bleach:roof_tiles",)):
+        ring(t, y, 0, 1, last, last, block)
+    # The gate, four wide and three high between dark posts, a banner on each, under a lintel and a little roof.
+    t.fill(gate[0], 1, 1, gate[-1], 3, 1, "minecraft:air")
+    for x in (gate[0] - 1, gate[-1] + 1):
+        t.fill(x, 1, 1, x, 3, 1, log, axis="y")
+        t.set(x, 2, 0, "bleach:division_banner", division=DIVISIONS[number - 1], facing="north")
+        t.set(x - 1 if x < gate[0] else x + 1, 1, 3, "minecraft:lantern", hanging="false", waterlogged="false")
+    t.fill(gate[0] - 1, 4, 1, gate[-1] + 1, 4, 1, log, axis="x")
+    for z, facing in ((0, "south"), (2, "north")):
+        t.fill(gate[0] - 3, 5, z, gate[-1] + 3, 5, z, facing=facing, **stair)
+    t.fill(gate[0] - 3, 5, 1, gate[-1] + 3, 5, 1, "bleach:roof_tiles")
+    t.fill(gate[0] - 3, 6, 1, gate[-1] + 3, 6, 1, "bleach:roof_tile_slab", **slab)
+
+    # The main hall, the First's the larger, and the two quarters behind it.
+    if number == 1:
+        hall(t, 2, 9, last - 2, 21, 4, (7, 12, 19, 24))
+        t.fill(11, 1, 18, 20, 1, 19, "minecraft:dark_oak_slab", **slab)  # the dais, short of the back door
+    else:
+        hall(t, 6, 11, last - 6, 19, 4, (10, 21))
+    for x0 in (2, last - 12):
+        hall(t, x0, 25, x0 + 10, 29, 3, (x0 + 5,))
+    if number == 4:  # six beds, heads to the hall's back wall, either side of the aisle
+        for x in (8, 10, 12, 19, 21, 23):
+            for z, part in ((17, "foot"), (18, "head")):
+                t.set(x, 1, z, "minecraft:white_bed", facing="south", occupied="false", part=part)
+    if number == 12:  # four lab benches, each with a brewing stand and a cauldron on it
+        for z in (14, 16):
+            for x0, stand, cauldron in ((8, 9, 11), (19, 22, 20)):
+                t.fill(x0, 1, z, x0 + 4, 1, z, "minecraft:smooth_stone_slab", type="top", waterlogged="false")
+                t.set(stand, 2, z, "minecraft:brewing_stand", has_bottle_0="false", has_bottle_1="false",
+                      has_bottle_2="false")
+                t.set(cauldron, 2, z, "minecraft:cauldron")
+    if number == 13:  # the pond west of the path, on the lawn under the yard, in a rim of mossy stone
+        ring(t, 0, 2, 3, 10, 9, "minecraft:mossy_stone_bricks")
+        t.fill(3, 0, 4, 9, 0, 8, "minecraft:water", level="0")
+        for x, z in ((4, 5), (7, 7), (8, 4)):
+            t.set(x, 1, z, "minecraft:lily_pad")
+    join_panes(t)
+    # Water stays where it is set, and a bed whole: beside the water only water or full blocks, under it the lawn,
+    # and each bed and the pond in one chunk, each half of a bed with its partner.
+    for (x, y, z), (block, properties) in t.blocks.items():
+        square = (x // 16, z // 16)
+        if block == "minecraft:water":
+            for nx, nz in ((x - 1, z), (x + 1, z), (x, z - 1), (x, z + 1)):
+                if t.get(nx, y, nz) not in SOLID | {block} or (nx // 16, nz // 16) != square or y != 0:
+                    raise ValueError(f"the pond's water at {(x, y, z)} could run out by {(nx, y, nz)}")
+        if block == "minecraft:white_bed":
+            state = dict(properties)
+            dx, dz = SIDES[state["facing"]]
+            if state["part"] == "head":  # the foot lies behind the head, the head ahead of the foot
+                dx, dz = -dx, -dz
+            if t.get(x + dx, y, z + dz) != block or ((x + dx) // 16, (z + dz) // 16) != square:
+                raise ValueError(f"the bed at {(x, y, z)} has no partner beside it in its chunk")
+    return t
+
+
 TEMPLATES = {
     "academy/academy.nbt": academy,
     "field.nbt": field,
     "gate/house.nbt": gate_house,
     "lane.nbt": lane,
 }
+TEMPLATES.update((f"barracks/{name}.nbt", functools.partial(barracks, number))
+                 for number, name in enumerate(DIVISIONS, 1))
 
 
 def main(argv):
@@ -324,11 +467,11 @@ def main(argv):
         if check:
             try:
                 actual = gzip.decompress(path.read_bytes())
-            except OSError as error:
+            except (OSError, EOFError, zlib.error) as error:
                 stale.append("%s: %s" % (path, error))
                 continue
             if actual != expected:
-                stale.append("%s: differs from what %s() builds" % (path, build.__name__))
+                stale.append("%s: differs from what this script builds" % path)
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(gzip.compress(expected, mtime=0))

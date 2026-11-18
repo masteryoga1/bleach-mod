@@ -1,11 +1,14 @@
 package io.github.masteryoga1.bleach.world;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 /**
  * Soul Society's plan: every size and height that Java needs and the world's JSON must agree with, and the places where
@@ -61,22 +64,69 @@ public final class SeireiteiPlan {
     public static final int ACADEMY_FLOOR_Y = PLATEAU_Y + 1;
     /** Where a soul sent to the Academy lands: on the path two blocks inside its gate. */
     public static final double ACADEMY_LANDING_X = ACADEMY_X - 1.5, ACADEMY_LANDING_Z = ACADEMY_Z + 7.5;
+    /** Sōkyoku Hill's reserve: every column nearer the centre column than this, kept for the hill's own works. */
+    public static final int HILL_RESERVE_RADIUS = 140;
+    /** The Senkaimon court's reserve: this many columns each side of the block its gates come out on. */
+    public static final int COURT_RESERVE_HALF = 24;
+    /** A gate's forecourt: this many columns each side of its axis, this many deep in from the wall's inner face. */
+    public static final int FORECOURT_HALF_WIDTH = 20, FORECOURT_DEPTH = 48;
+    /** How many columns about each site's own are kept for it too. */
+    public static final int SITE_MARGIN = 4;
+    /** A barracks compound's side: two chunks, its corners on chunk lines. */
+    public static final int BARRACKS_SIZE = 32;
 
     /** Every planned site: a template set whole at its corner, turned, on the ground there, one structure for each group. */
     public static final List<Site> SITES = List.of(
-            new Site("academy", ACADEMY_X, ACADEMY_Z, BleachMod.id("academy/academy"), Rotation.CLOCKWISE_90),
+            new Site("academy", ACADEMY_X, ACADEMY_Z, BleachMod.id("academy/academy"), Rotation.CLOCKWISE_90, 15, 17),
             // The gate houses in the order of the Rukongai's regions, each the south one turned about the centre column.
             gateHouse(SEIREITEI_RADIUS, GATE_HALF_WIDTH - 1, Rotation.COUNTERCLOCKWISE_90),
             gateHouse(-GATE_HALF_WIDTH, SEIREITEI_RADIUS, Rotation.NONE),
             gateHouse(-SEIREITEI_RADIUS - 1, -GATE_HALF_WIDTH, Rotation.CLOCKWISE_90),
-            gateHouse(GATE_HALF_WIDTH - 1, -SEIREITEI_RADIUS - 1, Rotation.CLOCKWISE_180));
+            gateHouse(GATE_HALF_WIDTH - 1, -SEIREITEI_RADIUS - 1, Rotation.CLOCKWISE_180),
+            // The Gotei 13's barracks, each on chunk lines: the First's at the north gate's way in by the hill, its gate up
+            // that way; the rest clockwise round a ring about 460 out from 15°, each gate facing the centre column.
+            barracks("first", -16, -192, Rotation.NONE), barracks("second", 127, -433, Rotation.CLOCKWISE_180),
+            barracks("third", 335, -305, Rotation.CLOCKWISE_180), barracks("fourth", 432, -97, Rotation.COUNTERCLOCKWISE_90),
+            barracks("fifth", 432, 127, Rotation.COUNTERCLOCKWISE_90), barracks("sixth", 304, 304, Rotation.NONE),
+            barracks("seventh", 96, 432, Rotation.NONE), barracks("eighth", -128, 432, Rotation.NONE),
+            barracks("ninth", -336, 304, Rotation.NONE), barracks("tenth", -433, 96, Rotation.CLOCKWISE_90),
+            barracks("eleventh", -433, -128, Rotation.CLOCKWISE_90), barracks("twelfth", -305, -305, Rotation.CLOCKWISE_180),
+            barracks("thirteenth", -97, -433, Rotation.CLOCKWISE_180));
+    /**
+     * The plan's reserves, which no later street, wall or site may enter but its own group's: Sōkyoku Hill, the Academy's
+     * grounds, the Senkaimon court and each gate's forecourt, then every site with its margin, in the plan's order.
+     */
+    public static final List<Reserve> RESERVES = reserves();
 
     private SeireiteiPlan() {
     }
 
     /** A gate house filling a gap of the wall, its template's corner at the gap's corner here, its front facing out. */
     private static Site gateHouse(int x, int z, Rotation rotation) {
-        return new Site("gate", x, z, BleachMod.id("gate/house"), rotation);
+        return new Site("gate", x, z, BleachMod.id("gate/house"), rotation, 2 * GATE_HALF_WIDTH, WALL_THICKNESS);
+    }
+
+    /** A division's barracks, its template named as the division's banner is, its corner on a chunk's. */
+    private static Site barracks(String division, int x, int z, Rotation rotation) {
+        return new Site("barracks", x, z, BleachMod.id("barracks/" + division), rotation, BARRACKS_SIZE, BARRACKS_SIZE);
+    }
+
+    /** The named reserves, then each site's. */
+    private static List<Reserve> reserves() {
+        int hill = HILL_RESERVE_RADIUS, court = COURT_RESERVE_HALF, half = FORECOURT_HALF_WIDTH;
+        int near = SEIREITEI_RADIUS - FORECOURT_DEPTH, far = SEIREITEI_RADIUS - 1;
+        List<Reserve> rows = new ArrayList<>(List.of(new Reserve("hill", -hill, -hill, hill - 1, hill - 1, true),
+                // The Academy's hall in its north-east corner, a forecourt before its gate, and room west and south.
+                new Reserve("academy", -288, 208, -177, 303, false),
+                new Reserve("court", SENKAIMON_COURT_X - court, SENKAIMON_COURT_Z - court, SENKAIMON_COURT_X + court,
+                        SENKAIMON_COURT_Z + court, false),
+                // The forecourts in the gate sites' order: east, south, west, north.
+                new Reserve("gate", near, -half, far, half - 1, false),
+                new Reserve("gate", -half, near, half - 1, far, false),
+                new Reserve("gate", -far - 1, -half, -near - 1, half - 1, false),
+                new Reserve("gate", -half, -far - 1, half - 1, -near - 1, false)));
+        SITES.forEach(site -> rows.add(site.reserve()));
+        return List.copyOf(rows);
     }
 
     /** How far this block's centre lies from the centre column. */
@@ -121,6 +171,17 @@ public final class SeireiteiPlan {
         return SITES.stream().filter(site -> site.group().equals(group)).toList();
     }
 
+    /** The first reserve that keeps this column, the named ones before the sites', or null if none does. */
+    @Nullable
+    public static Reserve reservedBy(int x, int z) {
+        for (Reserve reserve : RESERVES) {
+            if (reserve.contains(x, z)) {
+                return reserve;
+            }
+        }
+        return null;
+    }
+
     /** The group's site whose structure starts in this chunk, or null. */
     @Nullable
     public static Site siteAt(String group, int chunkX, int chunkZ) {
@@ -132,11 +193,42 @@ public final class SeireiteiPlan {
         return null;
     }
 
-    /** One planned site: its group, the corner its template is placed from, the template and its turn. */
-    public record Site(String group, int x, int z, ResourceLocation template, Rotation rotation) {
+    /**
+     * One planned site: its group, the corner its template is placed from, the template, its turn, and the template's
+     * width and depth (its x and z) before the turn.
+     */
+    public record Site(String group, int x, int z, ResourceLocation template, Rotation rotation, int width, int depth) {
         /** The chunk its structure starts in, the one holding its corner. */
         public ChunkPos chunk() {
             return new ChunkPos(x >> 4, z >> 4);
+        }
+
+        /** The columns its template covers, turned about the corner, as one layer on the plateau. */
+        public BoundingBox footprint() {
+            BlockPos corner = new BlockPos(x, PLATEAU_Y, z);
+            return BoundingBox.fromCorners(corner, corner.offset(new BlockPos(width - 1, 0, depth - 1).rotate(rotation)));
+        }
+
+        /** Its footprint and the margin about it: its own reserve. */
+        public Reserve reserve() {
+            BoundingBox box = footprint();
+            return new Reserve(group, box.minX() - SITE_MARGIN, box.minZ() - SITE_MARGIN, box.maxX() + SITE_MARGIN,
+                    box.maxZ() + SITE_MARGIN, false);
+        }
+    }
+
+    /**
+     * Columns kept for a group's own works, which no other's street, wall or site may enter: those between two corners,
+     * both included, or, for a round one, those whose centres lie inside the disc that square bounds.
+     */
+    public record Reserve(String group, int minX, int minZ, int maxX, int maxZ, boolean round) {
+        /** Whether this column is kept. */
+        public boolean contains(int x, int z) {
+            if (x < minX || x > maxX || z < minZ || z > maxZ) {
+                return false;
+            }
+            double half = (maxX - minX + 1) / 2.0, dx = x + 0.5 - minX - half, dz = z + 0.5 - minZ - half;
+            return !round || dx * dx + dz * dz < half * half;
         }
     }
 }
