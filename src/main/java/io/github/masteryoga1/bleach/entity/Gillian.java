@@ -23,9 +23,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -38,12 +36,10 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -52,7 +48,6 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -901,94 +896,10 @@ public class Gillian extends Menos {
         }
     }
 
-    /**
-     * One of the Gillian's two hit boxes, a body above its knees and a head about its mask. Arrows,
-     * blades, beams and the crosshair find it where they would miss the Gillian itself; whatever
-     * strikes it strikes the Gillian. It lives beside the Gillian, never saved and never ticked by the
-     * world: the Gillian moves it.
-     */
-    public static final class Part extends PartEntity<Gillian> {
-        private final EntityDimensions size;
-        private float scale = 1.0F;
-        private boolean placed;
-
+    /** One of the Gillian's two hit boxes, a body above its knees and a head about its mask (see {@link GiantPart}). */
+    public static final class Part extends GiantPart<Gillian> {
         Part(Gillian parent, float width, float height) {
-            super(parent);
-            size = EntityDimensions.scalable(width, height);
-            refreshDimensions();
-        }
-
-        @Override
-        protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        }
-
-        @Override
-        protected void readAdditionalSaveData(CompoundTag tag) {
-        }
-
-        @Override
-        protected void addAdditionalSaveData(CompoundTag tag) {
-        }
-
-        @Override
-        public boolean isPickable() {
-            return true;
-        }
-
-        @Override
-        public boolean hurt(DamageSource source, float amount) {
-            return !isInvulnerableTo(source) && getParent().hurt(source, amount);
-        }
-
-        @Override
-        public void kill() {
-            getParent().kill();
-        }
-
-        @Override
-        public boolean is(Entity entity) {
-            return this == entity || getParent() == entity;
-        }
-
-        /** Parts live outside the world's entity storage; the Gillian itself is never saved either. */
-        @Override
-        public boolean shouldBeSaved() {
-            return false;
-        }
-
-        @Override
-        public EntityDimensions getDimensions(Pose pose) {
-            // Null only while the entity itself is being made, before the size is set.
-            return size != null ? size.scale(scale) : super.getDimensions(pose);
-        }
-
-        @Override
-        @Nullable
-        public ItemStack getPickResult() {
-            return getParent().getPickResult();
-        }
-
-        /** Grows with the Gillian, should its size ever change. */
-        void resize(float parentScale) {
-            if (parentScale != scale) {
-                scale = parentScale;
-                refreshDimensions();
-            }
-        }
-
-        /** Moves to this bottom centre, starting from where it was, so it does not slide in from far away. */
-        void placeAt(double x, double y, double z) {
-            double fromX = placed ? getX() : x;
-            double fromY = placed ? getY() : y;
-            double fromZ = placed ? getZ() : z;
-            setPos(x, y, z);
-            xo = fromX;
-            yo = fromY;
-            zo = fromZ;
-            xOld = fromX;
-            yOld = fromY;
-            zOld = fromZ;
-            placed = true;
+            super(parent, width, height);
         }
     }
 }

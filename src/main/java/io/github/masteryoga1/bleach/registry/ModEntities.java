@@ -197,8 +197,8 @@ public final class ModEntities {
     // ---- Seireitei ----
 
     /**
-     * A gatekeeper, the giant before one of Seireitei's four great gates: about 8 blocks tall, saved, made only by its
-     * gate (see GateState), and never knocked back.
+     * A gatekeeper, the giant before one of Seireitei's four great gates: about 8 blocks tall, with two hit boxes of its
+     * own (see {@link GateKeeper.Part}), saved, made only by its gate (see GateState), and never knocked back.
      */
     public static final DeferredHolder<EntityType<?>, EntityType<GateKeeper>> GATE_KEEPER =
             ENTITY_TYPES.register("gate_keeper", () -> EntityType.Builder

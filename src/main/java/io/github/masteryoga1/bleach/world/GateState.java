@@ -36,9 +36,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /**
  * The great gates of the four gate houses, and their keepers, in Soul Society's saved data: how many rows each gate
  * stands above its doorway's floor, from 0 (down) to {@link SeireiteiPlan#GATE_LIFT} (lifted), which of the two it is
- * moving to, and the one UUID every keeper of it is made with. Each gate is laid from this, never by the template, once
- * its house is seen standing and again after every start, so that its cells come to match the height saved (server
- * thread only).
+ * moving to, the one UUID every keeper of it is made with, and when a keeper's yield drops it again. Each gate is laid
+ * from this, never by the template, once its house is seen standing and again after every start, so that its cells come
+ * to match the height saved (server thread only).
  */
 public final class GateState extends SavedData {
     public static final String NAME = "bleach_gates";
@@ -57,9 +57,16 @@ public final class GateState extends SavedData {
     private static final int WICKET_X = LAST_X + 2;
     /** In the template, before its turn: the keeper's post, 4.5 blocks out from the house's face on its doorway's axis. */
     private static final double POST_X = SeireiteiPlan.GATE_HALF_WIDTH, POST_Z = 12.5;
+    /**
+     * The keeper's ground in the template: 12 blocks either side of the axis, from the gate's outer face to r 528, and
+     * from the plateau 10 blocks up, his reach at his post. Only its x and z count, as his reach runs from his own feet.
+     */
+    private static final double GROUND_SIDE = 12.0, GROUND_NEAR = SeireiteiPlan.GATE_ROW + 1, GROUND_FAR = 16.0;
     /** Where the keeper's feet may go in the template: its whole body on its ground and out of the gap. */
     private static final double FOOT_NEAR = 9.5, FOOT_FAR = 14.5, FOOT_SIDE = 10.5;
-    private static final String LIST = "Gates", HEIGHT = "Height", TARGET = "Target", KEEPER = "Keeper";
+    private static final String LIST = "Gates", HEIGHT = "Height", TARGET = "Target", KEEPER = "Keeper", DROP_AT = "DropAt";
+    /** The time of a drop when none is due. */
+    private static final long NONE = Long.MAX_VALUE;
     private static final SavedData.Factory<GateState> FACTORY =
             new SavedData.Factory<>(GateState::new, GateState::load, null);
     /** Each gate's columns at the plateau across its doorway, as the stamp turns them. */
@@ -68,10 +75,10 @@ public final class GateState extends SavedData {
     private static final BlockPos[] WICKETS = new BlockPos[GATES];
     /** Each gate's box: every cell it fills down or lifted, the pier beside it and its wicket. */
     private static final BoundingBox[] BOXES = new BoundingBox[GATES];
-    /** Each gate's keeper's post (its feet), facing and footing, as the stamp turns them. */
+    /** Each gate's keeper's post (its feet), facing, ground and footing, as the stamp turns them. */
     private static final Vec3[] POSTS = new Vec3[GATES];
     private static final float[] YAWS = new float[GATES];
-    private static final AABB[] FOOTINGS = new AABB[GATES];
+    private static final AABB[] GROUNDS = new AABB[GATES], FOOTINGS = new AABB[GATES];
 
     static {
         for (int gate = 0; gate < GATES; gate++) {
@@ -86,6 +93,8 @@ public final class GateState extends SavedData {
             BOXES[gate] = BoundingBox.fromCorners(COLUMNS[gate][0], WICKETS[gate].above(ROWS + LIFT - 1));
             POSTS[gate] = point(site, POST_X, 0.0, POST_Z);
             YAWS[gate] = site.rotation().rotate(Direction.SOUTH).toYRot();
+            GROUNDS[gate] = new AABB(point(site, POST_X - GROUND_SIDE, 0.0, GROUND_NEAR),
+                    point(site, POST_X + GROUND_SIDE, 10.0, GROUND_FAR));
             FOOTINGS[gate] = new AABB(point(site, POST_X - FOOT_SIDE, 0.0, FOOT_NEAR),
                     point(site, POST_X + FOOT_SIDE, 0.0, FOOT_FAR));
         }
@@ -95,8 +104,9 @@ public final class GateState extends SavedData {
     /** Not saved: whether this start has laid the gate, whether its last step was held up, and when it is next looked at. */
     private final boolean[] laid = new boolean[GATES], held = new boolean[GATES];
     private final int[] nextAt = new int[GATES];
-    /** Saved: each gate's keeper, the UUID every keeper of it is made with. */
+    /** Saved: each gate's keeper, the UUID every keeper of it is made with, and the game time a yield's drop is due. */
     private final UUID[] keeper = new UUID[GATES];
+    private final long[] dropAt = {NONE, NONE, NONE, NONE};
     /** Not saved: the server tick at which each laid gate's keeper is next looked for. */
     private final int[] keeperAt = new int[GATES];
 
@@ -119,6 +129,7 @@ public final class GateState extends SavedData {
             state.height[gate] = Mth.clamp(each.getInt(HEIGHT), 0, LIFT);
             state.target[gate] = each.getInt(TARGET) == LIFT ? LIFT : 0;
             state.keeper[gate] = each.hasUUID(KEEPER) ? each.getUUID(KEEPER) : null;
+            state.dropAt[gate] = each.contains(DROP_AT, Tag.TAG_LONG) ? each.getLong(DROP_AT) : NONE;
         }
         return state;
     }
@@ -132,6 +143,9 @@ public final class GateState extends SavedData {
             each.putInt(TARGET, target[gate]);
             if (keeper[gate] != null) {
                 each.putUUID(KEEPER, keeper[gate]);
+            }
+            if (dropAt[gate] != NONE) {
+                each.putLong(DROP_AT, dropAt[gate]);
             }
             gates.add(each);
         }
@@ -155,6 +169,11 @@ public final class GateState extends SavedData {
         return keeper[gate];
     }
 
+    /** The game time this gate is dropped at after a keeper's yield, or {@link Long#MAX_VALUE} if none is due. */
+    public long dropAt(int gate) {
+        return dropAt[gate];
+    }
+
     /** Whether this gate's blocks have been laid since the server started, so they stand as its height says. */
     public boolean laid(int gate) {
         return laid[gate];
@@ -172,23 +191,49 @@ public final class GateState extends SavedData {
     }
 
     /**
-     * Sets this gate (0 to 3, in the plan's order) rising to its lift, which no body stops, with a sound if it moves now.
-     * The command (7j4) and the keepers (7j7) lift and drop a gate by these two calls.
+     * Sets this gate (0 to 3, in the plan's order) rising to its lift, which no body stops, with a sound if it moves now,
+     * there to stay whatever drop a keeper's yield had set. The command (7j4) lifts and drops a gate by these two calls,
+     * and a keeper's yield by {@link #liftFor}.
      *
      * @return whether it was not already lifted or rising
      */
     public boolean lift(ServerLevel level, int gate) {
+        cancelDrop(gate);
         return moveTo(level, gate, LIFT);
     }
 
     /**
      * Sets this gate (0 to 3, in the plan's order) falling to close its doorway, holding while a body is under it, with a
-     * sound if it moves now.
+     * sound if it moves now; a drop a keeper's yield had set is then no longer due.
      *
      * @return whether it was not already down or falling
      */
     public boolean drop(ServerLevel level, int gate) {
+        cancelDrop(gate);
         return moveTo(level, gate, 0);
+    }
+
+    /**
+     * A keeper has yielded: this gate rises now and is dropped so many ticks on, unless an operator lifted it, which
+     * stays. A drop already due is put off to then.
+     *
+     * @return whether the gate was set to rise for the keeper
+     */
+    public boolean liftFor(ServerLevel level, int gate, int ticks) {
+        if (target[gate] == LIFT && dropAt[gate] == NONE) {
+            return false;
+        }
+        moveTo(level, gate, LIFT);
+        dropAt[gate] = level.getGameTime() + ticks;
+        setDirty();
+        return true;
+    }
+
+    private void cancelDrop(int gate) {
+        if (dropAt[gate] != NONE) {
+            dropAt[gate] = NONE;
+            setDirty();
+        }
     }
 
     private boolean moveTo(ServerLevel level, int gate, int to) {
@@ -242,6 +287,14 @@ public final class GateState extends SavedData {
         return POSTS[gate];
     }
 
+    /**
+     * This gate's keeper's ground: before its house, and the gap's Rukongai half from the gate's outer face, y 72 to 82 at
+     * its post. Only its x and z extents count, as the keeper measures its height from his own feet.
+     */
+    public static AABB ground(int gate) {
+        return GROUNDS[gate];
+    }
+
     /** The way this gate's keeper faces at its post: out of its gate, into the Rukongai. */
     public static float yaw(int gate) {
         return YAWS[gate];
@@ -260,8 +313,8 @@ public final class GateState extends SavedData {
     }
 
     /**
-     * Each tick, the gates due a look: one not laid tries to be, one moving steps, and a laid gate's keeper is looked for
-     * once a second. A still gate costs two comparisons.
+     * Each tick, the gates due a look: a yield's drop comes due, one not laid tries to be, one moving steps, and a laid
+     * gate's keeper is looked for once a second. A still gate costs three comparisons.
      */
     public static void onServerTick(ServerTickEvent.Post event) {
         ServerLevel level = event.getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
@@ -272,7 +325,11 @@ public final class GateState extends SavedData {
 
     private void tick(ServerLevel level) {
         int now = level.getServer().getTickCount();
+        long time = level.getGameTime();
         for (int gate = 0; gate < GATES; gate++) {
+            if (time >= dropAt[gate]) {
+                drop(level, gate);
+            }
             if (laid[gate] && now >= keeperAt[gate]) {
                 keeperAt[gate] = now + LOOK_TICKS;
                 keep(level, gate);
