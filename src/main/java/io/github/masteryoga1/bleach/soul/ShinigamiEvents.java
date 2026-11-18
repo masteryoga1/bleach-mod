@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.world.AcademySite;
+import io.github.masteryoga1.bleach.world.GateHouses;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -81,9 +82,13 @@ public final class ShinigamiEvents {
         bus.addListener(ShinigamiEvents::onPlayerTick);
         bus.addListener(ShinigamiEvents::onChangedDimension);
         bus.addListener(ShinigamiEvents::onLoggedIn);
-        // The Academy in Seireitei is completed where its chunks were made before it, or with structures off.
+        // The Academy in Seireitei and the gate houses are completed where their chunks were made before them, or with
+        // structures off; a soul a house is built over, or joins inside, is moved out of its blocks.
         bus.addListener(AcademySite::onChunkLoad);
         bus.addListener(AcademySite::onServerTick);
+        bus.addListener(GateHouses::onChunkLoad);
+        bus.addListener(GateHouses::onServerTick);
+        bus.addListener(GateHouses::onEntityJoin);
     }
 
     /** A soul who left while standing on reishi is standing on it again. */

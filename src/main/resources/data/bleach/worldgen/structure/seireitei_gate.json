@@ -1,0 +1,8 @@
+{
+  "type": "bleach:site",
+  "biomes": "#bleach:has_structure/site",
+  "group": "gate",
+  "spawn_overrides": {},
+  "step": "surface_structures",
+  "terrain_adaptation": "none"
+}

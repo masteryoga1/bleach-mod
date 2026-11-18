@@ -72,7 +72,7 @@ public final class ShakonmakuTests {
      * Soul Society's chunks within 2 of this one, made now; this one and the ring about it are held entity-ticking until
      * the test ends.
      */
-    private static Cleanup hold(GameTestHelper helper, int chunkX, int chunkZ) {
+    static Cleanup hold(GameTestHelper helper, int chunkX, int chunkZ) {
         ServerLevel soul = SiteTests.soul(helper);
         for (int x = -2; x <= 2; x++) {
             for (int z = -2; z <= 2; z++) {
@@ -87,7 +87,7 @@ public final class ShakonmakuTests {
     }
 
     /** A Shinigami (who sees spirits) joined in this game mode and set down here in Soul Society, able to fly. */
-    private static ServerPlayer soulAt(GameTestHelper helper, ServerLevel soul, GameType mode, Vec3 at) {
+    static ServerPlayer soulAt(GameTestHelper helper, ServerLevel soul, GameType mode, Vec3 at) {
         ServerPlayer player = TestPlayers.join(helper, mode, new Vec3(1.5, 1.0, 1.5));
         player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, 400.0F));
         player.getAbilities().mayfly = true;
@@ -96,7 +96,7 @@ public final class ShakonmakuTests {
     }
 
     /** Moves the player here as its client would: a move packet, handled by the server as it handles every one. */
-    private static void move(ServerPlayer player, Vec3 to) {
+    static void move(ServerPlayer player, Vec3 to) {
         player.connection.handleMovePlayer(new ServerboundMovePlayerPacket.Pos(to.x, to.y, to.z, false));
     }
 
@@ -125,8 +125,8 @@ public final class ShakonmakuTests {
     }
 
     /** Lets a test's chunks go and takes away what it set down in Soul Society when it passes or fails, however it ends. */
-    private static final class Cleanup implements GameTestListener {
-        private final ServerLevel soul;
+    static final class Cleanup implements GameTestListener {
+        final ServerLevel soul;
         private final ChunkPos centre;
         private final List<Entity> placed = new ArrayList<>();
 

@@ -92,15 +92,23 @@ public final class SoulSocietyTests {
         helper.assertTrue(inside == 0 && wall == 1, "Seireitei has " + inside + " features and its wall " + wall);
         Set<Holder<Biome>> ours = Set.copyOf(biomes);
         Registry<Structure> structures = access.registryOrThrow(Registries.STRUCTURE);
-        // Soul Society's own sites stand there by its plan (see SiteStructure); nothing else may, and so far one does.
+        // Soul Society's own sites stand there by its plan (see SiteStructure); nothing else may, and so far two do, each
+        // placed by a set of its own.
         for (Structure structure : structures) {
             helper.assertFalse(!(structure instanceof SiteStructure) && structure.biomes().stream().anyMatch(ours::contains),
                     structures.getKey(structure) + " can generate in Soul Society");
         }
         List<String> sited = structures.stream().filter(structure -> structure.biomes().stream().anyMatch(ours::contains))
-                .map(structure -> String.valueOf(structures.getKey(structure))).toList();
-        helper.assertTrue(sited.equals(List.of(BleachMod.id("seireitei_academy").toString())),
-                "the structures that may stand in Soul Society are " + sited + ", not the Seireitei Academy alone");
+                .map(structure -> String.valueOf(structures.getKey(structure))).sorted().toList();
+        List<String> allowed =
+                List.of(BleachMod.id("seireitei_academy").toString(), BleachMod.id("seireitei_gate").toString());
+        helper.assertTrue(sited.equals(allowed),
+                "the structures that may stand in Soul Society are " + sited + ", not the Academy and the gate houses");
+        List<String> sets = access.registryOrThrow(Registries.STRUCTURE_SET).entrySet().stream()
+                .filter(set -> set.getValue().structures().stream()
+                        .anyMatch(entry -> sited.contains(entry.structure().getRegisteredName())))
+                .map(set -> set.getKey().location().toString()).sorted().toList();
+        helper.assertTrue(sets.equals(allowed), "the sets that place them are " + sets + ", not " + allowed);
 
         // The seam travel looks worlds up through: a stand-in while a test sets one, the real world again after.
         ServerLevel real = BleachWorlds.level(server, BleachWorlds.SOUL_SOCIETY);

@@ -1,0 +1,13 @@
+{
+  "placement": {
+    "type": "bleach:site",
+    "group": "gate",
+    "salt": 0
+  },
+  "structures": [
+    {
+      "structure": "bleach:seireitei_gate",
+      "weight": 1
+    }
+  ]
+}

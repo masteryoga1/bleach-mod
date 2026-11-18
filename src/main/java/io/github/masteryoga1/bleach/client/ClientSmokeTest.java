@@ -78,6 +78,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
@@ -2227,7 +2228,8 @@ public final class ClientSmokeTest {
                         + ", the lawn's block " + minecraft.level.getBlockState(BlockPos.containing(SOUL_SOCIETY_X,
                                 SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
         expectWithin(minecraft, 6850, 6985, () -> wallStands(minecraft.level),
-                "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a 16-block gap");
+                "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a gate house (the"
+                        + " client holds " + wallSeen(minecraft.level) + ")");
         expectWithin(minecraft, 7010, 7090, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
                         && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.ACADEMY_FLOOR_Y) < 0.01
                         && academyStands(minecraft.level) && !instructorsNear(minecraft, 32.0).isEmpty(),
@@ -2451,17 +2453,37 @@ public final class ClientSmokeTest {
                 && Math.abs(box.getYsize() - 4.0) < 0.01 && Math.abs(box.getZsize() - Senkaimon.THICKNESS) < 0.01;
     }
 
-    /** Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of an open gap. */
+    /**
+     * Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of the gap, and the
+     * gate house in it, a plaster pier against each side and its doorway open between dark posts.
+     */
     private static boolean wallStands(ClientLevel level) {
+        Block sekkiseki = ModBlocks.SEKKISEKI.get(), plaster = ModBlocks.WHITE_PLASTER.get();
+        List<BlockPos> at = wallPlaces();
+        // Each pair lies in one chunk, so the block beside the air shows that the air was sent, not missing.
+        return level.getBlockState(at.get(0)).is(sekkiseki) && level.getBlockState(at.get(1)).is(plaster)
+                && level.getBlockState(at.get(2)).is(sekkiseki) && level.getBlockState(at.get(3)).is(plaster)
+                && level.getBlockState(at.get(4)).is(Blocks.STRIPPED_DARK_OAK_LOG) && level.getBlockState(at.get(5)).isAir()
+                && level.getBlockState(at.get(6)).is(sekkiseki) && level.getBlockState(at.get(7)).isAir();
+    }
+
+    /**
+     * The blocks {@link #wallStands} reads, in pairs: the wall and the pier at each side of the south gap, the doorway's
+     * east post and the air inside it, and the wall's top block east of the gap and the air over it.
+     */
+    private static List<BlockPos> wallPlaces() {
         int z = SeireiteiPlan.SEIREITEI_RADIUS, w = SeireiteiPlan.GATE_HALF_WIDTH, top = SeireiteiPlan.WALL_TOP_Y;
-        Block sekkiseki = ModBlocks.SEKKISEKI.get();
-        // Each pair lies in one chunk, so the Sekkiseki shows that the air beside it was sent, not missing.
-        return level.getBlockState(new BlockPos(w, 90, z)).is(sekkiseki)
-                && level.getBlockState(new BlockPos(w - 1, 90, z)).isAir()
-                && level.getBlockState(new BlockPos(-w - 1, 90, z)).is(sekkiseki)
-                && level.getBlockState(new BlockPos(-w, 90, z)).isAir()
-                && level.getBlockState(new BlockPos(16, top - 1, z)).is(sekkiseki)
-                && level.getBlockState(new BlockPos(16, top, z)).isAir();
+        int door = SeireiteiPlan.GATE_DOOR_HALF_WIDTH;
+        return List.of(new BlockPos(w, 90, z), new BlockPos(w - 1, 90, z), new BlockPos(-w - 1, 90, z),
+                new BlockPos(-w, 90, z), new BlockPos(door, 90, z), new BlockPos(door - 1, 90, z),
+                new BlockPos(16, top - 1, z), new BlockPos(16, top, z));
+    }
+
+    /** What the client holds at each place {@link #wallStands} reads, or that its chunk has not come, for a failure. */
+    private static String wallSeen(ClientLevel level) {
+        return wallPlaces().stream().map(pos -> pos.toShortString() + " " + (level.hasChunkAt(pos)
+                ? BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()) : "unloaded"))
+                .collect(Collectors.joining(", "));
     }
 
     /** Whether the player stands on Seireitei's lawn at y 72, where {@link #LAWN_TP} sets it. */
@@ -2635,9 +2657,9 @@ public final class ClientSmokeTest {
 
     /**
      * Holds (or lets go of) the arrival chunks in Soul Society, the Senkaimon court's, the lawn spot's and the Academy's,
-     * on the integrated server with a forced ticket each, which generates them in the background, as the forceload
-     * command would not. The Academy's landing lies in its hall's chunk, and a ticket reaches a chunk each way, so the
-     * gate's is held too.
+     * and the south gap's whose wall and gate house the lawn's wall check reads, on the integrated server with a forced
+     * ticket each, which generates them in the background, as the forceload command would not. A ticket reaches a chunk
+     * each way, so the Academy's gate and both sides of the gap are held too.
      */
     private static void holdArrival(Minecraft minecraft, boolean hold) {
         MinecraftServer server = minecraft.getSingleplayerServer();
@@ -2646,6 +2668,7 @@ public final class ClientSmokeTest {
         }
         List<ChunkPos> chunks = List.of(new ChunkPos(BlockPos.containing(TravelLogic.COURT)),
                 new ChunkPos(BlockPos.containing(SOUL_SOCIETY_X, SeireiteiPlan.PLATEAU_Y, SOUL_SOCIETY_Z)),
+                new ChunkPos(new BlockPos(0, SeireiteiPlan.PLATEAU_Y, SeireiteiPlan.SEIREITEI_RADIUS)),
                 new ChunkPos(BlockPos.containing(SeireiteiPlan.ACADEMY_LANDING_X, SeireiteiPlan.ACADEMY_FLOOR_Y,
                         SeireiteiPlan.ACADEMY_LANDING_Z)));
         server.execute(() -> {
