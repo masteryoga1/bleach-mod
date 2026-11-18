@@ -67,6 +67,8 @@ public final class SiteTests {
             ResourceKey.create(Registries.STRUCTURE_SET, BleachMod.id("seireitei_academy"));
     /** The chunk the plan's Academy starts in, the one holding its corner. */
     private static final ChunkPos HOME = new ChunkPos(-12, 14);
+    /** The chunk the plan's yard of training dummies starts in, the one academy site but the hall's near it. */
+    private static final ChunkPos YARD = new ChunkPos(-14, 15);
     /** Where the Academy's template is set from: its corner, on the lawn. */
     private static final BlockPos CORNER = new BlockPos(-192, 72, 224);
     /** The Academy's box: its template, 15 by 9 by 17, turned clockwise about the corner. */
@@ -171,7 +173,8 @@ public final class SiteTests {
 
     /**
      * Test A. The Academy's set is placed by the plan: it may stand in Soul Society and not in the Overworld, it starts
-     * in the one chunk the plan names and in none about it, and the plan's one Academy is the template turned clockwise.
+     * in the chunks the plan names, the hall's and its yard's about it, and the plan's first academy site is the hall's
+     * template turned clockwise.
      */
     @GameTest(template = "empty", batch = "site")
     public static void siteChunksFollowThePlan(GameTestHelper helper) {
@@ -192,14 +195,14 @@ public final class SiteTests {
         for (int x = HOME.x - 2; x <= HOME.x + 2; x++) {
             for (int z = HOME.z - 2; z <= HOME.z + 2; z++) {
                 boolean starts = placement.isStructureChunk(state, x, z);
-                helper.assertTrue(starts == (x == HOME.x && z == HOME.z),
+                helper.assertTrue(starts == (x == HOME.x && z == HOME.z || x == YARD.x && z == YARD.z),
                         "chunk (" + x + ", " + z + ") is " + (starts ? "" : "not ") + "where the Academy starts");
             }
         }
         helper.assertFalse(placement.isStructureChunk(state, 0, 0), "the Academy starts in the centre column's chunk");
 
         List<SeireiteiPlan.Site> sites = SeireiteiPlan.sites("academy");
-        helper.assertTrue(sites.size() == 1, "the plan's academy group has " + sites.size() + " sites, not one");
+        helper.assertTrue(sites.size() == 4, "the plan's academy group has " + sites.size() + " sites, not four");
         SeireiteiPlan.Site site = sites.get(0);
         helper.assertTrue(site.rotation() == Rotation.CLOCKWISE_90 && site.template().equals(BleachMod.id("academy/academy"))
                 && site.chunk().equals(HOME), "the plan's Academy is " + site);

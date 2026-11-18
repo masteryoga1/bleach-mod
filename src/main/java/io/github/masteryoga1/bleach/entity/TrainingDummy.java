@@ -1,6 +1,9 @@
 package io.github.masteryoga1.bleach.entity;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.damagesource.DamageSource;
@@ -18,11 +21,14 @@ import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * A straw training dummy for the Academy's students: a blow lands on it, and trains as {@link
+ * A straw training dummy of the Academy's grounds: a blow lands on it, and trains as {@link
  * io.github.masteryoga1.bleach.soul.SoulEvents} says, but its health never falls; it never moves, turns or rides, and
  * no creature takes it for a foe. Only {@code /kill} and the void take it away, with no death.
  */
 public class TrainingDummy extends LivingEntity {
+    /** A template's dummy carries this: it takes its UUID from where it stands, so a second set there is refused. */
+    private static final String SPOT = "Spot";
+
     public TrainingDummy(EntityType<? extends TrainingDummy> type, Level level) {
         super(type, level);
     }
@@ -50,6 +56,16 @@ public class TrainingDummy extends LivingEntity {
     @Override
     protected void onBelowWorld() {
         discard();
+    }
+
+    /** A template's dummy takes its UUID from its world and block; one read back from its save keeps the saved one. */
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        if (tag.getBoolean(SPOT)) {
+            setUUID(UUID.nameUUIDFromBytes((level().dimension().location() + "@" + blockPosition().asLong())
+                    .getBytes(StandardCharsets.UTF_8)));
+        }
     }
 
     /** It never moves: no step, fall, knockback, blast, push or current carries it, though it pushes back. */
@@ -81,7 +97,7 @@ public class TrainingDummy extends LivingEntity {
         return false;
     }
 
-    /** Body and head always face where it was set, as an armour stand's do. */
+    /** Body and head always face where it was set, so a turned template turns all of it, as an armour stand does. */
     @Override
     protected float tickHeadTurn(float bodyTarget, float walked) {
         yBodyRotO = yHeadRotO = yRotO;

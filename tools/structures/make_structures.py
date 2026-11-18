@@ -452,6 +452,81 @@ def barracks(number):
     return t
 
 
+# The Academy's grounds, set on the lawn where SeireiteiPlan.java's academy rows put them. A dummy faces the way given,
+# in the game's degrees (0 south, 90 west, 180 north, 270 east), before its site's turn.
+SLAB_STEP = dict(block="minecraft:stone_brick_slab", type="bottom", waterlogged="false")
+
+
+def dummy(t, x, z, facing, y=1):
+    """A training dummy on its post of dark oak at (x, y - 1, z). Spot tells it to take its UUID from where it stands."""
+    t.set(x, y - 1, z, "minecraft:stripped_dark_oak_log", axis="y")
+    t.add_entity(x + 0.5, float(y), z + 0.5, id=string("bleach:training_dummy"), Rotation=floats(float(facing), 0.0),
+                 Spot=byte(1))
+
+
+def lamp(t, x, z, y=1):
+    """A stone lantern: a lantern on a post of stone brick wall."""
+    t.set(x, y, z, "minecraft:stone_brick_wall", east="none", north="none", south="none", up="true",
+          waterlogged="false", west="none")
+    t.set(x, y + 1, z, "minecraft:lantern", hanging="false", waterlogged="false")
+
+
+def dojo():
+    """
+    The dojo west of the hall: a building of the Academy's kind with a step before the door in each long side, and a
+    training dummy in each end bay, facing the middle once the site is turned.
+    """
+    t = Template(21, 10, 15)
+    hall(t, 1, 1, 19, 13, 4, (5, 15))
+    for z in (0, 14):
+        t.set(10, 0, z, **SLAB_STEP)
+    dummy(t, 4, 7, 270)
+    dummy(t, 16, 7, 90)
+    join_panes(t)
+    return t
+
+
+def yard():
+    """
+    The yard south of the hall: calcite on the lawn with a step of slabs along its north edge, the side the hall is on, a
+    stone path down its middle, a stone lantern at each corner and eight training dummies in two rows, facing north.
+    """
+    t = Template(24, 5, 16)
+    t.fill(0, 0, 0, 23, 0, 0, **SLAB_STEP)
+    t.fill(0, 0, 1, 23, 0, 15, "minecraft:calcite")
+    t.fill(11, 0, 1, 12, 0, 15, "minecraft:stone_bricks")
+    for x in (0, 23):
+        for z in (1, 15):
+            lamp(t, x, z)
+    for x in (5, 9, 14, 18):
+        for z in (5, 10):
+            dummy(t, x, z, 180)
+    return t
+
+
+def kido_range():
+    """
+    The Kidō range west of the yard, unturned: a platform of dark oak at its east end with a lantern at each outer
+    corner, two dummies on the lawn 5 and 10 blocks out between plaster walls, and 19 out a backstop of mud brick with a
+    target for each of three lanes.
+    """
+    t = Template(26, 8, 15)
+    t.fill(0, 0, 0, 1, 6, 14, "minecraft:mud_bricks")
+    t.fill(0, 7, 0, 1, 7, 14, "bleach:roof_tile_slab", type="bottom", waterlogged="false")
+    for z in (2, 7, 12):
+        t.set(1, 2, z, "minecraft:target", power="0")
+    for y, block in enumerate(("bleach:black_plaster", "bleach:white_plaster", "bleach:white_plaster",
+                               "bleach:roof_tiles")):
+        for z in (0, 14):
+            t.fill(2, y, z, 20, y, z, block)
+    t.fill(21, 0, 0, 25, 0, 14, "minecraft:dark_oak_slab", type="bottom", waterlogged="false")
+    for z in (0, 14):
+        lamp(t, 25, z, 0)
+    dummy(t, 16, 4, 270)
+    dummy(t, 11, 10, 270)
+    return t
+
+
 # Sōkyoku Hill's works, as SeireiteiPlan.java's hill row has them: one template at the corner (111, 72, 5), turned
 # CLOCKWISE_180, so world x = 111 - template x and world z = 5 - template z; the hill's cliff at radius 64, its top at 136.
 HILL_CORNER, HILL_SIZE = (111, 5), (53, 95, 12)
@@ -668,6 +743,9 @@ def cavern():
 
 TEMPLATES = {
     "academy/academy.nbt": academy,
+    "academy/dojo.nbt": dojo,
+    "academy/range.nbt": kido_range,
+    "academy/yard.nbt": yard,
     "field.nbt": field,
     "gate/house.nbt": gate_house,
     "hill/cave.nbt": cave,
