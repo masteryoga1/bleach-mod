@@ -175,7 +175,8 @@ public final class GateKeeperTests {
 
     /**
      * Who may pass a gate, for each soul the mod knows, under the default config, which allows no Quincy hybrid: those it
-     * bars are told why, and a Hollow player passes in creative or spectator but not in survival.
+     * bars are told why, only the living being told they live, and a Hollow player passes in creative or spectator but
+     * not in survival.
      */
     @GameTest(template = "empty")
     public static void whoMayPassAGate(GameTestHelper helper) {
@@ -188,7 +189,9 @@ public final class GateKeeperTests {
         Map<String, SoulData> pass = Map.of("a Shinigami", ShinigamiTests.soul(SoulState.SHINIGAMI, 400.0F),
                 "a Substitute", ShinigamiTests.substitute(200.0F), "a Visored, unmasked", visored,
                 "a Rukongai soul", ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F),
-                "a student", ShinigamiTests.student(60.0F));
+                "a student", ShinigamiTests.student(60.0F),
+                // However little its power: the Academy takes any Rukongai soul but an awakened Quincy.
+                "a weak Rukongai soul", ShinigamiTests.soul(SoulState.RUKONGAI, 1.0F));
         Map<String, SoulData> barred = Map.of("a Human", ShinigamiTests.soul(SoulState.HUMAN, 20.0F),
                 "a Plus", ShinigamiTests.soul(SoulState.PLUS, 20.0F),
                 "a Quincy", QuincyTests.quincy(Bloodline.GEMISCHT, 1, 200.0F), "a Rukongai Quincy", rukongaiQuincy,
@@ -203,6 +206,10 @@ public final class GateKeeperTests {
                         && GateLogic.barredKey(barred.get("a Hollow")).equals("message.bleach.gate.barred.hollow")
                         && GateLogic.barredKey(masked).equals("message.bleach.gate.barred.hollow"),
                 "a barred soul is told the wrong reason");
+        // So no soul that has died is told the gate will not open to the living.
+        barred.forEach((who, data) -> helper.assertTrue(!data.state().isSpirit()
+                        || !GateLogic.barredKey(data).equals("message.bleach.gate.barred.living"),
+                who + ", who has died, is told the gate will not open to the living"));
         Player hollow = helper.makeMockPlayer(GameType.SURVIVAL);
         hollow.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.HOLLOW, 200.0F));
         Player creative = helper.makeMockPlayer(GameType.CREATIVE), spectator = helper.makeMockPlayer(GameType.SPECTATOR);

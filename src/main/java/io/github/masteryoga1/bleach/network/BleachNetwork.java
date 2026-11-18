@@ -35,8 +35,9 @@ public final class BleachNetwork {
      * 20: the Gate key.
      * 21: {@code NpcAction.BUTTERFLY}, the instructor's Jigokuchō, and academy_pos gone from ShinigamiProgress.
      * 22: the gatekeepers' dialogue views, and the passes won from them in ShinigamiProgress.
+     * 23: the duty Shinigami's HOMEWARD view.
      */
-    private static final String VERSION = "22";
+    private static final String VERSION = "23";
 
     private BleachNetwork() {
     }

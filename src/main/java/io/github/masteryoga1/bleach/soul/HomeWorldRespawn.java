@@ -1,13 +1,16 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.Rukongai;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
@@ -22,9 +25,14 @@ import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
  * Where a soul with no spawn of its own wakes when it dies: one that has passed on at its Rukongai home, a student at the
  * Academy, a Shinigami at Soul Society's Senkaimon court, a Menos Grande or an Arrancar in Hueco Mundo, and anyone else
  * where vanilla puts it. A bed or anchor of its own still wins. Only while the server's
- * {@code [soul_society] home_world_respawn} is on.
+ * {@code [soul_society] home_world_respawn} is on; a soul that has passed on and lingers in the Human World is sent to
+ * the same home by the Shinigami on duty (see {@link #sendHome}).
  */
 public final class HomeWorldRespawn {
+    /** What a soul the Shinigami on duty sends home is told there: its Rukongai home's name, or the Academy's gates. */
+    public static final String SENT_HOME_KEY = "message.bleach.duty_sent_home";
+    public static final String SENT_HOME_ACADEMY_KEY = "message.bleach.duty_sent_home.academy";
+
     /** Where a soul wakes, with what it is told there; {@link #VANILLA} leaves the respawn as it is. */
     public enum Home {
         RUKONGAI("message.bleach.respawn.rukongai"),
@@ -67,6 +75,51 @@ public final class HomeWorldRespawn {
             case ARRANCAR -> Home.HUECO_MUNDO;
             default -> Home.VANILLA;
         };
+    }
+
+    /**
+     * A soul's home in Soul Society if it has passed on, the Rukongai or the Academy, read as {@link #homeOf} reads it for
+     * a soul with no spawn of its own; null for any other soul.
+     */
+    @Nullable
+    public static Home passedOnHome(SoulData data) {
+        Home home = homeOf(data, false);
+        return home == Home.RUKONGAI || home == Home.ACADEMY ? home : null;
+    }
+
+    /**
+     * Sends a soul that has passed on home, alive and as it is, its own spawn kept, to where it would wake with none, and
+     * tells it why; one no home there will hold, or whose change of world is refused, stays and is told so.
+     *
+     * @return whether it was moved
+     */
+    public static boolean sendHome(ServerPlayer soul) {
+        Home home = passedOnHome(SoulLogic.get(soul));
+        if (home == null) {
+            return false;
+        }
+        ServerLevel world = BleachWorlds.level(soul.server, BleachWorlds.SOUL_SOCIETY);
+        Vec3 spot = world == null ? null
+                : home == Home.RUKONGAI ? RukongaiEvents.home(soul, world) : AcademyLocator.landing(soul, world);
+        if (spot != null) {
+            // Gone in the motes of a passing, riders set down; the command's teleport takes it off its mount and wakes it.
+            ShinigamiNpc.showPassage(soul.serverLevel(), soul.getX(), soul.getY(), soul.getZ());
+            soul.ejectPassengers();
+            soul.teleportTo(world, spot.x, spot.y, spot.z, Set.of(),
+                    home == Home.RUKONGAI ? RukongaiEvents.facingSeireitei(spot) : AcademyLocator.LANDING_YAW, 0.0F);
+        }
+        // Another mod may refuse the change of world.
+        if (spot == null || soul.level() != world) {
+            soul.sendSystemMessage(Component.translatable("message.bleach.konso.no_academy")
+                    .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+            return false;
+        }
+        soul.resetFallDistance();
+        MutableComponent told = home == Home.RUKONGAI
+                ? Component.translatable(SENT_HOME_KEY, Rukongai.placeName(Mth.floor(spot.x), Mth.floor(spot.z)))
+                : Component.translatable(SENT_HOME_ACADEMY_KEY);
+        soul.sendSystemMessage(told.withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        return true;
     }
 
     /** Whether the blow that killed this Hollow purifies it, so it comes back a soul (see {@link HollowBody#afterDeath}). */

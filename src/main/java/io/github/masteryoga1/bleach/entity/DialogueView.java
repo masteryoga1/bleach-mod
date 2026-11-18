@@ -68,7 +68,9 @@ public enum DialogueView {
     /** A gatekeeper is beaten and fights no one, from his yield until he is whole. */
     KEEPER_BEATEN,
     /** A gatekeeper fights this soul, which may pass, for its blow, until it leaves his ground. */
-    KEEPER_FOE;
+    KEEPER_FOE,
+    /** A Shinigami on duty tells the soul it came for, which has passed on, to stay near and be sent home, or walk off. */
+    HOMEWARD;
 
     private static final IntFunction<DialogueView> BY_ID =
             ByIdMap.continuous(DialogueView::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);
