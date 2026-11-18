@@ -8,8 +8,8 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * Where a soul stands on the road to becoming a Shinigami: Academy enrolment, the Asauchi it was
  * issued, power lent to or taken from a Shinigami, Konsō performed, the Hollow a Visored carries
- * inside, and its Kidō. Saved with the soul and sent to its owner's client. Times are game times in ticks;
- * {@link #NEVER} means it never happened.
+ * inside, its Kidō, and the passes it won from the gates' keepers. Saved with the soul and sent to its owner's client.
+ * Times are game times in ticks; {@link #NEVER} means it never happened.
  *
  * @param enrolled        whether a Rukongai soul is studying at the Academy
  * @param asauchiIssuedAt when the Academy last handed this soul an Asauchi
@@ -22,20 +22,21 @@ import net.minecraft.resources.ResourceLocation;
  * @param visored         the Hollow that took root in this soul's wounds, the fights with it and its mask (see
  *                        {@link VisoredLogic}); it belongs to the soul's Shinigami power, so it is kept here
  * @param kido            the Kidō spell this soul chose and the day of its last lesson (see {@link KidoLogic})
+ * @param gates           the game time each gate's pass won from its keeper lapses (see {@link GateLogic#holdsPass})
  */
 public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long powerLentUntil, float lentReiryoku,
                                 long gavePowerAt, long woundedMetAt, long konsoDay, int konsoRewards,
-                                Visored visored, Kido kido) {
+                                Visored visored, Kido kido, Gates gates) {
     /** Far enough in the past that {@code now - NEVER} cannot overflow. */
     public static final long NEVER = Long.MIN_VALUE / 2;
 
     public static final ShinigamiProgress NONE =
-            new ShinigamiProgress(false, NEVER, 0L, 0.0F, NEVER, NEVER, -1L, 0, Visored.NONE, Kido.NONE);
+            new ShinigamiProgress(false, NEVER, 0L, 0.0F, NEVER, NEVER, -1L, 0, Visored.NONE, Kido.NONE, Gates.NONE);
 
     // Every field is read leniently, so one bad value falls back to its default on its own, a save from before
     // the Visored has no "visored" at all and reads as having no Hollow inside, and a save from before Kidō has no
     // "kido" and reads as no spell chosen and no lesson given. A save from before 7d3 holds an "academy_pos", which is
-    // read past.
+    // read past, and a save from before the gates' passes has no "gates" and holds none.
     public static final Codec<ShinigamiProgress> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.lenientOptionalFieldOf("enrolled", false).forGetter(ShinigamiProgress::enrolled),
             Codec.LONG.lenientOptionalFieldOf("asauchi_issued_at", NEVER).forGetter(ShinigamiProgress::asauchiIssuedAt),
@@ -46,70 +47,77 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
             Codec.LONG.lenientOptionalFieldOf("konso_day", -1L).forGetter(ShinigamiProgress::konsoDay),
             Codec.INT.lenientOptionalFieldOf("konso_rewards", 0).forGetter(ShinigamiProgress::konsoRewards),
             Visored.CODEC.lenientOptionalFieldOf("visored", Visored.NONE).forGetter(ShinigamiProgress::visored),
-            Kido.CODEC.lenientOptionalFieldOf("kido", Kido.NONE).forGetter(ShinigamiProgress::kido)
+            Kido.CODEC.lenientOptionalFieldOf("kido", Kido.NONE).forGetter(ShinigamiProgress::kido),
+            Gates.CODEC.lenientOptionalFieldOf("gates", Gates.NONE).forGetter(ShinigamiProgress::gates)
     ).apply(instance, ShinigamiProgress::new));
 
-    /** A missing Visored record is no Hollow inside, and a missing Kidō record no spell chosen. */
+    /** A missing Visored record is no Hollow inside, a missing Kidō record no spell chosen, and missing passes none. */
     public ShinigamiProgress {
         visored = visored == null ? Visored.NONE : visored;
         kido = kido == null ? Kido.NONE : kido;
+        gates = gates == null ? Gates.NONE : gates;
     }
 
-    /** The record of 5i, less the Academy it once remembered, with no Hollow inside and no Kidō spell chosen. */
+    /** The record of 5i, less the Academy it once remembered, with no Hollow inside, no Kidō spell chosen and no pass. */
     public ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long powerLentUntil, float lentReiryoku,
                              long gavePowerAt, long woundedMetAt, long konsoDay, int konsoRewards) {
         this(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt, woundedMetAt, konsoDay,
-                konsoRewards, Visored.NONE, Kido.NONE);
+                konsoRewards, Visored.NONE, Kido.NONE, Gates.NONE);
     }
 
     public ShinigamiProgress withEnrolled(boolean value) {
         return new ShinigamiProgress(value, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, visored, kido);
+                woundedMetAt, konsoDay, konsoRewards, visored, kido, gates);
     }
 
     public ShinigamiProgress withAsauchiIssuedAt(long value) {
         return new ShinigamiProgress(enrolled, value, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, visored, kido);
+                woundedMetAt, konsoDay, konsoRewards, visored, kido, gates);
     }
 
     public ShinigamiProgress withPowerLentUntil(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, value, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, visored, kido);
+                woundedMetAt, konsoDay, konsoRewards, visored, kido, gates);
     }
 
     public ShinigamiProgress withLentReiryoku(float value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, value, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, visored, kido);
+                woundedMetAt, konsoDay, konsoRewards, visored, kido, gates);
     }
 
     public ShinigamiProgress withGavePowerAt(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, value,
-                woundedMetAt, konsoDay, konsoRewards, visored, kido);
+                woundedMetAt, konsoDay, konsoRewards, visored, kido, gates);
     }
 
     public ShinigamiProgress withWoundedMetAt(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                value, konsoDay, konsoRewards, visored, kido);
+                value, konsoDay, konsoRewards, visored, kido, gates);
     }
 
     public ShinigamiProgress withKonsoDay(long value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, value, konsoRewards, visored, kido);
+                woundedMetAt, value, konsoRewards, visored, kido, gates);
     }
 
     public ShinigamiProgress withKonsoRewards(int value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, value, visored, kido);
+                woundedMetAt, konsoDay, value, visored, kido, gates);
     }
 
     public ShinigamiProgress withVisored(Visored value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, value, kido);
+                woundedMetAt, konsoDay, konsoRewards, value, kido, gates);
     }
 
     public ShinigamiProgress withKido(Kido value) {
         return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
-                woundedMetAt, konsoDay, konsoRewards, visored, value);
+                woundedMetAt, konsoDay, konsoRewards, visored, value, gates);
+    }
+
+    public ShinigamiProgress withGates(Gates value) {
+        return new ShinigamiProgress(enrolled, asauchiIssuedAt, powerLentUntil, lentReiryoku, gavePowerAt,
+                woundedMetAt, konsoDay, konsoRewards, visored, kido, value);
     }
 
     /**
@@ -261,6 +269,38 @@ public record ShinigamiProgress(boolean enrolled, long asauchiIssuedAt, long pow
 
         public Kido withLessonDay(long value) {
             return new Kido(chosen, value);
+        }
+    }
+
+    /**
+     * The passes this soul won from the gates' keepers: for each gate, in the plan's order, the game time its pass lapses,
+     * or {@link ShinigamiProgress#NEVER} for none. Read leniently gate by gate, so a missing or damaged entry is no pass.
+     */
+    public record Gates(long shoryumon, long shuwaimon, long hakutomon, long kokuryomon) {
+        public static final Gates NONE = new Gates(NEVER, NEVER, NEVER, NEVER);
+
+        public static final Codec<Gates> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.LONG.lenientOptionalFieldOf("shoryumon", NEVER).forGetter(Gates::shoryumon),
+                Codec.LONG.lenientOptionalFieldOf("shuwaimon", NEVER).forGetter(Gates::shuwaimon),
+                Codec.LONG.lenientOptionalFieldOf("hakutomon", NEVER).forGetter(Gates::hakutomon),
+                Codec.LONG.lenientOptionalFieldOf("kokuryomon", NEVER).forGetter(Gates::kokuryomon)
+        ).apply(instance, Gates::new));
+
+        /** When this gate's pass lapses (0 to 3, in the plan's order), or {@code NEVER}, for any other number too. */
+        public long until(int gate) {
+            return switch (gate) {
+                case 0 -> shoryumon;
+                case 1 -> shuwaimon;
+                case 2 -> hakutomon;
+                case 3 -> kokuryomon;
+                default -> NEVER;
+            };
+        }
+
+        /** These passes with this gate's lapsing then: one entry a gate, so a second win there renews the first. */
+        public Gates withUntil(int gate, long value) {
+            return new Gates(gate == 0 ? value : shoryumon, gate == 1 ? value : shuwaimon,
+                    gate == 2 ? value : hakutomon, gate == 3 ? value : kokuryomon);
         }
     }
 }

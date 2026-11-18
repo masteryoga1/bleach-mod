@@ -1,14 +1,20 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
+import io.github.masteryoga1.bleach.network.OpenDialoguePayload;
+import io.github.masteryoga1.bleach.network.SyncSoulPayload;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.soul.GateLogic;
+import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShakonmakuEvents;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.GateState;
@@ -23,6 +29,9 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestSequence;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -51,13 +60,13 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the gatekeepers and the gates' rule in the real Soul Society: the keepers' batch works one gate a test, as
- * the digging batch does, and every test that works a keeper sends it away at its end, so a later batch finds each
- * gate's keeper whole at its post, made again with the same UUID.
+ * the digging and pass batches do, and every test that works a keeper sends it away at its end, so a later batch finds
+ * each gate's keeper whole at its post, made again with the same UUID.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class GateKeeperTests {
-    private static final String BATCH = "gate_keeper", DIG = "gate_dig";
+    private static final String BATCH = "gate_keeper", DIG = "gate_dig", PASS = "gate_pass";
     private static final int EAST = 0, SOUTH = 1, WEST = 2, NORTH = 3;
 
     private GateKeeperTests() {
@@ -117,6 +126,38 @@ public final class GateKeeperTests {
         CompoundTag saved = keeper.saveWithoutId(new CompoundTag());
         saved.putLong("BeatenAt", keeper.level().getGameTime() - ticks);
         keeper.load(saved);
+    }
+
+    /** This soul, given this gate's pass as if won from its keeper at this game time. */
+    static SoulData holding(SoulData data, int gate, long wonAt) {
+        GateLogic.grantPass(data, gate, wonAt);
+        return data;
+    }
+
+    /** When this joined soul's pass at this gate lapses, or never. */
+    private static long passUntil(ServerPlayer player, int gate) {
+        return SoulLogic.get(player).shinigami().gates().until(gate);
+    }
+
+    /** Uses this keeper or its part with the main hand: the view of the one dialogue he opened for it, or null for none. */
+    private static DialogueView talk(ServerPlayer player, GateKeeper keeper, Entity used) {
+        int before = TestPlayers.dialogues(player).size();
+        InteractionResult result = used.interact(player, InteractionHand.MAIN_HAND);
+        List<OpenDialoguePayload> all = TestPlayers.dialogues(player);
+        return result == InteractionResult.SUCCESS && all.size() == before + 1
+                && all.get(before).entityId() == keeper.getId() ? all.get(before).view() : null;
+    }
+
+    /** The key of the first note of the last dialogue this joined soul was opened, or "none". */
+    private static String noteKey(ServerPlayer player) {
+        List<OpenDialoguePayload> all = TestPlayers.dialogues(player);
+        List<Component> notes = all.isEmpty() ? List.of() : all.get(all.size() - 1).notes();
+        return !notes.isEmpty() && notes.get(0).getContents() instanceof TranslatableContents words ? words.getKey() : "none";
+    }
+
+    /** A soul as read back from this saved tag. */
+    private static SoulData read(CompoundTag saved) {
+        return SoulData.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow();
     }
 
     // ---- The rule ----
@@ -490,6 +531,261 @@ public final class GateKeeperTests {
 
     private static boolean near(double value, double expected) {
         return Math.abs(value - expected) < 1.0E-3;
+    }
+
+    // ---- The keepers' words and the winner's pass ----
+
+    /**
+     * What Hakutōmon's keeper says, by the soul and by his state: who may pass is let by, the barred are barred whatever
+     * pass they hold elsewhere, lapsed or looking a Hollow; a winner is greeted, whole or beaten; and a soul that may pass
+     * and is fought for its blow is told the fight ends off his ground.
+     */
+    @GameTest(template = "empty")
+    public static void whatAKeeperSays(GameTestHelper helper) {
+        long now = 1_000_000L;
+        SoulData shinigami = ShinigamiTests.soul(SoulState.SHINIGAMI, 400.0F);
+        SoulData hollow = ShinigamiTests.soul(SoulState.HOLLOW, 200.0F);
+        SoulData quincy = QuincyTests.quincy(Bloodline.GEMISCHT, 1, 200.0F), winner = holding(quincy.copy(), WEST, now);
+        DialogueView open = DialogueView.KEEPER_OPEN, barred = DialogueView.KEEPER_BARRED, won = DialogueView.KEEPER_WON;
+        DialogueView kneels = DialogueView.KEEPER_BEATEN, foe = DialogueView.KEEPER_FOE;
+        record Said(String who, SoulData data, boolean beaten, boolean fought, DialogueView view) {
+        }
+        List<Said> said = List.of(new Said("a Shinigami", shinigami, false, false, open),
+                new Said("a Rukongai soul", ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F), false, false, open),
+                new Said("a Human", ShinigamiTests.soul(SoulState.HUMAN, 200.0F), false, false, barred),
+                new Said("a Plus", ShinigamiTests.soul(SoulState.PLUS, 20.0F), false, false, barred),
+                new Said("a Quincy", quincy, false, false, barred), new Said("a Hollow", hollow, false, false, barred),
+                new Said("the winner", winner, false, false, won),
+                new Said("a Shinigami with the pass", holding(shinigami.copy(), WEST, now), false, false, won),
+                new Said("a Quincy with Shōryūmon's pass", holding(quincy.copy(), EAST, now), false, false, barred),
+                new Said("a Quincy whose pass lapsed", holding(quincy.copy(), WEST, now - GateLogic.PASS_TICKS), false, false,
+                        barred),
+                new Said("a Hollow with the pass", holding(hollow.copy(), WEST, now), false, false, barred),
+                new Said("a Shinigami, he beaten", shinigami, true, false, kneels),
+                new Said("a Quincy, he beaten", quincy, true, false, kneels),
+                new Said("the winner, he beaten", winner, true, false, won),
+                new Said("a Shinigami fought", shinigami, false, true, foe),
+                new Said("the winner fought", winner, false, true, foe),
+                new Said("a Quincy fought", quincy, false, true, barred));
+        for (Said each : said) {
+            DialogueView view = GateKeeper.viewFor(each.data(), true, WEST, now, each.beaten(), each.fought());
+            helper.assertTrue(view == each.view(), each.who() + " is told " + view + ", not " + each.view());
+        }
+        helper.assertTrue(GateKeeper.viewFor(hollow, false, WEST, now, false, false) == open,
+                "a Hollow in creative is barred");
+        helper.succeed();
+    }
+
+    /**
+     * A pass won at Hakutōmon lets a Quincy by there for a game day and nowhere else, renews on a second win, is of no use
+     * to a soul that looks a Hollow, saves, goes to its owner's client and outlives death; a damaged or missing entry is
+     * none, and the rest of the soul still reads.
+     */
+    @GameTest(template = "empty")
+    public static void aPassHoldsAtItsGateForADay(GameTestHelper helper) {
+        long now = 1_000_000L, day = GateLogic.PASS_TICKS;
+        SoulData none = QuincyTests.quincy(Bloodline.GEMISCHT, 1, 200.0F), quincy = holding(none.copy(), WEST, now);
+        helper.assertTrue(GateLogic.mayPass(quincy, WEST, now) && GateLogic.mayPass(quincy, WEST, now + day - 1)
+                        && !GateLogic.mayPass(quincy, WEST, now + day) && !GateLogic.mayPass(quincy, WEST, now - day - 1),
+                "the pass does not hold for a day from its win");
+        helper.assertTrue(!GateLogic.mayPass(quincy, EAST, now) && !GateLogic.mayPass(quincy, -1, now)
+                        && !GateLogic.mayPass(quincy) && !GateLogic.mayPass(none, WEST, now),
+                "the pass opens another gate, or a Quincy with none passes");
+        holding(holding(quincy, WEST, now + 100), EAST, now);
+        ShinigamiProgress.Gates west = ShinigamiProgress.Gates.NONE.withUntil(WEST, now + 100 + day);
+        ShinigamiProgress.Gates gates = west.withUntil(EAST, now + day);
+        helper.assertTrue(quincy.shinigami().gates().equals(gates), "two more wins left " + quincy.shinigami().gates());
+        SoulData masked = ShinigamiTests.soul(SoulState.SHINIGAMI, 400.0F);
+        VisoredLogic.setRecord(masked, VisoredLogic.record(masked).withRootedAt(0L).withSubduedAt(1L)
+                .withMaskEndsAt(Long.MAX_VALUE / 2));
+        Map<String, SoulData> pass = Map.of("an aware Human",
+                holding(ShinigamiTests.soul(SoulState.HUMAN, 200.0F), WEST, now), "a Plus",
+                holding(ShinigamiTests.soul(SoulState.PLUS, 20.0F), WEST, now), "a Rukongai Quincy",
+                holding(QuincyTests.in(SoulState.RUKONGAI, QuincyTests.quincy(Bloodline.GEMISCHT, 1, 50.0F)), WEST, now));
+        Map<String, SoulData> seen = Map.of("a Hollow", holding(ShinigamiTests.soul(SoulState.HOLLOW, 200.0F), WEST, now),
+                "an Arrancar", holding(ShinigamiTests.soul(SoulState.ARRANCAR, 600.0F), WEST, now),
+                "a masked Visored", holding(masked, WEST, now));
+        pass.forEach((who, data) -> helper.assertTrue(GateLogic.mayPass(data, WEST, now), who + " with the pass is barred"));
+        seen.forEach((who, data) -> helper.assertTrue(!GateLogic.mayPass(data, WEST, now)
+                && GateLogic.holdsPass(data, WEST, now), who + " may use its pass, or holds none"));
+        CompoundTag saved = (CompoundTag) SoulData.CODEC.encodeStart(NbtOps.INSTANCE, quincy).getOrThrow();
+        helper.assertTrue(read(saved).shinigami().gates().equals(gates)
+                        && read(SyncSoulPayload.of(quincy).data()).shinigami().gates().equals(gates)
+                        && SoulLogic.afterDeath(quincy).shinigami().gates().equals(gates),
+                "the passes were lost by a save, the owner's copy or a death");
+        ShinigamiProgress one = ShinigamiProgress.NONE.withGates(ShinigamiProgress.Gates.NONE.withUntil(WEST, now));
+        CompoundTag empty = (CompoundTag) ShinigamiProgress.CODEC.encodeStart(NbtOps.INSTANCE, ShinigamiProgress.NONE)
+                .getOrThrow();
+        CompoundTag written = (CompoundTag) ShinigamiProgress.CODEC.encodeStart(NbtOps.INSTANCE, one).getOrThrow();
+        helper.assertTrue(!empty.contains("gates") && written.contains("gates")
+                        && ShinigamiProgress.CODEC.parse(NbtOps.INSTANCE, written).getOrThrow().equals(one),
+                "no pass was written as " + empty + ", and one as " + written);
+        saved.getCompound("shinigami").getCompound("gates").putString("shoryumon", "soon");
+        helper.assertTrue(read(saved).shinigami().gates().equals(west),
+                "a damaged entry read as " + read(saved).shinigami().gates());
+        saved.getCompound("shinigami").putString("gates", "none");
+        SoulData damaged = read(saved);
+        helper.assertTrue(damaged.shinigami().gates().equals(ShinigamiProgress.Gates.NONE) && QuincyLogic.isAwakened(damaged),
+                "a damaged record read as " + damaged.shinigami().gates() + ", or lost the rest of the soul");
+        saved.getCompound("shinigami").remove("gates");
+        helper.assertTrue(read(saved).shinigami().gates().equals(ShinigamiProgress.Gates.NONE),
+                "a save from before the passes holds one");
+        helper.succeed();
+    }
+
+    /**
+     * Hakutōmon's keeper, quiet, yields: every player whose blow landed since he was last whole wins his gate's pass for a
+     * day and is told so, while a soul in creative, one who stood by and one whose blow from the lawn did not land win
+     * nothing, and a soul unaware of him cannot talk to him. Whole again, he lets his winner be and greets it, fights it
+     * once it strikes him, and at his next yield a blow from before he was last whole wins nothing, and a second win renews.
+     */
+    @GameTest(template = "empty", batch = PASS, timeoutTicks = 400)
+    public static void everySoulWhoseBlowLandedWinsTheGate(GameTestHelper helper) {
+        ShakonmakuTests.Cleanup held = GateTests.hold(helper, WEST);
+        sendAway(held, WEST);
+        ServerLevel soul = held.soul;
+        ServerPlayer[] s = new ServerPlayer[6];
+        GateKeeper[] keeper = new GateKeeper[1];
+        long[] won = new long[2];
+        fresh(helper, soul, WEST, keeper, true)
+                .thenExecute(() -> {
+                    s[0] = joined(helper, soul, QuincyTests.quincy(Bloodline.GEMISCHT, 1, 200.0F), v(-521.5, 72.0, 4.5));
+                    s[1] = joined(helper, soul, ShinigamiTests.soul(SoulState.HUMAN, 200.0F), v(-521.5, 72.0, -4.5));
+                    s[2] = joined(helper, soul, QuincyTests.quincy(Bloodline.GEMISCHT, 1, 200.0F), v(-524.5, 72.0, -4.5));
+                    s[3] = joined(helper, soul, QuincyTests.quincy(Bloodline.GEMISCHT, 1, 200.0F), v(-521.5, 72.0, 0.5));
+                    s[3].setGameMode(GameType.CREATIVE);
+                    // On the lawn, off his ground; and a Human unaware of spirits, on it.
+                    s[4] = joined(helper, soul, ShinigamiTests.soul(SoulState.SHINIGAMI, 400.0F), v(-505.5, 72.0, 0.5));
+                    s[5] = joined(helper, soul, ShinigamiTests.soul(SoulState.HUMAN, 1.0F), v(-521.5, 72.0, 8.5));
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    GateKeeper k = keeper[0];
+                    float floor = k.getMaxHealth() * GateKeeper.YIELD_SHARE;
+                    helper.assertTrue(k.dialogueKey().equals("gate_keeper.hakutomon")
+                                    && talk(s[2], k, k) == DialogueView.KEEPER_BARRED
+                                    && noteKey(s[2]).equals("message.bleach.gate.barred.quincy") && talk(s[5], k, k) == null
+                                    && TestPlayers.dialogues(s[5]).isEmpty() && k.getTarget() == null,
+                            "the keeper spoke wrongly to a barred soul or to one unaware of him");
+                    k.setHealth(floor + 20.0F);
+                    for (int striker : new int[] {0, 1, 3}) {
+                        float was = k.getHealth();
+                        k.invulnerableTime = 0;
+                        helper.assertTrue(k.hurt(soul.damageSources().playerAttack(s[striker]), 5.0F) && k.getHealth() < was,
+                                "soul " + striker + "'s blow did not land");
+                    }
+                    helper.assertTrue(!k.hurt(soul.damageSources().playerAttack(s[4]), 5.0F), "a blow from the lawn landed");
+                    k.invulnerableTime = 0;
+                    k.hurt(soul.damageSources().playerAttack(s[1]), 10_000.0F);
+                    won[0] = soul.getGameTime();
+                    GateState.get(soul).drop(soul, WEST);
+                    long until = won[0] + GateLogic.PASS_TICKS;
+                    helper.assertTrue(k.isBeaten() && passUntil(s[0], WEST) == until && passUntil(s[1], WEST) == until
+                                    && SoulLogic.get(s[0]).shinigami().gates()
+                                            .equals(ShinigamiProgress.Gates.NONE.withUntil(WEST, until))
+                                    && TravelTests.lines(s[0], GateKeeper.WON_KEY) == 1
+                                    && TravelTests.lines(s[1], GateKeeper.WON_KEY) == 1,
+                            "the strikers did not win his gate's pass alone, or were not told: " + TravelTests.said(s[0]));
+                    for (int none : new int[] {2, 3, 4}) {
+                        helper.assertTrue(passUntil(s[none], WEST) == ShinigamiProgress.NEVER
+                                && TravelTests.lines(s[none], GateKeeper.WON_KEY) == 0, "soul " + none + " won a pass");
+                    }
+                    helper.assertTrue(TravelTests.lines(s[2], GateKeeper.YIELDS_KEY) == 1 && GateLogic.mayPass(s[0], WEST)
+                                    && !GateLogic.mayPass(s[0], EAST) && talk(s[0], k, k.head()) == DialogueView.KEEPER_WON
+                                    && noteKey(s[0]).equals("screen.bleach.dialogue.note.time_left")
+                                    && talk(s[2], k, k) == DialogueView.KEEPER_BEATEN,
+                            "the winner may not pass his gate alone, or the beaten keeper spoke wrongly");
+                    yieldedAgo(k, GateKeeper.HEAL_TICKS);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(!keeper[0].isBeaten()
+                        && keeper[0].getHealth() == keeper[0].getMaxHealth(), "the keeper is not whole again"))
+                .thenExecute(() -> {
+                    GateKeeper k = keeper[0];
+                    helper.assertTrue(talk(s[0], k, k) == DialogueView.KEEPER_WON && !k.canAttack(s[0]) && k.canAttack(s[2]),
+                            "whole again, the keeper would fight his winner, or let a barred soul be");
+                    k.invulnerableTime = 0;
+                    helper.assertTrue(k.hurt(soul.damageSources().playerAttack(s[0]), 2.0F) && k.canAttack(s[0])
+                            && talk(s[0], k, k) == DialogueView.KEEPER_FOE, "a winner who strikes him is not his foe");
+                    k.setHealth(k.getMaxHealth());
+                })
+                // One look once a second finds him whole and forgets that blow.
+                .thenIdle(21)
+                .thenExecute(() -> {
+                    GateKeeper k = keeper[0];
+                    k.setHealth(k.getMaxHealth() * GateKeeper.YIELD_SHARE + 10.0F);
+                    k.invulnerableTime = 0;
+                    k.hurt(soul.damageSources().playerAttack(s[1]), 5.0F);
+                    k.invulnerableTime = 0;
+                    k.hurt(soul.damageSources().playerAttack(s[2]), 10_000.0F);
+                    won[1] = soul.getGameTime();
+                    GateState.get(soul).drop(soul, WEST);
+                    helper.assertTrue(k.isBeaten() && passUntil(s[1], WEST) == won[1] + GateLogic.PASS_TICKS
+                                    && passUntil(s[2], WEST) == won[1] + GateLogic.PASS_TICKS
+                                    && passUntil(s[0], WEST) == won[0] + GateLogic.PASS_TICKS
+                                    && TravelTests.lines(s[0], GateKeeper.WON_KEY) == 1
+                                    && TravelTests.lines(s[1], GateKeeper.WON_KEY) == 2
+                                    && TravelTests.lines(s[2], GateKeeper.WON_KEY) == 1,
+                            "the second yield's winners are wrong: " + passUntil(s[0], WEST) + ", " + passUntil(s[1], WEST)
+                                    + ", " + passUntil(s[2], WEST));
+                })
+                .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), WEST))
+                .thenSucceed();
+    }
+
+    /**
+     * Shōryūmon's keeper, awake, lets a Quincy holding his gate's pass be on his ground and greets it, and the wicket opens
+     * to its hand and lets it through; holding another gate's pass and this one's lapsed, it is barred again: the open
+     * wicket holds it back, its hand is refused and told why, and the keeper may fight it.
+     */
+    @GameTest(template = "empty", batch = PASS, timeoutTicks = 400)
+    public static void aPassOpensItsOwnGateForADay(GameTestHelper helper) {
+        ShakonmakuTests.Cleanup held = GateTests.hold(helper, EAST);
+        sendAway(held, EAST);
+        ServerLevel soul = held.soul;
+        BlockPos wicket = GateState.wicket(EAST);
+        held.atEnd(() -> GateTests.shut(soul, wicket));
+        // Along the wicket's way as the wicket's test walks it: against the wicket, on his ground, and past it.
+        double x = wicket.getX(), z = wicket.getZ() + 0.6;
+        Vec3 against = new Vec3(x + 1.5, 72.0, z), through = new Vec3(x - 0.5, 72.0, z);
+        BlockHitResult touch = new BlockHitResult(Vec3.atCenterOf(wicket), Direction.EAST, wicket, false);
+        ServerPlayer[] holder = new ServerPlayer[1];
+        GateKeeper[] keeper = new GateKeeper[1];
+        fresh(helper, soul, EAST, keeper, false)
+                .thenExecute(() -> {
+                    SoulData data = holding(QuincyTests.quincy(Bloodline.GEMISCHT, 1, 200.0F), EAST, soul.getGameTime());
+                    holder[0] = joined(helper, soul, data, against);
+                    helper.assertTrue(keeper[0].dialogueKey().equals("gate_keeper")
+                                    && talk(holder[0], keeper[0], keeper[0]) == DialogueView.KEEPER_WON,
+                            "the keeper did not greet it");
+                })
+                .thenIdle(5)
+                .thenExecuteFor(40, () -> helper.assertTrue(keeper[0].getTarget() == null && !keeper[0].canAttack(holder[0])
+                        && keeper[0].standsOnGround(holder[0]) && holder[0].getHealth() == holder[0].getMaxHealth(),
+                        "the keeper went for a soul holding his pass"))
+                .thenExecute(() -> helper.assertTrue(use(holder[0], soul, touch).consumesAction() && open(soul, wicket)
+                        && TravelTests.lines(holder[0], "message.bleach.gate.barred.quincy") == 0, "its hand was refused"))
+                .thenIdle(1)
+                .thenExecute(() -> GateTests.step(helper, holder[0], through, through, "the soul with the pass stepping in"))
+                .thenIdle(1)
+                .thenExecute(() -> GateTests.step(helper, holder[0], against, against, "the soul with the pass stepping out"))
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    GateKeeper k = keeper[0];
+                    ServerPlayer h = holder[0];
+                    // Quiet now, so he does not strike a soul barred again.
+                    k.setNoAi(true);
+                    long now = soul.getGameTime();
+                    holding(holding(SoulLogic.get(h), EAST, now - GateLogic.PASS_TICKS), SOUTH, now);
+                    helper.assertTrue(GateLogic.mayPass(h, SOUTH) && !GateLogic.mayPass(h, EAST) && k.canAttack(h),
+                            "another gate's pass, or a lapsed one, opens this gate");
+                    GateTests.step(helper, h, through, against, "the soul with a lapsed pass, the wicket open");
+                    GateTests.shut(soul, wicket);
+                    helper.assertTrue(use(h, soul, touch).consumesAction() && !open(soul, wicket)
+                                    && TravelTests.lines(h, "message.bleach.gate.barred.quincy") == 1
+                                    && talk(h, k, k) == DialogueView.KEEPER_BARRED,
+                            "a soul whose pass lapsed opened the wicket, or was not told why");
+                })
+                .thenSucceed();
     }
 
     // ---- Digging round a gate ----

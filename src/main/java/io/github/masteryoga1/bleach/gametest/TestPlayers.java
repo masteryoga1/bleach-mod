@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import com.mojang.authlib.GameProfile;
+import io.github.masteryoga1.bleach.network.OpenDialoguePayload;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,6 +20,7 @@ import net.minecraft.network.PacketSendListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket;
 import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
@@ -38,14 +40,16 @@ import net.neoforged.neoforge.network.registration.NetworkRegistry;
 /**
  * Real server players for game tests. Vanilla's mock server player cannot take the mod's payloads, so this joins one
  * the way NeoForge's own test framework does: on an in-memory connection that has every channel, answers teleports and
- * keep-alives as a client would, and keeps what its action bar and chat show (and, for one a test watches, the
- * particles and sounds it is sent) for the test to read.
+ * keep-alives as a client would, and keeps what its action bar and chat show and the dialogues it is opened (and, for
+ * one a test watches, the particles and sounds it is sent) for the test to read.
  */
 final class TestPlayers {
     /** What each joined player has been shown on its action bar, for its test to read. */
     private static final Map<UUID, List<Component>> ACTION_BAR = new ConcurrentHashMap<>();
     /** What each joined player has been shown in chat, for its test to read. */
     private static final Map<UUID, List<Component>> CHAT = new ConcurrentHashMap<>();
+    /** The dialogues each joined player has been opened, oldest first, for its test to read. */
+    private static final Map<UUID, List<OpenDialoguePayload>> DIALOGUES = new ConcurrentHashMap<>();
     /** The particle and sound packets sent to each player a test watches ({@link #watchEffects}), oldest first. */
     private static final Map<UUID, List<Packet<?>>> EFFECTS = new ConcurrentHashMap<>();
 
@@ -84,6 +88,9 @@ final class TestPlayers {
                 } else if (packet instanceof ClientboundSystemChatPacket chat) {
                     (chat.overlay() ? ACTION_BAR : CHAT).computeIfAbsent(player.getUUID(),
                             id -> new CopyOnWriteArrayList<>()).add(chat.content());
+                } else if (packet instanceof ClientboundCustomPayloadPacket custom
+                        && custom.payload() instanceof OpenDialoguePayload dialogue) {
+                    DIALOGUES.computeIfAbsent(player.getUUID(), id -> new CopyOnWriteArrayList<>()).add(dialogue);
                 } else if (packet instanceof ClientboundLevelParticlesPacket || packet instanceof ClientboundSoundPacket) {
                     List<Packet<?>> effects = EFFECTS.get(player.getUUID());
                     if (effects != null) {
@@ -111,6 +118,11 @@ final class TestPlayers {
     /** The lines this joined player has been shown in chat so far, oldest first. */
     static List<Component> chat(ServerPlayer player) {
         return CHAT.getOrDefault(player.getUUID(), List.of());
+    }
+
+    /** The dialogues this joined player has been opened so far, oldest first. */
+    static List<OpenDialoguePayload> dialogues(ServerPlayer player) {
+        return DIALOGUES.getOrDefault(player.getUUID(), List.of());
     }
 
     /** From now on keeps the particle and sound packets this joined player is sent, for {@link #takeEffects}. */
@@ -148,10 +160,11 @@ final class TestPlayers {
         public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
         }
 
-        /** Forgets the player's action bar, chat and effects and disconnects it, unless it has already gone. */
+        /** Forgets the player's action bar, chat, dialogues and effects and disconnects it, unless it has already gone. */
         private void leave() {
             ACTION_BAR.remove(player.getUUID());
             CHAT.remove(player.getUUID());
+            DIALOGUES.remove(player.getUUID());
             EFFECTS.remove(player.getUUID());
             if (!player.hasDisconnected()) {
                 player.connection.disconnect(Component.literal("Test finished"));

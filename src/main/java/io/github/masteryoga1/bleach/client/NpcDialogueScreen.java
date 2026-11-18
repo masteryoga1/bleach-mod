@@ -71,8 +71,9 @@ public final class NpcDialogueScreen extends Screen {
     @Override
     protected void init() {
         int textWidth = PANEL_WIDTH - 2 * PADDING;
-        speech = font.split(Component.translatable("screen.bleach.dialogue." + dialogue.dialogueKey() + "." + view.key()),
-                textWidth);
+        Component said = Component.translatable("screen.bleach.dialogue." + dialogue.dialogueKey() + "." + view.key(),
+                npc.getDisplayName());
+        speech = font.split(said, textWidth);
         noteLines.clear();
         for (Component note : notes) {
             noteLines.addAll(font.split(note, textWidth));
