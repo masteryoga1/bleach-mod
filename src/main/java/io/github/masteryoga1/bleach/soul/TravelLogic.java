@@ -23,7 +23,7 @@ import net.minecraft.world.phys.Vec3;
  * the opener's own level, so game tests can call them directly with mock players. {@link TravelEvents} acts on them.
  */
 public final class TravelLogic {
-    /** Where every gate from the Human World comes out: the middle of the court's block, on Seireitei's lawn. */
+    /** Where every gate from the Human World comes out: the middle of the paved court's marked block. */
     public static final Vec3 COURT = new Vec3(SeireiteiPlan.SENKAIMON_COURT_X + 0.5, SeireiteiPlan.PLATEAU_Y,
             SeireiteiPlan.SENKAIMON_COURT_Z + 0.5);
     /** Where a Garganta into Soul Society comes out, from the centre: district 1, 16 blocks outside the Shakonmaku. */

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Rotation;
@@ -56,7 +57,7 @@ public final class SeireiteiPlan {
     public static final int HILL_BIOME_RADIUS = 52, WALL_BIOME_INNER = 504, WALL_BIOME_OUTER = 528;
     /** The first districts of the rough and of the wilds' biome. */
     public static final int ROUGH_FROM_DISTRICT = 31, WILDS_FROM_DISTRICT = 79;
-    /** The Senkaimon court, where every gate from the Human World comes out: open lawn north-east of the hill. */
+    /** The Senkaimon court, where every gate from the Human World comes out: a paved square north-east of the hill. */
     public static final int SENKAIMON_COURT_X = SEIREITEI_RADIUS * 3 / 8, SENKAIMON_COURT_Z = -SEIREITEI_RADIUS * 9 / 16;
     /** The Shin'ō Academy's north-east corner, where its template is placed from; its gate faces east. */
     public static final int ACADEMY_X = -192, ACADEMY_Z = 224;
@@ -74,6 +75,18 @@ public final class SeireiteiPlan {
     public static final int SITE_MARGIN = 4;
     /** A barracks compound's side: two chunks, its corners on chunk lines. */
     public static final int BARRACKS_SIZE = 32;
+    /** A barracks gateway's first column and width in its template's north wall, as make_structures.py's GATEWAY. */
+    public static final int BARRACKS_GATEWAY_X = 14, BARRACKS_GATEWAY_WIDTH = 4;
+    /** An avenue's columns each side of its gate's axis: its doorway's. The two ring roads' width. */
+    public static final int AVENUE_HALF_WIDTH = GATE_DOOR_HALF_WIDTH, RING_WIDTH = 6;
+    /** The outer ring road's inner edge: past the Academy grounds' far corner, short of the diagonal compounds'. */
+    public static final double OUTER_RING_RADIUS = 418.5;
+    /** City blocks repeat every two chunks, a lane this many columns each side of each chunk-pair line. */
+    public static final int BLOCK_PITCH = 32, LANE_HALF_WIDTH = 2;
+    /** The unwalled lane along the Seireiheki's inner face, and a lane wall's height: plinth, plaster and its cap. */
+    public static final int WALL_LANE = 4, LANE_WALL_HEIGHT = 4;
+    /** The court square's lanterns: on its diagonals, this many columns out from its arrival block. */
+    public static final int COURT_LANTERN_NEAR = 6, COURT_LANTERN_FAR = 18;
 
     /** Every planned site: a template set whole at its corner, turned, on the ground there, one structure for each group. */
     public static final List<Site> SITES = List.of(
@@ -97,6 +110,10 @@ public final class SeireiteiPlan {
      * grounds, the Senkaimon court and each gate's forecourt, then every site with its margin, in the plan's order.
      */
     public static final List<Reserve> RESERVES = reserves();
+    /** The north avenue's last row: the one before the First's reserve, short of its gate. */
+    private static final int NORTH_AVENUE_END_Z = sites("barracks").get(0).reserve().minZ() - 1;
+    /** Each barracks gate's paved path, in {@code sites("barracks")}' order: see {@link #gatePaths()}. */
+    private static final List<BoundingBox> GATE_PATHS = makeGatePaths();
 
     private SeireiteiPlan() {
     }
@@ -182,6 +199,93 @@ public final class SeireiteiPlan {
         return null;
     }
 
+    /** What Seireitei's streets lay on this column, from the column alone: nothing, paving, the court's, or a lane wall. */
+    public static Street street(int x, int z) {
+        if (radius(x, z) >= SEIREITEI_RADIUS) {
+            return Street.NONE;
+        }
+        Reserve kept = reservedBy(x, z);
+        String group = kept == null ? "" : kept.group();
+        if (group.equals("court")) {
+            int dx = Math.abs(x - SENKAIMON_COURT_X), dz = Math.abs(z - SENKAIMON_COURT_Z);
+            return dx + dz == 0 ? Street.MARK
+                    : dx == dz && (dx == COURT_LANTERN_NEAR || dx == COURT_LANTERN_FAR) ? Street.LANTERN : Street.PAVING;
+        }
+        if (avenue(x, z) || ring(x, z) || onGatePath(x, z)) {
+            // Paving crosses a gate's forecourt, and a compound's margin only on its own gate's path.
+            return kept == null || group.equals("gate") || group.equals("barracks") && onGatePath(x, z)
+                    ? Street.PAVING : Street.NONE;
+        }
+        if (kept != null || lane(x) || lane(z) || lane(x + BLOCK_PITCH / 2) || lane(z + BLOCK_PITCH / 2)
+                || radius(x, z) >= SEIREITEI_RADIUS - WALL_LANE) {
+            return Street.NONE;
+        }
+        return bordersWay(x + 1, z) || bordersWay(x - 1, z) || bordersWay(x, z + 1) || bordersWay(x, z - 1)
+                ? Street.WALL : Street.NONE;
+    }
+
+    /** Whether this column lies on an avenue, the north one ending before the First's reserve. */
+    public static boolean avenue(int x, int z) {
+        boolean north = z < 0 && Math.abs(x + 0.5) < AVENUE_HALF_WIDTH;
+        return axisDistance(x, z) < AVENUE_HALF_WIDTH && !(north && z > NORTH_AVENUE_END_Z);
+    }
+
+    /** Whether this column lies on a ring road: the inner one about the hill's reserve, or the outer one. */
+    public static boolean ring(int x, int z) {
+        double r = radius(x, z);
+        return r >= HILL_RESERVE_RADIUS && r < HILL_RESERVE_RADIUS + RING_WIDTH
+                || r >= OUTER_RING_RADIUS && r < OUTER_RING_RADIUS + RING_WIDTH;
+    }
+
+    /** Whether this x or z lies in a lane; a block side's opening is the lane half a pitch on. */
+    private static boolean lane(int c) {
+        return Math.floorMod(c + LANE_HALF_WIDTH, BLOCK_PITCH) < 2 * LANE_HALF_WIDTH;
+    }
+
+    /** Whether a block's edge beside this column is walled: a lane, an avenue or a gate's path, off the wall's lane. */
+    private static boolean bordersWay(int x, int z) {
+        return radius(x, z) < SEIREITEI_RADIUS - WALL_LANE && (lane(x) || lane(z) || avenue(x, z) || onGatePath(x, z));
+    }
+
+    /** Each barracks gate's paved path, in {@code sites("barracks")}' order: copies, so no caller moves the plan's own. */
+    public static List<BoundingBox> gatePaths() {
+        return GATE_PATHS.stream().map(path -> path.moved(0, 0, 0)).toList();
+    }
+
+    /** Whether this column lies on a barracks gate's paved path. */
+    public static boolean onGatePath(int x, int z) {
+        for (BoundingBox path : GATE_PATHS) {
+            if (path.isInside(x, PLATEAU_Y, z)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Each barracks gate's path: its gateway's columns, straight out from its step until both edges meet a road. */
+    private static List<BoundingBox> makeGatePaths() {
+        List<BoundingBox> paths = new ArrayList<>();
+        for (Site site : sites("barracks")) {
+            BlockPos corner = new BlockPos(site.x(), PLATEAU_Y, site.z());
+            BlockPos left = corner.offset(new BlockPos(BARRACKS_GATEWAY_X, 0, -1).rotate(site.rotation()));
+            BlockPos right = left.offset(new BlockPos(BARRACKS_GATEWAY_WIDTH - 1, 0, 0).rotate(site.rotation()));
+            Direction out = site.rotation().rotate(Direction.NORTH);
+            int rows = 1;
+            while (!road(left.relative(out, rows)) || !road(right.relative(out, rows))) {
+                if (++rows > BARRACKS_SIZE) {
+                    throw new IllegalStateException(site.template() + "'s gate meets no road");
+                }
+            }
+            paths.add(BoundingBox.fromCorners(left, right.relative(out, rows - 1)));
+        }
+        return List.copyOf(paths);
+    }
+
+    /** Whether this column lies on an avenue or a ring road, which a gate's path runs out to. */
+    private static boolean road(BlockPos pos) {
+        return avenue(pos.getX(), pos.getZ()) || ring(pos.getX(), pos.getZ());
+    }
+
     /** The group's site whose structure starts in this chunk, or null. */
     @Nullable
     public static Site siteAt(String group, int chunkX, int chunkZ) {
@@ -231,4 +335,7 @@ public final class SeireiteiPlan {
             return !round || dx * dx + dz * dz < half * half;
         }
     }
+
+    /** What the streets lay on a column: nothing, paving, the court's marked arrival or a lantern, or a lane wall. */
+    public enum Street { NONE, PAVING, MARK, LANTERN, WALL }
 }

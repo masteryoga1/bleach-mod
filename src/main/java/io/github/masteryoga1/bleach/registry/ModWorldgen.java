@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.world.gen.DangaiLaneFeature;
 import io.github.masteryoga1.bleach.world.gen.RadialDensity;
 import io.github.masteryoga1.bleach.world.gen.SeireihekiFeature;
+import io.github.masteryoga1.bleach.world.gen.SeireiteiStreetsFeature;
 import io.github.masteryoga1.bleach.world.gen.SitePiece;
 import io.github.masteryoga1.bleach.world.gen.SitePlacement;
 import io.github.masteryoga1.bleach.world.gen.SiteStructure;
@@ -38,6 +39,9 @@ public final class ModWorldgen {
     /** {@code bleach:seireiheki}, which the wall's biome places. */
     public static final DeferredHolder<Feature<?>, SeireihekiFeature> SEIREIHEKI =
             FEATURES.register("seireiheki", SeireihekiFeature::new);
+    /** {@code bleach:seireitei_streets}, which Seireitei's biomes place after the Seireiheki. */
+    public static final DeferredHolder<Feature<?>, SeireiteiStreetsFeature> SEIREITEI_STREETS =
+            FEATURES.register("seireitei_streets", SeireiteiStreetsFeature::new);
     /** {@code bleach:dangai_lane}, which the Dangai's biome places. */
     public static final DeferredHolder<Feature<?>, DangaiLaneFeature> DANGAI_LANE =
             FEATURES.register("dangai_lane", DangaiLaneFeature::new);

@@ -117,8 +117,10 @@ public final class RegistrationTests {
         LootTable drops = helper.getLevel().getServer().reloadableRegistries().getLootTable(sekkiseki.getLootTable());
         helper.assertTrue(drops != LootTable.EMPTY, "Sekkiseki has no loot table");
         helper.assertTrue(BuiltInRegistries.DENSITY_FUNCTION_TYPE.get(BleachMod.id("radial")) == RadialDensity.DATA_CODEC
-                        && BuiltInRegistries.FEATURE.get(BleachMod.id("seireiheki")) == ModWorldgen.SEIREIHEKI.get(),
-                "bleach:radial or bleach:seireiheki is not registered");
+                        && BuiltInRegistries.FEATURE.get(BleachMod.id("seireiheki")) == ModWorldgen.SEIREIHEKI.get()
+                        && BuiltInRegistries.FEATURE.get(BleachMod.id("seireitei_streets"))
+                                == ModWorldgen.SEIREITEI_STREETS.get(),
+                "bleach:radial, bleach:seireiheki or bleach:seireitei_streets is not registered");
         helper.succeed();
     }
 

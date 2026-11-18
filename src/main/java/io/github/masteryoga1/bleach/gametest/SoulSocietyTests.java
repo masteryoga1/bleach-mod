@@ -41,6 +41,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -88,8 +89,10 @@ public final class SoulSocietyTests {
             helper.assertTrue(carved == (name.endsWith("_rough") || name.endsWith("_wilds")),
                     name + (carved ? " is carved" : " is not carved"));
         }
-        int inside = features(biomes.get(1)), wall = features(biomes.get(2));
-        helper.assertTrue(inside == 0 && wall == 1, "Seireitei has " + inside + " features and its wall " + wall);
+        List<String> inside = placed(biomes.get(1)), wall = placed(biomes.get(2));
+        helper.assertTrue(inside.equals(List.of("0 bleach:seireitei_streets"))
+                        && wall.equals(List.of("0 bleach:seireiheki", "0 bleach:seireitei_streets")),
+                "Seireitei places " + inside + " and its wall " + wall);
         Set<Holder<Biome>> ours = Set.copyOf(biomes);
         Registry<Structure> structures = access.registryOrThrow(Registries.STRUCTURE);
         // Soul Society's own sites stand there by its plan (see SiteStructure); nothing else may, and so far three do, each
@@ -263,8 +266,11 @@ public final class SoulSocietyTests {
                 ResourceKey.create(Registries.BIOME, BleachMod.id(name)))).toList();
     }
 
-    private static int features(Holder<Biome> biome) {
-        return biome.value().getGenerationSettings().features().stream().mapToInt(HolderSet::size).sum();
+    /** A biome's placed features by name, each after its step's number, in each step's order. */
+    private static List<String> placed(Holder<Biome> biome) {
+        List<HolderSet<PlacedFeature>> steps = biome.value().getGenerationSettings().features();
+        return IntStream.range(0, steps.size()).boxed().flatMap(step -> steps.get(step).stream()
+                .map(feature -> step + " " + feature.getRegisteredName())).toList();
     }
 
     static double density(RandomState noise, int x, int y, int z) {
