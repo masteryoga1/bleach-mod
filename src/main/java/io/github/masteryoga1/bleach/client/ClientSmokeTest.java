@@ -310,6 +310,10 @@ public final class ClientSmokeTest {
     private static final int FIRST_STEP_TICK = 40;
     /** How long the steps wait on the bloodline answer before the run fails. */
     private static final int BLOODLINE_WAIT_TICKS = 400;
+    /** The last ticks of the Senkaimon's arrival check and of the lawn's wall check, which a slow server can make late. */
+    private static final int COURT_BY_TICK = 6800, WALL_BY_TICK = 6985;
+    /** How long the clock may wait in all before those ticks for the server to catch up, before the checks fail. */
+    private static final int SERVER_WAIT_TICKS = 400;
     /** How many of the server's last chat lines are kept for the checks that read them. */
     private static final int CHAT_LINES_KEPT = 16;
     /** How many of the server's last action bar lines are kept for a failure to name. */
@@ -323,6 +327,8 @@ public final class ClientSmokeTest {
     private static int bloodlineTicks;
     /** How many ticks the steps have waited on the bloodline answer. */
     private static int bloodlineWaitTicks;
+    /** How many ticks the clock has waited for the server before the Soul Society checks' last ticks. */
+    private static int serverWaitTicks;
     /** The first tick of each {@link #expectWithin} window that has already passed. */
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** When the player was sent into the third gate, by the clock and by the server's own tick count. */
@@ -422,6 +428,9 @@ public final class ClientSmokeTest {
         }
         LocalPlayer player = minecraft.player;
         SoulData soul = player.getData(SoulAttachments.SOUL);
+        if (waitsForServer(minecraft, player)) {
+            return;
+        }
         // The steps wait for the bloodline answer: the first one makes a Plus, who is never asked.
         if (ticksInWorld < FIRST_STEP_TICK - 1 || soul.quincy().decided()) {
             ++ticksInWorld;
@@ -2214,9 +2223,7 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 6630, 6654, () -> gateAhead(minecraft, player),
                 "the turned blade never opened a Senkaimon two blocks south of the player, facing it, 3 wide and 4 tall"
                         + " (the action bar's last lines: " + recentActionBar() + ")");
-        expectWithin(minecraft, 6665, 6800, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
-                        && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
-                        && horizontalDistance(player.position(), TravelLogic.COURT) < 0.5,
+        expectWithin(minecraft, 6665, COURT_BY_TICK, () -> atCourt(minecraft, player),
                 "the Senkaimon never brought the player to its court on Seireitei's lawn at y 72 (it is in "
                         + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString()
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
@@ -2228,7 +2235,7 @@ public final class ClientSmokeTest {
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
                         + ", the lawn's block " + minecraft.level.getBlockState(BlockPos.containing(SOUL_SOCIETY_X,
                                 SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
-        expectWithin(minecraft, 6850, 6985, () -> wallStands(minecraft.level),
+        expectWithin(minecraft, 6850, WALL_BY_TICK, () -> wallStands(minecraft.level),
                 "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a gate house, its"
                         + " great gate down (the client holds " + wallSeen(minecraft.level) + ")");
         expectWithin(minecraft, 7010, 7090, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
@@ -2493,6 +2500,24 @@ public final class ClientSmokeTest {
                 .hasChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()))
                 ? BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()) : "unloaded"))
                 .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Whether the clock waits a tick before the last tick of the Senkaimon's arrival check or of the lawn's wall check,
+     * for what a server stalled by the crossing or behind sends late. Past {@link #SERVER_WAIT_TICKS} it goes on, and the
+     * check fails as before.
+     */
+    private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
+        boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
+                || ticksInWorld == WALL_BY_TICK - 1 && !wallStands(minecraft.level);
+        return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
+    }
+
+    /** Whether the player stands in the Senkaimon's court on Seireitei's lawn at y 72, where the gate brings it. */
+    private static boolean atCourt(Minecraft minecraft, LocalPlayer player) {
+        return minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY && player.onGround()
+                && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
+                && horizontalDistance(player.position(), TravelLogic.COURT) < 0.5;
     }
 
     /** Whether the player stands on Seireitei's lawn at y 72, where {@link #LAWN_TP} sets it. */
