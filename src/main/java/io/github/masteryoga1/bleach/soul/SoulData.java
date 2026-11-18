@@ -126,6 +126,11 @@ public final class SoulData {
     long actionBarAt = NEVER;
     /** Game time the Shakonmaku last told this soul it was turned back, so a soul pushing at it is told once a second. */
     long shakonmakuToldAt = NEVER;
+    /**
+     * Whether Sekkiseki shut this soul in at its last look ({@link SekkisekiLogic}): it neither refills nor keeps what it
+     * holds.
+     */
+    boolean enclosed;
     /** Blows that landed on a Hollow's body in a row, without one to the mask, for the hint to aim for the mask. */
     int bodyHitsWithoutMask;
     /** The Jinzen this soul is sitting in, from settling down to opening its eyes: see {@link JinzenLogic}. */

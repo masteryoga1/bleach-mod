@@ -979,9 +979,9 @@ public final class QuincyArtsEvents {
     }
 
     /**
-     * One pulse of Sklaverei: the reishi of what is near is drawn in. Hollows are hurt by it (and
-     * their reishi poisons), aware players lose reishi or reiryoku to it, and others' arrows and
-     * Getsuga in the air come apart into it, up to a cap a pulse.
+     * One pulse of Sklaverei: the reishi of what is near is drawn in, and lost if Sekkiseki holds the
+     * user. Hollows are hurt by it (and their reishi poisons), aware players lose reishi or reiryoku to
+     * it, and others' arrows and Getsuga in the air come apart into it, up to a cap a pulse.
      */
     private static void sklavereiPulse(Player p, SoulData d) {
         if (!(p.level() instanceof ServerLevel level)) {
@@ -1028,7 +1028,7 @@ public final class QuincyArtsEvents {
             gained += Math.min(perProjectile, cap - gained);
             drawIn(level, at, chest);
         }
-        if (gained > 0.0F) {
+        if (gained > 0.0F && !SekkisekiLogic.held(d)) {
             QuincyLogic.setReishi(d, QuincyLogic.reishi(d) + gained);
         }
     }
@@ -1146,8 +1146,8 @@ public final class QuincyArtsEvents {
 
     /**
      * Fires only for hits that got past shields and invulnerability frames. A formed Seele's cut
-     * draws reishi back into the wielder, twice as much from a Hollow or a released reiatsu; a hard
-     * hit, or anything that comes in at the head, breaks a Vollständig halo.
+     * draws reishi back into a wielder Sekkiseki does not hold, twice as much from a Hollow or a released
+     * reiatsu; a hard hit, or anything that comes in at the head, breaks a Vollständig halo.
      */
     private static void onDamagePost(LivingDamageEvent.Post event) {
         LivingEntity target = event.getEntity();
@@ -1157,7 +1157,8 @@ public final class QuincyArtsEvents {
         }
         DamageSource source = event.getSource();
         Player wielder = formedMelee(source);
-        if (wielder != null && wielder != target && SoulLogic.hasSoul(wielder)) {
+        if (wielder != null && wielder != target && SoulLogic.hasSoul(wielder)
+                && !SekkisekiLogic.held(SoulLogic.get(wielder))) {
             SoulData theirs = SoulLogic.get(wielder);
             boolean doubled = QuincyLogic.isHollowLike(target)
                     || (target instanceof Player player && SoulLogic.hasSoul(player) && SoulLogic.get(player).isReiatsuReleased());

@@ -997,6 +997,7 @@
   "message.bleach.garganta.too_weak": "Not enough reiryoku to open a Garganta",
   "message.bleach.garganta.crowded": "Another gate stands too close",
   "message.bleach.garganta.sekkiseki": "A Garganta cannot open into Sekkiseki",
+  "message.bleach.sekkiseki.enclosed": "Sekkiseki shuts you in on every side: your reiryoku drains away",
   "message.bleach.garganta.mount": "The Garganta takes no mount. Step down to pass",
   "message.bleach.garganta.no_landing": "The far side of the Garganta is blocked",
   "message.bleach.dangai.entered": "No guide leads you: you are in the Dangai. Follow the lane to its end",

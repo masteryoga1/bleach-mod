@@ -95,7 +95,7 @@ public final class SoulSocietyTests {
                 "Seireitei places " + inside + " and its wall " + wall);
         Set<Holder<Biome>> ours = Set.copyOf(biomes);
         Registry<Structure> structures = access.registryOrThrow(Registries.STRUCTURE);
-        // Soul Society's own sites stand there by its plan (see SiteStructure); nothing else may, and so far three do, each
+        // Soul Society's own sites stand there by its plan (see SiteStructure); nothing else may, and so far four do, each
         // placed by a set of its own.
         for (Structure structure : structures) {
             helper.assertFalse(!(structure instanceof SiteStructure) && structure.biomes().stream().anyMatch(ours::contains),
@@ -104,9 +104,10 @@ public final class SoulSocietyTests {
         List<String> sited = structures.stream().filter(structure -> structure.biomes().stream().anyMatch(ours::contains))
                 .map(structure -> String.valueOf(structures.getKey(structure))).sorted().toList();
         List<String> allowed = List.of(BleachMod.id("seireitei_academy").toString(),
-                BleachMod.id("seireitei_barracks").toString(), BleachMod.id("seireitei_gate").toString());
+                BleachMod.id("seireitei_barracks").toString(), BleachMod.id("seireitei_gate").toString(),
+                BleachMod.id("seireitei_hill").toString());
         helper.assertTrue(sited.equals(allowed), "the structures that may stand in Soul Society are " + sited
-                + ", not the Academy, the barracks and the gate houses");
+                + ", not the Academy, the barracks, the gate houses and the hill's works");
         List<String> sets = access.registryOrThrow(Registries.STRUCTURE_SET).entrySet().stream()
                 .filter(set -> set.getValue().structures().stream()
                         .anyMatch(entry -> sited.contains(entry.structure().getRegisteredName())))

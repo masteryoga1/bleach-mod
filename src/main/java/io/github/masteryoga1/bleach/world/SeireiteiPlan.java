@@ -104,7 +104,10 @@ public final class SeireiteiPlan {
             barracks("seventh", 96, 432, Rotation.NONE), barracks("eighth", -128, 432, Rotation.NONE),
             barracks("ninth", -336, 304, Rotation.NONE), barracks("tenth", -433, 96, Rotation.CLOCKWISE_90),
             barracks("eleventh", -433, -128, Rotation.CLOCKWISE_90), barracks("twelfth", -305, -305, Rotation.CLOCKWISE_180),
-            barracks("thirteenth", -97, -433, Rotation.CLOCKWISE_180));
+            barracks("thirteenth", -97, -433, Rotation.CLOCKWISE_180),
+            // Sōkyoku Hill's works in its own reserve: the Senzaikyū on the lawn east of the hill, on the east avenue's
+            // line, and its bridge to the hill's end, from the tower's south-east foot, turned so it stands on the lawn.
+            new Site("hill", 111, 5, BleachMod.id("hill/senzaikyu"), Rotation.CLOCKWISE_180, 53, 12));
     /**
      * The plan's reserves, which no later street, wall or site may enter but its own group's: Sōkyoku Hill, the Academy's
      * grounds, the Senkaimon court and each gate's forecourt, then every site with its margin, in the plan's order.

@@ -7,7 +7,8 @@ Run from the repository root:
 
 The check compares the uncompressed NBT, not the gzip bytes, so a different zlib build does not trip
 it. Templates are written for Minecraft 1.21.1 (data version 3955) and list every position in their
-box, air included, so placing one clears whatever was there.
+box, air included, so placing one clears whatever was there, but for any position left as structure_void, which keeps
+the ground it is set over.
 
 Uses only the standard library.
 """
@@ -21,6 +22,7 @@ from pathlib import Path
 
 STRUCTURES = Path("src/main/resources/data/bleach/structure")
 DATA_VERSION = 3955
+VOID = "minecraft:structure_void"  # left out of a template, as a structure block leaves it: the ground there stays
 
 END, BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, BYTES, STRING, LIST, COMPOUND = range(11)
 
@@ -132,6 +134,8 @@ class Template:
             for y in range(height):
                 for z in range(depth):
                     state = self.blocks.get((x, y, z), ("minecraft:air", ()))
+                    if state[0] == VOID:
+                        continue
                     if state not in index:
                         index[state] = len(palette)
                         name, properties = state
@@ -448,10 +452,92 @@ def barracks(number):
     return t
 
 
+# Sōkyoku Hill's works, as SeireiteiPlan.java's hill row has them: one template at the corner (111, 72, 5), turned
+# CLOCKWISE_180, so world x = 111 - template x and world z = 5 - template z; the hill's cliff at radius 64, its top at 136.
+HILL_CORNER, HILL_SIZE = (111, 5), (53, 95, 12)
+MESA_RADIUS, MESA_TOP_Y = 64, 136
+TURNED = {"north": "south", "south": "north", "east": "west", "west": "east"}
+
+
+def senzaikyu():
+    """
+    Sōkyoku Hill's works, set out in the world's blocks from the hill's east end to the lawn east of it: the stand on
+    the end, whose underside is cut back, a bridge at the hill's height, and the Senzaikyū, a Sekkiseki tower whose
+    stair climbs round a solid core from the bridge's door to the cell, its window high and barred toward the stand.
+    The hill's own blocks are left as they stand, but for that cut and the stand's floor.
+    """
+    t = Template(*HILL_SIZE)
+
+    def put(x, y, z, block, **properties):
+        t.set(HILL_CORNER[0] - x, y - PLATEAU_Y, HILL_CORNER[1] - z, block, **properties)
+
+    def box(x0, y0, z0, x1, y1, z1, block, **properties):
+        for x in range(x0, x1 + 1):
+            for y in range(y0, y1 + 1):
+                for z in range(z0, z1 + 1):
+                    put(x, y, z, block, **properties)
+
+    sek, air, log = "bleach:sekkiseki", "minecraft:air", "minecraft:stripped_dark_oak_log"
+    west, north, south = HILL_CORNER[0] - HILL_SIZE[0] + 1, HILL_CORNER[1] - HILL_SIZE[2] + 1, HILL_CORNER[1]
+    # The hill's end: its cliff cut back under a lip from y 130, 1 deeper each 4 rows from y 102 to 5 at y 118.
+    for x in range(west, MESA_RADIUS):
+        for z in range(north, south + 1):
+            if math.hypot(x + 0.5, z + 0.5) >= MESA_RADIUS:
+                raise ValueError(f"the hill's end at {(x, z)} is off the hill")
+            for y in range(PLATEAU_Y, MESA_TOP_Y - 1):
+                cut = y < 130 and MESA_RADIUS - x <= min(5, max(0, (y - 98) // 4))
+                put(x, y, z, air if cut else VOID)
+            put(x, MESA_TOP_Y - 1, z, "minecraft:stone_bricks")
+    # The Sōkyoku's stand, for show: two posts under a beam and a tiled cap, the halberd upright between them.
+    for z in (-4, 3):
+        box(61, 136, z, 61, 152, z, log, axis="y")
+    box(61, 153, -4, 61, 153, 3, log, axis="z")
+    box(60, 154, -5, 62, 154, 4, "bleach:roof_tile_slab", type="bottom", waterlogged="false")
+    box(61, 136, -1, 61, 149, 0, log, axis="y")
+    box(61, 150, -2, 61, 151, 1, "minecraft:smooth_stone")
+    box(61, 152, -1, 61, 152, 0, "minecraft:smooth_stone")
+    # The bridge: a calcite deck level with the hill's top from its cliff to the tower, a plaster rail each side.
+    box(MESA_RADIUS, MESA_TOP_Y - 1, -2, 99, MESA_TOP_Y - 1, 1, "minecraft:calcite")
+    for z in (-2, 1):
+        box(MESA_RADIUS, MESA_TOP_Y, z, 99, MESA_TOP_Y, z, "bleach:white_plaster")
+    # The tower, 12 square from the lawn to the cell's roof: a stairwell round a core 6 square, the cell over both.
+    box(100, PLATEAU_Y, north, HILL_CORNER[0], 164, south, sek)
+    box(102, 136, -4, 109, 158, 3, air)
+    box(103, 136, -3, 108, 158, 2, sek)
+    box(102, 160, -4, 109, 163, 3, air)
+    # The stair, from the landing inside the door round the core, Sekkiseki under each step, the cell's floor opened
+    # over the last; each step faces the way up, written turned back for the template's turn.
+    steps = [(102, z) for z in range(1, 4)] + [(x, 3) for x in range(103, 110)] \
+        + [(109, z) for z in range(2, -5, -1)] + [(x, -4) for x in range(108, 101, -1)]
+    last = (102, 0)
+    for k, (x, z) in enumerate(steps, 1):
+        way = {(0, 1): "south", (1, 0): "east", (0, -1): "north", (-1, 0): "west"}[(x - last[0], z - last[1])]
+        box(x, 136, z, x, 134 + k, z, sek)
+        put(x, 135 + k, z, "minecraft:polished_diorite_stairs", facing=TURNED[way], half="bottom", shape="straight",
+            waterlogged="false")
+        if 156 <= 135 + k < 159:
+            put(x, 159, z, air)
+        last = (x, z)
+    for z in (-1, 0):
+        box(100, 136, z, 101, 138, z, air)  # the bridge's door, 2 wide and 3 high
+        put(101, 163, z, air)  # the window, one row high under the ceiling in the west wall, barred in its outer course
+        put(100, 163, z, "minecraft:iron_bars", east="false", north="true", south="true", waterlogged="false",
+            west="false")
+    # The crown: a parapet round the roof, a merlon on every other block.
+    for x in range(100, HILL_CORNER[0] + 1):
+        for z in range(north, south + 1):
+            if x in (100, 111) or z in (north, south):
+                put(x, 165, z, sek)
+                if (x + z) % 2 == 0:
+                    put(x, 166, z, sek)
+    return t
+
+
 TEMPLATES = {
     "academy/academy.nbt": academy,
     "field.nbt": field,
     "gate/house.nbt": gate_house,
+    "hill/senzaikyu.nbt": senzaikyu,
     "lane.nbt": lane,
 }
 TEMPLATES.update((f"barracks/{name}.nbt", functools.partial(barracks, number))
