@@ -9,6 +9,7 @@ import io.github.masteryoga1.bleach.menu.TailoringPages;
 import io.github.masteryoga1.bleach.recipe.TailoringInput;
 import io.github.masteryoga1.bleach.recipe.TailoringRecipe;
 import io.github.masteryoga1.bleach.registry.BleachTags;
+import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModRecipes;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
@@ -20,11 +21,14 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -35,6 +39,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -84,7 +91,8 @@ public final class GarbTests {
                 ModItems.WARAJI.get(), ModItems.QUINCY_TUNIC.get(), ModItems.QUINCY_TROUSERS.get(),
                 ModItems.QUINCY_SHOES.get(), ModItems.SANREI_GLOVE.get(), ModItems.WANDENREICH_CAP.get(),
                 ModItems.WANDENREICH_COAT.get(), ModItems.WANDENREICH_TROUSERS.get(), ModItems.WANDENREICH_BOOTS.get(),
-                ModItems.ARRANCAR_JACKET.get(), ModItems.ARRANCAR_HAKAMA.get(), ModItems.ARRANCAR_ZORI.get())),
+                ModItems.ARRANCAR_JACKET.get(), ModItems.ARRANCAR_HAKAMA.get(), ModItems.ARRANCAR_ZORI.get(),
+                ModItems.ACADEMY_KOSODE.get(), ModItems.ACADEMY_HAKAMA.get())),
                 "tailoring makes " + results);
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("tailoring_table")).isPresent(),
                 "the Tailoring Table cannot be crafted");
@@ -106,6 +114,19 @@ public final class GarbTests {
         TailoringRecipe hakama = recipe(helper, "shihakusho_hakama");
         helper.assertTrue(hakama.matches(new TailoringInput(stack(Items.BLACK_WOOL, 4), stack(Items.DIRT, 3)),
                 helper.getLevel()), "the hakama, which needs no trim, looked at the trim slot");
+
+        TailoringRecipe white = recipe(helper, "academy_kosode");
+        helper.assertTrue(white.matches(new TailoringInput(stack(Items.WHITE_WOOL, 5), stack(Items.BLUE_WOOL, 1)),
+                helper.getLevel()) && white.result().is(ModItems.ACADEMY_KOSODE.get()),
+                "5 white wool trimmed with 1 blue do not make the Academy's kosode");
+        helper.assertFalse(white.matches(new TailoringInput(stack(Items.WHITE_WOOL, 5), ItemStack.EMPTY), helper.getLevel())
+                || white.matches(new TailoringInput(stack(Items.WHITE_WOOL, 4), stack(Items.BLUE_WOOL, 1)),
+                        helper.getLevel()), "the Academy's kosode was made without its blue trim, or from 4 white wool");
+        TailoringRecipe blue = recipe(helper, "academy_hakama");
+        helper.assertTrue(blue.matches(new TailoringInput(stack(Items.BLUE_WOOL, 4), ItemStack.EMPTY), helper.getLevel())
+                && blue.result().is(ModItems.ACADEMY_HAKAMA.get()), "the Academy's hakama is not 4 blue wool");
+        helper.assertFalse(blue.matches(new TailoringInput(stack(Items.BLUE_WOOL, 3), ItemStack.EMPTY), helper.getLevel()),
+                "3 blue wool made the Academy's hakama");
         helper.succeed();
     }
 
@@ -315,6 +336,83 @@ public final class GarbTests {
         player.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
         helper.assertTrue(ShinigamiLogic.regenMultiplier(player, shinigami, NOW) == 1.0,
                 "two pieces of the Shihakushō gave the set bonus");
+        helper.succeed();
+    }
+
+    /**
+     * The Academy's uniform is cloth of its own: worn whole, kosode and hakama of either trim, it quickens a student's
+     * reiryoku as the Shihakushō does, once, and no one else's; its kosode over the Shihakushō's hakama is neither set.
+     */
+    @GameTest(template = "empty")
+    public static void theUniformQuickensAStudentOnce(GameTestHelper helper) {
+        double bonus = 1.0 + BleachConfig.get(BleachConfig.SHIHAKUSHO_SET_REGEN_BONUS);
+        ItemStack top = new ItemStack(ModItems.ACADEMY_KOSODE.get());
+        helper.assertTrue(top.is(BleachTags.ACADEMY_UNIFORM) && !top.is(BleachTags.SHINIGAMI_GARB) && !top.isDamageableItem()
+                        && top.getAttributeModifiers().modifiers().isEmpty()
+                        && BuiltInRegistries.ARMOR_MATERIAL.containsKey(BleachMod.id("academy_uniform")),
+                top + " is not cloth of the Academy's own");
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setItemSlot(EquipmentSlot.CHEST, top);
+        player.setItemSlot(EquipmentSlot.LEGS, new ItemStack(ModItems.ACADEMY_HAKAMA_RED.get()));
+        SoulData student = ShinigamiTests.student(40.0F);
+        assertRegen(helper, player, student, bonus, "a student in a blue kosode and red hakama");
+        assertRegen(helper, player, ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F), 1.0, "a Shinigami in the uniform");
+        assertRegen(helper, player, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F), 1.0, "a soul not enrolled in it");
+        player.setItemSlot(EquipmentSlot.FEET, new ItemStack(ModItems.WARAJI.get()));
+        assertRegen(helper, player, student, bonus, "a student in the uniform and waraji");
+        player.setItemSlot(EquipmentSlot.LEGS, new ItemStack(ModItems.SHIHAKUSHO_HAKAMA.get()));
+        assertRegen(helper, player, student, 1.0, "a student in its kosode over the Shihakushō's hakama and waraji");
+        wearFullSet(player);
+        assertRegen(helper, player, student, bonus, "a student in the Shihakushō");
+        helper.succeed();
+    }
+
+    private static void assertRegen(GameTestHelper helper, Player player, SoulData data, double expected, String who) {
+        double actual = ShinigamiLogic.regenMultiplier(player, data, NOW);
+        helper.assertTrue(Math.abs(actual - expected) < EPSILON, who + " regenerates at " + actual + ", not " + expected);
+    }
+
+    /**
+     * A piece of the Academy's uniform used on a Tailoring Table from the main hand changes its trim for nothing, only that
+     * piece's, and not again until its cooldown ends; wool, or a piece in the off hand, passes to the table's window.
+     */
+    @GameTest(template = "empty")
+    public static void theTableChangesTheTrimOfThePieceUsed(GameTestHelper helper) {
+        BlockPos table = new BlockPos(1, 1, 1);
+        helper.setBlock(table, ModBlocks.TAILORING_TABLE.get());
+        try {
+            Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+            player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.ACADEMY_KOSODE.get()));
+            player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(ModItems.ACADEMY_HAKAMA.get()));
+            helper.useBlock(table, player);
+            helper.assertTrue(player.getMainHandItem().is(ModItems.ACADEMY_KOSODE_RED.get())
+                            && player.getMainHandItem().getCount() == 1
+                            && player.getOffhandItem().is(ModItems.ACADEMY_HAKAMA.get()),
+                    "used on the table, the kosode is " + player.getMainHandItem() + " and the hakama "
+                            + player.getOffhandItem());
+            // A mock player never ticks, so the cooldown stays until it is taken off.
+            helper.useBlock(table, player);
+            helper.assertTrue(player.getMainHandItem().is(ModItems.ACADEMY_KOSODE_RED.get()),
+                    "used again at once, the kosode is " + player.getMainHandItem());
+            player.getCooldowns().removeCooldown(ModItems.ACADEMY_KOSODE.get());
+            player.getCooldowns().removeCooldown(ModItems.ACADEMY_KOSODE_RED.get());
+            helper.useBlock(table, player);
+            helper.assertTrue(player.getMainHandItem().is(ModItems.ACADEMY_KOSODE.get()),
+                    "used again once it could be, the kosode is " + player.getMainHandItem());
+            BlockPos at = helper.absolutePos(table);
+            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(at), Direction.UP, at, false);
+            BlockState state = helper.getBlockState(table);
+            ItemStack wool = new ItemStack(Items.BLUE_WOOL);
+            ItemStack hakama = player.getOffhandItem();
+            helper.assertTrue(state.useItemOn(wool, helper.getLevel(), player, InteractionHand.MAIN_HAND, hit)
+                            == ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION
+                            && state.useItemOn(hakama, helper.getLevel(), player, InteractionHand.OFF_HAND, hit)
+                            == ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION
+                            && wool.is(Items.BLUE_WOOL) && player.getOffhandItem().is(ModItems.ACADEMY_HAKAMA.get()),
+                    "wool, or the hakama in the off hand, did not pass to the table's window");
+        } finally {
+            helper.setBlock(table, Blocks.AIR);
+        }
         helper.succeed();
     }
 

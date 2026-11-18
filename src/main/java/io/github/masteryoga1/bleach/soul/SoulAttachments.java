@@ -49,6 +49,13 @@ public final class SoulAttachments {
             () -> AttachmentType.builder(() -> DummyDrill.NONE)
                     .serialize(DummyDrill.CODEC, drill -> !drill.equals(DummyDrill.NONE)).copyOnDeath().build());
 
+    /**
+     * Whether the Academy has handed this soul its uniform, at enrolment or at the instructor's next talk (see {@link
+     * ShinigamiEvents#uniformAtTalk}). Saved once given, so an old save reads false; kept through death; never sent.
+     */
+    public static final Supplier<AttachmentType<Boolean>> UNIFORM_GIVEN = ATTACHMENT_TYPES.register("uniform_given",
+            () -> AttachmentType.builder(() -> false).serialize(Codec.BOOL, given -> given).copyOnDeath().build());
+
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());

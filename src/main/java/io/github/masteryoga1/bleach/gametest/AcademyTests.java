@@ -49,10 +49,14 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -65,6 +69,7 @@ import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.attachment.AttachmentHolder;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -245,6 +250,75 @@ public final class AcademyTests {
         helper.assertTrue(ShinigamiEvents.mayReceiveAsauchi(player, data, now), "the wait for a new blade never ends");
         helper.assertTrue(ShinigamiEvents.reissueAsauchi(player), "a lost blade was not replaced after the wait");
         helper.assertTrue(player.getInventory().countItem(ModItems.ASAUCHI.get()) == 1, "the new blade is not in the inventory");
+        helper.succeed();
+    }
+
+    /** The pieces of the Academy's uniform this player carries or wears, in either trim. */
+    private static int uniformPieces(Player player) {
+        return player.getInventory().countItem(ModItems.ACADEMY_KOSODE.get())
+                + player.getInventory().countItem(ModItems.ACADEMY_KOSODE_RED.get())
+                + player.getInventory().countItem(ModItems.ACADEMY_HAKAMA.get())
+                + player.getInventory().countItem(ModItems.ACADEMY_HAKAMA_RED.get());
+    }
+
+    /**
+     * Enrolment hands out the Academy's uniform beside the Asauchi, kosode and hakama trimmed in blue, and marks it given;
+     * a soul that already wears a kosode of either trim is handed only the hakama.
+     */
+    @GameTest(template = "empty")
+    public static void enrolmentHandsOutTheUniform(GameTestHelper helper) {
+        Player player = visitor(helper, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F));
+        helper.assertTrue(ShinigamiEvents.enroll(player) && player.getData(SoulAttachments.UNIFORM_GIVEN),
+                "a Rukongai soul could not enroll, or was not marked as handed the uniform");
+        for (var piece : List.of(ModItems.ASAUCHI.get(), ModItems.ACADEMY_KOSODE.get(), ModItems.ACADEMY_HAKAMA.get())) {
+            helper.assertTrue(player.getInventory().countItem(piece) == 1, "enrolling did not give one " + piece);
+        }
+        helper.assertTrue(uniformPieces(player) == 2, "enrolling gave " + uniformPieces(player) + " pieces of the uniform");
+        Player sewn = visitor(helper, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F));
+        sewn.setItemSlot(EquipmentSlot.CHEST, new ItemStack(ModItems.ACADEMY_KOSODE_RED.get()));
+        ShinigamiEvents.enroll(sewn);
+        helper.assertTrue(uniformPieces(sewn) == 2 && sewn.getInventory().countItem(ModItems.ACADEMY_HAKAMA.get()) == 1,
+                "a soul wearing its own red kosode was handed " + (uniformPieces(sewn) - 1) + " more pieces");
+        helper.succeed();
+    }
+
+    /**
+     * A student enrolled before there was a uniform, whose save holds no mark of one, is handed it with a word as its
+     * first talk with the instructor opens, and the mark is saved; its inventory is emptied after every talk, so each
+     * later one would hand it again but for the mark, and a Shinigami or a soul not enrolled is handed none.
+     */
+    @GameTest(template = "empty")
+    public static void anOldStudentIsHandedTheUniformOnce(GameTestHelper helper) {
+        ServerPlayer student = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(2.5, 1.0, 1.5));
+        student.setData(SoulAttachments.SOUL, ShinigamiTests.student(40.0F));
+        String given = "bleach:uniform_given";
+        helper.assertFalse(student.saveWithoutId(new CompoundTag()).getCompound(AttachmentHolder.ATTACHMENTS_NBT_KEY)
+                .contains(given), "a student never handed the uniform saves the mark of it");
+        AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 1, 1, 1);
+        String received = "message.bleach.academy_uniform.received";
+        try {
+            for (int talk = 1; talk <= 3; talk++) {
+                boolean opened = instructor.interact(student, InteractionHand.MAIN_HAND) == InteractionResult.SUCCESS
+                        && TestPlayers.dialogues(student).size() == talk;
+                int pieces = uniformPieces(student);
+                int told = DutyTests.said(student, received).size();
+                helper.assertTrue(opened && pieces == (talk == 1 ? 2 : 0) && told == 1,
+                        "at talk " + talk + " the student was handed " + pieces + " pieces and told " + told + " times");
+                student.getInventory().clearContent();
+            }
+        } finally {
+            // Persistent, and the test grid is never cleared.
+            instructor.discard();
+        }
+        CompoundTag saved = student.saveWithoutId(new CompoundTag());
+        Player loaded = helper.makeMockPlayer(GameType.SURVIVAL);
+        loaded.load(saved);
+        helper.assertTrue(saved.getCompound(AttachmentHolder.ATTACHMENTS_NBT_KEY).getBoolean(given)
+                        && ShinigamiLogic.isStudent(SoulLogic.get(loaded)) && loaded.getData(SoulAttachments.UNIFORM_GIVEN),
+                "the uniform given was not saved, or did not load");
+        helper.assertFalse(ShinigamiEvents.uniformAtTalk(visitor(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 40.0F)))
+                        || ShinigamiEvents.uniformAtTalk(visitor(helper, ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F))),
+                "a Shinigami or a soul not enrolled was handed the uniform at a talk");
         helper.succeed();
     }
 

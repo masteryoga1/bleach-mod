@@ -26,6 +26,8 @@ public final class BleachTags {
     public static final TagKey<Item> WANDENREICH_UNIFORM = TagKey.create(Registries.ITEM, BleachMod.id("wandenreich_uniform"));
     /** The pieces of the white Arrancar uniform: jacket, hakama and zōri. */
     public static final TagKey<Item> ARRANCAR_UNIFORM = TagKey.create(Registries.ITEM, BleachMod.id("arrancar_uniform"));
+    /** The pieces of the Shin'ō Academy's uniform: the kosode and hakama, each in blue and in red. */
+    public static final TagKey<Item> ACADEMY_UNIFORM = TagKey.create(Registries.ITEM, BleachMod.id("academy_uniform"));
     /** Food a Hollow player can still eat. Empty: a Hollow feeds on souls. Packs may add to it. */
     public static final TagKey<Item> HOLLOW_EDIBLE = TagKey.create(Registries.ITEM, BleachMod.id("hollow_edible"));
     /** What a Hollow player can wear though its hide refuses armour: elytra, carved pumpkins and heads. */

@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
+import io.github.masteryoga1.bleach.item.AcademyUniformItem;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEntities;
@@ -157,7 +158,7 @@ public final class ShinigamiEvents {
 
     // ---- The Academy ----
 
-    /** A Rukongai soul enrolls at the Academy and is handed an Asauchi. */
+    /** A Rukongai soul enrols at the Academy and is handed an Asauchi and the Academy's uniform. */
     public static boolean enroll(Player player) {
         SoulData data = SoulLogic.get(player);
         if (!ShinigamiLogic.canEnroll(data)) {
@@ -167,6 +168,7 @@ public final class ShinigamiEvents {
         giveAsauchi(player, data);
         playSound(player, SoundEvents.BOOK_PAGE_TURN);
         player.sendSystemMessage(Component.translatable("message.bleach.enrolled"));
+        giveUniform(player);
         if (player instanceof ServerPlayer serverPlayer) {
             Milestones.check(serverPlayer, data);
         }
@@ -230,6 +232,38 @@ public final class ShinigamiEvents {
     public static void giveAsauchi(Player player, SoulData data) {
         give(player, new ItemStack(ModItems.ASAUCHI.get()));
         data.setShinigami(data.shinigami().withAsauchiIssuedAt(player.level().getGameTime()));
+    }
+
+    /**
+     * Hands this soul, trimmed in blue, each piece of the Academy's uniform it carries in neither trim, with a word if it
+     * hands any, and marks the uniform given, so the instructor never hands it again. Returns whether it handed any.
+     */
+    private static boolean giveUniform(Player player) {
+        boolean handed = false;
+        for (AcademyUniformItem piece : List.of(ModItems.ACADEMY_KOSODE.get(), ModItems.ACADEMY_HAKAMA.get())) {
+            if (!piece.carriedBy(player)) {
+                give(player, new ItemStack(piece));
+                handed = true;
+            }
+        }
+        if (handed) {
+            player.sendSystemMessage(Component.translatable("message.bleach.academy_uniform.received")
+                    .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        }
+        player.setData(SoulAttachments.UNIFORM_GIVEN, true);
+        return handed;
+    }
+
+    /**
+     * As the instructor's dialogue opens: a student the Academy never handed its uniform, one enrolled before there was
+     * any, is handed it now, once. One lost after that is not handed again; the Tailoring Table sews another.
+     */
+    public static boolean uniformAtTalk(Player player) {
+        if (!SoulLogic.hasSoul(player) || !ShinigamiLogic.isStudent(SoulLogic.get(player))
+                || player.getData(SoulAttachments.UNIFORM_GIVEN)) {
+            return false;
+        }
+        return giveUniform(player);
     }
 
     /** Puts an item in the player's inventory, or at their feet if it is full. */

@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
+import io.github.masteryoga1.bleach.item.AcademyUniformItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModItems;
@@ -303,13 +304,14 @@ public final class ShinigamiLogic {
     // ---- Regeneration ----
 
     /**
-     * How fast this soul regenerates compared with normal: faster in the full Shihakushō for those
-     * it suits, slower while its power is lent, while Hollow poison is in a Quincy's blood, or while
-     * a Hollow is ravenous or starving.
+     * How fast this soul regenerates compared with normal: faster in the full Shihakushō for those it suits, or in the
+     * Academy's whole uniform for a student, once even in both; slower while its power is lent, while Hollow poison is
+     * in a Quincy's blood, or while a Hollow is ravenous or starving.
      */
     public static double regenMultiplier(LivingEntity entity, SoulData data, long now) {
         double multiplier = 1.0;
-        if (garbBonusApplies(data) && ShihakushoItem.isFullSet(entity)) {
+        if ((garbBonusApplies(data) && ShihakushoItem.isFullSet(entity))
+                || (isStudent(data) && AcademyUniformItem.isFullSet(entity))) {
             multiplier *= 1.0 + BleachConfig.get(BleachConfig.SHIHAKUSHO_SET_REGEN_BONUS);
         }
         if (isPowerLent(data, now)) {
