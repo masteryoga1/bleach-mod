@@ -313,7 +313,9 @@ public final class ClientSmokeTest {
     private static final int BLOODLINE_WAIT_TICKS = 400;
     /** The last ticks of the Senkaimon's arrival check and of the lawn's wall check, which a slow server can make late. */
     private static final int COURT_BY_TICK = 6800, WALL_BY_TICK = 6985;
-    /** How long the clock may wait in all before those ticks for the server to catch up, before the checks fail. */
+    /** The press of the gate home, which waits for the first gate's wait to have run on a server that lost ticks. */
+    private static final int GATE_HOME_PRESS_TICK = 7320;
+    /** How long the clock may wait in all before those three ticks for the server to catch up, before the checks fail. */
     private static final int SERVER_WAIT_TICKS = 400;
     /** How many of the server's last chat lines are kept for the checks that read them. */
     private static final int CHAT_LINES_KEPT = 16;
@@ -1507,9 +1509,10 @@ public final class ClientSmokeTest {
             case 7100 -> command(minecraft, LAWN_TP);
             case 7190 -> holdArrival(minecraft, false);
             // Home by a gate opened in Soul Society. The first gate's wait of 600 server ticks from about 6631 has run
-            // by about 7231, 89 ticks before the press; the gate opens about 7351, two blocks south.
+            // by about 7231, 89 ticks before the press, unless a stall cost the server ticks, which the clock then waits
+            // out before the press; the gate opens about 7351, two blocks south.
             case 7310 -> command(minecraft, "bleach reiryoku @s 800 800");
-            case 7320 -> GateKeys.OPEN.setDown(true);
+            case GATE_HOME_PRESS_TICK -> GateKeys.OPEN.setDown(true);
             case 7368 -> GateKeys.OPEN.setDown(false);
             // Into it: it passes about 7392, to the bottom centre of the block the first gate was taken from.
             case 7370 -> command(minecraft, "tp @s ~ ~ ~2");
@@ -2522,13 +2525,33 @@ public final class ClientSmokeTest {
 
     /**
      * Whether the clock waits a tick before the last tick of the Senkaimon's arrival check or of the lawn's wall check,
-     * for what a server stalled by the crossing or behind sends late. Past {@link #SERVER_WAIT_TICKS} it goes on, and the
-     * check fails as before.
+     * for what a server stalled by the crossing or behind sends late, or before the gate home's press, for the first
+     * gate's wait that such a server has not yet run. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails
+     * as before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
-                || ticksInWorld == WALL_BY_TICK - 1 && !wallStands(minecraft.level);
+                || ticksInWorld == WALL_BY_TICK - 1 && !wallStands(minecraft.level)
+                || ticksInWorld == GATE_HOME_PRESS_TICK - 1 && !serverGateReady(minecraft);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
+    }
+
+    /** Whether the server's soul has no Senkaimon wait left to run, read on the server; false with no server to ask. */
+    private static boolean serverGateReady(Minecraft minecraft) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server == null || local == null) {
+            return false;
+        }
+        try {
+            return server.submit(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                return player != null
+                        && TravelLogic.cooldownSeconds(SoulLogic.get(player), player.level().getGameTime()) == 0;
+            }).get(2L, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /** Whether the player stands in the Senkaimon's court on Seireitei's lawn at y 72, where the gate brings it. */
