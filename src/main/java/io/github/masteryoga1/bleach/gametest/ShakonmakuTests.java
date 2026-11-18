@@ -602,13 +602,14 @@ public final class ShakonmakuTests {
         check(wrong, "the Academy", new Vec3(SeireiteiPlan.ACADEMY_LANDING_X, SeireiteiPlan.ACADEMY_FLOOR_Y,
                 SeireiteiPlan.ACADEMY_LANDING_Z), Side.INSIDE);
         // The plan's worked cells: the sphere beside the west gap and off the south axis, the inner face off and in the
-        // south gap, the gap's outer face and its edges (the smoke test's), the wall's top, the strip, the lawn, the sky.
+        // south gap, the gap's ways and the faces about them, the wall's top, the strip, the lawn, the sky.
         int[][] inside = {{-525, 120, 0}, {-526, 120, 0}, {12, 120, 525}, {20, 90, 511}, {0, 90, 511}, {16, 112, 512},
-                {20, 112, 516}, {20, 112, 521}, {0, 112, 516}, {0, 72, 510}, {0, 0, 511}, {0, 300, 470}};
-        int[][] gateway = {{0, 90, 512}, {0, 90, 519}, {7, 90, 512}, {-8, 90, 512}, {0, 72, 516}, {0, 111, 516}};
+                {20, 112, 516}, {20, 112, 521}, {0, 112, 516}, {0, 72, 510}, {0, 0, 511}, {0, 300, 470}, {7, 90, 512},
+                {-8, 90, 512}, {0, 111, 516}, {0, 97, 516}, {0, 70, 515}};
+        int[][] gateway = {{0, 90, 512}, {0, 90, 519}, {0, 96, 512}, {6, 72, 515}, {6, 72, 517}};
         int[][] outside = {{-527, 120, 0}, {12, 120, 526}, {20, 90, 512}, {0, 90, 520}, {20, 90, 519}, {8, 90, 512},
                 {-9, 90, 512}, {16, 111, 512}, {20, 72, 523}, {20, 111, 521}, {0, 72, 521}, {0, 72, 524}, {20, 50, 516},
-                {0, 300, 480}, {521, 72, 30}};
+                {0, 300, 480}, {521, 72, 30}, {0, 72, 516}, {6, 72, 516}, {0, 97, 517}, {0, 70, 517}};
         Map.of(Side.INSIDE, inside, Side.GATEWAY, gateway, Side.OUTSIDE, outside).forEach((side, cells) -> {
             for (int[] cell : cells) {
                 check(wrong, "the plan's cell", new Vec3(cell[0] + 0.5, cell[1], cell[2] + 0.5), side);

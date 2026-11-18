@@ -108,7 +108,10 @@ public final class ModBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
                     .strength(-1.0F, 3600000.0F).noLootTable().pushReaction(PushReaction.BLOCK)
                     .isValidSpawn((state, level, pos, type) -> false));
-    /** The wicket through a gate house's right-hand pier: a dark wooden door that nothing breaks and anyone opens. */
+    /**
+     * The wicket through a gate house's right-hand pier: a dark wooden door that nothing breaks, opened by hand but not
+     * from the Rukongai's side by a soul the gates bar.
+     */
     public static final DeferredBlock<WicketBlock> WICKET = BLOCKS.register("wicket",
             () -> new WicketBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN)
                     .instrument(NoteBlockInstrument.BASS).strength(-1.0F, 3600000.0F).noOcclusion().noLootTable()

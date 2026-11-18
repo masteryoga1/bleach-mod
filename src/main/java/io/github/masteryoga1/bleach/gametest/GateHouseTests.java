@@ -6,7 +6,6 @@ import io.github.masteryoga1.bleach.world.GateHouses;
 import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
-import io.github.masteryoga1.bleach.world.Shakonmaku;
 import io.github.masteryoga1.bleach.world.gen.SitePiece;
 import io.github.masteryoga1.bleach.world.gen.SitePlacement;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -222,7 +221,7 @@ public final class GateHouseTests {
 
     /**
      * Test A. The gate houses' set is placed by the plan, in Soul Society only, at the four sites' chunks and none about
-     * them; each site's box is exactly its gap, clear of the wall and the membrane's gateway below the wall's top, faces
+     * them; each site's box is exactly its gap, clear of the wall and in the plan's gap below the wall's top, faces
      * the Rukongai with its wicket on the right coming in, and is laid out there by the structure as the stamp reads it.
      */
     @GameTest(template = "empty", batch = "gate")
@@ -261,8 +260,8 @@ public final class GateHouseTests {
                     double r = SeireiteiPlan.radius(column.getX(), column.getZ());
                     boolean gap = r >= SeireiteiPlan.SEIREITEI_RADIUS && r < SeireiteiPlan.WALL_OUTER_RADIUS
                             && !SeireiteiPlan.inWall(column.getX(), column.getZ());
-                    helper.assertTrue(inBox == gap && (!inBox || Shakonmaku.side(column.getX(), SeireiteiPlan.WALL_TOP_Y
-                            - 1, column.getZ()) == Shakonmaku.Side.GATEWAY), "column " + column.toShortString()
+                    helper.assertTrue(inBox == gap && (!inBox || SeireiteiPlan.inGap(column.getX(), SeireiteiPlan.WALL_TOP_Y
+                            - 1, column.getZ())), "column " + column.toShortString()
                             + (inBox ? " is" : " is not") + " in house " + house);
                 }
             }

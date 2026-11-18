@@ -34,6 +34,8 @@ public final class SeireiteiPlan {
     public static final int GATE_ROW = WALL_THICKNESS / 2, GATE_LIFT = 12;
     /** The wicket's opening: this many rows from the ground through the right-hand pier, coming in from the Rukongai. */
     public static final int GATE_WICKET_ROWS = 2;
+    /** A gap cell this far out or more lies on the Rukongai's half, beyond the great gate's outer face. */
+    public static final int GATE_FACE_RADIUS = GATE_RADIUS + 1;
     /** Sōkyoku Hill: a sheer mesa. */
     public static final int MESA_RADIUS = 64, MESA_TOP_Y = 136;
     /** The cavern inside the hill: air from its floor up to, not including, its ceiling. */
@@ -86,6 +88,21 @@ public final class SeireiteiPlan {
     /** How far this block's centre lies from the nearer of the lines x = 0 and z = 0, on which the gates stand. */
     public static double axisDistance(int x, int z) {
         return Math.min(Math.abs(x + 0.5), Math.abs(z + 0.5));
+    }
+
+    /** Whether this block lies in a gate's gap, below the wall's top: the gate house's cells and the ground under them. */
+    public static boolean inGap(int x, int y, int z) {
+        double r = radius(x, z);
+        return y < WALL_TOP_Y && r >= SEIREITEI_RADIUS && r < WALL_OUTER_RADIUS && axisDistance(x, z) < GATE_HALF_WIDTH;
+    }
+
+    /**
+     * How far this block's centre lies across its gate's gap from the gap's middle, signed so that every wicket's way
+     * lies at the same positive distance.
+     */
+    public static double across(int x, int z) {
+        double dx = x + 0.5, dz = z + 0.5;
+        return Math.abs(dx) < Math.abs(dz) ? Math.signum(dz) * dx : -Math.signum(dx) * dz;
     }
 
     /** Whether this column is part of the Seireiheki, not one of its gate gaps. */

@@ -12,10 +12,13 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The Shakonmaku, the membrane over Seireitei: a sphere of {@link SeireiteiPlan#SHAKONMAKU_RADIUS} about the plateau's
  * middle that, with the Seireiheki below it, parts Soul Society into three sides. It is no block: every block's cell
- * lies on one side, and a line crosses it where it steps from an inside cell straight to an outside one, or back.
+ * lies on one side, and a line crosses it where it steps from an inside cell straight to an outside one, or back. In a
+ * gate's gap only the doorway and the wicket's way are the gateway, and the great gate's row in them stands on the
+ * Rukongai's side; the rest of the gap lies on the side of the gate's outer face it is on, so that no way round a shut
+ * gate leads through.
  */
 public final class Shakonmaku {
-    /** Where a cell lies: inside the wall or under the membrane above it, in a gate's gap, or anywhere else. */
+    /** Where a cell lies: inside the wall or under the membrane above it, in a gate's way through its gap, or elsewhere. */
     public enum Side {
         INSIDE, GATEWAY, OUTSIDE
     }
@@ -43,18 +46,31 @@ public final class Shakonmaku {
     }
 
     /**
-     * The side this block's cell lies on: in a gate's gap below the wall's top, inside if its centre is under the
-     * sphere and nearer the centre column than the inner face or at the wall's top or above, else outside.
+     * The side this block's cell lies on: in a gate's gap below the wall's top, the gateway for the doorway and the
+     * wicket's way except in the great gate's row, which is outside; any other gap cell is inside if nearer the centre
+     * column than the gate's outer face, else outside. Anywhere else a cell is inside if its centre is under the sphere
+     * and nearer the centre column than the inner face or at the wall's top or above, else outside.
      */
     public static Side side(int x, int y, int z) {
         double r = SeireiteiPlan.radius(x, z);
-        if (y < SeireiteiPlan.WALL_TOP_Y && r >= SeireiteiPlan.SEIREITEI_RADIUS && r < SeireiteiPlan.WALL_OUTER_RADIUS
-                && SeireiteiPlan.axisDistance(x, z) < SeireiteiPlan.GATE_HALF_WIDTH) {
-            return Side.GATEWAY;
+        if (SeireiteiPlan.inGap(x, y, z)) {
+            boolean way = way(x, y, z), beyond = r >= SeireiteiPlan.GATE_FACE_RADIUS;
+            if (way && (beyond || r < SeireiteiPlan.GATE_RADIUS)) {
+                return Side.GATEWAY;
+            }
+            return way || beyond ? Side.OUTSIDE : Side.INSIDE;
         }
         double up = y + 0.5 - CENTRE_Y;
         boolean under = r * r + up * up < RADIUS_SQR;
         return under && (r < SeireiteiPlan.SEIREITEI_RADIUS || y >= SeireiteiPlan.WALL_TOP_Y) ? Side.INSIDE : Side.OUTSIDE;
+    }
+
+    /** Whether this gap cell is the doorway's, below its head, or the wicket's way, its two rows over the plateau. */
+    private static boolean way(int x, int y, int z) {
+        double across = SeireiteiPlan.across(x, z);
+        int row = y - SeireiteiPlan.PLATEAU_Y, door = SeireiteiPlan.GATE_DOOR_HALF_WIDTH;
+        return row >= 0 && (Math.abs(across) < door && y < SeireiteiPlan.GATE_DOOR_TOP_Y
+                || across > door + 1 && across < door + 2 && row < SeireiteiPlan.GATE_WICKET_ROWS);
     }
 
     /** The side of the cell this point is in. */
@@ -62,14 +78,44 @@ public final class Shakonmaku {
         return side(Mth.floor(at.x), Mth.floor(at.y), Mth.floor(at.z));
     }
 
+    /** The side a leap starts or lands on: a gateway cell counts as the half of its gap it lies on, the gate's row out. */
+    public static Side half(Vec3 at) {
+        Side side = side(at);
+        if (side != Side.GATEWAY) {
+            return side;
+        }
+        return SeireiteiPlan.radius(Mth.floor(at.x), Mth.floor(at.z)) < SeireiteiPlan.GATE_RADIUS ? Side.INSIDE
+                : Side.OUTSIDE;
+    }
+
     /**
      * Where the line from {@code from} to {@code to} first steps straight from an inside cell to an outside one or back,
-     * a gate's gap between them never counting: the point and face where it enters the first cell on the far side, or
+     * a gateway cell between them never counting: the point and face where it enters the first cell on the far side, or
      * null. A point on a face lies in the cell on its positive side, and only the line's part within the far sphere is
      * walked (none if an end is not finite).
      */
     @Nullable
     public static BlockHitResult crossing(Vec3 from, Vec3 to) {
+        return crossing(from, to, false);
+    }
+
+    /**
+     * As {@link #crossing}, for a body: the line crosses where it first meets an outside cell after an inside one, or
+     * back, a gateway between them or not, so that no body goes through a gate's row faster than it walks.
+     */
+    @Nullable
+    public static BlockHitResult bodyCrossing(Vec3 from, Vec3 to) {
+        return crossing(from, to, true);
+    }
+
+    /** Whether a body moving from {@code from} to {@code to} crosses the membrane anywhere. */
+    public static boolean bodyCrosses(Vec3 from, Vec3 to) {
+        return bodyCrossing(from, to) != null;
+    }
+
+    /** {@link #crossing}, or {@link #bodyCrossing} if strict. */
+    @Nullable
+    private static BlockHitResult crossing(Vec3 from, Vec3 to, boolean strict) {
         if (!finite(from) || !finite(to) || from.equals(to) || core(from) && core(to)) {
             return null;
         }
@@ -85,7 +131,7 @@ public final class Shakonmaku {
         }
         Vec3 start = enter > 0.0 ? from.add(way.scale(enter)) : from;
         Vec3 end = leave < 1.0 ? from.add(way.scale(leave)) : to;
-        return walk(start, end);
+        return walk(start, end, strict);
     }
 
     /** Whether the line from {@code from} to {@code to} crosses the membrane anywhere. */
@@ -93,12 +139,12 @@ public final class Shakonmaku {
         return crossing(from, to) != null;
     }
 
-    /** The cell walk of {@link #crossing}, along a line that lies within the far sphere. */
+    /** The cell walk of {@link #crossing}, or of {@link #bodyCrossing} if strict, along a line within the far sphere. */
     @Nullable
-    private static BlockHitResult walk(Vec3 from, Vec3 to) {
+    private static BlockHitResult walk(Vec3 from, Vec3 to, boolean strict) {
         Vec3 way = to.subtract(from);
         BlockPos.MutableBlockPos cell = BlockPos.containing(from).mutable();
-        Side before = side(cell);
+        Side before = side(cell), last = before;
         for (int entered = 0; entered < MOST_CELLS; entered++) {
             // The face the line passes next: one met heading the positive way is passed there, the other way past it.
             Direction ahead = null;
@@ -117,10 +163,15 @@ public final class Shakonmaku {
                 return null;
             }
             Side here = side(cell.move(ahead));
-            if (before != here && before != Side.GATEWAY && here != Side.GATEWAY) {
+            boolean crossed = strict ? here != Side.GATEWAY && last != Side.GATEWAY && here != last
+                    : before != here && before != Side.GATEWAY && here != Side.GATEWAY;
+            if (crossed) {
                 return new BlockHitResult(from.add(way.scale(soonest)), ahead.getOpposite(), cell.immutable(), false);
             }
             before = here;
+            if (here != Side.GATEWAY) {
+                last = here;
+            }
         }
         return null;
     }
