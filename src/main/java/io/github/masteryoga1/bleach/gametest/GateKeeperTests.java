@@ -42,6 +42,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
@@ -102,16 +103,26 @@ public final class GateKeeperTests {
     }
 
     /**
-     * Waits for this gate down and its keeper; sends that keeper away and waits for its gates to make it again, whole at
-     * its post, into {@code keeper}; and, if asked, quiets it, so that a test starts from a keeper as a batch finds it.
+     * Clears the Rukongai's beasts about this gate and waits for it down and its keeper; sends that keeper away and waits
+     * for its gates to make it again, whole at its post, into {@code keeper}; and, if asked, quiets it, so that a test
+     * starts from a keeper as a batch finds it.
      */
     static GameTestSequence fresh(GameTestHelper helper, ServerLevel soul, int gate, GateKeeper[] keeper, boolean quiet) {
         return helper.startSequence()
+                .thenExecute(() -> clearBeasts(soul, gate))
                 .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), gate))
                 .thenWaitUntil(() -> helper.assertTrue(keeper(soul, gate) != null, "gate " + gate + " has no keeper yet"))
                 .thenExecute(() -> keeper(soul, gate).discard())
                 .thenWaitUntil(() -> keeper[0] = assertKeeper(helper, soul, gate))
                 .thenExecute(() -> keeper[0].setNoAi(quiet));
+    }
+
+    /**
+     * Takes away the Rukongai's beasts about this gate's house and its keeper's ground, which the world's chunks are made
+     * with: one that wanders under the gate while it is lifted holds its fall as a soul's body does.
+     */
+    private static void clearBeasts(ServerLevel soul, int gate) {
+        soul.getEntitiesOfClass(Animal.class, GateState.ground(gate).inflate(24.0, 16.0, 24.0)).forEach(Entity::discard);
     }
 
     /** A soul of this kind joined in survival and set down here in Soul Society. */
@@ -478,8 +489,12 @@ public final class GateKeeperTests {
                             since + " ticks on, the keeper is at " + k.getHealth() + ", not " + due);
                 })
                 .thenWaitUntil(() -> helper.assertTrue(gates.target(NORTH) == 0, "the gate has not been dropped"))
-                .thenExecute(() -> helper.assertTrue(soul.getGameTime() - yielded[0] <= GateKeeper.HOLD_TICKS + 1,
-                        "the gate dropped " + (soul.getGameTime() - yielded[0]) + " ticks on"))
+                .thenExecute(() -> {
+                    helper.assertTrue(soul.getGameTime() - yielded[0] <= GateKeeper.HOLD_TICKS + 1,
+                            "the gate dropped " + (soul.getGameTime() - yielded[0]) + " ticks on");
+                    // A beast that wandered under it in the half minute would hold it up.
+                    clearBeasts(soul, NORTH);
+                })
                 .thenWaitUntil(() -> GateTests.assertDown(helper, gates, NORTH))
                 .thenExecute(() -> yieldedAgo(keeper[0], GateKeeper.HEAL_TICKS))
                 .thenWaitUntil(() -> helper.assertTrue(!keeper[0].isBeaten()
