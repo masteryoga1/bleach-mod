@@ -91,6 +91,7 @@ import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -2454,38 +2455,42 @@ public final class ClientSmokeTest {
     }
 
     /**
-     * Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of the gap, and the
-     * gate house in it, a plaster pier against each side and its doorway open between dark posts, closed further in by
-     * its great gate, down.
+     * Whether the client holds the south wall as the plan lays it, on the gap's east side: Sekkiseki to its top, and the
+     * gate house in the gap, a plaster pier against the wall and its doorway open by a dark post, closed further in by
+     * its great gate, down. The west side's chunk is some 40 chunks into what the client is sent from the lawn spot, too
+     * late for a slow runner; the game tests read both sides.
      */
     private static boolean wallStands(ClientLevel level) {
         Block sekkiseki = ModBlocks.SEKKISEKI.get(), plaster = ModBlocks.WHITE_PLASTER.get();
         List<BlockPos> at = wallPlaces();
         // Each pair lies in one chunk, so the block beside the air shows that the air was sent, not missing.
         return level.getBlockState(at.get(0)).is(sekkiseki) && level.getBlockState(at.get(1)).is(plaster)
-                && level.getBlockState(at.get(2)).is(sekkiseki) && level.getBlockState(at.get(3)).is(plaster)
-                && level.getBlockState(at.get(4)).is(Blocks.STRIPPED_DARK_OAK_LOG) && level.getBlockState(at.get(5)).isAir()
-                && level.getBlockState(at.get(6)).is(sekkiseki) && level.getBlockState(at.get(7)).isAir()
-                && level.getBlockState(at.get(8)).is(ModBlocks.GREAT_GATE.get());
+                && level.getBlockState(at.get(2)).is(Blocks.STRIPPED_DARK_OAK_LOG) && level.getBlockState(at.get(3)).isAir()
+                && level.getBlockState(at.get(4)).is(sekkiseki) && level.getBlockState(at.get(5)).isAir()
+                && level.getBlockState(at.get(6)).is(ModBlocks.GREAT_GATE.get());
     }
 
     /**
-     * The blocks {@link #wallStands} reads: in pairs, the wall and the pier at each side of the south gap, the doorway's
+     * The blocks {@link #wallStands} reads: in pairs, the wall and the pier at the south gap's east side, the doorway's
      * east post and the air inside it, and the wall's top block east of the gap and the air over it; then the great gate
      * in the gap's middle row, which GateState lays once the house stands.
      */
     private static List<BlockPos> wallPlaces() {
         int z = SeireiteiPlan.SEIREITEI_RADIUS, w = SeireiteiPlan.GATE_HALF_WIDTH, top = SeireiteiPlan.WALL_TOP_Y;
         int door = SeireiteiPlan.GATE_DOOR_HALF_WIDTH;
-        return List.of(new BlockPos(w, 90, z), new BlockPos(w - 1, 90, z), new BlockPos(-w - 1, 90, z),
-                new BlockPos(-w, 90, z), new BlockPos(door, 90, z), new BlockPos(door - 1, 90, z),
+        return List.of(new BlockPos(w, 90, z), new BlockPos(w - 1, 90, z), new BlockPos(door, 90, z),
+                new BlockPos(door - 1, 90, z),
                 new BlockPos(16, top - 1, z), new BlockPos(16, top, z),
                 new BlockPos(0, 90, SeireiteiPlan.GATE_RADIUS));
     }
 
-    /** What the client holds at each place {@link #wallStands} reads, or that its chunk has not come, for a failure. */
+    /**
+     * What the client holds at each place {@link #wallStands} reads, or that its chunk has not come, for a failure. A
+     * client level says it has every chunk, so its chunk cache is asked.
+     */
     private static String wallSeen(ClientLevel level) {
-        return wallPlaces().stream().map(pos -> pos.toShortString() + " " + (level.hasChunkAt(pos)
+        return wallPlaces().stream().map(pos -> pos.toShortString() + " " + (level.getChunkSource()
+                .hasChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()))
                 ? BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()) : "unloaded"))
                 .collect(Collectors.joining(", "));
     }
