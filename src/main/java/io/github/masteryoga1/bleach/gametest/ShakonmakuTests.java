@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.soul.TravelLogic;
+import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.world.Shakonmaku;
@@ -129,6 +130,7 @@ public final class ShakonmakuTests {
         final ServerLevel soul;
         private final ChunkPos centre;
         private final List<Entity> placed = new ArrayList<>();
+        private final List<Runnable> ends = new ArrayList<>();
 
         private Cleanup(ServerLevel soul, ChunkPos centre) {
             this.soul = soul;
@@ -140,6 +142,11 @@ public final class ShakonmakuTests {
             placed.add(entity);
             soul.addFreshEntity(entity);
             return entity;
+        }
+
+        /** Has this run too when the test ends, passed or failed, before its chunks are let go. */
+        void atEnd(Runnable end) {
+            ends.add(end);
         }
 
         @Override
@@ -160,9 +167,10 @@ public final class ShakonmakuTests {
         public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
         }
 
-        /** Takes away what the test set down and lets its chunks go. */
+        /** Takes away what the test set down, runs what it asked to at its end, and lets its chunks go. */
         private void end() {
             TravelTests.discard(placed.toArray(new Entity[0]));
+            ends.forEach(Runnable::run);
             soul.getChunkSource().removeRegionTicket(TicketType.FORCED, centre, HOLD_DISTANCE, centre);
         }
     }
@@ -275,25 +283,41 @@ public final class ShakonmakuTests {
     }
 
     /**
-     * Through the north gate's gap at y 95 a soul flies out and back in, each step let be, the gap between; then, out
-     * in front of the gate, rising past the wall's top into the membrane over the strip, it is turned back.
+     * Through the north gate's gap at y 80, under its great gate lifted, a soul flies out and back in, each step let be,
+     * the gap between; then, out in front of the gate, rising past the wall's top into the membrane over the strip, it is
+     * turned back, and the gate is dropped again.
      */
-    @GameTest(template = "empty", batch = BATCH, timeoutTicks = 200)
+    @GameTest(template = "empty", batch = BATCH, timeoutTicks = 400)
     public static void aSoulPassesThroughAGateBothWays(GameTestHelper helper) {
-        ServerLevel soul = hold(helper, 0, -33).soul;
-        Vec3[] way = {new Vec3(0.5, 95.0, -509.5), new Vec3(0.5, 95.0, -513.5), new Vec3(0.5, 95.0, -517.5),
-                new Vec3(0.5, 95.0, -521.5)};
+        int north = Rukongai.Region.NORTH.ordinal();
+        ServerLevel soul = GateTests.dropped(hold(helper, 0, -33), north).soul;
+        GateState gates = GateState.get(soul);
+        Vec3[] way = {new Vec3(0.5, 80.0, -509.5), new Vec3(0.5, 80.0, -513.5), new Vec3(0.5, 80.0, -517.5),
+                new Vec3(0.5, 80.0, -521.5)};
+        // Up from the way out, no move further than the server lets a client go in a tick.
+        Vec3[] climb = {new Vec3(0.5, 88.0, -521.5), new Vec3(0.5, 96.0, -521.5)};
         Vec3 risen = new Vec3(0.5, 104.0, -521.5), over = new Vec3(0.5, 113.0, -521.5);
         on(helper, Side.INSIDE, way[0], over);
         on(helper, Side.GATEWAY, way[1], way[2]);
-        on(helper, Side.OUTSIDE, way[3], risen);
+        on(helper, Side.OUTSIDE, way[3], climb[0], climb[1], risen);
         ServerPlayer player = soulAt(helper, soul, GameType.SURVIVAL, way[0]);
         int[] order = {1, 2, 3, 2, 1, 0, 1, 2, 3};
-        var sequence = helper.startSequence().thenIdle(5);
+        var sequence = helper.startSequence()
+                .thenWaitUntil(() -> GateTests.assertDown(helper, gates, north))
+                .thenExecute(() -> gates.lift(soul, north))
+                .thenWaitUntil(() -> GateTests.assertIs(helper, gates, north, GateState.Status.LIFTED,
+                        SeireiteiPlan.GATE_LIFT))
+                .thenIdle(5);
         for (int step : order) {
             sequence = sequence.thenExecute(() -> {
                 move(player, way[step]);
                 at(helper, player, way[step], "the soul stepping through the gate");
+            }).thenIdle(1);
+        }
+        for (Vec3 up : climb) {
+            sequence = sequence.thenExecute(() -> {
+                move(player, up);
+                at(helper, player, up, "the soul rising in front of the gate");
             }).thenIdle(1);
         }
         sequence.thenExecute(() -> move(player, risen))
@@ -302,7 +326,9 @@ public final class ShakonmakuTests {
                     move(player, over);
                     at(helper, player, risen, "the soul rising over the gate's mouth");
                     helper.assertTrue(told(player) == 1, "the soul was told " + TravelTests.said(player));
+                    gates.drop(soul, north);
                 })
+                .thenWaitUntil(() -> GateTests.assertDown(helper, gates, north))
                 .thenSucceed();
     }
 

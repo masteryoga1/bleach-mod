@@ -91,6 +91,7 @@ import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -309,6 +310,10 @@ public final class ClientSmokeTest {
     private static final int FIRST_STEP_TICK = 40;
     /** How long the steps wait on the bloodline answer before the run fails. */
     private static final int BLOODLINE_WAIT_TICKS = 400;
+    /** The last ticks of the Senkaimon's arrival check and of the lawn's wall check, which a slow server can make late. */
+    private static final int COURT_BY_TICK = 6800, WALL_BY_TICK = 6985;
+    /** How long the clock may wait in all before those ticks for the server to catch up, before the checks fail. */
+    private static final int SERVER_WAIT_TICKS = 400;
     /** How many of the server's last chat lines are kept for the checks that read them. */
     private static final int CHAT_LINES_KEPT = 16;
     /** How many of the server's last action bar lines are kept for a failure to name. */
@@ -322,6 +327,8 @@ public final class ClientSmokeTest {
     private static int bloodlineTicks;
     /** How many ticks the steps have waited on the bloodline answer. */
     private static int bloodlineWaitTicks;
+    /** How many ticks the clock has waited for the server before the Soul Society checks' last ticks. */
+    private static int serverWaitTicks;
     /** The first tick of each {@link #expectWithin} window that has already passed. */
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** When the player was sent into the third gate, by the clock and by the server's own tick count. */
@@ -421,6 +428,9 @@ public final class ClientSmokeTest {
         }
         LocalPlayer player = minecraft.player;
         SoulData soul = player.getData(SoulAttachments.SOUL);
+        if (waitsForServer(minecraft, player)) {
+            return;
+        }
         // The steps wait for the bloodline answer: the first one makes a Plus, who is never asked.
         if (ticksInWorld < FIRST_STEP_TICK - 1 || soul.quincy().decided()) {
             ++ticksInWorld;
@@ -2213,9 +2223,7 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 6630, 6654, () -> gateAhead(minecraft, player),
                 "the turned blade never opened a Senkaimon two blocks south of the player, facing it, 3 wide and 4 tall"
                         + " (the action bar's last lines: " + recentActionBar() + ")");
-        expectWithin(minecraft, 6665, 6800, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
-                        && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
-                        && horizontalDistance(player.position(), TravelLogic.COURT) < 0.5,
+        expectWithin(minecraft, 6665, COURT_BY_TICK, () -> atCourt(minecraft, player),
                 "the Senkaimon never brought the player to its court on Seireitei's lawn at y 72 (it is in "
                         + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString()
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
@@ -2227,9 +2235,9 @@ public final class ClientSmokeTest {
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
                         + ", the lawn's block " + minecraft.level.getBlockState(BlockPos.containing(SOUL_SOCIETY_X,
                                 SeireiteiPlan.PLATEAU_Y - 1, SOUL_SOCIETY_Z)) + ")");
-        expectWithin(minecraft, 6850, 6985, () -> wallStands(minecraft.level),
-                "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a gate house (the"
-                        + " client holds " + wallSeen(minecraft.level) + ")");
+        expectWithin(minecraft, 6850, WALL_BY_TICK, () -> wallStands(minecraft.level),
+                "the Seireiheki never reached the client as the plan lays it: Sekkiseki to y 111 by a gate house, its"
+                        + " great gate down (the client holds " + wallSeen(minecraft.level) + ")");
         expectWithin(minecraft, 7010, 7090, () -> minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY
                         && player.onGround() && Math.abs(player.getY() - SeireiteiPlan.ACADEMY_FLOOR_Y) < 0.01
                         && academyStands(minecraft.level) && !instructorsNear(minecraft, 32.0).isEmpty(),
@@ -2454,36 +2462,62 @@ public final class ClientSmokeTest {
     }
 
     /**
-     * Whether the client holds the south wall as the plan lays it: Sekkiseki to its top on both sides of the gap, and the
-     * gate house in it, a plaster pier against each side and its doorway open between dark posts.
+     * Whether the client holds the south wall as the plan lays it, on the gap's east side: Sekkiseki to its top, and the
+     * gate house in the gap, a plaster pier against the wall and its doorway open by a dark post, closed further in by
+     * its great gate, down. The west side's chunk is some 40 chunks into what the client is sent from the lawn spot, too
+     * late for a slow runner; the game tests read both sides.
      */
     private static boolean wallStands(ClientLevel level) {
         Block sekkiseki = ModBlocks.SEKKISEKI.get(), plaster = ModBlocks.WHITE_PLASTER.get();
         List<BlockPos> at = wallPlaces();
         // Each pair lies in one chunk, so the block beside the air shows that the air was sent, not missing.
         return level.getBlockState(at.get(0)).is(sekkiseki) && level.getBlockState(at.get(1)).is(plaster)
-                && level.getBlockState(at.get(2)).is(sekkiseki) && level.getBlockState(at.get(3)).is(plaster)
-                && level.getBlockState(at.get(4)).is(Blocks.STRIPPED_DARK_OAK_LOG) && level.getBlockState(at.get(5)).isAir()
-                && level.getBlockState(at.get(6)).is(sekkiseki) && level.getBlockState(at.get(7)).isAir();
+                && level.getBlockState(at.get(2)).is(Blocks.STRIPPED_DARK_OAK_LOG) && level.getBlockState(at.get(3)).isAir()
+                && level.getBlockState(at.get(4)).is(sekkiseki) && level.getBlockState(at.get(5)).isAir()
+                && level.getBlockState(at.get(6)).is(ModBlocks.GREAT_GATE.get());
     }
 
     /**
-     * The blocks {@link #wallStands} reads, in pairs: the wall and the pier at each side of the south gap, the doorway's
-     * east post and the air inside it, and the wall's top block east of the gap and the air over it.
+     * The blocks {@link #wallStands} reads: in pairs, the wall and the pier at the south gap's east side, the doorway's
+     * east post and the air inside it, and the wall's top block east of the gap and the air over it; then the great gate
+     * in the gap's middle row, which GateState lays once the house stands.
      */
     private static List<BlockPos> wallPlaces() {
         int z = SeireiteiPlan.SEIREITEI_RADIUS, w = SeireiteiPlan.GATE_HALF_WIDTH, top = SeireiteiPlan.WALL_TOP_Y;
         int door = SeireiteiPlan.GATE_DOOR_HALF_WIDTH;
-        return List.of(new BlockPos(w, 90, z), new BlockPos(w - 1, 90, z), new BlockPos(-w - 1, 90, z),
-                new BlockPos(-w, 90, z), new BlockPos(door, 90, z), new BlockPos(door - 1, 90, z),
-                new BlockPos(16, top - 1, z), new BlockPos(16, top, z));
+        return List.of(new BlockPos(w, 90, z), new BlockPos(w - 1, 90, z), new BlockPos(door, 90, z),
+                new BlockPos(door - 1, 90, z),
+                new BlockPos(16, top - 1, z), new BlockPos(16, top, z),
+                new BlockPos(0, 90, SeireiteiPlan.GATE_RADIUS));
     }
 
-    /** What the client holds at each place {@link #wallStands} reads, or that its chunk has not come, for a failure. */
+    /**
+     * What the client holds at each place {@link #wallStands} reads, or that its chunk has not come, for a failure. A
+     * client level says it has every chunk, so its chunk cache is asked.
+     */
     private static String wallSeen(ClientLevel level) {
-        return wallPlaces().stream().map(pos -> pos.toShortString() + " " + (level.hasChunkAt(pos)
+        return wallPlaces().stream().map(pos -> pos.toShortString() + " " + (level.getChunkSource()
+                .hasChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()))
                 ? BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()) : "unloaded"))
                 .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Whether the clock waits a tick before the last tick of the Senkaimon's arrival check or of the lawn's wall check,
+     * for what a server stalled by the crossing or behind sends late. Past {@link #SERVER_WAIT_TICKS} it goes on, and the
+     * check fails as before.
+     */
+    private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
+        boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
+                || ticksInWorld == WALL_BY_TICK - 1 && !wallStands(minecraft.level);
+        return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
+    }
+
+    /** Whether the player stands in the Senkaimon's court on Seireitei's lawn at y 72, where the gate brings it. */
+    private static boolean atCourt(Minecraft minecraft, LocalPlayer player) {
+        return minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY && player.onGround()
+                && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
+                && horizontalDistance(player.position(), TravelLogic.COURT) < 0.5;
     }
 
     /** Whether the player stands on Seireitei's lawn at y 72, where {@link #LAWN_TP} sets it. */

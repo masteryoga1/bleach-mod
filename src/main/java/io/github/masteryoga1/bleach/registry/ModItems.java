@@ -86,6 +86,7 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.DIVISION_BANNER.get(), new Item.Properties()
                     .component(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY
                             .with(DivisionBannerBlock.DIVISION, DivisionBannerBlock.Division.FIRST))));
+    public static final DeferredItem<BlockItem> GREAT_GATE = ITEMS.registerSimpleBlockItem(ModBlocks.GREAT_GATE);
 
     /** The soul pager every Shinigami carries. See {@link DenreishinkiItem}. */
     public static final DeferredItem<DenreishinkiItem> DENREISHINKI = ITEMS.register("denreishinki",

@@ -49,7 +49,8 @@ public final class SoulSocietyWorldTests {
         int plateau = SeireiteiPlan.PLATEAU_Y, top = SeireiteiPlan.WALL_TOP_Y, g = SeireiteiPlan.GATE_RADIUS;
         int d = (int) (g / Math.sqrt(2.0)), w = SeireiteiPlan.GATE_HALF_WIDTH;
         BlockPos lawn = new BlockPos(300, plateau - 1, 40), wall = new BlockPos(d, top - 1, d);
-        BlockPos gap = new BlockPos(0, plateau - 1, g);
+        // A row inside the great gate's, which stands in the gap's middle row once its house is laid.
+        BlockPos gap = new BlockPos(0, plateau - 1, g - 1);
         // Each generated in full where it is, wall feature and all: about 25 chunks round each, once.
         List.of(lawn, wall, gap).forEach(soul::getChunk);
         Block sekkiseki = ModBlocks.SEKKISEKI.get();
@@ -60,8 +61,8 @@ public final class SoulSocietyWorldTests {
                         && soul.getBlockState(wall.atY(0)).is(Blocks.BEDROCK),
                 "the Seireiheki at (" + d + ", " + d + ") is not Sekkiseki from y 1 to " + (top - 1) + " on bedrock");
         helper.assertTrue(soul.getBlockState(gap).is(Blocks.GRASS_BLOCK) && soul.getBlockState(gap.above()).isAir()
-                        && soul.getBlockState(new BlockPos(w, 90, g)).is(sekkiseki)
-                        && soul.getBlockState(new BlockPos(0, 90, g)).isAir(),
+                        && soul.getBlockState(new BlockPos(w, 90, g - 1)).is(sekkiseki)
+                        && soul.getBlockState(new BlockPos(0, 90, g - 1)).isAir(),
                 "the south gate's gap is not open lawn between walls");
         helper.succeed();
     }

@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.gametest;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.world.GateHouses;
+import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
 import io.github.masteryoga1.bleach.world.Shakonmaku;
@@ -43,9 +44,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Seireiheki's gate houses in the real Soul Society, which the test server, making no structures, has only
- * from the stamp. Tests A and B read all four houses; C to E, in a batch of their own, each work on a house no other test
- * then holds, D and E taking theirs down. Every test lets go of its chunks and what it set down however it ends, and a
- * house taken down is built again.
+ * from the stamp: A and B read all four houses and their gates, and C to E, in a batch of their own, each work on a
+ * house no other test then holds, C lifting its gate and D and E taking theirs down. Every test lets go of its chunks
+ * and what it set down however it ends, a gate it lifted is dropped, and a house taken down is built again.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -97,7 +98,8 @@ public final class GateHouseTests {
 
     /**
      * Asserts that this house stands as the plan lays it, every block of its box: open where the template leaves it
-     * open, else neither air nor Sekkiseki; the wall's Sekkiseki beside it across the gap; and open air over it all.
+     * open, or in the gate's row what GateState lays there, else neither air nor Sekkiseki; the wall's Sekkiseki beside
+     * it across the gap; and open air over it all.
      * The generator's own blocks stand at its own places, turned with the house: plinth, pier, roof, stairs, posts, wicket.
      */
     private static void assertHouse(GameTestHelper helper, ServerLevel soul, int house, String when) {
@@ -132,12 +134,18 @@ public final class GateHouseTests {
                 for (int z = 0; z < GateHouses.SIZE.getZ(); z++) {
                     BlockState state = soul.getBlockState(at(house, x, y, z));
                     boolean right = y == height ? state.isAir() : x < 0 || x == width ? state.is(sekkiseki)
-                            : open(x, y, z) ? state.isAir() : !state.isAir() && !state.is(sekkiseki);
+                            : open(x, y, z) ? z == SeireiteiPlan.GATE_ROW ? gateOrOpen(state) : state.isAir()
+                            : !state.isAir() && !state.is(sekkiseki);
                     helper.assertTrue(right, "house " + house + "'s (" + x + ", " + y + ", " + z + ") at "
                             + at(house, x, y, z).toShortString() + " is " + state + " " + when);
                 }
             }
         }
+    }
+
+    /** Whether a cell GateState lays holds air or its great gate, laid yet or not. */
+    private static boolean gateOrOpen(BlockState state) {
+        return state.isAir() || state.is(ModBlocks.GREAT_GATE.get());
     }
 
     /** Asserts that this place of a house's template, turned and set, holds the block expected. */
@@ -284,10 +292,10 @@ public final class GateHouseTests {
     // ---- The houses ----
 
     /**
-     * Test B. All four houses stand once their chunks load, each as the plan lays it, turned to face the Rukongai: the
-     * doorway, the slot and the wicket's way open, no Sekkiseki in them, and the wall's Sekkiseki on both sides.
+     * Test B. All four houses stand once their chunks load, each as the plan lays it, turned to face the Rukongai, with
+     * the doorway, slot and wicket's way open, no Sekkiseki in them, the wall's on both sides, and its great gate down.
      */
-    @GameTest(template = "empty", batch = "gate", timeoutTicks = 200)
+    @GameTest(template = "empty", batch = "gate", timeoutTicks = 400)
     public static void theGateHousesStandAsThePlanLaysThem(GameTestHelper helper) {
         ServerLevel soul = SiteTests.soul(helper);
         // One house a step, so that no tick of the test makes more than one house's chunks.
@@ -296,26 +304,42 @@ public final class GateHouseTests {
             int house = each;
             sequence = sequence.thenExecute(() -> hold(helper, house))
                     .thenWaitUntil(() -> assertPlaced(helper, soul, house, "from its chunks' loads alone"))
-                    .thenExecute(() -> assertHouse(helper, soul, house, "once it stood"));
+                    .thenExecute(() -> assertHouse(helper, soul, house, "once it stood"))
+                    .thenExecute(() -> GateState.get(soul).drop(soul, house))
+                    .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), house))
+                    .thenExecute(() -> GateTests.assertGate(helper, soul, house, 0, "once its house stood"));
         }
         sequence.thenSucceed();
     }
 
     /**
-     * Test C. A Shinigami walks out of Seireitei through the south house's doorway, step by step across the gap, and
-     * back; a step from the Rukongai into the left pier is put back.
+     * Test C. A Shinigami's step through the south house's doorway is put back by its great gate, down; with the gate
+     * lifted, it walks out of Seireitei step by step across the gap, and back, and a step from the Rukongai into the left
+     * pier is put back before the gate is dropped again.
      */
-    @GameTest(template = "empty", batch = "gate_house", timeoutTicks = 200)
+    @GameTest(template = "empty", batch = "gate_house", timeoutTicks = 400)
     public static void aSoulWalksThroughADoorway(GameTestHelper helper) {
-        ServerLevel soul = hold(helper, SOUTH).soul;
+        ServerLevel soul = GateTests.dropped(hold(helper, SOUTH), SOUTH).soul;
+        GateState gates = GateState.get(soul);
         Vec3[] way = {new Vec3(0.5, 72.0, 509.5), new Vec3(0.5, 72.0, 513.5), new Vec3(0.5, 72.0, 517.5),
                 new Vec3(0.5, 72.0, 521.5)};
         Vec3 beside = new Vec3(-6.5, 72.0, 521.5), pier = new Vec3(-6.5, 72.0, 517.5);
         ServerPlayer player = ShakonmakuTests.soulAt(helper, soul, GameType.SURVIVAL, way[0]);
-        int[] order = {1, 2, 3, 2, 1, 0, 1, 2, 3};
+        int[] order = {2, 3, 2, 1, 0, 1, 2, 3};
         var sequence = helper.startSequence()
                 .thenWaitUntil(() -> assertPlaced(helper, soul, SOUTH, "before the walk"))
-                .thenIdle(5);
+                .thenWaitUntil(() -> GateTests.assertDown(helper, gates, SOUTH))
+                .thenIdle(5)
+                .thenExecute(() -> ShakonmakuTests.move(player, way[1]))
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    ShakonmakuTests.move(player, way[2]);
+                    helper.assertTrue(player.position().distanceToSqr(way[1]) < 1.0E-6, "the soul stepping through the"
+                            + " closed gate is at " + player.position() + ", not put back at " + way[1]);
+                    gates.lift(soul, SOUTH);
+                })
+                .thenWaitUntil(() -> GateTests.assertIs(helper, gates, SOUTH, GateState.Status.LIFTED,
+                        SeireiteiPlan.GATE_LIFT));
         for (int step : order) {
             sequence = sequence.thenExecute(() -> {
                 ShakonmakuTests.move(player, way[step]);
@@ -329,7 +353,9 @@ public final class GateHouseTests {
                     ShakonmakuTests.move(player, pier);
                     helper.assertTrue(player.position().distanceToSqr(beside) < 1.0E-6, "the soul stepping into the left pier"
                             + " is at " + player.position() + ", not put back at " + beside);
+                    gates.drop(soul, SOUTH);
                 })
+                .thenWaitUntil(() -> GateTests.assertDown(helper, gates, SOUTH))
                 .thenSucceed();
     }
 
