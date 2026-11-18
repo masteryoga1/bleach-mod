@@ -61,6 +61,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue GRADUATION_KIDO_LEVEL;
     public static final ModConfigSpec.IntValue ASAUCHI_REISSUE_MINUTES;
     public static final ModConfigSpec.IntValue KIDO_LESSON_XP;
+    public static final ModConfigSpec.IntValue DUMMY_XP_PER_DAY;
 
     public static final ModConfigSpec.DoubleValue KONSO_GROWTH;
     public static final ModConfigSpec.IntValue KONSO_REWARDED_PER_DAY;
@@ -897,6 +898,11 @@ public final class BleachConfig {
                 .comment("Kidō xp the Academy instructor's lesson gives a student, once a day (a new day comes each"
                         + " morning, or every 20 minutes of play). 0 gives the lesson without xp.")
                 .defineInRange("kido_lesson_xp", 40, 0, 1_000);
+        DUMMY_XP_PER_DAY = builder
+                .comment("Zanjutsu and Hakuda xp, between the two, that a soul's blows on the Academy's training dummies"
+                        + " can give it in a day (a new day comes each morning, or every 20 minutes of play). Each blow"
+                        + " gives a quarter of [hollows] hit_stat_xp. 0 turns their training off.")
+                .defineInRange("dummy_xp_per_day", 80, 0, 1_000);
         builder.pop();
 
         builder.push("konso");

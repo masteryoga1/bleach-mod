@@ -5,13 +5,16 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.Hollow;
+import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageSource;
@@ -261,10 +264,34 @@ public final class SoulEvents {
         // an unmasked Hollow is: its mask is only a remnant, with nothing to strike.
         if (attacker.tickCount - data.lastCombatXpTick >= COMBAT_XP_COOLDOWN_TICKS) {
             data.lastCombatXpTick = attacker.tickCount;
+            // A training dummy teaches at a quarter of a Hollow's rate, up to the day's cap.
+            if (event.getEntity() instanceof TrainingDummy) {
+                drill(attacker, data, stat);
+                return;
+            }
             int xp = event.getEntity() instanceof Hollow hollow
                     ? HollowLogic.hitXp(true, hollow.wasMaskStruckAt(attacker.level().getGameTime()))
                     : event.getEntity() instanceof ArrancarNpc ? HollowLogic.hitXp(true, false) : 1;
             SoulLogic.addStatXp(attacker, data, stat, xp);
+        }
+    }
+
+    /**
+     * A blow on a training dummy, counted in quarters of a point ({@link DummyDrill}): a quarter of what a blow on a
+     * Hollow gives, up to {@code [academy] dummy_xp_per_day} points a day, the lesson's day. The blow that reaches the
+     * cap tells an aware soul so in chat, once that day; past it a blow trains nothing.
+     */
+    private static void drill(ServerPlayer player, SoulData data, Stat stat) {
+        long day = KidoLogic.lessonDay(player.level().getGameTime(), player.level().getDayTime());
+        int perDay = BleachConfig.get(BleachConfig.DUMMY_XP_PER_DAY);
+        DummyDrill before = player.getData(SoulAttachments.DUMMY_DRILL);
+        DummyDrill after = before.blow(HollowLogic.hitXp(true, false), perDay, day);
+        player.setData(SoulAttachments.DUMMY_DRILL, after);
+        int points = after.today() - before.todayOn(day);
+        SoulLogic.addStatXp(player, data, stat, points);
+        if (points > 0 && after.today() >= perDay && SoulLogic.isAware(data)) {
+            player.sendSystemMessage(Component.translatable("message.bleach.training_dummy.spent")
+                    .withStyle(ChatFormatting.GRAY));
         }
     }
 

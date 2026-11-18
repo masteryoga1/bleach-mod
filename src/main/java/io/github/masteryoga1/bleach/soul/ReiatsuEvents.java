@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
+import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -167,11 +168,13 @@ public final class ReiatsuEvents {
 
     /**
      * Who the aura reaches: not the releaser, what they ride or carry, or their own pets; nothing that
-     * cannot be hurt (an Academy instructor, the Quincy Elder); not players in creative or spectator
-     * mode; and not players they could not hurt (PvP off, or a team with friendly fire off).
+     * cannot be hurt (an Academy instructor, the Quincy Elder) or a training dummy; not players in
+     * creative or spectator mode; and not players they could not hurt (PvP off, or a team with friendly
+     * fire off).
      */
     private static boolean isAffected(ServerPlayer releaser, LivingEntity entity) {
-        if (entity.isInvulnerable() || entity.getRootVehicle() == releaser.getRootVehicle()) {
+        if (entity.isInvulnerable() || entity instanceof TrainingDummy
+                || entity.getRootVehicle() == releaser.getRootVehicle()) {
             return false;
         }
         if (entity instanceof OwnableEntity pet && releaser.getUUID().equals(pet.getOwnerUUID())) {

@@ -41,6 +41,14 @@ public final class SoulAttachments {
             () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
                     .serialize(Codec.LONG, at -> at != ShinigamiProgress.NEVER).copyOnDeath().build());
 
+    /**
+     * A soul's drill at the Academy's training dummies: its day, that day's points and the quarter carried (see {@link
+     * DummyDrill}). Saved once it has one; kept through death; never sent.
+     */
+    public static final Supplier<AttachmentType<DummyDrill>> DUMMY_DRILL = ATTACHMENT_TYPES.register("dummy_drill",
+            () -> AttachmentType.builder(() -> DummyDrill.NONE)
+                    .serialize(DummyDrill.CODEC, drill -> !drill.equals(DummyDrill.NONE)).copyOnDeath().build());
+
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());

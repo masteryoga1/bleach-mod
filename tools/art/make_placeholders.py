@@ -1521,6 +1521,24 @@ def duty_shinigami():
     return c
 
 
+def training_dummy():
+    """A training dummy of bound straw, in the humanoid layout the zombie's layer uses (the left arm and leg mirror the
+    right ones' nets): straw on the head, body, arm and leg, dark straw cords round the neck, waist, wrist and ankle,
+    and a dark cross on the face for a target. The hat layer stays clear."""
+    c = Canvas(64, 64)
+    # Head, body, arm and leg: where each net starts, and the box's size.
+    for u, v, w, h, d in ((0, 0, 8, 8, 8), (16, 16, 8, 12, 4), (40, 16, 4, 12, 4), (0, 16, 4, 12, 4)):
+        box(c, u, v, w, h, d, STRAW)
+        mottle(c, u, v, u + 2 * (w + d), v + d + h, STRAW_DARK, 7)
+    c.rect(16, 20, 40, 21, STRAW_DARK)    # the cord round the neck
+    c.rect(16, 30, 40, 31, STRAW_DARK)    # round the waist
+    c.rect(40, 30, 56, 31, STRAW_DARK)    # round the wrist
+    c.rect(0, 30, 16, 31, STRAW_DARK)     # round the ankle
+    line(c, 9, 9, 14, 14, STRAW_DARK)     # the cross on the face
+    line(c, 14, 9, 9, 14, STRAW_DARK)
+    return c
+
+
 def gate_keeper(gate):
     """A drawing function for a gatekeeper's skin, in the player skin layout with wide arms: weathered skin on the head
     and arms, dark hair over the top, back and sides of the head and two rows down the face, two dark eyes, the keeper's
@@ -2041,6 +2059,7 @@ TEXTURES = {
     "entity/arrancar_digits.png": arrancar_digits,
     "entity/arrancar.png": arrancar_npc,
     "entity/duty_shinigami.png": duty_shinigami,
+    "entity/training_dummy.png": training_dummy,
     **{"entity/gate_keeper/%s.png" % name: gate_keeper(gate) for gate, name in enumerate(GATE_NAMES)},
     "entity/inner_hollow.png": inner_hollow,
     "entity/hollow_player_mask.png": hollow_player_mask,

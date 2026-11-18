@@ -32,6 +32,7 @@ import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import net.minecraft.core.registries.Registries;
@@ -42,9 +43,9 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * The mod's entity types: Shinigami and Quincy NPCs, Hollows and the Menos Grande, Arrancar NPCs, a
- * Shinigami's inner Hollow, Pluses, the Garganta, zanpakutō techniques, the Cero, Negación's light and the
- * Caja Negación, Dankū's wall, the Senkaimon, and the Quincy's arrows, blades and Gintō spells.
+ * The mod's entity types: Shinigami and Quincy NPCs, the Academy's training dummy, Hollows and the Menos Grande,
+ * Arrancar NPCs, a Shinigami's inner Hollow, Pluses, the Garganta, zanpakutō techniques, the Cero, Negación's light
+ * and the Caja Negación, Dankū's wall, the Senkaimon, and the Quincy's arrows, blades and Gintō spells.
  */
 public final class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -65,6 +66,16 @@ public final class ModEntities {
                     .eyeHeight(1.62F)
                     .clientTrackingRange(10)
                     .build(BleachMod.id("wounded_shinigami").toString()));
+
+    /** The Academy's training dummy: no harm fells it and nothing moves it (see {@link TrainingDummy}). */
+    public static final DeferredHolder<EntityType<?>, EntityType<TrainingDummy>> TRAINING_DUMMY =
+            ENTITY_TYPES.register("training_dummy", () -> EntityType.Builder
+                    .<TrainingDummy>of(TrainingDummy::new, MobCategory.MISC)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("training_dummy").toString()));
 
     /**
      * A Shinigami on duty, come down to a Plus whose chain has begun to wear. It cannot be hurt and is never saved: a
@@ -445,6 +456,7 @@ public final class ModEntities {
     public static void onAttributes(EntityAttributeCreationEvent event) {
         event.put(ACADEMY_INSTRUCTOR.get(), ShinigamiNpc.createAttributes().build());
         event.put(WOUNDED_SHINIGAMI.get(), ShinigamiNpc.createAttributes().build());
+        event.put(TRAINING_DUMMY.get(), TrainingDummy.createAttributes().build());
         event.put(DUTY_SHINIGAMI.get(), ShinigamiNpc.createAttributes().build());
         event.put(QUINCY_ELDER.get(), QuincyNpc.createAttributes().build());
         event.put(QUINCY_HUNTER.get(), QuincyHunter.createHunterAttributes().build());
