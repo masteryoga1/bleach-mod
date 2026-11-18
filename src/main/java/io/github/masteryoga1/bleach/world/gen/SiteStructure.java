@@ -15,8 +15,8 @@ import net.minecraft.world.level.levelgen.structure.StructureType;
 
 /**
  * {@code bleach:site}: one of Soul Society's planned buildings. In the chunk its site starts in, that site's template is
- * set at its corner and turn, on the ground there; placed anywhere else by command, the group's first site's template is
- * set at that chunk's corner.
+ * set at its corner and turn, at its own height or on the ground there; placed anywhere else by command, the group's
+ * first site's template is set at that chunk's corner, on the ground.
  */
 public final class SiteStructure extends Structure {
     public static final MapCodec<SiteStructure> CODEC = RecordCodecBuilder.<SiteStructure>mapCodec(instance ->
@@ -46,9 +46,11 @@ public final class SiteStructure extends Structure {
         SeireiteiPlan.Site site = planned != null ? planned : sites.get(0);
         int x = planned != null ? site.x() : chunk.getMinBlockX();
         int z = planned != null ? site.z() : chunk.getMinBlockZ();
-        // The noise's ground, not the world's, so worldgen, a command and the stamp for old worlds all agree.
-        int y = context.chunkGenerator().getFirstFreeHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG,
-                context.heightAccessor(), context.randomState());
+        // The noise's ground, not the world's, so worldgen, a command and the stamp for old worlds all agree; a site with
+        // its own height, under the ground, is set there.
+        int y = planned != null && planned.y() != SeireiteiPlan.Site.GROUND ? planned.y()
+                : context.chunkGenerator().getFirstFreeHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG,
+                        context.heightAccessor(), context.randomState());
         BlockPos corner = new BlockPos(x, y, z);
         return Optional.of(new GenerationStub(corner, pieces -> pieces.addPiece(
                 new SitePiece(context.structureTemplateManager(), site.template(), corner, site.rotation()))));

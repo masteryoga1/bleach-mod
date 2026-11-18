@@ -533,11 +533,147 @@ def senzaikyu():
     return t
 
 
+# Sōkyoku Hill's other works, each unturned at its corner (world = corner + template), as SeireiteiPlan.java's hill rows
+# set them: the zigzag stair in the north cliff, the cave in the west cliff with its stair down, and the cavern's dressing.
+STAIR_CORNER, STAIR_SIZE = (-10, PLATEAU_Y, -64), (20, 67, 5)
+CAVE_CORNER, CAVE_SIZE = (-64, 56, 0), (20, 19, 2)
+CAVERN_CORNER, CAVERN_SIZE = (-31, 54, -31), (62, 54, 62)
+CAVERN_FLOOR_Y = 56  # the cavern's air: r < 44 from here up to, not including, y 120
+STEP = dict(block="minecraft:stone_stairs", half="bottom", shape="straight", waterlogged="false")
+
+
+def carved(size, corner):
+    """A template that keeps the ground wherever it sets nothing, and a put that sets a world block from this corner."""
+    t = Template(*size)
+    t.fill(0, 0, 0, size[0] - 1, size[1] - 1, size[2] - 1, VOID)
+
+    def put(x, y, z, block, **properties):
+        t.set(x - corner[0], y - corner[1], z - corner[2], block, **properties)
+    return t, put
+
+
+def stair():
+    """
+    The zigzag stair cut into the hill's north cliff from the lawn to the top: four flights of 16 steps turning on
+    landings at each end, behind the cliff's own rock with a slit at eye height. A flight's first steps run in a lane cut
+    behind the one below it, so the lower flight keeps its headroom.
+    """
+    t, put = carved(STAIR_SIZE, STAIR_CORNER)
+    west, east, inner = STAIR_CORNER[0], STAIR_CORNER[0] + STAIR_SIZE[0] - 1, STAIR_CORNER[2] + STAIR_SIZE[2] - 1
+    face = {x: min(z for z in range(STAIR_CORNER[2], inner + 1) if math.hypot(x + 0.5, z + 0.5) < MESA_RADIUS)
+            for x in range(west, east + 1)}
+
+    def cut(x, feet, lanes, slit):
+        for z in lanes:
+            for y in range(feet, feet + 3):
+                put(x, y, z, "minecraft:air")
+        if slit and feet + 2 < MESA_TOP_Y:  # rock under it and over it, so no soul climbs out
+            put(x, feet + 1, face[x], "minecraft:air")
+
+    for x in (east - 1, east):  # the foot, open to the lawn
+        cut(x, PLATEAU_Y, range(face[x], inner + 1), False)
+    for feet in range(PLATEAU_Y + 16, MESA_TOP_Y, 16):  # a landing at the west end, then the east, then the west
+        for x in (west, west + 1) if feet % 32 == 24 else (east - 1, east):
+            cut(x, feet, range(face[x] + 1, inner + 1), True)
+    for flight in range(4):  # west on the first and third, east on the second and fourth
+        for k, x in enumerate(range(east - 2, west + 1, -1) if flight % 2 == 0 else range(west + 2, east - 1), 1):
+            feet = PLATEAU_Y + 16 * flight + k
+            lane = range(face[x] + 1, face[x] + 3) if flight == 0 or k > 3 \
+                else range(face[x] + 3, inner + 1) if k < 3 else range(face[x] + 1, inner + 1)
+            cut(x, feet, lane, lane[0] == face[x] + 1)
+            for z in lane:
+                put(x, feet - 1, z, facing="west" if flight % 2 == 0 else "east", **STEP)
+    return t
+
+
+def cave():
+    """
+    The small cave in the hill's west cliff at the lawn and the stair from it down to the cavern's floor: a mouth 2 wide
+    and 3 high, 16 steps of the hill's stone down to the east and a level way out onto the floor, lit from its roof.
+    """
+    t, put = carved(CAVE_SIZE, CAVE_CORNER)
+    mouth = CAVE_CORNER[0]
+    for x in range(mouth, mouth + CAVE_SIZE[0]):
+        feet = max(CAVERN_FLOOR_Y, min(PLATEAU_Y, PLATEAU_Y + mouth + 1 - x))
+        for z in range(CAVE_CORNER[2], CAVE_CORNER[2] + CAVE_SIZE[2]):
+            for y in range(feet, feet + 3):
+                put(x, y, z, "minecraft:air")
+            if feet > CAVERN_FLOOR_Y and x > mouth:  # a step under each rise, so a soul walks up it as down
+                put(x, feet - 1, z, facing="west", **STEP)
+            if (x - mouth) % 5 == 3:
+                put(x, feet + 3, z, "minecraft:shroomlight")
+    return t
+
+
+# The cavern's spires, each (x, z, radius at the floor, height); the hot spring's water (x0, z0, x1, z1), sunk into the
+# floor; the floor's patches; and what holds the spring's water in: its rim and its bed.
+SPIRES = ((-22, -18, 4, 46), (-14, 14, 3, 30), (-6, -26, 3, 22), (2, 4, 5, 52), (10, -14, 3, 34), (12, 22, 4, 40),
+          (22, -2, 3, 26), (24, -22, 4, 44), (-24, 8, 3, 18), (27, 14, 2, 16))
+SPRING = (17, 4, 22, 9)
+PATCHES = ("minecraft:andesite", "minecraft:tuff", "minecraft:cobblestone")
+HOLDS_WATER = frozenset({"minecraft:mossy_cobblestone", "minecraft:stone", "minecraft:shroomlight"})
+
+
+def scatter(x, z):
+    """A fixed hash of a column, for patches that fall the same on every run."""
+    v = (x * 374761393 + z * 668265263) & 0xFFFFFFFF
+    v = (v ^ (v >> 13)) * 1274126177 & 0xFFFFFFFF
+    return v ^ (v >> 16)
+
+
+def cavern():
+    """
+    The cavern's dressing: patches of andesite, tuff and cobblestone in its stone floor, thinning out toward the edge,
+    spires of banded rock with lights round their feet, and the hot spring sunk in the floor in a rim of mossy stone,
+    lit from beneath. The cavern's air, walls and roof are left as they stand.
+    """
+    t, put = carved(CAVERN_SIZE, CAVERN_CORNER)
+    x0, y0, z0 = CAVERN_CORNER
+    floor, last = CAVERN_FLOOR_Y - 1, CAVERN_SIZE[0] - 1
+    for x in range(x0, x0 + CAVERN_SIZE[0]):
+        for z in range(z0, z0 + CAVERN_SIZE[2]):
+            edge = min(x - x0, last - (x - x0), z - z0, last - (z - z0))
+            h = scatter(x // 2, z // 2) % 9  # 2-by-2 patches, a third of the floor away from the edge
+            if h < min(3, edge // 4):
+                put(x, floor, z, PATCHES[h])
+    for cx, cz, base, height in SPIRES:
+        for y in range(CAVERN_FLOOR_Y, CAVERN_FLOOR_Y + height):
+            r = base * (1 - (y - CAVERN_FLOOR_Y) / height) ** 0.7 + 0.5
+            for x in range(cx - base, cx + base + 1):
+                for z in range(cz - base, cz + base + 1):
+                    if (x - cx) ** 2 + (z - cz) ** 2 <= r * r:
+                        put(x, y, z, "minecraft:andesite" if (y // 4) % 3 == 1 else "minecraft:stone")
+        reach = int(base * (1 - 1 / height) ** 0.7 + 0.5)  # its half-width a block up, where a light faces each way
+        for dx, dz in SIDES.values():
+            put(cx + dx * reach, CAVERN_FLOOR_Y + 1, cz + dz * reach, "minecraft:shroomlight")
+    sx0, sz0, sx1, sz1 = SPRING
+    for x in range(sx0 - 1, sx1 + 2):
+        for z in range(sz0 - 1, sz1 + 2):
+            if sx0 <= x <= sx1 and sz0 <= z <= sz1:
+                put(x, floor, z, "minecraft:water", level="0")
+                put(x, floor - 1, z, "minecraft:shroomlight" if (x + z) % 3 == 0 else "minecraft:stone")
+            else:
+                put(x, floor, z, "minecraft:mossy_cobblestone")
+    for i in range(16):  # a marker in the floor of each chunk the dressing covers
+        t.set(1 + 16 * (i % 4), floor - y0, 1 + 16 * (i // 4), "minecraft:polished_andesite")
+    # The spring stays where it is set: beside and under its water only water, its rim or its bed, all in one chunk.
+    for (x, y, z), (block, _) in t.blocks.items():
+        if block == "minecraft:water":
+            for nx, ny, nz in ((x - 1, y, z), (x + 1, y, z), (x, y, z - 1), (x, y, z + 1), (x, y - 1, z)):
+                if t.get(nx, ny, nz) not in HOLDS_WATER | {block} \
+                        or ((nx + x0) >> 4, (nz + z0) >> 4) != ((x + x0) >> 4, (z + z0) >> 4):
+                    raise ValueError(f"the spring's water at {(x + x0, y + y0, z + z0)} could run out")
+    return t
+
+
 TEMPLATES = {
     "academy/academy.nbt": academy,
     "field.nbt": field,
     "gate/house.nbt": gate_house,
+    "hill/cave.nbt": cave,
+    "hill/cavern.nbt": cavern,
     "hill/senzaikyu.nbt": senzaikyu,
+    "hill/stair.nbt": stair,
     "lane.nbt": lane,
 }
 TEMPLATES.update((f"barracks/{name}.nbt", functools.partial(barracks, number))

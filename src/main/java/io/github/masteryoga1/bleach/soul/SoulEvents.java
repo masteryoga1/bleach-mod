@@ -117,6 +117,7 @@ public final class SoulEvents {
         boolean meditating = (player.isCrouching() && player.onGround() && movedSqr < 1.0E-4)
                 || JinzenLogic.isSitting(player, data);
         SekkisekiLogic.tick(player, data);
+        HotSpring.tick(player);
         if (mayRegenerate(player, data)) {
             SoulLogic.regenTick(data, meditating || player.isSleeping(),
                     ShinigamiLogic.regenMultiplier(player, data, player.level().getGameTime()));

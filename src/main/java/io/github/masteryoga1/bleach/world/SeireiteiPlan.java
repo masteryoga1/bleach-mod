@@ -88,7 +88,7 @@ public final class SeireiteiPlan {
     /** The court square's lanterns: on its diagonals, this many columns out from its arrival block. */
     public static final int COURT_LANTERN_NEAR = 6, COURT_LANTERN_FAR = 18;
 
-    /** Every planned site: a template set whole at its corner, turned, on the ground there, one structure for each group. */
+    /** Every planned site: a template set whole at its corner, turned, on the ground there or at its own height. */
     public static final List<Site> SITES = List.of(
             new Site("academy", ACADEMY_X, ACADEMY_Z, BleachMod.id("academy/academy"), Rotation.CLOCKWISE_90, 15, 17),
             // The gate houses in the order of the Rukongai's regions, each the south one turned about the centre column.
@@ -107,7 +107,12 @@ public final class SeireiteiPlan {
             barracks("thirteenth", -97, -433, Rotation.CLOCKWISE_180),
             // Sōkyoku Hill's works in its own reserve: the Senzaikyū on the lawn east of the hill, on the east avenue's
             // line, and its bridge to the hill's end, from the tower's south-east foot, turned so it stands on the lawn.
-            new Site("hill", 111, 5, BleachMod.id("hill/senzaikyu"), Rotation.CLOCKWISE_180, 53, 12));
+            new Site("hill", 111, 5, BleachMod.id("hill/senzaikyu"), Rotation.CLOCKWISE_180, 53, 12),
+            // Then, unturned, each at its own height: the stair up the north cliff from the lawn, the cave in the west
+            // cliff at the lawn on the west avenue's line with its stair down, and the cavern's dressing from its floor.
+            new Site("hill", -10, -64, BleachMod.id("hill/stair"), Rotation.NONE, 20, 5, PLATEAU_Y),
+            new Site("hill", -64, 0, BleachMod.id("hill/cave"), Rotation.NONE, 20, 2, CAVERN_FLOOR_Y),
+            new Site("hill", -31, -31, BleachMod.id("hill/cavern"), Rotation.NONE, 62, 62, CAVERN_FLOOR_Y - 2));
     /**
      * The plan's reserves, which no later street, wall or site may enter but its own group's: Sōkyoku Hill, the Academy's
      * grounds, the Senkaimon court and each gate's forecourt, then every site with its margin, in the plan's order.
@@ -153,6 +158,11 @@ public final class SeireiteiPlan {
     public static double radius(int x, int z) {
         double dx = x + 0.5, dz = z + 0.5;
         return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /** Whether this block lies in the cavern inside Sōkyoku Hill, in the air the noise leaves there. */
+    public static boolean inCavern(int x, int y, int z) {
+        return radius(x, z) < CAVERN_RADIUS && y >= CAVERN_FLOOR_Y && y < CAVERN_CEILING_Y;
     }
 
     /** How far this block's centre lies from the nearer of the lines x = 0 and z = 0, on which the gates stand. */
@@ -301,10 +311,19 @@ public final class SeireiteiPlan {
     }
 
     /**
-     * One planned site: its group, the corner its template is placed from, the template, its turn, and the template's
-     * width and depth (its x and z) before the turn.
+     * One planned site: its group, the corner its template is placed from, the template, its turn, the template's width
+     * and depth (its x and z) before the turn, and the y its corner is set at, or {@link #GROUND} for the ground there.
      */
-    public record Site(String group, int x, int z, ResourceLocation template, Rotation rotation, int width, int depth) {
+    public record Site(String group, int x, int z, ResourceLocation template, Rotation rotation, int width, int depth,
+                       int y) {
+        /** The y of a site set on the ground at its corner, as worldgen finds it there: every site on the lawn. */
+        public static final int GROUND = Integer.MIN_VALUE;
+
+        /** A site set on the ground at its corner. */
+        public Site(String group, int x, int z, ResourceLocation template, Rotation rotation, int width, int depth) {
+            this(group, x, z, template, rotation, width, depth, GROUND);
+        }
+
         /** The chunk its structure starts in, the one holding its corner. */
         public ChunkPos chunk() {
             return new ChunkPos(x >> 4, z >> 4);
