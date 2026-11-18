@@ -294,9 +294,10 @@ public final class GateHouseTests {
 
     /**
      * Test B. All four houses stand once their chunks load, each as the plan lays it, turned to face the Rukongai, with
-     * the doorway, slot and wicket's way open, no Sekkiseki in them, the wall's on both sides, its gate down and wicket hung.
+     * the doorway, slot and wicket's way open, no Sekkiseki in them, the wall's on both sides, its gate down and wicket
+     * hung, and its keeper at its post.
      */
-    @GameTest(template = "empty", batch = "gate", timeoutTicks = 400)
+    @GameTest(template = "empty", batch = "gate", timeoutTicks = 800)
     public static void theGateHousesStandAsThePlanLaysThem(GameTestHelper helper) {
         ServerLevel soul = SiteTests.soul(helper);
         // One house a step, so that no tick of the test makes more than one house's chunks.
@@ -308,7 +309,8 @@ public final class GateHouseTests {
                     .thenExecute(() -> assertHouse(helper, soul, house, "once it stood"))
                     .thenExecute(() -> GateState.get(soul).drop(soul, house))
                     .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), house))
-                    .thenExecute(() -> GateTests.assertGate(helper, soul, house, 0, "once its house stood"));
+                    .thenExecute(() -> GateTests.assertGate(helper, soul, house, 0, "once its house stood"))
+                    .thenWaitUntil(() -> GateKeeperTests.assertKeeper(helper, soul, house));
         }
         sequence.thenSucceed();
     }

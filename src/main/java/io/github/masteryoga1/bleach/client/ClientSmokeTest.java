@@ -374,6 +374,14 @@ public final class ClientSmokeTest {
     private static int actionBarAt;
     /** The last lines the server put on the action bar, oldest first, each with its tick, for a failure to name. */
     private static final Deque<String> actionBarLines = new ArrayDeque<>();
+    /**
+     * The player's own fired trace that was in the level as the last action bar line to find one came, and the first
+     * tick after that line: a cast's call is sent in the tick its trace is drawn, just after the trace, so this holds a
+     * trace that a hitch let come and go between two of the client's ticks.
+     */
+    @Nullable
+    private static CeroBeam traceAtCall;
+    private static int traceAtCallTick;
     /** The last lines the server put in the chat, oldest first, as plain text, for the checks that read them. */
     private static final Deque<String> chatLines = new ArrayDeque<>();
 
@@ -395,6 +403,13 @@ public final class ClientSmokeTest {
             actionBarLines.addLast(ticksInWorld + ": \"" + actionBar.getString() + "\"");
             while (actionBarLines.size() > ACTION_BAR_LINES_KEPT) {
                 actionBarLines.removeFirst();
+            }
+            Minecraft minecraft = Minecraft.getInstance();
+            CeroBeam trace = minecraft.player == null || minecraft.level == null ? null
+                    : ownCero(minecraft, minecraft.player, CeroBeam::isFired);
+            if (trace != null) {
+                traceAtCall = trace;
+                traceAtCallTick = ticksInWorld + 1;
             }
         } else {
             chatLines.addLast(event.getMessage().getString());
@@ -2078,14 +2093,14 @@ public final class ClientSmokeTest {
         // A mob's effects never reach a client, so the trace is what a client can be asked about a bind: one that met the
         // villager four blocks south runs about 3 blocks from the hand, and a miss runs on to the ray's end, about 7½
         // blocks for Sai and 11½ for Hainawa.
-        if (expectWithin(minecraft, 5191, 5210, () -> ownBind(minecraft, player, KidoSpell.SAI, 2.0, 5.0) != null,
+        if (expectWithin(minecraft, 5191, 5210, () -> bindSeen(minecraft, player, KidoSpell.SAI, 2.0, 5.0, 5191),
                 "the Kidō key never cast Sai at the villager, or its trace never reached the client or did not stop at"
                         + " the villager (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_sai");
         }
         expectWithin(minecraft, 5210, 5222, () -> chosenIs(soul, KidoSpell.HAINAWA),
                 "Sneak and the Kidō key never chose Hainawa");
-        if (expectWithin(minecraft, 5229, 5250, () -> ownBind(minecraft, player, KidoSpell.HAINAWA, 2.0, 5.0) != null,
+        if (expectWithin(minecraft, 5229, 5250, () -> bindSeen(minecraft, player, KidoSpell.HAINAWA, 2.0, 5.0, 5229),
                 "the Kidō key never cast Hainawa at the villager, or its trace never reached the client or did not stop"
                         + " at the villager (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_hainawa");
@@ -2103,7 +2118,7 @@ public final class ClientSmokeTest {
                 "the chant of Geki was never spoken back to its caster");
         // A bind that holds as well as binds shows the client nothing more than one that binds: its trace stops at the
         // villager, about 3 blocks from the hand, where a miss runs on to about 9½ blocks for Geki and 15½ for Rikujōkōrō.
-        if (expectWithin(minecraft, 5320, 5360, () -> ownBind(minecraft, player, KidoSpell.GEKI, 2.0, 5.0) != null,
+        if (expectWithin(minecraft, 5316, 5360, () -> bindSeen(minecraft, player, KidoSpell.GEKI, 2.0, 5.0, 5316),
                 "the chant of Geki never cast it, or its red trace never reached the client or did not stop at the"
                         + " villager (the action bar last read: " + lastActionBar() + ")")) {
             shot(minecraft, "kido_geki");
@@ -2121,9 +2136,10 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, 5356, 5380, () -> spokenBack(player, incantation(minecraft, KidoSpell.RIKUJOKORO, 0)),
                 "the chant of Rikujōkōrō was never spoken back to its caster");
-        if (expectWithin(minecraft, 5395, 5440, () -> ownBind(minecraft, player, KidoSpell.RIKUJOKORO, 2.0, 5.0) != null,
+        // From the tick after the check above, so no tick goes unwatched; a trace whose call came sooner is not taken.
+        if (expectWithin(minecraft, 5391, 5440, () -> bindSeen(minecraft, player, KidoSpell.RIKUJOKORO, 2.0, 5.0, 5391),
                 "the chant of Rikujōkōrō never cast it, or its pale yellow trace never reached the client or did not stop"
-                        + " at the villager (the action bar last read: " + lastActionBar() + ")")) {
+                        + " at the villager (the action bar's last lines: " + recentActionBar() + ")")) {
             shot(minecraft, "kido_rikujokoro");
         }
         // The smoke itself is seen only by those who see spirits, and what it does to a mob never reaches a client; the
@@ -2585,6 +2601,29 @@ public final class ClientSmokeTest {
         }
         double length = trace.reach().length();
         return length >= min && length <= max ? trace : null;
+    }
+
+    /**
+     * Whether the player's own trace of a bind is seen as {@link #ownBind} sees it, or was in the level as an action
+     * bar line came just before tick {@code from} or later, in the spell's colour and between these lengths. The call
+     * follows the trace in the tick it is drawn, so a trace a hitch let come and go between two ticks, which no tick
+     * sees, is still seen; a line handled late in a hitch counts from the tick before the hitch, so it never seems
+     * later than it came.
+     */
+    private static boolean bindSeen(Minecraft minecraft, LocalPlayer player, ResourceKey<KidoSpell> key, double min,
+                                    double max, int from) {
+        if (ownBind(minecraft, player, key, min, max) != null) {
+            return true;
+        }
+        CeroBeam trace = traceAtCall;
+        double length = trace == null ? -1.0 : trace.reach().length();
+        if (trace == null || traceAtCallTick < from || trace.colour() != colourOf(minecraft, key) || length < min
+                || length > max) {
+            return false;
+        }
+        BleachMod.LOGGER.info("Smoke test: the {} trace came and went between two ticks; seen as its call came at {}",
+                key.location(), traceAtCallTick);
+        return true;
     }
 
     /** The spell's incantation at this place in its list, as this client's copy of it has it, or null without one. */

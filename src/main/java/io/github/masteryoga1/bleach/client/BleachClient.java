@@ -198,6 +198,7 @@ public final class BleachClient {
         event.registerEntityRenderer(ModEntities.QUINCY_HUNTER.get(),
                 context -> new QuincyNpcRenderer<QuincyHunter>(context, hunter));
         event.registerEntityRenderer(ModEntities.ARRANCAR.get(), ArrancarNpcRenderer::new);
+        event.registerEntityRenderer(ModEntities.GATE_KEEPER.get(), GateKeeperRenderer::new);
         event.registerEntityRenderer(ModEntities.INNER_HOLLOW.get(),
                 context -> new HumanoidMobRenderer<InnerHollow, PlayerModel<InnerHollow>>(context,
                         new PlayerModel<>(context.bakeLayer(ModelLayers.PLAYER), false), 0.5F) {

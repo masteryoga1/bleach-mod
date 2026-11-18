@@ -41,6 +41,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -888,8 +889,8 @@ public class Gillian extends Menos {
      * a path ends here, so nothing (not even fleeing from reiatsu) ever walks a Gillian by a path.
      */
     static final class Navigation extends GroundPathNavigation {
-        Navigation(Gillian gillian, Level level) {
-            super(gillian, level);
+        Navigation(Mob mob, Level level) {
+            super(mob, level);
         }
 
         @Override

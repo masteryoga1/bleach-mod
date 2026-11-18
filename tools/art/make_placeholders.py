@@ -129,6 +129,12 @@ ARRANCAR_SKIN = rgb(226, 214, 200)
 # A Shinigami on duty's warm skin and short dark hair.
 DUTY_SKIN = rgb(222, 184, 150)
 DUTY_HAIR = rgb(44, 34, 30)
+# The gatekeepers, by gate in the plan's order (GateState.NAMES): Kaiwan, Higonyūdō, Jidanbō and Danzōmaru.
+GATE_KEEPER_SKIN, GATE_KEEPER_HAIR = rgb(196, 150, 112), rgb(40, 30, 26)
+GATE_NAMES = ("shoryumon", "shuwaimon", "hakutomon", "kokuryomon")
+# Each keeper's robe and sash.
+GATE_KEEPER_ROBES = ((rgb(58, 92, 128), rgb(214, 196, 140)), (rgb(140, 52, 44), rgb(60, 44, 36)),
+                     (rgb(232, 228, 214), rgb(52, 48, 60)), (rgb(36, 34, 40), rgb(150, 120, 70)))
 # The Caja Negación: a slate cube, lit from above and its left, seamed in Negación's pale gold.
 CAJA_FACE = rgb(0x3A, 0x3D, 0x48)
 CAJA_SIDE = rgb(0x2A, 0x2C, 0x35)
@@ -1515,6 +1521,31 @@ def duty_shinigami():
     return c
 
 
+def gate_keeper(gate):
+    """A drawing function for a gatekeeper's skin, in the player skin layout with wide arms: weathered skin on the head
+    and arms, dark hair over the top, back and sides of the head and two rows down the face, two dark eyes, the keeper's
+    robe over the body and legs, and a sash across the waist. Every overlay layer stays clear."""
+    robe, sash = GATE_KEEPER_ROBES[gate]
+
+    def draw():
+        c = Canvas(64, 64)
+        # Head, right arm and left arm in skin; body, right leg and left leg in the robe.
+        for u, v, w, h, d in ((0, 0, 8, 8, 8), (40, 16, 4, 12, 4), (32, 48, 4, 12, 4)):
+            box(c, u, v, w, h, d, GATE_KEEPER_SKIN)
+        for u, v, w, h, d in ((16, 16, 8, 12, 4), (0, 16, 4, 12, 4), (16, 48, 4, 12, 4)):
+            box(c, u, v, w, h, d, robe)
+        c.rect(16, 28, 40, 30, sash)              # the sash, round the body's net at the waist
+        c.rect(8, 0, 16, 8, GATE_KEEPER_HAIR)     # the top of the head
+        c.rect(0, 8, 8, 16, GATE_KEEPER_HAIR)     # its right side
+        c.rect(16, 8, 32, 16, GATE_KEEPER_HAIR)   # its left side and back
+        c.rect(8, 8, 16, 10, GATE_KEEPER_HAIR)    # two rows down the face
+        c.rect(9, 12, 11, 13, VOID)               # the eyes, two pixels wide, either side of the middle
+        c.rect(13, 12, 15, 13, VOID)
+        return c
+    draw.__name__ = "gate_keeper_" + GATE_NAMES[gate]
+    return draw
+
+
 def inner_hollow():
     """A Visored's inner Hollow, its host's white double, in the player skin layout with wide arms: white skin, and
     white hair over the top, back and sides of the head and down the face to its third row, over two black eyes with
@@ -2010,6 +2041,7 @@ TEXTURES = {
     "entity/arrancar_digits.png": arrancar_digits,
     "entity/arrancar.png": arrancar_npc,
     "entity/duty_shinigami.png": duty_shinigami,
+    **{"entity/gate_keeper/%s.png" % name: gate_keeper(gate) for gate, name in enumerate(GATE_NAMES)},
     "entity/inner_hollow.png": inner_hollow,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
