@@ -70,6 +70,8 @@ import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.GateState;
+import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
@@ -122,6 +124,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach chain &lt;players&gt; &lt;seconds&gt;
  * /bleach reset &lt;players&gt;
  * /bleach academy                   (where the Academy stands in Soul Society; a click suggests the teleport there)
+ * /bleach gate &lt;gate&gt; &lt;lift|drop|status&gt;   (hakutomon, kokuryomon, shoryumon or shuwaimon, from any world)
  * /bleach garganta &lt;players&gt; [kind|numero|privaron]   (a tear now; not on Peaceful)
  *                                    (kind: spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas)
  *                                    (numero: a lone Número; privaron: a Privaron Espada and its Fracción)
@@ -191,6 +194,9 @@ public final class BleachCommand {
     private static final SuggestionProvider<CommandSourceStack> GINTO_SPELLS = suggest(GintoSpell.values());
     private static final SuggestionProvider<CommandSourceStack> BAIT_ACTIONS = suggest(BaitAction.values());
     private static final SuggestionProvider<CommandSourceStack> RANSOTENGAI_ACTIONS = suggest(RansotengaiAction.values());
+    /** The great gates, by the names a command takes. */
+    private static final SuggestionProvider<CommandSourceStack> GATES = (context, builder) ->
+            SharedSuggestionProvider.suggest(GateState.NAMES, builder);
     /** The spirits the world loaded, read from the server's registry. */
     private static final SuggestionProvider<CommandSourceStack> SPIRITS = (context, builder) ->
             SharedSuggestionProvider.suggestResource(ZanpakutoSpirits.registry(context.getSource().getLevel())
@@ -243,6 +249,12 @@ public final class BleachCommand {
                                 .executes(BleachCommand::reset)))
                 .then(Commands.literal("academy")
                         .executes(context -> academy(context.getSource())))
+                .then(Commands.literal("gate")
+                        .then(Commands.argument("gate", StringArgumentType.word())
+                                .suggests(GATES)
+                                .then(Commands.literal("lift").executes(context -> gate(context, true, true)))
+                                .then(Commands.literal("drop").executes(context -> gate(context, true, false)))
+                                .then(Commands.literal("status").executes(context -> gate(context, false, false)))))
                 .then(Commands.literal("garganta")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .executes(context -> garganta(context, null))
@@ -551,6 +563,43 @@ public final class BleachCommand {
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                 Component.translatable("chat.coordinates.tooltip"))));
         source.sendSuccess(() -> Component.translatable("commands.bleach.academy.success", coordinates), false);
+        return 1;
+    }
+
+    /**
+     * Lifts or drops one of the Seireiheki's great gates, or says where it is, from any world: a gate not yet laid, or
+     * already lifted or rising, or down or falling, is only reported.
+     */
+    private static int gate(CommandContext<CommandSourceStack> context, boolean move, boolean lift) {
+        CommandSourceStack source = context.getSource();
+        String name = StringArgumentType.getString(context, "gate");
+        int gate = GateState.NAMES.indexOf(name.toLowerCase(Locale.ROOT));
+        if (gate < 0) {
+            source.sendFailure(Component.translatable("commands.bleach.unknown_gate", name));
+            return 0;
+        }
+        // The level the gates tick in, as the stamp has it: no test's stand-in.
+        ServerLevel soulSociety = source.getServer().getLevel(BleachWorlds.SOUL_SOCIETY);
+        if (soulSociety == null) {
+            source.sendFailure(Component.translatable("commands.bleach.academy.none"));
+            return 0;
+        }
+        GateState gates = GateState.get(soulSociety);
+        Component gateName = Rukongai.Region.values()[gate].gateName();
+        if (move && gates.laid(gate) && (lift ? gates.lift(soulSociety, gate) : gates.drop(soulSociety, gate))) {
+            source.sendSuccess(() -> Component.translatable(lift ? "commands.bleach.gate.lift" : "commands.bleach.gate.drop",
+                    gateName), true);
+            return 1;
+        }
+        String key = switch (gates.status(gate)) {
+            case DOWN -> "commands.bleach.gate.status.down";
+            case LIFTED -> "commands.bleach.gate.status.lifted";
+            case RISING -> "commands.bleach.gate.status.rising";
+            case FALLING -> "commands.bleach.gate.status.falling";
+            case WAITING -> "commands.bleach.gate.status.waiting";
+            case NOT_LAID -> "commands.bleach.gate.status.not_laid";
+        };
+        source.sendSuccess(() -> Component.translatable(key, gateName), false);
         return 1;
     }
 

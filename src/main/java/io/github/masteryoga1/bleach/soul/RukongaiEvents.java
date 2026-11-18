@@ -49,10 +49,11 @@ public final class RukongaiEvents {
             return;
         }
         int x = player.getBlockX();
+        int y = player.getBlockY();
         int z = player.getBlockZ();
-        int place = player.level().dimension() == BleachWorlds.SOUL_SOCIETY ? Rukongai.place(x, z) : Rukongai.NOWHERE;
+        int place = player.level().dimension() == BleachWorlds.SOUL_SOCIETY ? Rukongai.place(x, y, z) : Rukongai.NOWHERE;
         if (tells(SoulLogic.get(player), place, player.level().getGameTime())) {
-            player.displayClientMessage(Rukongai.placeName(x, z).withStyle(ChatFormatting.GRAY), true);
+            player.displayClientMessage(Rukongai.placeName(x, y, z).withStyle(ChatFormatting.GRAY), true);
         }
     }
 

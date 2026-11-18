@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.block.DivisionBannerBlock;
 import io.github.masteryoga1.bleach.block.KoryuBlock;
 import io.github.masteryoga1.bleach.block.ReishiFootingBlock;
 import io.github.masteryoga1.bleach.block.TailoringTableBlock;
+import io.github.masteryoga1.bleach.block.WicketBlock;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.ColorRGBA;
 import net.minecraft.world.level.block.Block;
@@ -107,6 +108,11 @@ public final class ModBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
                     .strength(-1.0F, 3600000.0F).noLootTable().pushReaction(PushReaction.BLOCK)
                     .isValidSpawn((state, level, pos, type) -> false));
+    /** The wicket through a gate house's right-hand pier: a dark wooden door that nothing breaks and anyone opens. */
+    public static final DeferredBlock<WicketBlock> WICKET = BLOCKS.register("wicket",
+            () -> new WicketBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN)
+                    .instrument(NoteBlockInstrument.BASS).strength(-1.0F, 3600000.0F).noOcclusion().noLootTable()
+                    .pushReaction(PushReaction.BLOCK).isValidSpawn((state, level, pos, type) -> false)));
 
     private ModBlocks() {
     }

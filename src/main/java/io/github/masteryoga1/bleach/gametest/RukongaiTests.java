@@ -88,6 +88,8 @@ public final class RukongaiTests {
             {0, -3100, 81, NORTH}, {9000, 100, 266, EAST}};
     private static final String SEIREITEI_KEY = "message.bleach.place.seireitei";
     private static final String SEIREIHEKI_KEY = "message.bleach.place.seireiheki";
+    /** The south gate's name, the place a soul is told of in its gap below the wall's top. */
+    private static final String SHUWAIMON_KEY = "message.bleach.place.gate.south";
     private static final String WOKE_KEY = "message.bleach.konso.rukongai";
     private static final String WAY_KEY = "message.bleach.academy_way.gate";
     /** How many draws a test of the odds makes. */
@@ -362,7 +364,7 @@ public final class RukongaiTests {
     }
 
     /**
-     * A real soul in Soul Society is told it is in Seireitei, then, in the south gate's gap, that it is in the Seireiheki,
+     * A real soul in Soul Society is told it is in Seireitei, then, in the south gate's gap, that it is at Shuwaimon,
      * but not until another line has shown its 60 ticks. Out of Soul Society and back to the same gap, it is told again.
      */
     @GameTest(template = "empty", timeoutTicks = 400)
@@ -388,18 +390,18 @@ public final class RukongaiTests {
                     otherAt[0] = player.level().getGameTime();
                     player.teleportTo(soul, 0.5, SeireiteiPlan.PLATEAU_Y, 515.5, 0.0F, 0.0F);
                 })
-                // The south gate's gap is the Seireiheki's band, but the other line is still showing.
+                // The south gate's gap is the gate's own place, but the other line is still showing.
                 .thenIdle(40)
-                .thenExecute(() -> helper.assertTrue(TravelTests.lines(player, SEIREIHEKI_KEY) == 0L,
+                .thenExecute(() -> helper.assertTrue(TravelTests.lines(player, SHUWAIMON_KEY) == 0L,
                         "the place covered another line 40 ticks after it: " + TravelTests.said(player)))
-                .thenWaitUntil(() -> helper.assertTrue(TravelTests.lines(player, SEIREIHEKI_KEY) == 1L,
+                .thenWaitUntil(() -> helper.assertTrue(TravelTests.lines(player, SHUWAIMON_KEY) == 1L,
                         "the soul in the wall's gap was never told: " + TravelTests.said(player) + " at "
                                 + TravelTests.where(player)))
                 .thenExecute(() -> helper.assertTrue(player.level().getGameTime() - otherAt[0] >= RukongaiEvents.QUIET_TICKS,
                         "the place came " + (player.level().getGameTime() - otherAt[0]) + " ticks after another line"))
                 // Each place told once so far, so the count below can only grow by the way back.
                 .thenExecute(() -> helper.assertTrue(TravelTests.lines(player, SEIREITEI_KEY) == 1L
-                                && TravelTests.lines(player, SEIREIHEKI_KEY) == 1L,
+                                && TravelTests.lines(player, SHUWAIMON_KEY) == 1L,
                         "before leaving, the soul was told " + TravelTests.said(player)))
                 // Out of Soul Society and back to the same gap: told again only if leaving forgot the place, as the
                 // gap was the last place told and is the same place on the way back.
@@ -412,7 +414,7 @@ public final class RukongaiTests {
                 .thenWaitUntil(() -> helper.assertTrue(player.tickCount >= leftAt[0] + 20,
                         "the soul has ticked " + (player.tickCount - leftAt[0]) + " times in the Overworld"))
                 .thenExecute(() -> player.teleportTo(soul, 0.5, SeireiteiPlan.PLATEAU_Y, 515.5, 0.0F, 0.0F))
-                .thenWaitUntil(() -> helper.assertTrue(TravelTests.lines(player, SEIREIHEKI_KEY) == 2L
+                .thenWaitUntil(() -> helper.assertTrue(TravelTests.lines(player, SHUWAIMON_KEY) == 2L
                                 && TravelTests.lines(player, SEIREITEI_KEY) == 1L,
                         "the soul back in the wall's gap was told " + TravelTests.said(player) + " at "
                                 + TravelTests.where(player)))
