@@ -133,7 +133,8 @@ public final class GateTests {
                     assertGate(helper, soul, SOUTH, 2, "over the cow");
                     helper.assertTrue(cow[0].isAlive() && cow[0].getHealth() == cow[0].getMaxHealth()
                             && cow[0].position().equals(under), "the cow under the gate is at " + cow[0].position());
-                    List<ItemEntity> items = soul.getEntitiesOfClass(ItemEntity.class, new AABB(dirt).inflate(3.0, 8.0, 3.0),
+                    // Pushed out of the gate's row, a drop can fly some 6 blocks along the passage before it lands.
+                    List<ItemEntity> items = soul.getEntitiesOfClass(ItemEntity.class, new AABB(dirt).inflate(8.0),
                             item -> item.getItem().is(Items.DIRT));
                     helper.assertFalse(items.isEmpty(), "the dirt the gate broke dropped nothing");
                     items.forEach(Entity::discard);
