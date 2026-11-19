@@ -175,7 +175,7 @@ public final class UraharaShop {
      * a huge mushroom, which stand taller than the land may rise, all dry, or ice, a lily pad or snow, which may lie over
      * water.
      */
-    private static boolean open(BlockState state) {
+    static boolean open(BlockState state) {
         return state.getFluidState().isEmpty() && (state.isAir() || state.is(BlockTags.LOGS)
                 || state.is(BlockTags.REPLACEABLE_BY_TREES) || state.is(Blocks.BAMBOO) || state.is(Blocks.BAMBOO_SAPLING)
                 || state.is(Blocks.MUSHROOM_STEM) || state.is(Blocks.BROWN_MUSHROOM_BLOCK)
@@ -255,16 +255,21 @@ public final class UraharaShop {
         }
     }
 
-    /** What the stamp chose for this world's shop, saved with the Overworld: not yet asked, built, or given up. */
+    /** What a stamp chose for the shop or the room under it, saved with the Overworld: not yet asked, built, or given up. */
     public static final class Mark extends SavedData {
         private static final String NAME = "bleach_urahara_shop", STATE = "State";
         private static final int UNDECIDED = 0, BUILT = 1, GIVEN_UP = 2;
         private static final SavedData.Factory<Mark> FACTORY = new SavedData.Factory<>(Mark::new, Mark::load, null);
         private int state = UNDECIDED;
 
-        /** This world's mark, made undecided on first asking. */
-        private static Mark get(ServerLevel overworld) {
-            return overworld.getDataStorage().computeIfAbsent(FACTORY, NAME);
+        /** This world's mark for its shop, made undecided on first asking. */
+        static Mark get(ServerLevel overworld) {
+            return get(overworld, NAME);
+        }
+
+        /** This world's mark saved under this name, made undecided on first asking. */
+        static Mark get(ServerLevel overworld, String name) {
+            return overworld.getDataStorage().computeIfAbsent(FACTORY, name);
         }
 
         /** The mark as saved; a value out of range is undecided. */
@@ -281,18 +286,18 @@ public final class UraharaShop {
             return tag;
         }
 
-        /** Whether the stamp has chosen, to build the shop or to give it up. */
+        /** Whether the stamp has chosen, to build it or to give it up. */
         public boolean decided() {
             return state != UNDECIDED;
         }
 
-        /** Whether the stamp built the shop, or found it standing whole. */
+        /** Whether the stamp built it, or found it standing whole. */
         public boolean built() {
             return state == BUILT;
         }
 
-        /** Marks the shop built, or given up; the first choice stands. */
-        private void decide(boolean build) {
+        /** Marks it built, or given up; the first choice stands. */
+        void decide(boolean build) {
             if (!decided()) {
                 state = build ? BUILT : GIVEN_UP;
                 setDirty();
