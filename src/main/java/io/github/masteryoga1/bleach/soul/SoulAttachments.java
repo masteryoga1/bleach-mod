@@ -64,6 +64,14 @@ public final class SoulAttachments {
             () -> AttachmentType.builder(() -> FieldTrial.NONE)
                     .serialize(FieldTrial.CODEC, trial -> !trial.equals(FieldTrial.NONE)).copyOnDeath().build());
 
+    /**
+     * The day (the mod's, {@link KidoLogic#lessonDay}) this soul last bought Hollow Bait from Kisuke Urahara, who sells
+     * each soul one a day. Saved once bought; kept through death, so dying buys no more; never sent.
+     */
+    public static final Supplier<AttachmentType<Long>> SHOP_BAIT_DAY = ATTACHMENT_TYPES.register("shop_bait_day",
+            () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
+                    .serialize(Codec.LONG, day -> day != ShinigamiProgress.NEVER).copyOnDeath().build());
+
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());

@@ -34,7 +34,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Kisuke Urahara, who keeps the Urahara Shop: a Shinigami in a gigai that every player sees, the unaware living too,
  * and that hides him from Pesquisa, so he is in neither spirit tag. Only {@code /kill} and the void harm him; nothing
- * moves him, he never despawns, no creature hunts him, and he talks to each soul by what it is, offering nothing yet.
+ * moves him, he never despawns, no creature hunts him, and he talks to each soul by what it is and sells it what it
+ * can use, at his counter ({@link UraharaCounter}).
  */
 public class KisukeUrahara extends Mob implements DialogueNpc {
     /** A template's keeper carries this: he takes his UUID from where he stands, so a second set there is refused. */
@@ -108,14 +109,25 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
         }
         if (player instanceof ServerPlayer visitor && !visitor.isSpectator() && SoulLogic.hasSoul(visitor)
                 && distanceToSqr(visitor) <= TALK_RANGE_SQR) {
-            DialogueView view = viewFor(SoulLogic.get(visitor));
+            SoulData soul = SoulLogic.get(visitor);
+            DialogueView view = viewFor(soul);
             getLookControl().setLookAt(visitor, 30.0F, 30.0F);
             Component aside = Component.translatable("screen.bleach.dialogue." + dialogueKey() + "." + view.key()
                     + ".aside" + (1 + getRandom().nextInt(ASIDES)));
-            BleachNetwork.openDialogue(visitor, this, view, List.of(), List.of(), List.of(aside));
+            BleachNetwork.openDialogue(visitor, this, view, List.of(), unreadyFor(soul, level().getGameTime()),
+                    List.of(aside));
             return InteractionResult.SUCCESS;
         }
         return InteractionResult.PASS;
+    }
+
+    /**
+     * His trade button greyed for a soul whose view trades but that he sells nothing now: one he would sell only bait,
+     * while the server keeps bait turned off.
+     */
+    public static List<NpcAction> unreadyFor(SoulData soul, long now) {
+        return NpcAction.TRADE.allowedIn(viewFor(soul)) && UraharaCounter.waresFor(soul, now).isEmpty()
+                ? List.of(NpcAction.TRADE) : List.of();
     }
 
     @Override
@@ -123,9 +135,25 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
         return "urahara";
     }
 
-    /** None of his views offers an action yet, so whatever a client asks for is ignored. */
+    /**
+     * Opens his wares for a soul that pressed his trade button: he checks again that he serves it and that its view
+     * trades now, so a client cannot ask for what it was never offered. Anything else asked of him is ignored.
+     */
     @Override
     public void perform(Player visitor, NpcAction action) {
+        if (action == NpcAction.TRADE && visitor instanceof ServerPlayer customer && serves(customer)
+                && action.allowedIn(viewFor(SoulLogic.get(customer)))) {
+            UraharaCounter.open(this, customer);
+        }
+    }
+
+    /**
+     * Whether he serves this soul now: he stands, and it is alive, in the game, in his world, within 8 blocks and has a
+     * soul. A trade lasts only while this holds.
+     */
+    boolean serves(Player visitor) {
+        return isAlive() && visitor.isAlive() && !visitor.isSpectator() && visitor.level() == level()
+                && distanceToSqr(visitor) <= TALK_RANGE_SQR && SoulLogic.hasSoul(visitor);
     }
 
     /** Only {@code /kill} and the void reach him: no blow, a creative player's too, and no fire, fall, blast or art. */
