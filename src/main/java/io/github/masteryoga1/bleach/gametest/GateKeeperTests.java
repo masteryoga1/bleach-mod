@@ -517,8 +517,9 @@ public final class GateKeeperTests {
      * lookup finds; a fighter's blow on the head lands on the keeper, a blow of no one does not, and one that would kill
      * it leaves it beaten.
      */
-    @GameTest(template = "empty", batch = DIG, timeoutTicks = 300)
+    @GameTest(template = "empty", batch = DIG, timeoutTicks = 900)
     public static void aBlowOnAKeepersHeadLands(GameTestHelper helper) {
+        // Its batch may run first of the gates': the house's chunks, and their keeper, wait on the world's loading.
         ShakonmakuTests.Cleanup held = GateTests.hold(helper, EAST);
         sendAway(held, EAST);
         ServerLevel soul = held.soul;
