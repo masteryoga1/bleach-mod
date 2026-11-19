@@ -720,6 +720,7 @@ public final class QuincyNpcTests {
         ordinals.put(DialogueView.SHOP_VISORED, 41);
         ordinals.put(NpcAction.TRADE, 12);
         ordinals.put(NpcAction.SENKAIMON, 13);
+        ordinals.put(NpcAction.GARGANTA, 14);
         ordinals.forEach((value, ordinal) -> helper.assertTrue(value.ordinal() == ordinal,
                 value + " is number " + value.ordinal() + ", not " + ordinal));
         List<NpcAction> teach = NpcAction.offeredIn(DialogueView.ELDER_TEACH);

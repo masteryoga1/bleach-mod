@@ -43,7 +43,10 @@ public enum NpcAction {
      * Kisuke Urahara's Senkaimon in the room under his shop, for a soul whose home it leads to or that has a gate of its
      * own back: a Rukongai soul, a student, a Shinigami or Substitute, a Visored.
      */
-    SENKAIMON(DialogueView.SHOP_SOUL, DialogueView.SHOP_STUDENT, DialogueView.SHOP_SHINIGAMI, DialogueView.SHOP_VISORED);
+    SENKAIMON(DialogueView.SHOP_SOUL, DialogueView.SHOP_STUDENT, DialogueView.SHOP_SHINIGAMI, DialogueView.SHOP_VISORED),
+    /** His Garganta between the Keikaigi's posts to Hueco Mundo, whose far end brings souls home: for all he sells to. */
+    GARGANTA(DialogueView.SHOP_AWARE, DialogueView.SHOP_PLUS, DialogueView.SHOP_SOUL, DialogueView.SHOP_STUDENT,
+            DialogueView.SHOP_SHINIGAMI, DialogueView.SHOP_QUINCY, DialogueView.SHOP_VISORED);
 
     private static final IntFunction<NpcAction> BY_ID =
             ByIdMap.continuous(NpcAction::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

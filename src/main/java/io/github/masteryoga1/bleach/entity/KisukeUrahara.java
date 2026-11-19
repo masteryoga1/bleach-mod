@@ -39,7 +39,7 @@ import net.minecraft.world.phys.Vec3;
  * Kisuke Urahara, who keeps the Urahara Shop: a Shinigami in a gigai that every player sees, the unaware living too,
  * and that hides him from Pesquisa, so he is in neither spirit tag. Only {@code /kill} and the void harm him; nothing
  * moves him, he never despawns, no creature hunts him, and he talks to each soul by what it is, sells it what it can
- * use at his counter ({@link UraharaCounter}) and opens it his Senkaimon in the room under the shop ({@link UraharaGates}).
+ * use at his counter ({@link UraharaCounter}) and opens it his gates in the room under the shop ({@link UraharaGates}).
  */
 public class KisukeUrahara extends Mob implements DialogueNpc {
     /** A template's keeper carries this: he takes his UUID from where he stands, so a second set there is refused. */
@@ -51,7 +51,7 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
     /** How far his body turns back a tick towards where he was set, as fast as his head follows it. */
     private static final float SETTLE_DEGREES = 10.0F;
 
-    /** Souls that asked him for his Senkaimon, each waiting until it comes down into the room; never saved. */
+    /** Souls that asked him for a gate, each waiting until it comes down into the room; never saved. */
     final Map<UUID, UraharaGates.Ask> asks = new HashMap<>();
 
     public KisukeUrahara(EntityType<? extends KisukeUrahara> type, Level level) {
@@ -153,8 +153,8 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
     }
 
     /**
-     * Opens his wares, or takes an ask for his Senkaimon ({@link UraharaGates}), for a soul that pressed that button: he
-     * checks again that he serves it and that its view offers it, so a client cannot ask for what it was never offered.
+     * Opens his wares, or takes an ask for one of his gates ({@link UraharaGates}), for a soul that pressed that button:
+     * he checks again that he serves it and that its view offers it, so a client cannot ask for what it was never offered.
      */
     @Override
     public void perform(Player visitor, NpcAction action) {
@@ -163,8 +163,8 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
         }
         if (action == NpcAction.TRADE) {
             UraharaCounter.open(this, soul);
-        } else if (action == NpcAction.SENKAIMON) {
-            UraharaGates.ask(this, soul.serverLevel(), soul);
+        } else if (action == NpcAction.SENKAIMON || action == NpcAction.GARGANTA) {
+            UraharaGates.ask(this, soul.serverLevel(), soul, action);
         }
     }
 
