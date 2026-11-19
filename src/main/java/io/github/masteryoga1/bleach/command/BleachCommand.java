@@ -30,6 +30,7 @@ import io.github.masteryoga1.bleach.soul.BaitLogic;
 import io.github.masteryoga1.bleach.soul.BaitSite;
 import io.github.masteryoga1.bleach.soul.BaitSites;
 import io.github.masteryoga1.bleach.soul.DevourEvents;
+import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
 import io.github.masteryoga1.bleach.soul.GranReyCero;
 import io.github.masteryoga1.bleach.soul.HollowBody;
@@ -109,6 +110,7 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 /**
@@ -118,6 +120,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach info [player]
  * /bleach soul &lt;players&gt; &lt;state&gt;      (a Shinigami also gets their first tier; arrancar tears the mask, below)
  * /bleach enroll &lt;players&gt;           (Rukongai souls only)
+ * /bleach trial &lt;players&gt;            (a student's field trial begins where it stands in the Human World)
  * /bleach reiryoku &lt;players&gt; &lt;max&gt; [current]
  * /bleach stat &lt;players&gt; &lt;stat&gt; &lt;level&gt;
  * /bleach tier &lt;players&gt; &lt;path&gt; &lt;tier&gt;   (on an Arrancar, hollow sets the form it rose from)
@@ -221,6 +224,9 @@ public final class BleachCommand {
                 .then(Commands.literal("enroll")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .executes(BleachCommand::enroll)))
+                .then(Commands.literal("trial")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(BleachCommand::trial)))
                 .then(Commands.literal("reiryoku")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .then(Commands.argument("max", FloatArgumentType.floatArg(0.0F))
@@ -1093,6 +1099,32 @@ public final class BleachCommand {
         return count;
     }
 
+    /**
+     * Begins each student's field trial where it stands, past the exams' mark and a failed day's wait; refuses, saying
+     * why, a soul that is no student, one on the death screen, one out of the Human World and one whose trial is under
+     * way.
+     */
+    private static int trial(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int begun = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            String refusal = !ShinigamiLogic.isStudent(SoulLogic.get(player)) ? "commands.bleach.trial.not_student"
+                    : !player.isAlive() ? "commands.bleach.trial.dead"
+                    : player.level().dimension() != Level.OVERWORLD ? "commands.bleach.trial.not_human_world"
+                    : FieldTrialEvents.running(player) ? "commands.bleach.trial.running" : null;
+            if (refusal != null) {
+                context.getSource().sendFailure(Component.translatable(refusal, player.getDisplayName()));
+                continue;
+            }
+            FieldTrialEvents.begin(player, player.level().getGameTime());
+            begun++;
+        }
+        int count = begun;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.trial.success", count), true);
+        }
+        return count;
+    }
+
     /** Sets maximum reiryoku and either refills it ({@code current < 0}) or sets the current amount too. */
     private static int setReiryoku(CommandContext<CommandSourceStack> context, float current)
             throws CommandSyntaxException {
@@ -1188,6 +1220,7 @@ public final class BleachCommand {
             KidoEvents.dropGather(player, SoulLogic.get(player));
             HollowBody.leaveBodyIfWorn(player, SoulLogic.get(player));
             VisoredEvents.endAll(player, SoulLogic.get(player), player.level().getGameTime());
+            FieldTrialEvents.forget(player);
             SoulData fresh = new SoulData();
             QuincyArtsLogic.keepLandingGrace(QuincyArtsLogic.arts(SoulLogic.get(player)), fresh);
             player.setData(SoulAttachments.SOUL, fresh);

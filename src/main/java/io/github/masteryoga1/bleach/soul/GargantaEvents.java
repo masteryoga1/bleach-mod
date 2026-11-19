@@ -122,8 +122,8 @@ public final class GargantaEvents {
     /**
      * Whether a Garganta may open near this soul now: the world allows it (not in a game test), and
      * the soul is alive, in survival or adventure mode, aware and not an Arrancar, past its grace after
-     * joining, and not under an Academy instructor's protection. A Hollow player draws them too, and
-     * they come as its rivals (see {@link HollowLogic#isRival}).
+     * joining, not on a field trial, and not under an Academy instructor's protection. A Hollow player
+     * draws them too, and they come as its rivals (see {@link HollowLogic#isRival}).
      */
     public static boolean mayArriveNear(ServerPlayer player, SoulData data, long now) {
         ServerLevel level = player.serverLevel();
@@ -133,7 +133,8 @@ public final class GargantaEvents {
             return false;
         }
         if (!player.isAlive() || !player.gameMode.isSurvival() || !SoulLogic.hasSoul(player)
-                || !SoulLogic.isAware(data) || data.state() == SoulState.ARRANCAR || now < data.arrivalGraceUntil) {
+                || !SoulLogic.isAware(data) || data.state() == SoulState.ARRANCAR || now < data.arrivalGraceUntil
+                || FieldTrialEvents.running(player)) {
             return false;
         }
         double safe = BleachConfig.get(BleachConfig.ACADEMY_SAFE_RADIUS);

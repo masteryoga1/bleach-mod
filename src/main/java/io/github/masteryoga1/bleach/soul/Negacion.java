@@ -129,16 +129,17 @@ public final class Negacion {
     /**
      * The shape and state rules every Negación keeps, for mobs and players alike: a living creature not held
      * already, no taller than {@link #MAX_HEIGHT} and no wider than {@link #MAX_WIDTH}. A Hollow must be no
-     * Gillian (it leaves by its own retreat) and not held in jaws, leaving, dissolving or held by a bait; a
-     * player must be no spectator and no giant; an Arrancar NPC must not be leaving through its Garganta.
+     * Gillian (it leaves by its own retreat), no student's practice Hollow, and not held in jaws, leaving, dissolving
+     * or held by a bait; a player must be no spectator and no giant; an Arrancar NPC must not be leaving through its
+     * Garganta.
      */
     public static boolean mayHold(LivingEntity target) {
         if (!target.isAlive() || held(target) || target.getBbHeight() > MAX_HEIGHT || target.getBbWidth() > MAX_WIDTH) {
             return false;
         }
         if (target instanceof Hollow hollow) {
-            return !(hollow instanceof Gillian) && !hollow.isSeized() && !hollow.isDeparting() && !hollow.isPurifying()
-                    && !hollow.isBaitHeld();
+            return !(hollow instanceof Gillian) && !hollow.isPractice() && !hollow.isSeized() && !hollow.isDeparting()
+                    && !hollow.isPurifying() && !hollow.isBaitHeld();
         }
         if (target instanceof Player player) {
             return !player.isSpectator() && !MenosBody.isGiant(player);

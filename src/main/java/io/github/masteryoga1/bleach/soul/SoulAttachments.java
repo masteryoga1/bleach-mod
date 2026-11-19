@@ -56,6 +56,14 @@ public final class SoulAttachments {
     public static final Supplier<AttachmentType<Boolean>> UNIFORM_GIVEN = ATTACHMENT_TYPES.register("uniform_given",
             () -> AttachmentType.builder(() -> false).serialize(Codec.BOOL, given -> given).copyOnDeath().build());
 
+    /**
+     * A student's field trial (see {@link FieldTrial}): saved once it has one, so an old save reads none; kept through
+     * death, so a pass outlives it; never sent.
+     */
+    public static final Supplier<AttachmentType<FieldTrial>> FIELD_TRIAL = ATTACHMENT_TYPES.register("field_trial",
+            () -> AttachmentType.builder(() -> FieldTrial.NONE)
+                    .serialize(FieldTrial.CODEC, trial -> !trial.equals(FieldTrial.NONE)).copyOnDeath().build());
+
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());

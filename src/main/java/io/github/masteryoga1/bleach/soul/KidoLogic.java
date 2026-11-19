@@ -513,7 +513,8 @@ public final class KidoLogic {
      * or a Caja; while the caster or a player it aims at fights its inner Hollow, only that Hollow (nothing reaches into
      * the duel or out of it); never a creative player. A body seized by its Hollow may always be bound, whatever the
      * PvP and team rules; anything else as a Hadō may strike it ({@link CeroBeam#mayStrike}), so never the caster's
-     * mount or pets, a Plus, a Shinigami or Quincy NPC, or a player the caster may not harm. Server side.
+     * mount or pets, a Plus, a Shinigami or Quincy NPC, a practice Hollow not its own, or a player the caster may not
+     * harm. Server side.
      */
     public static boolean mayBind(Player caster, LivingEntity target) {
         if (target == caster || !target.isAlive() || target.isSpectator() || Negacion.held(target)) {

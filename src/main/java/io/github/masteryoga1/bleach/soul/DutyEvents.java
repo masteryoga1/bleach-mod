@@ -127,8 +127,8 @@ public final class DutyEvents {
     /**
      * A Shinigami on duty comes down near this soul if it is due one, a Plus for its Konsō or a soul that has passed on to
      * send it home, stands in the Overworld outside creative and spectator mode, and no Shinigami NPC is near; the visit
-     * is marked and the soul told which way to look. A due Plus none came to is told why, at most once a revisit's wait,
-     * and a soul that has passed on nothing; public for game tests.
+     * is marked and the soul told which way to look. None comes to a student on its field trial. A due Plus none came to
+     * is told why, at most once a revisit's wait, and a soul that has passed on nothing; public for game tests.
      *
      * @return whether one came
      */
@@ -137,7 +137,8 @@ public final class DutyEvents {
         // None comes to send a soul home where there is no Soul Society to send it to.
         boolean homeward = dueHome(data, player.level().dimension(), spawnsInOverworld(player), last, now)
                 && BleachWorlds.level(player.server, BleachWorlds.SOUL_SOCIETY) != null;
-        if (player.isCreative() || player.isSpectator() || !homeward && !due(data, last, now)
+        if (player.isCreative() || player.isSpectator() || FieldTrialEvents.running(player)
+                || !homeward && !due(data, last, now)
                 || !player.serverLevel().getEntitiesOfClass(ShinigamiNpc.class,
                         player.getBoundingBox().inflate(EXCLUSION_RANGE)).isEmpty()) {
             return false;

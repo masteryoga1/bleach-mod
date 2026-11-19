@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.soul.DutyEvents;
+import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.HomeWorldRespawn;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.SoulData;
@@ -156,10 +157,12 @@ public final class DutyShinigami extends ShinigamiNpc {
 
     /**
      * Whether this soul may be sent home: alive, outside creative and spectator, not held in a Negación light or a Caja,
-     * with no bed or anchor of its own in the Overworld, and still a soul that has passed on, while the server sends home.
+     * not on its field trial, with no bed or anchor of its own in the Overworld, and still a soul that has passed on,
+     * while the server sends home.
      */
     private static boolean mayBeSent(ServerPlayer soul) {
         return soul.isAlive() && !soul.isCreative() && !soul.isSpectator() && !Negacion.held(soul)
+                && !FieldTrialEvents.running(soul)
                 && !DutyEvents.spawnsInOverworld(soul) && HomeWorldRespawn.passedOnHome(SoulLogic.get(soul)) != null
                 && DutyEvents.sendsHome();
     }

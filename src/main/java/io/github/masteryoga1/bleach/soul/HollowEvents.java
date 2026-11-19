@@ -188,6 +188,11 @@ public final class HollowEvents {
     }
 
     private static void onHollowDeath(Hollow hollow, DamageSource source) {
+        if (hollow.isPractice()) {
+            // Nothing a slain Hollow gives: no count, growth, experience, soul or bait's tally; its trial counts it.
+            FieldTrialEvents.onPracticeDeath(hollow, source);
+            return;
+        }
         // A devoured Hollow is eaten, not purified or slain: its devourer was fed in DevourEvents.
         if (!DevourLogic.isDevoured(source) && source.getEntity() instanceof Player killer && !hollow.isPurifying()) {
             if (!SoulLogic.hasSoul(killer)) {

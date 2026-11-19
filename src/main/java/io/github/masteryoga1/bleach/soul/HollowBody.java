@@ -657,7 +657,7 @@ public final class HollowBody {
         server.playNotifySound(ModSounds.HOLLOW_SCENT.get(), SoundSource.PLAYERS, 1.0F, 1.0F);
     }
 
-    /** Whether a hungry Hollow smells this creature: a soul it could devour. */
+    /** Whether a hungry Hollow smells this creature: a soul it could devour, so never a student's practice Hollow. */
     private static boolean smellable(LivingEntity entity) {
         if (!entity.isAlive()) {
             return false;
@@ -666,7 +666,7 @@ public final class HollowBody {
             return !plus.isDeparting();
         }
         if (entity instanceof Hollow hollow) {
-            return !hollow.isPurifying() && !hollow.isDeparting();
+            return !hollow.isPurifying() && !hollow.isDeparting() && !hollow.isPractice();
         }
         return entity instanceof Player other && HollowPlayerLogic.survivalRules(other) && SoulLogic.hasSoul(other)
                 && SoulLogic.isAware(SoulLogic.get(other)) && !HollowPlayerLogic.isHollow(SoulLogic.get(other));

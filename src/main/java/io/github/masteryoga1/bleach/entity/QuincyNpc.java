@@ -206,11 +206,11 @@ public abstract class QuincyNpc extends PathfinderMob implements RangedAttackMob
 
     /**
      * What a living Quincy hunts: a living Hollow that is not leaving or dissolving. Never Fishbone D,
-     * which stays the soul's own first fight, and never a player.
+     * which stays the soul's own first fight, nor a student's practice Hollow, and never a player.
      */
     public static boolean isQuarry(LivingEntity target) {
         return target instanceof Hollow hollow && hollow.isAlive() && !hollow.isDeparting() && !hollow.isPurifying()
-                && !(hollow instanceof FishboneD);
+                && !(hollow instanceof FishboneD) && !hollow.isPractice();
     }
 
     // ---- Lifetime and visitor ----
