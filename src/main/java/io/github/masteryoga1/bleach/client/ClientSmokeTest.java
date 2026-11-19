@@ -315,7 +315,9 @@ public final class ClientSmokeTest {
     private static final int COURT_BY_TICK = 6800, WALL_BY_TICK = 6985;
     /** The press of the gate home, which waits for the first gate's wait to have run on a server that lost ticks. */
     private static final int GATE_HOME_PRESS_TICK = 7320;
-    /** How long the clock may wait in all before those three ticks for the server to catch up, before the checks fail. */
+    /** The step into the Garganta in Seireitei, which waits for the server's tear to have seen who stood in it. */
+    private static final int GARGANTA_STEP_IN_TICK = 8475;
+    /** How long the clock may wait in all before those four ticks for the server to catch up, before the checks fail. */
     private static final int SERVER_WAIT_TICKS = 400;
     /** How many of the server's last chat lines are kept for the checks that read them. */
     private static final int CHAT_LINES_KEPT = 16;
@@ -1623,7 +1625,7 @@ public final class ClientSmokeTest {
             // Into it: 11 ticks inside pass it, about 8486, into Hueco Mundo at the same x and z, beyond the radius a soul
             // is pushed out to past Las Noches' wall: onto Las Noches' level ground at y 96 for any seed, 4.5 blocks
             // inside its edge.
-            case 8475 -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f", HUECO_MUNDO_X,
+            case GARGANTA_STEP_IN_TICK -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f", HUECO_MUNDO_X,
                     SeireiteiPlan.PLATEAU_Y, HUECO_MUNDO_Z));
             // Facing south over the slope to the dunes, whatever rotation the landing kept.
             case 8520 -> command(minecraft, "tp @s ~ ~ ~ 0 0");
@@ -2404,7 +2406,8 @@ public final class ClientSmokeTest {
                 "the Garganta never stood the player on white sand on Las Noches' level ground at y 96, under Hueco Mundo's"
                         + " cloudless sky with the moon full (it is in " + minecraft.level.dimension().location() + " at "
                         + player.position() + ", under " + minecraft.level.effects().getClass().getSimpleName()
-                        + " in moon phase " + minecraft.level.getMoonPhase() + ")");
+                        + " in moon phase " + minecraft.level.getMoonPhase() + "; the action bar's last lines: "
+                        + recentActionBar() + ")");
         expectWithin(minecraft, 8707, 8725, () -> actionBarShows(Component.translatable("message.bleach.garganta.turning")),
                 "on Las Noches' level ground, holding the Gate key never tore at the air (the action bar's last lines: "
                         + recentActionBar() + ")");
@@ -2525,15 +2528,39 @@ public final class ClientSmokeTest {
 
     /**
      * Whether the clock waits a tick before the last tick of the Senkaimon's arrival check or of the lawn's wall check,
-     * for what a server stalled by the crossing or behind sends late, or before the gate home's press, for the first
-     * gate's wait that such a server has not yet run. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails
-     * as before.
+     * for what a server stalled by the crossing or behind sends late, before the gate home's press, for the first
+     * gate's wait that such a server has not yet run, or before the step into the Garganta, for the tear's first tick.
+     * Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
                 || ticksInWorld == WALL_BY_TICK - 1 && !wallStands(minecraft.level)
-                || ticksInWorld == GATE_HOME_PRESS_TICK - 1 && !serverGateReady(minecraft);
+                || ticksInWorld == GATE_HOME_PRESS_TICK - 1 && !serverGateReady(minecraft)
+                || ticksInWorld == GARGANTA_STEP_IN_TICK - 1 && !serverRiftTicked(minecraft);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
+    }
+
+    /**
+     * Whether the Garganta beside the server's soul has ticked since it opened, read on the server; false with none or
+     * no server to ask. A tear passes over the souls in it at its first tick, so a client ticking ahead of a stalled
+     * server could step in first and never be taken.
+     */
+    private static boolean serverRiftTicked(Minecraft minecraft) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server == null || local == null) {
+            return false;
+        }
+        try {
+            return server.submit(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                List<GargantaRift> rifts = player == null ? List.of() : player.level().getEntitiesOfClass(
+                        GargantaRift.class, player.getBoundingBox().inflate(4.0), GargantaRift::isPassage);
+                return !rifts.isEmpty() && rifts.stream().allMatch(rift -> rift.tickCount > 0);
+            }).get(2L, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /** Whether the server's soul has no Senkaimon wait left to run, read on the server; false with no server to ask. */
