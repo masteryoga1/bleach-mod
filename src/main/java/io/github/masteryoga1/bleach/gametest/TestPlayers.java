@@ -18,6 +18,7 @@ import net.minecraft.gametest.framework.GameTestRunner;
 import net.minecraft.network.Connection;
 import net.minecraft.network.PacketSendListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
@@ -85,7 +86,7 @@ final class TestPlayers {
                             player.connection.handleAcceptTeleportPacket(answer);
                         }
                     }));
-                } else if (packet instanceof ClientboundSystemChatPacket chat) {
+                } else if (packet instanceof ClientboundSystemChatPacket chat && !announcesAdvancement(chat.content())) {
                     (chat.overlay() ? ACTION_BAR : CHAT).computeIfAbsent(player.getUUID(),
                             id -> new CopyOnWriteArrayList<>()).add(chat.content());
                 } else if (packet instanceof ClientboundCustomPayloadPacket custom
@@ -113,6 +114,15 @@ final class TestPlayers {
     /** The lines this joined player has been shown on its action bar so far, oldest first. */
     static List<Component> actionBar(ServerPlayer player) {
         return ACTION_BAR.getOrDefault(player.getUUID(), List.of());
+    }
+
+    /**
+     * Whether this chat line tells every player of an advancement made. None is kept: the beacon the test framework
+     * builds beside each test wins Bring Home the Beacon for any test player near it, on whatever tick it lights.
+     */
+    private static boolean announcesAdvancement(Component line) {
+        return line.getContents() instanceof TranslatableContents translated
+                && translated.getKey().startsWith("chat.type.advancement.");
     }
 
     /** The lines this joined player has been shown in chat so far, oldest first. */
