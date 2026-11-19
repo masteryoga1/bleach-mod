@@ -69,13 +69,15 @@ public final class Senkaimon extends Entity implements Portal {
     private static final double MOTE_RISE = 1.0;
     private static final double MOTE_SPEED = 0.02;
 
-    // Server side only, never synced or saved: who opened it, the world it leads to, and the Dangai lane those it does
-    // not guide cross.
+    // Server side only, never synced or saved: who opened it, the world it leads to, the Dangai lane those it does not
+    // guide cross, and the student whose field trial it serves, if any.
     @Nullable
     private UUID opener;
     @Nullable
     private ResourceKey<Level> leadsTo;
     private int lane;
+    @Nullable
+    private UUID trialFor;
 
     public Senkaimon(EntityType<? extends Senkaimon> type, Level level) {
         super(type, level);
@@ -83,23 +85,30 @@ public final class Senkaimon extends Entity implements Portal {
 
     // ---- Opening it ----
 
-    /**
-     * Opens a gate where {@link #standing} puts it, for {@code open_seconds}, heard and seen by those who see spirits.
-     * Null where no gate leads on, or if the level would not take it; crowding is the caller's rule.
-     */
+    /** A gate its opener turns before itself (see {@link #open(ServerLevel, Entity, Entity, long)}). */
     @Nullable
     public static Senkaimon open(ServerLevel level, Entity opener, long now) {
+        return open(level, opener, opener, now);
+    }
+
+    /**
+     * Opens a gate where {@link #standing} puts it before {@code before}, facing as {@link #facing(Entity, Entity)} says,
+     * for {@code open_seconds}, heard and seen by those who see spirits, turned by {@code turner}'s blade (null: by none,
+     * and no arm swings). Null where no gate leads on, or if the level would not take it; crowding is the caller's rule.
+     */
+    @Nullable
+    public static Senkaimon open(ServerLevel level, Entity before, @Nullable Entity turner, long now) {
         ResourceKey<Level> to = TravelLogic.leadsTo(level.dimension());
         if (to == null) {
             return null;
         }
-        Direction facing = opener.getDirection();
-        Vec3 at = standing(opener, facing);
+        Direction facing = facing(before, turner);
+        Vec3 at = standing(before, facing);
         Senkaimon gate = new Senkaimon(ModEntities.SENKAIMON.get(), level);
         gate.entityData.set(DATA_FACING, facing);
         gate.entityData.set(DATA_ENDS_AT,
                 now + (long) BleachConfig.get(BleachConfig.SENKAIMON_OPEN_SECONDS) * TICKS_PER_SECOND);
-        gate.opener = opener.getUUID();
+        gate.opener = (turner != null ? turner : before).getUUID();
         gate.leadsTo = to;
         gate.lane = level.getRandom().nextInt(DangaiPlan.LANES);
         gate.moveTo(at.x, at.y, at.z, facing.toYRot(), 0.0F);
@@ -112,7 +121,7 @@ public final class Senkaimon extends Entity implements Portal {
             BlockPos start = BlockPos.containing(DangaiPlan.entry(gate.lane));
             dangai.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(start), 0, start);
         }
-        if (opener instanceof LivingEntity living) {
+        if (turner instanceof LivingEntity living) {
             living.swing(InteractionHand.MAIN_HAND, true);
         }
         double middle = at.y + HEIGHT / 2.0;
@@ -123,18 +132,28 @@ public final class Senkaimon extends Entity implements Portal {
         return gate;
     }
 
-    /** The box a gate this opener opened now would fill: {@link #DISTANCE} before its feet, facing its way. */
-    public static AABB boxFor(Entity opener) {
-        Direction facing = opener.getDirection();
-        return boxAt(standing(opener, facing), facing);
+    /**
+     * The way a gate before {@code before} faces: away from {@code turner} when another turns it, so the gate stands
+     * beyond {@code before} from him; else the way {@code before} faces.
+     */
+    public static Direction facing(Entity before, @Nullable Entity turner) {
+        double dx = turner == null ? 0.0 : before.getX() - turner.getX();
+        double dz = turner == null ? 0.0 : before.getZ() - turner.getZ();
+        return dx * dx + dz * dz < 1.0E-4 ? before.getDirection() : Direction.getNearest(dx, 0.0, dz);
     }
 
-    /** Whether a gate this opener opened now would stand within one soul's reach of a gate already open. */
-    public static boolean crowded(Entity opener) {
+    /** The box a gate opened now before {@code before}, turned by {@code turner}, would fill: {@link #DISTANCE} out. */
+    public static AABB boxFor(Entity before, @Nullable Entity turner) {
+        Direction facing = facing(before, turner);
+        return boxAt(standing(before, facing), facing);
+    }
+
+    /** Whether such a gate opened now would stand within one soul's reach of a gate already open. */
+    public static boolean crowded(Entity before, @Nullable Entity turner) {
         // Grown by a player's size, so no soul's box could meet both gates at once.
-        AABB reach = boxFor(opener).inflate(EntityType.PLAYER.getWidth(), EntityType.PLAYER.getHeight(),
+        AABB reach = boxFor(before, turner).inflate(EntityType.PLAYER.getWidth(), EntityType.PLAYER.getHeight(),
                 EntityType.PLAYER.getWidth());
-        return !opener.level().getEntitiesOfClass(Senkaimon.class, reach).isEmpty();
+        return !before.level().getEntitiesOfClass(Senkaimon.class, reach).isEmpty();
     }
 
     /** Where a gate this opener opens stands: {@link #DISTANCE} before its feet, square to the nearest compass point. */
@@ -151,7 +170,7 @@ public final class Senkaimon extends Entity implements Portal {
         return new AABB(at.x - dx, at.y, at.z - dz, at.x + dx, at.y + HEIGHT, at.z + dz);
     }
 
-    /** The way it faces, which its depth runs along: the way its opener faced. */
+    /** The way it faces, which its depth runs along (see {@link #facing(Entity, Entity)}). */
     public Direction facing() {
         return entityData.get(DATA_FACING);
     }
@@ -176,6 +195,17 @@ public final class Senkaimon extends Entity implements Portal {
     /** The Dangai lane those this gate does not guide cross, picked as it opened. Server side only. */
     public int lane() {
         return lane;
+    }
+
+    /** Makes this a gate of this student's field trial, which only it may pass (see {@link TravelEvents#destination}). */
+    public void forTrial(UUID student) {
+        trialFor = student;
+    }
+
+    /** The student whose field trial this gate serves, or null for any other gate. Server side only. */
+    @Nullable
+    public UUID trialFor() {
+        return trialFor;
     }
 
     // ---- The entity ----

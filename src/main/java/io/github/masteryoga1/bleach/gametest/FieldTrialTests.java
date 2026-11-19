@@ -1,8 +1,13 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.AcademyInstructor;
+import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.Hollow;
+import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
+import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
 import io.github.masteryoga1.bleach.registry.ModEntities;
@@ -12,17 +17,25 @@ import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.Negacion;
+import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
+import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.TravelEvents;
 import io.github.masteryoga1.bleach.soul.TravelLogic;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestSequence;
@@ -43,6 +56,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.attachment.AttachmentHolder;
 import net.neoforged.neoforge.common.NeoForge;
@@ -52,9 +66,10 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for the Academy's field trial: the practice Hollows, the hunt and its pass, each failure and the day's wait, the
- * saved record and {@code /bleach trial}. The death, change of world and logout they post run every listener on the
- * joined players, harmlessly.
+ * Tests for the Academy's field trial: the practice Hollows, the hunt and its pass, each failure, the day's wait and the
+ * gates home each end owes, the saved record, {@code /bleach trial}, the instructor's offer and his gates there and home,
+ * and graduation's need of the pass. The death, change of world and logout they post run every listener on the joined
+ * players, harmlessly.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -63,6 +78,8 @@ public final class FieldTrialTests {
     private static final String TAG = "field_trial_command";
     /** How far about the student the ground must tick for practice Hollows 10 to 20 blocks off. */
     private static final double REACH = 24.0;
+    private static final long DAY = 24_000L;
+    private static final String GATE_HOME = "message.bleach.field_trial.gate_home";
 
     private FieldTrialTests() {
     }
@@ -110,6 +127,43 @@ public final class FieldTrialTests {
     /** The lesson's day, by which a failure is marked. */
     private static long today(GameTestHelper helper) {
         return KidoLogic.lessonDay(helper.getLevel().getGameTime(), helper.getLevel().getDayTime());
+    }
+
+    /** A student's soul at every exam's mark. */
+    private static SoulData atTheBar() {
+        SoulData data = ShinigamiTests.student(60.0F);
+        ShinigamiLogic.graduationRequirements().forEach((art, level) -> data.setLevel(art, level));
+        return data;
+    }
+
+    /** Gives this soul a passed field trial, as every test that graduates a student must. */
+    static void passed(Player player) {
+        player.setData(SoulAttachments.FIELD_TRIAL, FieldTrial.NONE.won());
+    }
+
+    /** Marks this student sent out by the instructor's gate, owed every gate home. */
+    private static void sentOut(ServerPlayer student) {
+        student.setData(SoulAttachments.FIELD_TRIAL, FieldTrialEvents.trial(student).sentOut());
+    }
+
+    /** This student's trial gates within 8 blocks of it. */
+    private static List<Senkaimon> gatesFor(ServerPlayer student) {
+        return student.level().getEntitiesOfClass(Senkaimon.class, student.getBoundingBox().inflate(8.0),
+                gate -> student.getUUID().equals(gate.trialFor()));
+    }
+
+    /** How many trial gates stand for this student, each then taken away, so that none crowds the next. */
+    private static int gatesTaken(ServerPlayer student) {
+        List<Senkaimon> gates = gatesFor(student);
+        gates.forEach(Entity::discard);
+        return gates.size();
+    }
+
+    /** Whether an instructor in Soul Society offers this soul its trial, this many days on. */
+    private static boolean offered(GameTestHelper helper, Player student, SoulData data, int daysOn) {
+        ServerLevel level = helper.getLevel();
+        return FieldTrialEvents.offered(student, data, BleachWorlds.SOUL_SOCIETY, level.getGameTime() + daysOn * DAY,
+                level.getDayTime() + daysOn * DAY);
     }
 
     /** Asserts this student's trial failed today, its hunt and bar gone, none due till a new day; told this line once. */
@@ -190,7 +244,7 @@ public final class FieldTrialTests {
 
     /**
      * The hunt's own practice Hollows come to a student two at a time, 10 to 20 blocks off and set on it; five slain
-     * pass, told: the bar comes down, the rest fade, and the student stays where it stands.
+     * pass, told: the bar comes down, the rest fade, and the student stays where it stands, owed no gate home.
      */
     @GameTest(template = "field", batch = "field_trial_hunt", skyAccess = true, timeoutTicks = 600)
     public static void fiveSlainPass(GameTestHelper helper) {
@@ -229,8 +283,9 @@ public final class FieldTrialTests {
                     FieldTrial trial = FieldTrialEvents.trial(student);
                     helper.assertTrue(trial.passed() && !trial.running() && FieldTrialEvents.bar(student) == null
                                     && practiceOf(student).isEmpty() && student.level() == level
+                                    && gatesFor(student).isEmpty()
                                     && DutyTests.said(student, "message.bleach.field_trial.passed").size() == 1,
-                            "five slain left the trial " + trial + ", its bar or a practice Hollow");
+                            "five slain left the trial " + trial + ", its bar, a practice Hollow or a gate");
                     clear.run();
                 }, clear))
                 .thenSucceed();
@@ -241,7 +296,8 @@ public final class FieldTrialTests {
     /**
      * A trial fails as its time runs out, as its student dies or leaves the Human World, each marked on the lesson's day
      * and told, its practice Hollows fading; one whose hunt could place no practice Hollow in its first 30 seconds ends
-     * with nothing marked, told why.
+     * with nothing marked, told why. Sent out by the instructor, a student timed out or without ground gets its gate home
+     * at once, and the next as each goes, the third the last; the dead get theirs alive again, and one who left none.
      */
     @GameTest(template = "empty", batch = "field_trial")
     public static void timeDeathAndLeavingFail(GameTestHelper helper) {
@@ -252,24 +308,49 @@ public final class FieldTrialTests {
         long now = HollowPlayerTests.now(helper);
         List<Hollow> hollows = new ArrayList<>(List.of(begun(helper, late), begun(helper, dying), begun(helper, leaving)));
         FieldTrialEvents.begin(stranded, now);
+        List<ServerPlayer> all = List.of(late, dying, leaving, stranded);
+        all.forEach(FieldTrialTests::sentOut);
         try {
             FieldTrialEvents.step(late, now + FieldTrialEvents.TRIAL_TICKS - 1);
             helper.assertTrue(FieldTrialEvents.trial(late).running(), "the trial ran out a tick early");
             FieldTrialEvents.step(late, now + FieldTrialEvents.TRIAL_TICKS);
+            helper.assertTrue(gatesTaken(late) == 1, "a student out of time was not opened its gate home at once");
+            for (int gate = 2; gate <= FieldTrial.GATES_HOME + 1; gate++) {
+                FieldTrialEvents.step(late, now);
+                helper.assertTrue(gatesTaken(late) == (gate <= FieldTrial.GATES_HOME ? 1 : 0), "gate home " + gate
+                        + " of " + FieldTrial.GATES_HOME + " did not open, or one past them did");
+            }
+            helper.assertTrue(FieldTrialEvents.trial(late).gatesHome() == 0
+                            && TravelTests.lines(late, GATE_HOME) == FieldTrial.GATES_HOME - 1
+                            && TravelTests.lines(late, GATE_HOME + ".last") == 1,
+                    "the gates home left " + FieldTrialEvents.trial(late) + ", told " + TravelTests.said(late));
+            // At no health, as a player is when its death is posted, so not alive (mc LivingEntity.java:1548-1550).
+            dying.setHealth(0.0F);
             NeoForge.EVENT_BUS.post(new LivingDeathEvent(dying, dying.damageSources().generic()));
+            helper.assertTrue(gatesTaken(dying) == 0 && FieldTrialEvents.trial(dying).gatesHome() == FieldTrial.GATES_HOME,
+                    "a dead student was opened a gate home, or let go of it");
+            dying.setHealth(dying.getMaxHealth());
+            FieldTrialEvents.step(dying, now);
+            helper.assertTrue(gatesTaken(dying) == 1, "a student alive again was not opened its gate home");
             NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerChangedDimensionEvent(leaving, Level.OVERWORLD, Level.NETHER));
+            helper.assertTrue(gatesTaken(leaving) == 0 && FieldTrialEvents.trial(leaving).gatesHome() == 0,
+                    "a student who left the Human World was opened a gate home, or is owed one");
             assertFailed(helper, late, "message.bleach.field_trial.failed.time");
             assertFailed(helper, dying, "message.bleach.field_trial.failed.died");
             assertFailed(helper, leaving, "message.bleach.field_trial.failed.left");
             helper.assertTrue(hollows.stream().allMatch(Entity::isRemoved), "a failed trial's practice Hollow stands on");
             // No step before: one would place a practice Hollow on the open ground about.
             FieldTrialEvents.step(stranded, now + FieldTrialEvents.GROUND_TICKS);
-            helper.assertTrue(FieldTrialEvents.trial(stranded).equals(FieldTrial.NONE)
-                            && FieldTrialEvents.bar(stranded) == null
+            helper.assertTrue(FieldTrialEvents.trial(stranded).cameHome().equals(FieldTrial.NONE)
+                            && FieldTrialEvents.bar(stranded) == null && gatesTaken(stranded) == 1
                             && DutyTests.said(stranded, "message.bleach.field_trial.no_ground").size() == 1,
-                    "a hunt with no ground left " + FieldTrialEvents.trial(stranded) + ", or was not told why");
+                    "a hunt with no ground left " + FieldTrialEvents.trial(stranded) + ", a gate home, or was not told why");
         } finally {
-            List.of(late, dying, leaving, stranded).forEach(FieldTrialEvents::forget);
+            dying.setHealth(dying.getMaxHealth());
+            all.forEach(student -> {
+                gatesTaken(student);
+                FieldTrialEvents.forget(student);
+            });
             TravelTests.discard(hollows.toArray(new Entity[0]));
         }
         helper.succeed();
@@ -278,9 +359,10 @@ public final class FieldTrialTests {
     // ---- The saved record, and a trial cut short ----
 
     /**
-     * A save from before the trial holds no record and reads as none, bad fields as their defaults, and a record
-     * round-trips; a logout fails the trial there and then, saved so. A trial saved under way by a stop or a crash fails,
-     * cut short and told, in its student's first second back.
+     * A save from before the trial holds no record and reads as none, bad fields as their defaults, one from before the
+     * gates home as owing none, and a record round-trips; a logout fails the trial there and then, saved so, opening no
+     * gate home and keeping them owed. A trial saved under way by a stop or a crash fails, cut short and told, in its
+     * student's first second back, and opens the gate home owed.
      */
     @GameTest(template = "empty", batch = "field_trial")
     public static void theRecordSavesAndAnAbsenceFails(GameTestHelper helper) {
@@ -291,9 +373,16 @@ public final class FieldTrialTests {
         bad.put("failed_day", StringTag.valueOf("monday"));
         helper.assertTrue(FieldTrial.CODEC.parse(NbtOps.INSTANCE, bad).result().equals(Optional.of(FieldTrial.NONE)),
                 "bad fields do not read as their defaults");
-        FieldTrial passed = FieldTrial.NONE.won();
-        helper.assertTrue(FieldTrial.CODEC.parse(NbtOps.INSTANCE, FieldTrial.CODEC.encodeStart(NbtOps.INSTANCE, passed)
-                .getOrThrow()).result().equals(Optional.of(passed)), "a passed record did not read back");
+        CompoundTag old = new CompoundTag();
+        old.putBoolean("passed", true);
+        old.putLong("failed_day", 3L);
+        old.putLong("started_at", 40L);
+        helper.assertTrue(FieldTrial.CODEC.parse(NbtOps.INSTANCE, old).result()
+                .equals(Optional.of(new FieldTrial(true, 3L, 40L, 0))), "a record from before the gates home owes one");
+        for (FieldTrial record : List.of(FieldTrial.NONE.won(), FieldTrial.NONE.lost(3L).sentOut())) {
+            helper.assertTrue(FieldTrial.CODEC.parse(NbtOps.INSTANCE, FieldTrial.CODEC.encodeStart(NbtOps.INSTANCE, record)
+                    .getOrThrow()).result().equals(Optional.of(record)), "the record " + record + " did not read back");
+        }
 
         ServerPlayer leaver = student(helper, new Vec3(2.5, 1.0, 1.5));
         ServerPlayer back = student(helper, new Vec3(6.5, 1.0, 1.5));
@@ -301,20 +390,29 @@ public final class FieldTrialTests {
             helper.assertFalse(leaver.saveWithoutId(new CompoundTag()).getCompound(AttachmentHolder.ATTACHMENTS_NBT_KEY)
                     .contains(KEY), "a student who never took the trial saves a record");
             SpiderHollow hollow = begun(helper, leaver);
+            sentOut(leaver);
+            // A logout marks the player gone before its event (mc ServerGamePacketListenerImpl.java:1168-1169).
+            leaver.disconnect();
             NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(leaver));
             assertFailed(helper, leaver, null);
             helper.assertTrue(hollow.isRemoved(), "a practice Hollow outlived its student's logout");
+            helper.assertTrue(gatesTaken(leaver) == 0 && FieldTrialEvents.trial(leaver).gatesHome() == FieldTrial.GATES_HOME,
+                    "a student logging out was opened a gate home, or let go of it");
             Player loaded = helper.makeMockPlayer(GameType.SURVIVAL);
             loaded.load(leaver.saveWithoutId(new CompoundTag()));
             helper.assertTrue(loaded.getData(SoulAttachments.FIELD_TRIAL).equals(FieldTrialEvents.trial(leaver)),
                     "the failed record did not load");
             long now = HollowPlayerTests.now(helper);
-            back.setData(SoulAttachments.FIELD_TRIAL, FieldTrial.NONE.begun(now));
+            back.setData(SoulAttachments.FIELD_TRIAL, FieldTrial.NONE.sentOut().begun(now));
             FieldTrialEvents.step(back, now);
             assertFailed(helper, back, "message.bleach.field_trial.failed.cut_short");
+            helper.assertTrue(gatesTaken(back) == 1, "a trial cut short opened no gate home");
         } finally {
+            gatesTaken(back);
             FieldTrialEvents.forget(leaver);
             FieldTrialEvents.forget(back);
+            // Off the server for good, as its logout would have taken it.
+            leaver.connection.disconnect(Component.literal("Logged out"));
         }
         helper.succeed();
     }
@@ -367,6 +465,210 @@ public final class FieldTrialTests {
             fallen.setHealth(fallen.getMaxHealth());
             all.forEach(FieldTrialEvents::forget);
         }
+        helper.succeed();
+    }
+
+    // ---- The offer ----
+
+    /**
+     * An instructor in Soul Society or the Human World offers the trial to a student at every exam's mark with one due,
+     * and to no one else: not one a mark short, a Shinigami or a soul not enrolled, nor one with a trial under way, passed
+     * or failed that day, nor where the server asks for none. In the Human World it begins where the student stands.
+     */
+    @GameTest(template = "empty", batch = "field_trial")
+    public static void theTrialIsOfferedOnlyAtTheBar(GameTestHelper helper) {
+        ServerPlayer bar = student(helper, new Vec3(2.5, 1.0, 1.5));
+        SoulData data = atTheBar();
+        bar.setData(SoulAttachments.SOUL, data);
+        long now = HollowPlayerTests.now(helper);
+        long dayTime = helper.getLevel().getDayTime();
+        AcademyInstructor instructor = helper.spawn(ModEntities.ACADEMY_INSTRUCTOR.get(), 1, 1, 1);
+        try {
+            helper.assertTrue(offered(helper, bar, data, 0)
+                            && FieldTrialEvents.offered(bar, data, Level.OVERWORLD, now, dayTime)
+                            && !FieldTrialEvents.offered(bar, data, Level.NETHER, now, dayTime),
+                    "the trial was offered in the wrong worlds");
+            KidoTests.withConfig(BleachConfig.FIELD_TRIAL, false, () -> helper.assertFalse(offered(helper, bar, data, 0),
+                    "the trial was offered with field_trial false"));
+            SoulData shy = atTheBar();
+            shy.setLevel(Stat.HOHO, ShinigamiLogic.graduationRequirements().get(Stat.HOHO) - 1);
+            SoulData shinigami = ShinigamiTests.soul(SoulState.SHINIGAMI, 60.0F);
+            SoulData unenrolled = ShinigamiTests.soul(SoulState.RUKONGAI, 60.0F);
+            for (SoulData other : List.of(shinigami, unenrolled)) {
+                ShinigamiLogic.graduationRequirements().forEach((art, level) -> other.setLevel(art, level));
+            }
+            helper.assertFalse(offered(helper, bar, shy, 0) || offered(helper, bar, shinigami, 0)
+                    || offered(helper, bar, unenrolled, 0), "the trial was offered a mark short, to a Shinigami or to a"
+                    + " soul not enrolled");
+            long today = today(helper);
+            for (FieldTrial trial : List.of(FieldTrial.NONE.lost(today), FieldTrial.NONE.begun(now), FieldTrial.NONE.won())) {
+                bar.setData(SoulAttachments.FIELD_TRIAL, trial);
+                helper.assertFalse(offered(helper, bar, data, 0), "the trial was offered with " + trial);
+            }
+            bar.setData(SoulAttachments.FIELD_TRIAL, FieldTrial.NONE.lost(today));
+            helper.assertTrue(offered(helper, bar, data, 1), "a trial failed today was not offered a day on");
+            bar.removeData(SoulAttachments.FIELD_TRIAL);
+            DialogueView view = instructor.viewFor(bar, data, now);
+            helper.assertTrue(view == DialogueView.STUDENT_TRIAL && instructor.viewFor(data, now) == DialogueView.STUDENT,
+                    "an instructor in the Human World showed the student " + view);
+            instructor.perform(bar, NpcAction.FIELD_TRIAL);
+            FieldTrial begun = FieldTrialEvents.trial(bar);
+            helper.assertTrue(begun.startedAt() == now && begun.gatesHome() == 0 && gatesFor(bar).isEmpty()
+                            && DutyTests.said(bar, "message.bleach.field_trial.begun").size() == 1,
+                    "the instructor in the Human World left the trial " + begun + ", or opened a gate");
+        } finally {
+            FieldTrialEvents.forget(bar);
+            // Persistent, and the test grid is never cleared.
+            instructor.discard();
+        }
+        helper.succeed();
+    }
+
+    // ---- The instructor's gates ----
+
+    /**
+     * An instructor in Soul Society sends a student at the bar out: his gate, beyond it from him and the only one (a
+     * second is crowded), takes it alone to where a gate home would set it down, its trial begun as it comes out; a
+     * Shinigami in the gate stays, told it is not its. Passed, the student is owed its gates home, the first of which
+     * opens before it and takes it to the Academy's landing, facing the hall, owed none.
+     */
+    @GameTest(template = "empty", batch = "field_trial_gate", timeoutTicks = 800)
+    public static void theInstructorsGatesTakeTheStudentOutAndHome(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ServerLevel soul = TravelTests.holdCourt(helper);
+        SiteTests.holdAcademy(helper);
+        // The return point the gate out sets the student down at, on stone.
+        helper.setBlock(1, 0, 0, Blocks.STONE);
+        BlockPos back = helper.absolutePos(new BlockPos(1, 1, 0));
+        ServerPlayer student = student(helper, new Vec3(1.5, 1.0, 1.5));
+        student.setData(SoulAttachments.SOUL, atTheBar());
+        student.setData(SoulAttachments.TRAVEL, student.getData(SoulAttachments.TRAVEL)
+                .withHumanWorldReturn(GlobalPos.of(Level.OVERWORLD, back)));
+        ServerPlayer shinigami = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(0.5, 1.0, 1.5));
+        shinigami.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, 200.0F));
+        Vec3 court = TravelLogic.COURT;
+        List<Entity> spawned = new ArrayList<>();
+        Runnable clear = () -> {
+            FieldTrialEvents.forget(student);
+            TravelTests.discard(spawned.toArray(new Entity[0]));
+            helper.setBlock(1, 0, 0, Blocks.AIR);
+        };
+        helper.runAtTickTime(790, () -> {
+            clear.run();
+            helper.fail("the student is at " + TravelTests.where(student) + " with " + FieldTrialEvents.trial(student)
+                    + "; the action bar said " + TravelTests.said(student));
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> AcademyTests.assertAcademyStands(helper, soul))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    AcademyInstructor instructor = ModEntities.ACADEMY_INSTRUCTOR.get().create(soul);
+                    instructor.moveTo(court.x - 3.0, court.y, court.z, 0.0F, 0.0F);
+                    soul.addFreshEntity(instructor);
+                    spawned.add(instructor);
+                    student.teleportTo(soul, court.x, court.y, court.z, 0.0F, 0.0F);
+                    shinigami.teleportTo(soul, court.x + 3.0, court.y, court.z, 0.0F, 0.0F);
+                    DialogueView view = instructor.viewFor(student, SoulLogic.get(student), soul.getGameTime());
+                    helper.assertTrue(view == DialogueView.STUDENT_TRIAL, "the instructor showed the student " + view);
+                    instructor.perform(student, NpcAction.FIELD_TRIAL);
+                    instructor.perform(student, NpcAction.FIELD_TRIAL);
+                    List<Senkaimon> out = gatesFor(student);
+                    spawned.addAll(out);
+                    // Facing from him to the student, so it stands beyond the student, never on or behind him.
+                    helper.assertTrue(out.size() == 1 && out.get(0).leadsTo() == Level.OVERWORLD
+                                    && out.get(0).facing() == Direction.EAST
+                                    && out.get(0).distanceTo(instructor) > student.distanceTo(instructor),
+                            "the instructor opened " + out.size() + " gates for the student, the first " + out.stream()
+                                    .map(gate -> gate.facing() + " at " + gate.position()).findFirst().orElse("none"));
+                    helper.assertTrue(TravelTests.lines(student, "message.bleach.field_trial.set_out") == 1
+                                    && TravelTests.lines(student, "message.bleach.senkaimon.crowded") == 1,
+                            "the student was told " + TravelTests.said(student));
+                }, clear))
+                .thenWaitUntil(() -> helper.assertTrue(!student.isChangingDimension() && !shinigami.isChangingDimension()
+                        && student.getPortalCooldown() == 0, "the two are still coming into Soul Society"))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    Senkaimon gate = gatesFor(student).get(0);
+                    Direction across = gate.facing().getClockWise();
+                    double dx = across.getStepX() * 0.75;
+                    double dz = across.getStepZ() * 0.75;
+                    student.teleportTo(soul, gate.getX() - dx, gate.getY(), gate.getZ() - dz, 0.0F, 0.0F);
+                    shinigami.teleportTo(soul, gate.getX() + dx, gate.getY(), gate.getZ() + dz, 0.0F, 0.0F);
+                }, clear))
+                .thenWaitUntil(() -> helper.assertTrue(student.level() == level, "the student is at "
+                        + TravelTests.where(student)))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    FieldTrial trial = FieldTrialEvents.trial(student);
+                    helper.assertTrue(student.position().distanceTo(Vec3.atBottomCenterOf(back)) < 0.01,
+                            "the gate out set the student down at " + student.position() + ", not at " + back);
+                    helper.assertTrue(trial.running() && trial.gatesHome() == FieldTrial.GATES_HOME
+                                    && level.getGameTime() - trial.startedAt() <= 1 && FieldTrialEvents.bar(student) != null
+                                    && DutyTests.said(student, "message.bleach.field_trial.begun").size() == 1,
+                            "coming out left the trial " + trial);
+                    helper.assertTrue(shinigami.level() == soul
+                                    && TravelTests.lines(shinigami, "message.bleach.field_trial.not_yours") >= 1,
+                            "the Shinigami is at " + TravelTests.where(shinigami) + ", told " + TravelTests.said(shinigami));
+                    for (int x = 0; x < FieldTrialEvents.NEEDED; x++) {
+                        helper.assertTrue(slay(student, practice(helper, student, x, 5)), "the student's blow did not land");
+                    }
+                    List<Senkaimon> home = gatesFor(student);
+                    spawned.addAll(home);
+                    FieldTrial passed = FieldTrialEvents.trial(student);
+                    helper.assertTrue(passed.passed() && !passed.running() && passed.gatesHome() == FieldTrial.GATES_HOME - 1
+                                    && home.size() == 1 && home.get(0).leadsTo() == BleachWorlds.SOUL_SOCIETY
+                                    && TravelTests.lines(student, GATE_HOME) == 1,
+                            "the pass left " + passed + " and " + home.size() + " gates home");
+                    // Its trial no longer due, the instructor's gate out takes it nowhere.
+                    helper.assertTrue(TravelEvents.destination((Senkaimon) spawned.get(1), student) == null,
+                            "the gate out would take the passed student out again");
+                }, clear))
+                .thenWaitUntil(() -> helper.assertTrue(!student.isChangingDimension() && student.getPortalCooldown() == 0,
+                        "the student is still coming out"))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    Senkaimon home = gatesFor(student).get(0);
+                    student.teleportTo(level, home.getX(), home.getY(), home.getZ(), 0.0F, 0.0F);
+                }, clear))
+                .thenWaitUntil(() -> helper.assertTrue(student.level() == soul, "the student is at "
+                        + TravelTests.where(student)))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    FieldTrial trial = FieldTrialEvents.trial(student);
+                    helper.assertTrue(student.position().distanceTo(AcademyLocator.LANDING) < 0.01
+                                    && Math.abs(Mth.wrapDegrees(student.getYRot() - AcademyLocator.LANDING_YAW)) < 0.01,
+                            "the gate home set the student down at " + student.position() + " facing " + student.getYRot());
+                    helper.assertTrue(trial.passed() && trial.gatesHome() == 0
+                                    && DutyTests.said(student, "message.bleach.konso.arrived").size() == 1,
+                            "coming home left " + trial);
+                    clear.run();
+                }, clear))
+                .thenSucceed();
+    }
+
+    // ---- Graduation ----
+
+    /**
+     * Graduation asks for the pass: a student at every exam's mark with none stays a student, unless the server asks for
+     * none. The pass outlives death, and with it the student graduates and its record goes; a Shinigami is untouched.
+     */
+    @GameTest(template = "empty", batch = "field_trial")
+    public static void graduationNeedsThePass(GameTestHelper helper) {
+        Player student = helper.makeMockPlayer(GameType.SURVIVAL);
+        student.setData(SoulAttachments.SOUL, atTheBar());
+        helper.assertFalse(ShinigamiEvents.graduate(student), "a student with no pass graduated");
+        helper.assertTrue(ShinigamiLogic.isStudent(SoulLogic.get(student)), "a student with no pass is a student no more");
+        Player free = helper.makeMockPlayer(GameType.SURVIVAL);
+        free.setData(SoulAttachments.SOUL, atTheBar());
+        KidoTests.withConfig(BleachConfig.FIELD_TRIAL, false, () -> helper.assertTrue(ShinigamiEvents.graduate(free)
+                && SoulLogic.get(free).state() == SoulState.SHINIGAMI, "with field_trial false a student did not graduate"));
+        passed(student);
+        Player reborn = helper.makeMockPlayer(GameType.SURVIVAL);
+        reborn.setData(SoulAttachments.SOUL, atTheBar());
+        // As a respawn copies a player's attachments (NeoForge's AttachmentInternals.onPlayerClone).
+        reborn.copyAttachmentsFrom(student, true);
+        helper.assertTrue(FieldTrialEvents.trial(reborn).passed(), "the pass did not outlive death");
+        helper.assertTrue(ShinigamiEvents.graduate(reborn) && SoulLogic.get(reborn).state() == SoulState.SHINIGAMI
+                && !reborn.hasData(SoulAttachments.FIELD_TRIAL), "the pass did not graduate the student, or stayed");
+        Player elder = helper.makeMockPlayer(GameType.SURVIVAL);
+        elder.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, 60.0F));
+        helper.assertFalse(ShinigamiEvents.graduate(elder) || SoulLogic.get(elder).state() != SoulState.SHINIGAMI
+                || SoulLogic.get(elder).maxReiryoku() != 60.0F, "a Shinigami graduated again, or was changed");
         helper.succeed();
     }
 }

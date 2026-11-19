@@ -155,6 +155,7 @@ public final class AcademyTests {
                 case PLUS -> List.of(NpcAction.KONSO);
                 case SOUL -> List.of(NpcAction.ENROLL);
                 case STUDENT -> List.of(NpcAction.GRADUATE, NpcAction.ASAUCHI, NpcAction.LESSON);
+                case STUDENT_TRIAL -> List.of(NpcAction.ASAUCHI, NpcAction.LESSON, NpcAction.FIELD_TRIAL);
                 case SUBSTITUTE, SHINIGAMI -> List.of(NpcAction.ASAUCHI, NpcAction.BUTTERFLY);
                 case OFFER_POWER -> List.of(NpcAction.ACCEPT_POWER);
                 case ELDER_GREETING, ELDER_LESSON -> List.of(NpcAction.LESSON);
@@ -215,6 +216,7 @@ public final class AcademyTests {
         helper.assertTrue(ShinigamiLogic.isStudent(data), "failing the exams ended the studies");
 
         ShinigamiLogic.graduationRequirements().forEach((art, level) -> data.setLevel(art, level));
+        FieldTrialTests.passed(player);
         float before = data.maxReiryoku();
         helper.assertTrue(ShinigamiEvents.graduate(player), "a trained student failed the exams");
         helper.assertTrue(data.state() == SoulState.SHINIGAMI && data.tier(PowerPath.SHINIGAMI) == 1,

@@ -20,10 +20,10 @@ public enum NpcAction {
     KONSO(DialogueView.PLUS),
     ENROLL(DialogueView.SOUL),
     GRADUATE(DialogueView.STUDENT),
-    ASAUCHI(DialogueView.SUBSTITUTE, DialogueView.STUDENT, DialogueView.SHINIGAMI),
+    ASAUCHI(DialogueView.SUBSTITUTE, DialogueView.STUDENT, DialogueView.STUDENT_TRIAL, DialogueView.SHINIGAMI),
     ACCEPT_POWER(DialogueView.OFFER_POWER),
     /** A lesson once a day: the Quincy Elder's, or the Academy instructor's Kidō lesson for a student. */
-    LESSON(DialogueView.ELDER_GREETING, DialogueView.ELDER_LESSON, DialogueView.STUDENT),
+    LESSON(DialogueView.ELDER_GREETING, DialogueView.ELDER_LESSON, DialogueView.STUDENT, DialogueView.STUDENT_TRIAL),
     /** The Elder's Ransōtengai trial. */
     RANSOTENGAI(DialogueView.ELDER_TEACH),
     /** The Elder's arrow beside the heart, which brings a sealed power back. */
@@ -33,7 +33,9 @@ public enum NpcAction {
     /** The instructor's blade through a Hollow player's mask. */
     PURIFY(DialogueView.HOLLOW_PURIFY),
     /** The instructor's Jigokuchō, for a Shinigami or a Substitute that has lost its own. */
-    BUTTERFLY(DialogueView.SUBSTITUTE, DialogueView.SHINIGAMI);
+    BUTTERFLY(DialogueView.SUBSTITUTE, DialogueView.SHINIGAMI),
+    /** The instructor's field trial: his Senkaimon from Soul Society, or in the Human World a hunt where one stands. */
+    FIELD_TRIAL(DialogueView.STUDENT_TRIAL);
 
     private static final IntFunction<NpcAction> BY_ID =
             ByIdMap.continuous(NpcAction::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

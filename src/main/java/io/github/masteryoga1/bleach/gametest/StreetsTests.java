@@ -337,7 +337,7 @@ public final class StreetsTests {
                 + landed);
         for (Direction facing : Direction.Plane.HORIZONTAL) {
             arriving.moveTo(TravelLogic.COURT.x, TravelLogic.COURT.y, TravelLogic.COURT.z, facing.toYRot(), 0.0F);
-            helper.assertFalse(soul.getBlockCollisions(null, Senkaimon.boxFor(arriving)).iterator().hasNext(),
+            helper.assertFalse(soul.getBlockCollisions(null, Senkaimon.boxFor(arriving, arriving)).iterator().hasNext(),
                     "a gate opened at the court facing " + facing + " meets a block");
         }
         helper.succeed();

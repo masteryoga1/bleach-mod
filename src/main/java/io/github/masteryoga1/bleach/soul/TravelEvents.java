@@ -47,7 +47,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 public final class TravelEvents {
     private static final String TURNING_KEY = "message.bleach.senkaimon.turning";
     private static final String TEARING_KEY = "message.bleach.garganta.turning";
-    private static final String NO_LANDING_KEY = "message.bleach.senkaimon.no_landing";
+    static final String NO_LANDING_KEY = "message.bleach.senkaimon.no_landing";
     private static final String GARGANTA_NO_LANDING_KEY = "message.bleach.garganta.no_landing";
     private static final String RECEIVED_KEY = "message.bleach.hell_butterfly.received";
     private static final String ISSUED_KEY = "message.bleach.hell_butterfly.issued";
@@ -186,12 +186,16 @@ public final class TravelEvents {
     // ---- The gate ----
 
     /**
-     * Where this gate takes this soul, or null, telling it why, when it may not pass. A soul it does not guide goes into
-     * the Dangai ({@link DangaiEvents#into}) unless its Hollow holds its body; any soul is refused if nowhere on the far
-     * side will hold it. The far side's chunks load here.
+     * Where this gate takes this soul, or null, telling it why, when it may not pass: a field trial's gate where the trial
+     * says ({@code FieldTrialEvents.destination}), and a soul it does not guide into the Dangai ({@link DangaiEvents#into})
+     * unless its Hollow holds its body. Any soul is refused if nowhere on the far side will hold it, and the far side's
+     * chunks load here.
      */
     @Nullable
     public static DimensionTransition destination(Senkaimon gate, ServerPlayer passer) {
+        if (gate.trialFor() != null) {
+            return FieldTrialEvents.destination(gate, passer);
+        }
         if (!TravelLogic.guided(passer)) {
             if (SoulLogic.hasSoul(passer) && VisoredLogic.takenOver(SoulLogic.get(passer))) {
                 passer.displayClientMessage(Component.translatable(TravelLogic.Refusal.TAKEN.messageKey())

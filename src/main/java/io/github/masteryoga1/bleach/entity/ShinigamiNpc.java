@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.HollowPlayerEvents;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
@@ -212,6 +213,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
             case LESSON -> KidoEvents.lesson(visitor, level().getGameTime(), level().getDayTime());
             case PURIFY -> HollowPlayerEvents.purifyByInstructor(this, visitor);
             case BUTTERFLY -> TravelEvents.issueButterfly(visitor, level().getGameTime(), level().getDayTime());
+            case FIELD_TRIAL -> FieldTrialEvents.setOut(this, visitor);
         }
     }
 

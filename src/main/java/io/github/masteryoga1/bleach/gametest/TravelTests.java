@@ -599,6 +599,7 @@ public final class TravelTests {
         Player graduate = mock(helper, GameType.SURVIVAL, ShinigamiTests.student(40.0F));
         SoulData data = SoulLogic.get(graduate);
         ShinigamiLogic.graduationRequirements().forEach((art, at) -> data.setLevel(art, at));
+        FieldTrialTests.passed(graduate);
         helper.assertTrue(ShinigamiEvents.graduate(graduate), "a trained student failed the exams");
         helper.assertTrue(butterflies(graduate) == 1, "graduating gave " + butterflies(graduate) + " Jigokuchō");
         assertDay(helper, graduate, today, "a graduate");
@@ -665,6 +666,7 @@ public final class TravelTests {
         Player graduate = mock(helper, GameType.SURVIVAL, ShinigamiTests.student(40.0F));
         SoulData data = SoulLogic.get(graduate);
         ShinigamiLogic.graduationRequirements().forEach((art, at) -> data.setLevel(art, at));
+        FieldTrialTests.passed(graduate);
         helper.assertTrue(ShinigamiEvents.graduate(graduate), "a trained student failed the exams");
         helper.assertTrue(butterflies(graduate) == 1, "graduating gave " + butterflies(graduate) + " Jigokuchō");
         assertDay(helper, graduate, today, "a graduate");

@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
@@ -17,6 +18,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.RelativeMovement;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.PushReaction;
@@ -72,6 +74,15 @@ public final class AcademyInstructor extends ShinigamiNpc {
             case RUKONGAI -> ShinigamiLogic.isStudent(visitor) ? DialogueView.STUDENT : DialogueView.SOUL;
             default -> DialogueView.SHINIGAMI;
         };
+    }
+
+    /** A student he would examine that is due its field trial is offered it instead ({@link FieldTrialEvents#offered}). */
+    @Override
+    public DialogueView viewFor(Player visitor, SoulData data, long now) {
+        DialogueView view = viewFor(data, now);
+        return view == DialogueView.STUDENT
+                && FieldTrialEvents.offered(visitor, data, level().dimension(), now, level().getDayTime())
+                ? DialogueView.STUDENT_TRIAL : view;
     }
 
     @Override
