@@ -31,6 +31,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
@@ -45,9 +46,9 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 /**
  * The Academy's field trial, a hunt in the Human World that the instructor offers at the stat bar, sending the student
  * out by his Senkaimon from Soul Society: practice Hollows come for it alone, two at a time, and five slain within five
- * minutes pass it. Time running out, death, leaving the Human World or logging out fails it, the lesson's day marked;
- * every end fades the practice Hollows, and one the instructor sent out is owed gates home to the Academy until it
- * leaves the Human World. Graduation asks for the pass unless the server says not.
+ * minutes pass it, though now and then a real Hollow breaks in. Time running out, death, leaving the Human World or
+ * logging out fails it, the lesson's day marked; every end fades the practice Hollows, and one the instructor sent out is
+ * owed gates home to the Academy until it leaves the Human World. Graduation asks for the pass unless the server says not.
  */
 public final class FieldTrialEvents {
     /** Practice Hollows a student must slay, the time it has, and how many come for it at once. The mod's numbers. */
@@ -76,17 +77,26 @@ public final class FieldTrialEvents {
     private static final String GATE_HOME_KEY = "message.bleach.field_trial.gate_home";
     private static final String LAST_GATE_KEY = "message.bleach.field_trial.gate_home.last";
     private static final String ARRIVED_KEY = "message.bleach.konso.arrived";
+    private static final String BREAK_IN_KEY = "message.bleach.field_trial.break_in";
+    /** A real Hollow that breaks in comes this long into the trial, and up to this much later: one to three minutes. */
+    private static final int BREAK_IN_EARLIEST = 60 * 20;
+    private static final int BREAK_IN_WINDOW = 120 * 20;
 
-    /** A trial's hunt while its student is here: when it began, its bar, how many it has slain, whether any came. */
+    /**
+     * A trial's hunt while its student is here: when it began, its bar, how many it has slain, whether any came, and when
+     * a real Hollow breaks in ({@link ShinigamiProgress#NEVER}: none, or it has come).
+     */
     private static final class Hunt {
         final long start;
         final ServerBossEvent bar;
         int slain;
         boolean placed;
+        long breakInAt;
 
-        Hunt(long start, ServerBossEvent bar) {
+        Hunt(long start, ServerBossEvent bar, long breakInAt) {
             this.start = start;
             this.bar = bar;
+            this.breakInAt = breakInAt;
         }
     }
 
@@ -109,7 +119,7 @@ public final class FieldTrialEvents {
         return player.getData(SoulAttachments.FIELD_TRIAL);
     }
 
-    /** Whether this soul's trial is under way: no Garganta tears near it, and no Shinigami on duty comes for it. */
+    /** Whether this soul's trial is under way: no Garganta tears near it but its break-in, and no Shinigami on duty comes. */
     public static boolean running(Player player) {
         return trial(player).running();
     }
@@ -254,8 +264,8 @@ public final class FieldTrialEvents {
     // ---- The hunt ----
 
     /**
-     * The trial begins where the student stands, as {@code /bleach trial} and the instructor begin it: its record, its bar
-     * and the line.
+     * The trial begins where the student stands, as {@code /bleach trial} and the instructor begin it: its record, its bar,
+     * the line, and the roll for a real Hollow breaking in.
      */
     public static void begin(ServerPlayer student, long now) {
         endHunt(student);
@@ -263,7 +273,9 @@ public final class FieldTrialEvents {
         ServerBossEvent bar = new ServerBossEvent(barName(0), BossEvent.BossBarColor.WHITE,
                 BossEvent.BossBarOverlay.PROGRESS);
         bar.addPlayer(student);
-        HUNTS.put(student.getUUID(), new Hunt(now, bar));
+        long breakInAt = student.getRandom().nextDouble() < BleachConfig.get(BleachConfig.FIELD_TRIAL_BREAK_IN_CHANCE)
+                ? now + BREAK_IN_EARLIEST + student.getRandom().nextInt(BREAK_IN_WINDOW) : ShinigamiProgress.NEVER;
+        HUNTS.put(student.getUUID(), new Hunt(now, bar, breakInAt));
         student.sendSystemMessage(Component.translatable(BEGUN_KEY, NEEDED, TRIAL_TICKS / 1200)
                 .withStyle(ChatFormatting.GOLD));
     }
@@ -271,8 +283,8 @@ public final class FieldTrialEvents {
     /**
      * Once a second for each player, from its tick; public for tests. A trial under way ends quietly for a soul no longer
      * a student; fails, cut short, with no hunt left of it (the server stopped or crashed), or with its time up; ends
-     * unmarked if no practice Hollow could come in its first 30 seconds; and otherwise keeps them coming; with none
-     * under way, a gate home owed is tended.
+     * unmarked if no practice Hollow could come in its first 30 seconds; and otherwise keeps them coming, and lets a real
+     * Hollow in at its time; with none under way, a gate home owed is tended.
      */
     public static void step(ServerPlayer student, long now) {
         FieldTrial trial = trial(student);
@@ -296,6 +308,7 @@ public final class FieldTrialEvents {
                 spawnPractice(student, hunt);
             }
             hunt.bar.setProgress(Mth.clamp(1.0F - (float) (now - hunt.start) / TRIAL_TICKS, 0.0F, 1.0F));
+            breakIn(student, hunt, now);
         }
     }
 
@@ -328,6 +341,33 @@ public final class FieldTrialEvents {
             SpiritSenses.particles(level, ParticleTypes.WHITE_ASH, at.x, at.y + hollow.getBbHeight() * 0.5, at.z, 12,
                     hollow.getBbWidth() * 0.4, hollow.getBbHeight() * 0.4, hollow.getBbWidth() * 0.4, 0.02);
         }
+    }
+
+    /**
+     * Once its time has come, a real Hollow the student's reiatsu draws tears in through a Garganta, told, as an operator's
+     * would (no cap, cooldown or Quincy Hunter after); held off, and tried each second, where none may open or beside an
+     * Academy instructor.
+     */
+    private static void breakIn(ServerPlayer student, Hunt hunt, long now) {
+        ServerLevel level = student.serverLevel();
+        if (hunt.breakInAt == ShinigamiProgress.NEVER || now < hunt.breakInAt || !student.gameMode.isSurvival()
+                || !HollowLogic.worldAllowsArrivals(level.getDifficulty(),
+                        level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING), level.dimension() == Level.OVERWORLD)
+                || GargantaEvents.shelteredByInstructor(student)) {
+            return;
+        }
+        // Opened now, whatever time the step was given (a test's), so the tear drops its Hollow on time.
+        if (GargantaEvents.openArrival(student, SoulLogic.get(student), null, level.getGameTime(), true)) {
+            hunt.breakInAt = ShinigamiProgress.NEVER;
+            student.sendSystemMessage(Component.translatable(BREAK_IN_KEY)
+                    .withStyle(ChatFormatting.RED, ChatFormatting.ITALIC));
+        }
+    }
+
+    /** When a real Hollow breaks into this student's trial under way; NEVER for none, or with no hunt. For tests. */
+    public static long breakInAt(Player student) {
+        Hunt hunt = HUNTS.get(student.getUUID());
+        return hunt == null ? ShinigamiProgress.NEVER : hunt.breakInAt;
     }
 
     /** This student's practice Hollows within {@link #STRAY}, alive, of this hunt or (null) of any. */

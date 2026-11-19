@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.DialogueView;
+import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
@@ -19,6 +20,7 @@ import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -54,9 +56,11 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.attachment.AttachmentHolder;
 import net.neoforged.neoforge.common.NeoForge;
@@ -68,8 +72,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * Tests for the Academy's field trial: the practice Hollows, the hunt and its pass, each failure, the day's wait and the
  * gates home each end owes, the saved record, {@code /bleach trial}, the instructor's offer and his gates there and home,
- * and graduation's need of the pass. The death, change of world and logout they post run every listener on the joined
- * players, harmlessly.
+ * graduation's need of the pass, and a real Hollow breaking in. The death, change of world and logout they post run every
+ * listener on the joined players, harmlessly.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -78,6 +82,8 @@ public final class FieldTrialTests {
     private static final String TAG = "field_trial_command";
     /** How far about the student the ground must tick for practice Hollows 10 to 20 blocks off. */
     private static final double REACH = 24.0;
+    /** The same for a Garganta 12 to 24 blocks off. */
+    private static final double BREAK_IN_REACH = 28.0;
     private static final long DAY = 24_000L;
     private static final String GATE_HOME = "message.bleach.field_trial.gate_home";
 
@@ -164,6 +170,33 @@ public final class FieldTrialTests {
         ServerLevel level = helper.getLevel();
         return FieldTrialEvents.offered(student, data, BleachWorlds.SOUL_SOCIETY, level.getGameTime() + daysOn * DAY,
                 level.getDayTime() + daysOn * DAY);
+    }
+
+    /** The Garganta torn for this student, standing. */
+    private static List<GargantaRift> torn(ServerPlayer student, AABB around) {
+        return student.serverLevel().getEntitiesOfClass(GargantaRift.class, around,
+                rift -> student.getUUID().equals(rift.drawer()));
+    }
+
+    /** The real Hollows a Garganta brought for this student, alive. */
+    private static List<Hollow> drawnTo(ServerPlayer student, AABB around) {
+        return student.serverLevel().getEntitiesOfClass(Hollow.class, around,
+                hollow -> hollow.isAlive() && !hollow.isPractice() && student.getUUID().equals(hollow.drawer()));
+    }
+
+    /**
+     * Steps this student's trial at this time with mob spawning on, only within this one call as game rules are the
+     * server's, and no instructor's shelter, so that none an earlier test left near holds a Garganta off.
+     */
+    private static void stepSpawning(ServerLevel level, ServerPlayer student, long now) {
+        GameRules.BooleanValue spawning = level.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING);
+        boolean was = spawning.get();
+        try {
+            spawning.set(true, level.getServer());
+            KidoTests.withConfig(BleachConfig.ACADEMY_SAFE_RADIUS, 0, () -> FieldTrialEvents.step(student, now));
+        } finally {
+            spawning.set(was, level.getServer());
+        }
     }
 
     /** Asserts this student's trial failed today, its hunt and bar gone, none due till a new day; told this line once. */
@@ -670,5 +703,82 @@ public final class FieldTrialTests {
         helper.assertFalse(ShinigamiEvents.graduate(elder) || SoulLogic.get(elder).state() != SoulState.SHINIGAMI
                 || SoulLogic.get(elder).maxReiryoku() != 60.0F, "a Shinigami graduated again, or was changed");
         helper.succeed();
+    }
+
+    // ---- The break-in ----
+
+    /**
+     * At chance 1 a real Hollow is due one to three minutes into a trial; at its time, stepped until open ground takes its
+     * tear, a Garganta opens for the student, told once, and a Hollow it drew comes through, real: slain, it counts as
+     * purified and not toward the five. On Peaceful none opens, and it stays due.
+     */
+    @GameTest(template = "field", batch = "field_trial_break_in", skyAccess = true, timeoutTicks = 400)
+    public static void aRealHollowBreaksIn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ServerPlayer student = student(helper, new Vec3(8.5, 2.0, 8.5));
+        Vec3 start = student.position();
+        List<ChunkPos> forced = HollowBaitTests.forceAround(level, start, BREAK_IN_REACH);
+        AABB around = new AABB(start, start).inflate(BREAK_IN_REACH + 8.0);
+        boolean peaceful = HollowPlayerTests.peaceful(helper);
+        long[] due = {ShinigamiProgress.NEVER};
+        // Every rift and Hollow about, practice and real, the hand-placed one among them.
+        Runnable clear = () -> {
+            FieldTrialEvents.forget(student);
+            level.getEntitiesOfClass(GargantaRift.class, around).forEach(Entity::discard);
+            level.getEntitiesOfClass(Hollow.class, around).forEach(Entity::discard);
+            forced.forEach(chunk -> level.setChunkForced(chunk.x, chunk.z, false));
+            forced.clear();
+        };
+        helper.runAtTickTime(390, () -> {
+            // Says how far it got: never rolled, still due, or no longer due, with what stands about.
+            long left = FieldTrialEvents.breakInAt(student);
+            String stage = due[0] == ShinigamiProgress.NEVER ? "never rolled"
+                    : "due at " + due[0] + (left == due[0] ? ", still due" : ", no longer due") + " at game time "
+                            + level.getGameTime() + ", with " + torn(student, around).size() + " Garganta and "
+                            + drawnTo(student, around).size() + " real Hollows standing";
+            clear.run();
+            helper.fail("no real Hollow came for the student in time; its break-in was " + stage);
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(HollowBaitTests.allTicking(level, start, BREAK_IN_REACH),
+                        "no ticking ground"))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    long now = level.getGameTime();
+                    KidoTests.withConfig(BleachConfig.FIELD_TRIAL_BREAK_IN_CHANCE, 1.0,
+                            () -> FieldTrialEvents.begin(student, now));
+                    due[0] = FieldTrialEvents.breakInAt(student);
+                    helper.assertTrue(due[0] >= now + 1200 && due[0] < now + 3600,
+                            "a sure break-in is due at " + due[0] + ", begun at " + now);
+                    // One standing, so a step at the due time does not end the hunt for want of ground.
+                    practice(helper, student, 8, 12);
+                }, clear))
+                // Each tick until open ground 12 to 24 blocks off takes the tear; on Peaceful once, which opens none.
+                .thenWaitUntil(() -> {
+                    if (torn(student, around).isEmpty()) {
+                        HollowBaitTests.orClear(() -> stepSpawning(level, student, due[0]), clear).run();
+                    }
+                    helper.assertTrue(peaceful || !torn(student, around).isEmpty(), "no Garganta opened at its time");
+                })
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    long after = FieldTrialEvents.breakInAt(student);
+                    int told = DutyTests.said(student, "message.bleach.field_trial.break_in").size();
+                    helper.assertTrue(peaceful ? torn(student, around).isEmpty() && after == due[0] && told == 0
+                                    : after == ShinigamiProgress.NEVER && told == 1,
+                            "at its time the break-in left it due at " + after + ", told " + told + " times");
+                }, clear))
+                .thenWaitUntil(() -> helper.assertTrue(peaceful || !drawnTo(student, around).isEmpty(),
+                        "no real Hollow came through for the student"))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    if (!peaceful) {
+                        SoulData data = SoulLogic.get(student);
+                        int purified = data.hunt().purified();
+                        helper.assertTrue(slay(student, drawnTo(student, around).get(0))
+                                        && data.hunt().purified() == purified + 1 && FieldTrialEvents.slain(student) == 0,
+                                "the real Hollow slain counted " + (data.hunt().purified() - purified)
+                                        + " purified, and the trial " + FieldTrialEvents.slain(student) + " slain");
+                    }
+                    clear.run();
+                }, clear))
+                .thenSucceed();
     }
 }

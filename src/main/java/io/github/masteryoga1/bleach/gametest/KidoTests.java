@@ -388,7 +388,7 @@ public final class KidoTests {
     }
 
     /** The same for a number: a chance set to 1 or 0, so no roll decides a test. */
-    private static void withConfig(ModConfigSpec.DoubleValue value, double set, Runnable body) {
+    static void withConfig(ModConfigSpec.DoubleValue value, double set, Runnable body) {
         double before = BleachConfig.get(value);
         value.set(set);
         try {
