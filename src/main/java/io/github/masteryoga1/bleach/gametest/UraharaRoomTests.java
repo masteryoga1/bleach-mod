@@ -53,7 +53,7 @@ public final class UraharaRoomTests {
      * How far a test lifts a shop and its room: the flat test world's floor is 3 blocks over its bottom, so a room 22 under
      * a shop there would leave the world.
      */
-    private static final int LIFT = 40;
+    static final int LIFT = 40;
 
     private UraharaRoomTests() {
     }
@@ -315,7 +315,7 @@ public final class UraharaRoomTests {
      * them held, and with land over the room if asked; every block of the shop's box and of the room's, with a rim of 2
      * about it, is put back when the test ends.
      */
-    private static Room roomAt(GameTestHelper helper, int chunkX, int chunkZ, int lift, boolean covered) {
+    static Room roomAt(GameTestHelper helper, int chunkX, int chunkZ, int lift, boolean covered) {
         ServerLevel level = helper.getLevel();
         ChunkPos chunk = new ChunkPos(chunkX, chunkZ);
         StructureStart shop = UraharaShopTests.startAt(level, chunk), start = UraharaRoom.startAt(level, chunk);
@@ -382,8 +382,8 @@ public final class UraharaRoomTests {
     }
 
     /** A test's shop and room: its world and hold, the shop's site and start, the room's start and the box put back. */
-    private record Room(ServerLevel level, ShakonmakuTests.Cleanup held, SeireiteiPlan.Site site, StructureStart shop,
-                        StructureStart start, BoundingBox box) {
+    record Room(ServerLevel level, ShakonmakuTests.Cleanup held, SeireiteiPlan.Site site, StructureStart shop,
+                StructureStart start, BoundingBox box) {
         /** Where this place, before the turn and from the shop's corner on its floor, lies in the world. */
         BlockPos at(BlockPos place) {
             return new BlockPos(site.x(), site.y(), site.z()).offset(place.rotate(site.rotation()));

@@ -8,11 +8,15 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
@@ -34,8 +38,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Kisuke Urahara, who keeps the Urahara Shop: a Shinigami in a gigai that every player sees, the unaware living too,
  * and that hides him from Pesquisa, so he is in neither spirit tag. Only {@code /kill} and the void harm him; nothing
- * moves him, he never despawns, no creature hunts him, and he talks to each soul by what it is and sells it what it
- * can use, at his counter ({@link UraharaCounter}).
+ * moves him, he never despawns, no creature hunts him, and he talks to each soul by what it is, sells it what it can
+ * use at his counter ({@link UraharaCounter}) and opens it his Senkaimon in the room under the shop ({@link UraharaGates}).
  */
 public class KisukeUrahara extends Mob implements DialogueNpc {
     /** A template's keeper carries this: he takes his UUID from where he stands, so a second set there is refused. */
@@ -46,6 +50,9 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
     private static final int ASIDES = 2;
     /** How far his body turns back a tick towards where he was set, as fast as his head follows it. */
     private static final float SETTLE_DEGREES = 10.0F;
+
+    /** Souls that asked him for his Senkaimon, each waiting until it comes down into the room; never saved. */
+    final Map<UUID, UraharaGates.Ask> asks = new HashMap<>();
 
     public KisukeUrahara(EntityType<? extends KisukeUrahara> type, Level level) {
         super(type, level);
@@ -69,6 +76,15 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
     protected void customServerAiStep() {
         if (!getLookControl().isLookingAtTarget()) {
             yBodyRot = Mth.approachDegrees(yBodyRot, getYRot(), SETTLE_DEGREES);
+        }
+    }
+
+    /** Each tick on the server, he opens the gate a soul asked for once it has come down into the room, even with no AI. */
+    @Override
+    public void tick() {
+        super.tick();
+        if (level() instanceof ServerLevel server && !asks.isEmpty()) {
+            UraharaGates.arrivals(this, server);
         }
     }
 
@@ -114,8 +130,9 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
             getLookControl().setLookAt(visitor, 30.0F, 30.0F);
             Component aside = Component.translatable("screen.bleach.dialogue." + dialogueKey() + "." + view.key()
                     + ".aside" + (1 + getRandom().nextInt(ASIDES)));
-            BleachNetwork.openDialogue(visitor, this, view, List.of(), unreadyFor(soul, level().getGameTime()),
-                    List.of(aside));
+            List<NpcAction> unready = new ArrayList<>(unreadyFor(soul, level().getGameTime()));
+            unready.addAll(UraharaGates.spent(visitor, level()));
+            BleachNetwork.openDialogue(visitor, this, view, List.of(), unready, List.of(aside));
             return InteractionResult.SUCCESS;
         }
         return InteractionResult.PASS;
@@ -136,14 +153,18 @@ public class KisukeUrahara extends Mob implements DialogueNpc {
     }
 
     /**
-     * Opens his wares for a soul that pressed his trade button: he checks again that he serves it and that its view
-     * trades now, so a client cannot ask for what it was never offered. Anything else asked of him is ignored.
+     * Opens his wares, or takes an ask for his Senkaimon ({@link UraharaGates}), for a soul that pressed that button: he
+     * checks again that he serves it and that its view offers it, so a client cannot ask for what it was never offered.
      */
     @Override
     public void perform(Player visitor, NpcAction action) {
-        if (action == NpcAction.TRADE && visitor instanceof ServerPlayer customer && serves(customer)
-                && action.allowedIn(viewFor(SoulLogic.get(customer)))) {
-            UraharaCounter.open(this, customer);
+        if (!(visitor instanceof ServerPlayer soul) || !serves(soul) || !action.allowedIn(viewFor(SoulLogic.get(soul)))) {
+            return;
+        }
+        if (action == NpcAction.TRADE) {
+            UraharaCounter.open(this, soul);
+        } else if (action == NpcAction.SENKAIMON) {
+            UraharaGates.ask(this, soul.serverLevel(), soul);
         }
     }
 

@@ -163,8 +163,8 @@ public final class AcademyTests {
                 case ELDER_RESTORE -> List.of(NpcAction.RESTORE);
                 case HUNTER_CHALLENGE, HUNTER_RIVALRY -> List.of(NpcAction.CONTEST);
                 case HOLLOW_PURIFY -> List.of(NpcAction.PURIFY);
-                case SHOP_AWARE, SHOP_PLUS, SHOP_SOUL, SHOP_STUDENT, SHOP_SHINIGAMI, SHOP_QUINCY, SHOP_VISORED ->
-                        List.of(NpcAction.TRADE);
+                case SHOP_AWARE, SHOP_PLUS, SHOP_QUINCY -> List.of(NpcAction.TRADE);
+                case SHOP_SOUL, SHOP_STUDENT, SHOP_SHINIGAMI, SHOP_VISORED -> List.of(NpcAction.TRADE, NpcAction.SENKAIMON);
                 case LIVING, HOLLOW, RESTING, QUINCY, ELDER_TRIAL, ELDER_IDLE, ELDER_STRANGER, ELDER_HOLLOW,
                         HUNTER_CONTEST, HUNTER_RESTING, HUNTER_PLAIN, HUNTER_HOLLOW, KEEPER_OPEN, KEEPER_BARRED,
                         KEEPER_WON, KEEPER_BEATEN, KEEPER_FOE, HOMEWARD, SHOP_STRANGER, SHOP_HOLLOW,
