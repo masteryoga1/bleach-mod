@@ -158,7 +158,8 @@ public final class AcademyTests {
                 case HUNTER_CHALLENGE, HUNTER_RIVALRY -> List.of(NpcAction.CONTEST);
                 case HOLLOW_PURIFY -> List.of(NpcAction.PURIFY);
                 case LIVING, HOLLOW, RESTING, QUINCY, ELDER_TRIAL, ELDER_IDLE, ELDER_STRANGER, ELDER_HOLLOW,
-                        HUNTER_CONTEST, HUNTER_RESTING, HUNTER_PLAIN, HUNTER_HOLLOW -> List.of();
+                        HUNTER_CONTEST, HUNTER_RESTING, HUNTER_PLAIN, HUNTER_HOLLOW, KEEPER_OPEN, KEEPER_BARRED,
+                        KEEPER_WON, KEEPER_BEATEN, KEEPER_FOE -> List.of();
             };
             helper.assertTrue(offered.equals(expected), view + " offers " + offered);
         }

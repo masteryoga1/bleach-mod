@@ -282,6 +282,18 @@ public final class GateState extends SavedData {
         return WICKETS[gate];
     }
 
+    /** The gate whose wicket has a half at this cell, or -1 for none: both sides, allocating nothing. */
+    public static int gateAt(BlockPos cell) {
+        for (int gate = 0; gate < GATES; gate++) {
+            BlockPos lower = WICKETS[gate];
+            if (cell.getX() == lower.getX() && cell.getZ() == lower.getZ()
+                    && (cell.getY() == lower.getY() || cell.getY() == lower.getY() + 1)) {
+                return gate;
+            }
+        }
+        return -1;
+    }
+
     /** Where this gate's keeper stands at its post, the bottom centre of its feet at the plateau. */
     public static Vec3 post(int gate) {
         return POSTS[gate];

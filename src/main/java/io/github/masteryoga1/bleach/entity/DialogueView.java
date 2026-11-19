@@ -58,7 +58,17 @@ public enum DialogueView {
     /** A Hollow or an Arrancar, whom the Hunter warns off. */
     HUNTER_HOLLOW,
     /** The instructor offers to cleanse a Hollow player with his blade. */
-    HOLLOW_PURIFY;
+    HOLLOW_PURIFY,
+    /** A gatekeeper lets this soul pass by the gates' rule: his wicket opens to its hand. */
+    KEEPER_OPEN,
+    /** A gatekeeper bars this soul, the reason in a note, and says that whoever beats him may pass. */
+    KEEPER_BARRED,
+    /** A gatekeeper greets a soul holding his gate's pass, which it won from him. */
+    KEEPER_WON,
+    /** A gatekeeper is beaten and fights no one, from his yield until he is whole. */
+    KEEPER_BEATEN,
+    /** A gatekeeper fights this soul, which may pass, for its blow, until it leaves his ground. */
+    KEEPER_FOE;
 
     private static final IntFunction<DialogueView> BY_ID =
             ByIdMap.continuous(DialogueView::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

@@ -1,13 +1,21 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.GateLogic;
+import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.QuincyArtsLogic;
+import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SpiritEvents;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.Shakonmaku;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -23,6 +31,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -53,11 +62,12 @@ import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 
 /**
  * The keeper of one of Seireitei's four great gates: a giant about 8 blocks tall, in two hit boxes as the Gillian is
- * ({@link Part}), who stands before his gate on the Rukongai's side and fights, on his own ground only, a soul the gate
- * bars or anyone who strikes him. No blow kills him: beaten to a tenth of his health he yields, holds his gate up for
- * half a minute, and heals over ten minutes.
+ * ({@link Part}), who stands before his gate on the Rukongai's side, speaks to a soul that uses him, and fights, on his
+ * own ground only, a soul the gate bars or anyone who strikes him. No blow kills him: beaten to a tenth of his health he
+ * yields, holds his gate up for half a minute and heals over ten minutes, and whoever struck him since he was last whole
+ * may pass his wicket for a day.
  */
-public class GateKeeper extends PathfinderMob {
+public class GateKeeper extends PathfinderMob implements DialogueNpc {
     public static final float WIDTH = 3.0F, HEIGHT = 8.0F, EYE_HEIGHT = 7.2F;
     /** The body part, hips to shoulders, from this high above the feet and this tall; the head part a cube above it. */
     public static final double BODY_BOTTOM = 3.0;
@@ -75,8 +85,13 @@ public class GateKeeper extends PathfinderMob {
     public static final int WIND_UP_TICKS = 10, COOLDOWN_TICKS = 40;
     /** How long after his last blow a foe it is not fighting stays its foe, so an old fight is not taken up on his return. */
     public static final int FORGET_TICKS = 100;
-    /** The line a soul striking it from beyond its ground is told, and the one the souls about hear when it yields. */
-    public static final String FAR_KEY = "message.bleach.gate_keeper.far", YIELDS_KEY = "message.bleach.gate_keeper.yields";
+    /** The lines a soul striking it from beyond its ground is told, the souls about hear as it yields, and its winners. */
+    public static final String FAR_KEY = "message.bleach.gate_keeper.far", YIELDS_KEY = "message.bleach.gate_keeper.yields",
+            WON_KEY = "message.bleach.gate_keeper.won";
+    /** A winner's note: how long its pass has to run. */
+    private static final String TIME_LEFT_KEY = "screen.bleach.dialogue.note.time_left";
+    /** Hakutōmon's, whose keeper speaks in his own manner. */
+    private static final String HAKUTOMON = "hakutomon";
     private static final double TOLD_RANGE = 32.0;
     private static final long NEVER = Long.MIN_VALUE;
     /** What each keeper holds, by gate in the plan's order, for the look only. */
@@ -98,6 +113,8 @@ public class GateKeeper extends PathfinderMob {
     private long foeAt;
     private int windUp = -1;
     private long readyAt;
+    /** Not saved: every player whose blow has landed on it since it was last whole, who win its pass should it yield. */
+    private final Set<UUID> strikers = new HashSet<>();
 
     public GateKeeper(EntityType<? extends GateKeeper> type, Level level) {
         super(type, level);
@@ -176,6 +193,71 @@ public class GateKeeper extends PathfinderMob {
         return Component.translatable(getType().getDescriptionId() + "." + GateState.NAMES.get(gate()));
     }
 
+    /** Jidanbō speaks in his own manner and the other three alike, each naming himself. Both sides. */
+    @Override
+    public String dialogueKey() {
+        return GateState.NAMES.get(gate()).equals(HAKUTOMON) ? "gate_keeper." + HAKUTOMON : "gate_keeper";
+    }
+
+    /**
+     * Used with the main hand by a soul that can touch him, he says what he has to say to it ({@link #viewFor}), with
+     * the reason the gate bars it or how long its pass has to run; talking starts and ends no fight.
+     */
+    @Override
+    protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+        if (hand != InteractionHand.MAIN_HAND) {
+            return InteractionResult.PASS;
+        }
+        if (level().isClientSide()) {
+            return InteractionResult.SUCCESS;
+        }
+        if (!(player instanceof ServerPlayer visitor) || visitor.isSpectator() || !SoulLogic.hasSoul(visitor)
+                || SpiritEvents.passesThrough(visitor, this)) {
+            return InteractionResult.PASS;
+        }
+        SoulData data = SoulLogic.get(visitor);
+        DialogueView view = viewFor(visitor);
+        List<Component> notes = switch (view) {
+            case KEEPER_BARRED -> List.of(Component.translatable(GateLogic.barredKey(data)));
+            case KEEPER_WON -> List.of(Component.translatable(TIME_LEFT_KEY, QuincyArtsLogic.formatTicks(
+                    data.shinigami().gates().until(gate()) - level().getGameTime())));
+            default -> List.of();
+        };
+        getLookControl().setLookAt(visitor, 30.0F, 30.0F);
+        BleachNetwork.openDialogue(visitor, this, view, List.of(), List.of(), notes);
+        return InteractionResult.SUCCESS;
+    }
+
+    /** What he says to this soul now, by its soul, whether he is beaten, and whether he fights it for a blow. Server side. */
+    public DialogueView viewFor(Player visitor) {
+        return viewFor(SoulLogic.get(visitor), HollowPlayerLogic.survivalRules(visitor), gate(), level().getGameTime(),
+                isBeaten(), visitor.getUUID().equals(foe) && canAttack(visitor));
+    }
+
+    /**
+     * What a keeper of this gate says to a soul, the first that holds: to one that may pass and is fought for its blow,
+     * that the fight ends off his ground; to one whose pass here counts, that he keeps his word; beaten, that he is;
+     * else as the gates' rule answers, open or barred. A soul in creative or spectator passes.
+     */
+    public static DialogueView viewFor(SoulData data, boolean survival, int gate, long now, boolean beaten, boolean fought) {
+        boolean passes = !survival || GateLogic.mayPass(data, gate, now);
+        if (fought && passes) {
+            return DialogueView.KEEPER_FOE;
+        }
+        if (passes && GateLogic.holdsPass(data, gate, now)) {
+            return DialogueView.KEEPER_WON;
+        }
+        if (beaten) {
+            return DialogueView.KEEPER_BEATEN;
+        }
+        return passes ? DialogueView.KEEPER_OPEN : DialogueView.KEEPER_BARRED;
+    }
+
+    /** No view of his offers an action, so whatever a client asks there is nothing to do. */
+    @Override
+    public void perform(Player visitor, NpcAction action) {
+    }
+
     @Override
     protected PathNavigation createNavigation(Level level) {
         return new Gillian.Navigation(this, level);
@@ -198,14 +280,14 @@ public class GateKeeper extends PathfinderMob {
 
     /**
      * Whom it fights, asked by every goal each tick: no one while beaten, nor a soul that cannot touch it, and on its
-     * ground only a soul the gate bars or the one who struck it last; never a player in creative or spectator mode, nor
-     * on Peaceful.
+     * ground only a soul the gate bars, unless it holds his pass, or the one who struck it last; never a player in
+     * creative or spectator mode, nor on Peaceful.
      */
     @Override
     public boolean canAttack(LivingEntity target) {
         return super.canAttack(target) && target != this && !isBeaten() && standsOnGround(target)
                 && !(target instanceof Player p && SpiritEvents.passesThrough(p, this))
-                && (target instanceof Player q && !GateLogic.mayPass(q) || target.getUUID().equals(foe));
+                && (target instanceof Player q && !GateLogic.mayPass(q, gate()) || target.getUUID().equals(foe));
     }
 
     /**
@@ -227,8 +309,8 @@ public class GateKeeper extends PathfinderMob {
 
     /**
      * A blow from beyond its ground does not land, and a player who struck it is told to come and face it; one that lands
-     * makes the striker its foe and puts off its heal by half a minute, and one that leaves it at a tenth of its health
-     * makes it yield.
+     * makes the striker its foe (and a player in survival one of those who win his pass) and puts off its heal by half a
+     * minute; one that leaves it at a tenth of its health makes it yield.
      */
     @Override
     public boolean hurt(DamageSource source, float amount) {
@@ -247,6 +329,10 @@ public class GateKeeper extends PathfinderMob {
             if (source.getEntity() instanceof LivingEntity attacker && attacker != this) {
                 foe = attacker.getUUID();
                 foeAt = server.getGameTime();
+                // Only a soul playing by survival's rules at the blow wins: in creative or spectator it passes anyway.
+                if (attacker instanceof Player striker && amount > 0.0F && HollowPlayerLogic.survivalRules(striker)) {
+                    strikers.add(striker.getUUID());
+                }
             }
             if (getHealth() <= floor() + 1.0E-3F) {
                 yieldGate(server);
@@ -272,7 +358,10 @@ public class GateKeeper extends PathfinderMob {
         }
     }
 
-    /** Beaten: it stops fighting, lifts its gate for half a minute, and the souls about are told. */
+    /**
+     * Beaten: it stops fighting, lifts its gate for half a minute and the souls about are told, and every player whose
+     * blow landed since it was last whole wins its pass for a day.
+     */
     private void yieldGate(ServerLevel level) {
         beatenAt = level.getGameTime();
         setTarget(null);
@@ -285,13 +374,25 @@ public class GateKeeper extends PathfinderMob {
         for (ServerPlayer soul : SpiritSenses.awareNear(level, position(), TOLD_RANGE)) {
             soul.displayClientMessage(line, true);
         }
+        Component won = Component.translatable(WON_KEY, getDisplayName()).withStyle(ChatFormatting.YELLOW);
+        for (UUID each : strikers) {
+            ServerPlayer winner = level.getServer().getPlayerList().getPlayer(each);
+            // Only a soul playing by survival's rules wins: in creative or spectator it passes anyway.
+            if (winner != null && HollowPlayerLogic.survivalRules(winner) && SoulLogic.hasSoul(winner)) {
+                GateLogic.grantPass(SoulLogic.get(winner), gate(), level.getGameTime());
+                if (GateLogic.mayPass(winner, gate())) {
+                    winner.displayClientMessage(won, true);
+                }
+            }
+        }
+        strikers.clear();
     }
 
     /**
      * Once a second on the server, AI or none: a keeper away from Soul Society or not its gate's goes; a foe it is not
-     * fighting is forgotten five seconds after his last blow; a wounded one heals as a beaten one does once no blow has
-     * landed for half a minute; a beaten one heals towards whole by the time since its yield, holds its arms up while it
-     * holds its gate, then kneels until whole.
+     * fighting is forgotten five seconds after his last blow; a whole one forgets its strikers, and a wounded one heals as
+     * a beaten one does once no blow has landed for half a minute; a beaten one heals towards whole by the time since its
+     * yield, holds its arms up while it holds its gate, then kneels until whole.
      */
     @Override
     public void tick() {
@@ -308,7 +409,9 @@ public class GateKeeper extends PathfinderMob {
             foe = null;
         }
         if (beatenAt == NEVER) {
-            if (getHealth() < getMaxHealth() && level.getGameTime() >= struckAt + REST_TICKS) {
+            if (getHealth() >= getMaxHealth()) {
+                strikers.clear();
+            } else if (level.getGameTime() >= struckAt + REST_TICKS) {
                 setHealth(getHealth() + (getMaxHealth() - floor()) * 20 / HEAL_TICKS);
             }
             return;
@@ -443,6 +546,12 @@ public class GateKeeper extends PathfinderMob {
     public static final class Part extends GiantPart<GateKeeper> {
         Part(GateKeeper parent, float width, float height) {
             super(parent, width, height);
+        }
+
+        /** A hand used on a part is used on the keeper, as a blow on it strikes him. */
+        @Override
+        public InteractionResult interact(Player player, InteractionHand hand) {
+            return getParent().interact(player, hand);
         }
     }
 

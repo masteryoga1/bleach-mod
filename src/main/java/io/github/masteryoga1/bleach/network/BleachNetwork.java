@@ -34,8 +34,9 @@ public final class BleachNetwork {
      * 19: the day of the instructor's Kidō lesson in the Kidō record, and the lesson in the student's dialogue.
      * 20: the Gate key.
      * 21: {@code NpcAction.BUTTERFLY}, the instructor's Jigokuchō, and academy_pos gone from ShinigamiProgress.
+     * 22: the gatekeepers' dialogue views, and the passes won from them in ShinigamiProgress.
      */
-    private static final String VERSION = "21";
+    private static final String VERSION = "22";
 
     private BleachNetwork() {
     }

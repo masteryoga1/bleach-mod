@@ -4,7 +4,7 @@ import net.minecraft.world.entity.player.Player;
 
 /**
  * A creature that talks: using it opens a dialogue whose text is
- * {@code screen.bleach.dialogue.<key>.<view>} and whose buttons come back as {@link NpcAction}s. The
+ * {@code screen.bleach.dialogue.<key>.<view>}, given its name, and whose buttons come back as {@link NpcAction}s. The
  * Shinigami of the Academy and the Quincy of the Human World both answer through here, so one screen
  * and one payload serve them all. Only living entities implement it.
  */
