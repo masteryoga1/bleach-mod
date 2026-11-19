@@ -415,7 +415,7 @@ public final class UraharaShopTests {
     // ---- Helpers ----
 
     /** The shop's start in this chunk, laid out as worldgen lays it there. */
-    private static StructureStart startAt(ServerLevel level, ChunkPos chunk) {
+    static StructureStart startAt(ServerLevel level, ChunkPos chunk) {
         ChunkGenerator generator = level.getChunkSource().getGenerator();
         return laid(level).generate(
                 level.registryAccess(), generator, generator.getBiomeSource(), level.getChunkSource().randomState(),
@@ -423,7 +423,7 @@ public final class UraharaShopTests {
     }
 
     /** The box of this start's one piece, the template turned, without the margin the start keeps for its beard. */
-    private static BoundingBox box(StructureStart start) {
+    static BoundingBox box(StructureStart start) {
         return start.getPieces().get(0).getBoundingBox();
     }
 
@@ -434,7 +434,7 @@ public final class UraharaShopTests {
     }
 
     /** Places this start in each chunk its piece covers, the chunk's whole column at once, as worldgen places it. */
-    private static void placeEach(ServerLevel level, StructureStart start) {
+    static void placeEach(ServerLevel level, StructureStart start) {
         ChunkGenerator generator = level.getChunkSource().getGenerator();
         for (ChunkPos chunk : covered(box(start))) {
             start.placeInChunk(level, level.structureManager(), generator, level.getRandom(), new BoundingBox(
@@ -444,7 +444,7 @@ public final class UraharaShopTests {
     }
 
     /** Remembers every block of this box, and when the test ends takes away the keepers there and sets each block back. */
-    private static void putBackAtEnd(ShakonmakuTests.Cleanup held, ServerLevel level, BoundingBox box) {
+    static void putBackAtEnd(ShakonmakuTests.Cleanup held, ServerLevel level, BoundingBox box) {
         Map<BlockPos, BlockState> before = blocks(level, box);
         held.atEnd(() -> {
             TravelTests.discard(level.getEntitiesOfClass(KisukeUrahara.class, AABB.of(box.inflatedBy(1)))
@@ -493,7 +493,7 @@ public final class UraharaShopTests {
     }
 
     /** Asserts every chunk this box covers has loaded its creatures, so that keepers are placed and counted there aright. */
-    private static void entitiesLoaded(GameTestHelper helper, ServerLevel level, BoundingBox box) {
+    static void entitiesLoaded(GameTestHelper helper, ServerLevel level, BoundingBox box) {
         // Patiently, as the test server's ticks outrun the loading threads that bring those creatures in.
         covered(box).forEach(chunk -> GateTests.patiently(helper, level.areEntitiesLoaded(chunk.toLong()),
                 "chunk " + chunk + " has not loaded its creatures"));

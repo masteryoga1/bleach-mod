@@ -872,6 +872,140 @@ def urahara_shop():
     return t
 
 
+# The training room under the Urahara Shop, in the shop's own frame before its turn (x across, y up from its floor, z back
+# from its front). Its template's corner lies at ROOM_CORNER, so its box is the shop's 13 by 16 grown alike on each side,
+# and a jigsaw at the shop's corner, in its roof, lays it under whatever shop is laid out at that chunk. Its rock fills
+# y -22 to -9 across the box: the floor at -22, the air from -21 to -10, the roof at -9. A shaft 3 by 3 rises from the
+# roof to under the shop's floor, where the hatch is (2, 0, 9).
+ROOM_CORNER, ROOM_SIZE = (-10, -22, -8), (33, 23, 32)
+ROOM_ROOF = -9
+SHAFT = (1, 8, 3, 10)  # x0, z0, x1, z1 of the shaft's rock round the ladder at (2, 9)
+HATCH = (2, 0, 9)
+GATE_FLOOR = (14, 1, 21, 17)  # x0, z0, x1, z1: level and clear to the roof, for the gates to come
+PILLAR = (-1, 8, 1, 10)  # x0, z0, x1, z1 of the rock the ladder runs down, floor to roof
+# Rock rising from the floor (x, z, radius at the floor, height), banded as the hill's spires; 12 meets the roof.
+OUTCROPS = ((-6, 0, 2, 12), (-5, 18, 3, 12), (18, -4, 2, 12), (9, -3, 2, 6), (7, 19, 2, 8), (18, 20, 2, 9),
+            (-6, 9, 1, 3), (11, 12, 1, 2), (4, 3, 1, 2))
+DRIPS = ((6, 5, 3), (12, 15, 2), (-4, 13, 3), (3, -4, 2), (11, 21, 2), (-7, -5, 2))  # (x, z, length) from the roof
+STRATA = {-21: "minecraft:deepslate", -20: "minecraft:deepslate", -15: "minecraft:tuff", -14: "minecraft:tuff"}
+ROOM_PATCHES = ("minecraft:andesite", "minecraft:tuff", "minecraft:cobblestone", "minecraft:deepslate")
+CLEAR = frozenset({"minecraft:air", "minecraft:ladder", "minecraft:spruce_trapdoor"})  # light passes; nothing stands in
+FACES = ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1))
+
+
+def training_room():
+    """
+    The training room under the Urahara Shop: a hall of bare rock 31 wide, 30 deep and 12 high, its floor patched, its
+    walls banded, outcrops rising from the floor and hanging from the roof, lit by shroomlights, reached by a ladder down a
+    shaft and a pillar from a hatch in the shop's floor behind the counter. Every block of the room and its shaft is set,
+    sealing it in its own rock; the ground between it and the shop's floor, and that floor but for the hatch, are kept.
+    """
+    t, put = carved(ROOM_SIZE, ROOM_CORNER)
+    x0, floor, z0 = ROOM_CORNER
+    x1, z1 = x0 + ROOM_SIZE[0] - 1, z0 + ROOM_SIZE[2] - 1
+    # The rock and the air: a floor and a roof of patched stone, walls banded with deepslate low and tuff higher.
+    for x in range(x0, x1 + 1):
+        for z in range(z0, z1 + 1):
+            patch = scatter(x // 2, z // 2) % 10
+            for y in range(floor, ROOM_ROOF + 1):
+                if x0 < x < x1 and z0 < z < z1 and floor < y < ROOM_ROOF:
+                    put(x, y, z, "minecraft:air")
+                elif y in (floor, ROOM_ROOF):
+                    put(x, y, z, ROOM_PATCHES[patch] if patch < 4 else "minecraft:stone")
+                else:
+                    put(x, y, z, STRATA.get(y, "minecraft:andesite" if patch == 0 else "minecraft:stone"))
+    # The outcrops and the pillar, banded as the hill's spires, with a light at each outcrop's feet where the floor is open.
+    for cx, cz, base, height in OUTCROPS:
+        for y in range(floor + 1, floor + 1 + height):
+            r = base * (1 - (y - floor - 1) / height) ** 0.7 + 0.5
+            for x in range(cx - base, cx + base + 1):
+                for z in range(cz - base, cz + base + 1):
+                    if (x - cx) ** 2 + (z - cz) ** 2 <= r * r:
+                        put(x, y, z, "minecraft:andesite" if (y // 4) % 3 == 1 else "minecraft:stone")
+    px0, pz0, px1, pz1 = PILLAR
+    for y in range(floor + 1, ROOM_ROOF):
+        for x in range(px0, px1 + 1):
+            for z in range(pz0, pz1 + 1):
+                put(x, y, z, "minecraft:andesite" if (y // 4) % 3 == 1 else "minecraft:stone")
+    for cx, cz, base, height in OUTCROPS:
+        for dx, dz in SIDES.values():
+            x, z = cx + dx * (base + 1), cz + dz * (base + 1)
+            if t.get(x - x0, 1, z - z0) == "minecraft:air":
+                put(x, floor, z, "minecraft:shroomlight")
+    for cx, cz, length in DRIPS:
+        for k in range(1, length + 1):
+            put(cx, ROOM_ROOF - k, cz, "minecraft:tuff" if k % 2 else "minecraft:stone")
+        if length > 2:
+            for dx, dz in SIDES.values():
+                put(cx + dx, ROOM_ROOF - 1, cz + dz, "minecraft:stone")
+    # Lights in the floor every 6 blocks each way where nothing stands on them, and in the roof every 10.
+    for x in range(x0 + 3, x1, 6):
+        for z in range(z0 + 3, z1, 6):
+            if t.get(x - x0, 1, z - z0) == "minecraft:air":
+                put(x, floor, z, "minecraft:shroomlight")
+    for x in range(x0 + 6, x1, 10):
+        for z in range(z0 + 5, z1, 10):
+            put(x, ROOM_ROOF, z, "minecraft:shroomlight")
+    # The way down: the hatch in the shop's floor, a ladder in a shaft of rock with two lights in its east wall, through
+    # the roof and down the pillar to the floor.
+    sx0, sz0, sx1, sz1 = SHAFT
+    for y in range(ROOM_ROOF + 1, 0):
+        for x in range(sx0, sx1 + 1):
+            for z in range(sz0, sz1 + 1):
+                put(x, y, z, "minecraft:stone")
+    for y in (-3, -7):
+        put(sx1, y, HATCH[2], "minecraft:shroomlight")
+    for y in range(floor + 1, 0):
+        put(HATCH[0], y, HATCH[2], "minecraft:ladder", facing="east", waterlogged="false")
+    put(*HATCH, "minecraft:spruce_trapdoor", facing="east", half="top", open="false", powered="false",
+        waterlogged="false")
+    # The jigsaw at the shop's corner, in the roof, that lays the room under the shop; it leaves the roof's own rock.
+    corner = (-x0, ROOM_ROOF - floor, -z0)
+    rock = t.get(*corner)
+    t.set(*corner, "minecraft:jigsaw", orientation="north_up")
+    t.set_data(*corner, compound(id=string("minecraft:jigsaw"), name=string("bleach:shop_corner"),
+                                 target=string("minecraft:empty"), pool=string("minecraft:empty"),
+                                 final_state=string(rock), joint=string("rollable"), placement_priority=integer(0),
+                                 selection_priority=integer(0)))
+    room_guards(t)
+    return t
+
+
+def room_guards(t):
+    """Raises unless the room is sealed in its rock, every place a creature may stand in it lit, the gates' floor clear."""
+    x0, y0, z0 = ROOM_CORNER
+    w, _, d = ROOM_SIZE
+    listed = {(x + x0, y + y0, z + z0): b for (x, y, z), (b, _) in t.blocks.items() if b != VOID}
+    sx0, sz0, sx1, sz1 = SHAFT
+
+    def inside(p):
+        x, y, z = p
+        return (x0 <= x < x0 + w and z0 <= z < z0 + d and y0 <= y <= ROOM_ROOF) \
+            or (sx0 <= x <= sx1 and sz0 <= z <= sz1 and ROOM_ROOF < y < 0) or p == HATCH
+
+    for p, block in listed.items():  # sealed: nothing open but the hatch, in the shop's floor, meets the ground kept
+        if block in CLEAR and p != HATCH and any(not inside(tuple(map(sum, zip(p, face)))) for face in FACES):
+            raise ValueError(f"the training room is open to the ground at {p}")
+    light, todo = {}, [p for p, block in listed.items() if block == "minecraft:shroomlight"]
+    for p in todo:
+        light[p] = 15
+    while todo:  # block light, as the game spreads it: one less a step through what lets it pass
+        p = todo.pop()
+        for q in (tuple(map(sum, zip(p, face))) for face in FACES):
+            if listed.get(q) in CLEAR and light.get(q, 0) < light[p] - 1:
+                light[q] = light[p] - 1
+                todo.append(q)
+    for (x, y, z), block in listed.items():  # lit: block light 1 at the least wherever a block below can be stood on
+        under = listed.get((x, y - 1, z))
+        if block in CLEAR and under is not None and under not in CLEAR and light.get((x, y, z), 0) < 1:
+            raise ValueError(f"the training room is dark enough for monsters at {(x, y, z)}")
+    gx0, gz0, gx1, gz1 = GATE_FLOOR
+    for x in range(gx0, gx1 + 1):
+        for z in range(gz0, gz1 + 1):
+            if any(listed[(x, y, z)] != "minecraft:air" for y in range(y0 + 1, ROOM_ROOF)):
+                raise ValueError(f"the gates' floor is not clear at {(x, z)}")
+
+
 TEMPLATES = {
     "academy/academy.nbt": academy,
     "academy/dojo.nbt": dojo,
@@ -885,6 +1019,7 @@ TEMPLATES = {
     "hill/stair.nbt": stair,
     "lane.nbt": lane,
     "urahara_shop.nbt": urahara_shop,
+    "urahara_training_room.nbt": training_room,
 }
 TEMPLATES.update((f"barracks/{name}.nbt", functools.partial(barracks, number))
                  for number, name in enumerate(DIVISIONS, 1))
