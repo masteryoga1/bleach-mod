@@ -2,7 +2,6 @@ package io.github.masteryoga1.bleach.world;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -28,11 +27,12 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * One structure's planned sites in one world, stamped into chunks made before a site existed, or made with structures
- * off: once the chunks a site covers and those beside them are loaded, each that never placed its part places it then.
- * A part an operator placed by command is known by its marker blocks and kept.
+ * off: once the chunks a site covers and those beside them are loaded, and the creatures saved in those it covers, each
+ * that never placed its part places it then. A part an operator placed by command is known by its marker blocks and kept.
  */
 public final class SiteStamp {
-    private static final int NO_RETRY = -1;
+    /** How many further checks, one a tick, a chunk's load gives a site while its chunks load: 5 seconds. */
+    private static final int LOAD_TRIES = 100;
 
     private final ResourceKey<Level> world;
     private final ResourceKey<Structure> structure;
@@ -41,12 +41,13 @@ public final class SiteStamp {
     private final Vec3i size;
     private final List<Marker> markers;
     private final Placed placed;
+    private final Guard guard;
     private final List<List<ChunkPos>> covered = new ArrayList<>(), around = new ArrayList<>();
     /**
-     * For each site, the server tick after which a check that found a chunk it needs not yet loaded runs once more, or
-     * {@link #NO_RETRY}. Server thread only. One left over from a world closed since costs a check that loads nothing.
+     * For each site, how many further checks, one a tick, are still to run since a check found what it needs not yet
+     * loaded; 0 for none. Server thread only. Some left over from a world closed since cost checks that load nothing.
      */
-    private final int[] retryAfter;
+    private final int[] triesLeft;
 
     /**
      * The stamp for this structure's sites in this world, each a template of this size before its turn, its parts known
@@ -54,6 +55,12 @@ public final class SiteStamp {
      */
     public SiteStamp(ResourceKey<Level> world, ResourceKey<Structure> structure, String name, List<SeireiteiPlan.Site> sites,
                      Vec3i size, List<Marker> markers, Placed placed) {
+        this(world, structure, name, sites, size, markers, placed, Guard.ANY);
+    }
+
+    /** As the stamp above, which builds over a site's bare chunks only when {@code guard} allows it. */
+    public SiteStamp(ResourceKey<Level> world, ResourceKey<Structure> structure, String name, List<SeireiteiPlan.Site> sites,
+                     Vec3i size, List<Marker> markers, Placed placed, Guard guard) {
         this.world = world;
         this.structure = structure;
         this.name = name;
@@ -61,6 +68,7 @@ public final class SiteStamp {
         this.size = size;
         this.markers = List.copyOf(markers);
         this.placed = placed;
+        this.guard = guard;
         for (int i = 0; i < this.sites.size(); i++) {
             BoundingBox box = box(i, 0);
             // Along x, a row of z at a time, as ChunkPos.rangeClosed runs.
@@ -69,8 +77,7 @@ public final class SiteStamp {
             covered.add(chunks);
             around.add(chunks.stream().flatMap(pos -> ChunkPos.rangeClosed(pos, 1)).distinct().toList());
         }
-        retryAfter = new int[this.sites.size()];
-        Arrays.fill(retryAfter, NO_RETRY);
+        triesLeft = new int[this.sites.size()];
     }
 
     /** The sites, in the plan's order. */
@@ -97,9 +104,10 @@ public final class SiteStamp {
     }
 
     /**
-     * A chunk of the world, one a site covers or one beside them, has loaded: once the tick is done, if all of that
-     * site's are loaded, whatever part of it is missing is built, and if one is not, the check runs once more after the
-     * next tick. Nothing is loaded or made for it, so whichever chunk loads last completes it.
+     * A chunk of the world, one a site covers or one beside them, has loaded: once the tick is done, that site is checked,
+     * and if its chunks are not all loaded yet it is checked again once a tick, up to {@link #LOAD_TRIES} times, and while
+     * only the creatures saved in those it covers are still to join, once a tick until they have. Nothing is loaded or
+     * made for it, so whichever loads last completes it.
      */
     public void onChunkLoad(ChunkEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel level && level.dimension() == world) {
@@ -111,12 +119,12 @@ public final class SiteStamp {
         }
     }
 
-    /** The one further try a check asked for, queued in a tick after the one it ran in. */
+    /** Queues this tick's further check of each site a check left tries, counting one off. */
     public void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
         for (int i = 0; i < sites.size(); i++) {
-            if (retryAfter[i] != NO_RETRY && server.getTickCount() > retryAfter[i]) {
-                retryAfter[i] = NO_RETRY;
+            if (triesLeft[i] > 0) {
+                triesLeft[i]--;
                 ServerLevel level = server.getLevel(world);
                 if (level != null) {
                     queueCheck(level, i, false);
@@ -126,24 +134,30 @@ public final class SiteStamp {
     }
 
     /** Checks once the server's current work is done: a chunk's load event comes inside the load itself. */
-    private void queueCheck(ServerLevel level, int index, boolean mayRetry) {
+    private void queueCheck(ServerLevel level, int index, boolean fromLoad) {
         MinecraftServer server = level.getServer();
-        server.tell(new TickTask(server.getTickCount(), () -> ensureBuiltIfLoaded(level, index, mayRetry)));
+        server.tell(new TickTask(server.getTickCount(), () -> ensureBuiltIfLoaded(level, index, fromLoad)));
     }
 
     /**
-     * As {@link #ensureBuilt(ServerLevel, int)}, but only when every chunk the site covers, and every one beside them,
-     * is loaded already; else, once, later. A block placed at its edge would make a neighbour that is not loaded load.
+     * As {@link #ensureBuilt(ServerLevel, int)}, but only when every chunk the site covers, and every one beside them, is
+     * loaded, and the creatures saved in those it covers have joined, so that {@code placed} finds each it buries. A chunk
+     * still to load gets the tries a chunk's load gives; creatures still to join, the tries renewed while the chunks stay.
      */
-    private void ensureBuiltIfLoaded(ServerLevel level, int index, boolean mayRetry) {
-        for (ChunkPos pos : around.get(index)) {
-            if (level.getChunkSource().getChunkNow(pos.x, pos.z) == null) {
-                if (mayRetry) {
-                    retryAfter[index] = level.getServer().getTickCount();
-                }
-                return;
+    private void ensureBuiltIfLoaded(ServerLevel level, int index, boolean fromLoad) {
+        if (!around.get(index).stream().allMatch(pos -> level.getChunkSource().getChunkNow(pos.x, pos.z) != null)) {
+            // A block placed at its edge would make a neighbour that is not loaded load; that one's own load checks again.
+            if (fromLoad) {
+                triesLeft[index] = LOAD_TRIES;
             }
+            return;
         }
+        if (!covered.get(index).stream().allMatch(pos -> level.areEntitiesLoaded(pos.toLong()))) {
+            // Read off the thread, saved creatures may join many ticks after their chunk, and no event says when.
+            triesLeft[index] = LOAD_TRIES;
+            return;
+        }
+        triesLeft[index] = 0;
         ensureBuilt(level, index);
     }
 
@@ -151,12 +165,18 @@ public final class SiteStamp {
      * Builds what was never placed of this site: its start, if its chunk has none, and the part of each chunk it covers
      * that holds no reference to it, which then gains one. A part that stands already, placed by command, only gains the
      * reference. Those chunks are loaded, and made, first, unless the site is whole already. Server thread only.
+     * Its guard is asked before anything is set, with the chunks still bare; on a no, nothing is set or placed.
      *
      * @return whether any part was placed
      */
     public boolean ensureBuilt(ServerLevel level, int index) {
         Structure laid = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(structure);
-        if (laid == null || whole(level, laid, index)) {
+        if (laid == null) {
+            return false;
+        }
+        if (whole(level, laid, index)) {
+            // With no chunk bare, the guard learns the site stands whole, as worldgen or a stamp left it.
+            guard.mayBuild(level, List.of());
             return false;
         }
         ChunkPos home = startChunk(index);
@@ -165,7 +185,8 @@ public final class SiteStamp {
         ChunkAccess homeChunk = level.getChunk(home.x, home.z);
         ChunkGenerator generator = level.getChunkSource().getGenerator();
         StructureStart start = homeChunk.getStartForStructure(laid);
-        if (start == null || !start.isValid()) {
+        boolean fresh = start == null || !start.isValid();
+        if (fresh) {
             start = laid.generate(level.registryAccess(), generator, generator.getBiomeSource(),
                     level.getChunkSource().randomState(), level.getStructureManager(), level.getSeed(), home, 0, level,
                     biome -> true);
@@ -173,30 +194,34 @@ public final class SiteStamp {
                 BleachMod.LOGGER.warn("{} could not be laid out in chunk {}; it was not built", name, home);
                 return false;
             }
-            homeChunk.setStartForStructure(laid, start);
         }
         BlockPos corner = start.getPieces().get(0) instanceof TemplateStructurePiece piece ? piece.templatePosition() : null;
-        boolean built = false;
-        for (ChunkAccess chunk : chunks) {
-            ChunkPos pos = chunk.getPos();
-            if (chunk.getReferencesForStructure(laid).contains(home.toLong())) {
-                continue;
-            }
-            // A /place sets no reference: building again would stack a second of what it holds on the first.
-            if (!partStands(chunk, index, corner)) {
-                if (chunk.getInhabitedTime() > 0) {
-                    BleachMod.LOGGER.warn("{} is built over chunk {}, where souls have spent {} ticks", name, pos,
-                            chunk.getInhabitedTime());
-                }
-                BoundingBox column = new BoundingBox(pos.getMinBlockX(), level.getMinBuildHeight(), pos.getMinBlockZ(),
-                        pos.getMaxBlockX(), level.getMaxBuildHeight(), pos.getMaxBlockZ());
-                start.placeInChunk(level, level.structureManager(), generator, level.getRandom(), column, pos);
-                placed.placed(level, column);
-                built = true;
-            }
-            chunk.addReferenceForStructure(laid, home.toLong());
+        List<LevelChunk> unreferenced = chunks.stream()
+                .filter(chunk -> !chunk.getReferencesForStructure(laid).contains(home.toLong())).toList();
+        // A /place sets no reference: building again would stack a second of what it holds on the first.
+        List<LevelChunk> bare = unreferenced.stream().filter(chunk -> !partStands(chunk, index, corner)).toList();
+        // Asked before anything is set, so a site refused leaves no start for /locate to report.
+        if (!guard.mayBuild(level, bare)) {
+            return false;
         }
-        return built;
+        if (fresh) {
+            homeChunk.setStartForStructure(laid, start);
+            // Tells /locate, as a chunk's load does; Soul Society's stamps gain only a cache refresh no /locate reads.
+            level.onStructureStartsAvailable(homeChunk);
+        }
+        for (LevelChunk chunk : bare) {
+            ChunkPos pos = chunk.getPos();
+            if (chunk.getInhabitedTime() > 0) {
+                BleachMod.LOGGER.warn("{} is built over chunk {}, where souls have spent {} ticks", name, pos,
+                        chunk.getInhabitedTime());
+            }
+            BoundingBox column = new BoundingBox(pos.getMinBlockX(), level.getMinBuildHeight(), pos.getMinBlockZ(),
+                    pos.getMaxBlockX(), level.getMaxBuildHeight(), pos.getMaxBlockZ());
+            start.placeInChunk(level, level.structureManager(), generator, level.getRandom(), column, pos);
+            placed.placed(level, column);
+        }
+        unreferenced.forEach(chunk -> chunk.addReferenceForStructure(laid, home.toLong()));
+        return !bare.isEmpty();
     }
 
     /** Whether every chunk the site covers is loaded and holds its reference, and its start is valid: nothing to do. */
@@ -271,5 +296,16 @@ public final class SiteStamp {
         };
 
         void placed(ServerLevel level, BoundingBox part);
+    }
+
+    /**
+     * Asked at each check, before anything is set or built, with the site's chunks still bare, or with none once it
+     * stands whole: nothing is set or placed on a no.
+     */
+    @FunctionalInterface
+    public interface Guard {
+        Guard ANY = (level, bare) -> true;
+
+        boolean mayBuild(ServerLevel level, List<? extends ChunkAccess> bare);
     }
 }

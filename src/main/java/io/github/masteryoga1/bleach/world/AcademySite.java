@@ -89,14 +89,14 @@ public final class AcademySite {
 
     /**
      * One of Soul Society's chunks of the Academy or its grounds, or one beside them, has loaded: once the tick is done,
-     * for each site whose chunks are all loaded, whatever part of it is missing is built, and if one is not, the check
-     * runs once more after the next tick.
+     * for each site whose chunks are all loaded, with the creatures saved in those it covers, whatever part of it is
+     * missing is built, and if one is not, the check runs again once a tick for a while (see {@link SiteStamp#onChunkLoad}).
      */
     public static void onChunkLoad(ChunkEvent.Load event) {
         STAMPS.forEach(stamp -> stamp.onChunkLoad(event));
     }
 
-    /** The one further try a check asked for, queued in a tick after the one it ran in. */
+    /** The further tries, one a tick, that a check asked for. */
     public static void onServerTick(ServerTickEvent.Post event) {
         STAMPS.forEach(stamp -> stamp.onServerTick(event));
     }

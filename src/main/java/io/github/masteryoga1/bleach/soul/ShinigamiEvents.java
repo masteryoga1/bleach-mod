@@ -15,6 +15,7 @@ import io.github.masteryoga1.bleach.world.AcademySite;
 import io.github.masteryoga1.bleach.world.GateHouses;
 import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.HillWorks;
+import io.github.masteryoga1.bleach.world.UraharaShop;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -98,6 +99,11 @@ public final class ShinigamiEvents {
         // Sōkyoku Hill's works likewise; a soul they are built over is moved out beside them.
         bus.addListener(HillWorks::onChunkLoad);
         bus.addListener(HillWorks::onServerTick);
+        // The Urahara Shop likewise in the Overworld, unless players have lived where it would stand or its land will not
+        // hold it; forgotten as a server stops, so the next world is planned afresh.
+        bus.addListener(UraharaShop::onChunkLoad);
+        bus.addListener(UraharaShop::onServerTick);
+        bus.addListener(UraharaShop::onServerStopped);
         // The houses' great gates, laid once each house stands, and moved a row at a time.
         bus.addListener(GateState::onServerTick);
         // The last change to a blow on a gatekeeper: none takes him below a tenth of his health.
