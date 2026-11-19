@@ -20,6 +20,7 @@ import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
+import io.github.masteryoga1.bleach.entity.KisukeUrahara;
 import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
@@ -76,6 +77,16 @@ public final class ModEntities {
                     .fireImmune()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("training_dummy").toString()));
+
+    /** Kisuke Urahara, who keeps the Urahara Shop: only {@code /kill} and the void harm him (see {@link KisukeUrahara}). */
+    public static final DeferredHolder<EntityType<?>, EntityType<KisukeUrahara>> KISUKE_URAHARA =
+            ENTITY_TYPES.register("kisuke_urahara", () -> EntityType.Builder
+                    .<KisukeUrahara>of(KisukeUrahara::new, MobCategory.MISC)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("kisuke_urahara").toString()));
 
     /**
      * A Shinigami on duty, come down to a Plus whose chain has begun to wear. It cannot be hurt and is never saved: a
@@ -471,5 +482,6 @@ public final class ModEntities {
         event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());
         event.put(PLUS.get(), PlusSpirit.createAttributes().build());
+        event.put(KISUKE_URAHARA.get(), KisukeUrahara.createAttributes().build());
     }
 }

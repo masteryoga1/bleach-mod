@@ -13,6 +13,7 @@ import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
+import io.github.masteryoga1.bleach.entity.KisukeUrahara;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
@@ -171,10 +172,10 @@ public final class BleachClient {
 
     /**
      * The Academy's instructor, the wounded Shinigami, the Quincy Elder and the Quincy Hunter wear four of the game's
-     * default player skins until the mod has its own, no two alike, and a Shinigami on duty the mod's own placeholder
-     * skin. An Arrancar wears the mod's own placeholder skin under its uniform, and a Visored's inner Hollow another of
-     * the mod's, holding the copy of its host's blade out as an Arrancar holds its own. Hollows use the vanilla spider
-     * and wolf models or simple ones of the mod's, and a Plus looks like a villager.
+     * default player skins until the mod has its own, no two alike, and a Shinigami on duty and Kisuke Urahara the mod's
+     * own placeholder skins. An Arrancar wears the mod's own placeholder skin under its uniform, and a Visored's inner
+     * Hollow another of the mod's, holding the copy of its host's blade out as an Arrancar holds its own. Hollows use the
+     * vanilla spider and wolf models or simple ones of the mod's, and a Plus looks like a villager.
      * Zanpakutō techniques and Gintō spells are drawn from plain shapes and the mod's placeholder
      * textures, the Heilig Pfeil, the fired Seele Schneider and the Letzt Pfeil as vanilla arrows
      * in the mod's own textures, and a Cero as the vanilla beacon beam in its own colour (Negación's light and the
@@ -192,6 +193,16 @@ public final class BleachClient {
         event.registerEntityRenderer(ModEntities.DUTY_SHINIGAMI.get(),
                 context -> new ShinigamiNpcRenderer<DutyShinigami>(context, duty));
         event.registerEntityRenderer(ModEntities.TRAINING_DUMMY.get(), TrainingDummyRenderer::new);
+        // Kisuke Urahara in his gigai: a player's model in the placeholder skin, his striped hat on its hat layer.
+        ResourceLocation urahara = BleachMod.id("textures/entity/kisuke_urahara.png");
+        event.registerEntityRenderer(ModEntities.KISUKE_URAHARA.get(),
+                context -> new HumanoidMobRenderer<KisukeUrahara, PlayerModel<KisukeUrahara>>(context,
+                        new PlayerModel<>(context.bakeLayer(ModelLayers.PLAYER), false), 0.5F) {
+                    @Override
+                    public ResourceLocation getTextureLocation(KisukeUrahara entity) {
+                        return urahara;
+                    }
+                });
         ResourceLocation elder = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/zuri.png");
         ResourceLocation hunter = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/efe.png");
         event.registerEntityRenderer(ModEntities.QUINCY_ELDER.get(),

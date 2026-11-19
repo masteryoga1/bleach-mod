@@ -137,6 +137,15 @@ ARRANCAR_SKIN = rgb(226, 214, 200)
 # A Shinigami on duty's warm skin and short dark hair.
 DUTY_SKIN = rgb(222, 184, 150)
 DUTY_HAIR = rgb(44, 34, 30)
+# Kisuke Urahara: fair skin, pale hair, a dark green coat over a darker robe, wooden sandals, and the green and white
+# striped bucket hat the reference notes give him.
+URAHARA_SKIN = rgb(232, 200, 170)
+URAHARA_HAIR = rgb(222, 204, 150)
+URAHARA_COAT = rgb(46, 90, 58)
+URAHARA_ROBE = rgb(40, 44, 40)
+URAHARA_GETA = rgb(120, 84, 50)
+URAHARA_HAT_GREEN = rgb(46, 110, 64)
+URAHARA_HAT_WHITE = rgb(237, 237, 224)
 # The gatekeepers, by gate in the plan's order (GateState.NAMES): Kaiwan, Higonyūdō, Jidanbō and Danzōmaru.
 GATE_KEEPER_SKIN, GATE_KEEPER_HAIR = rgb(196, 150, 112), rgb(40, 30, 26)
 GATE_NAMES = ("shoryumon", "shuwaimon", "hakutomon", "kokuryomon")
@@ -1537,6 +1546,45 @@ def duty_shinigami():
     return c
 
 
+def kisuke_urahara():
+    """Kisuke Urahara's placeholder, in the player skin layout with wide arms: a dark robe on the body and legs under a
+    dark green coat open down the front, its sleeves to the wrist, bare hands, wooden sandals, pale hair over a fair
+    face, and on the hat layer his striped bucket hat over the crown and the top three rows. The other overlays stay
+    clear."""
+    c = Canvas(64, 64)
+    box(c, 0, 0, 8, 8, 8, URAHARA_SKIN)
+    box(c, 16, 16, 8, 12, 4, URAHARA_ROBE)
+    # The coat: the body's sides and back, and two columns down its front either side of the robe.
+    body = faces(16, 16, 8, 12, 4)
+    for face in (2, 4, 5):
+        c.rect(*body[face], URAHARA_COAT)
+    x0, y0, x1, y1 = body[3]
+    c.rect(x0, y0, x0 + 2, y1, URAHARA_COAT)
+    c.rect(x1 - 2, y0, x1, y1, URAHARA_COAT)
+    # Arms in the coat's sleeves, the last two rows and the end bare; legs robed to the last row, sandals beneath.
+    for (u, v), cloth, end, rows in (((40, 16), URAHARA_COAT, URAHARA_SKIN, 2), ((32, 48), URAHARA_COAT, URAHARA_SKIN, 2),
+                                     ((0, 16), URAHARA_ROBE, URAHARA_GETA, 1), ((16, 48), URAHARA_ROBE, URAHARA_GETA, 1)):
+        box(c, u, v, 4, 12, 4, cloth)
+        nets = faces(u, v, 4, 12, 4)
+        c.rect(*nets[1], end)
+        for x0, y0, x1, y1 in nets[2:]:
+            c.rect(x0, y1 - rows, x1, y1, end)
+    # Pale hair over the top, sides and back of the head and a ragged fringe; two dark eyes beneath it.
+    c.rect(8, 0, 16, 8, URAHARA_HAIR)
+    c.rect(0, 8, 8, 14, URAHARA_HAIR)
+    c.rect(16, 8, 32, 14, URAHARA_HAIR)
+    for x in range(8, 16):
+        c.rect(x, 8, x + 1, 10 if x % 3 else 11, URAHARA_HAIR)
+    c.rect(9, 12, 11, 13, VOID)
+    c.rect(13, 12, 15, 13, VOID)
+    # The hat layer (net at 32, 0): stripes two pixels wide over the crown and down the top three rows of each side.
+    top, _, *sides = faces(32, 0, 8, 8, 8)
+    for x0, y0, x1, y1 in [top] + [(x0, y0, x1, y0 + 3) for x0, y0, x1, _ in sides]:
+        for x in range(x0, x1):
+            c.rect(x, y0, x + 1, y1, URAHARA_HAT_GREEN if (x // 2) % 2 == 0 else URAHARA_HAT_WHITE)
+    return c
+
+
 def training_dummy():
     """A training dummy of bound straw, in the humanoid layout the zombie's layer uses (the left arm and leg mirror the
     right ones' nets): straw on the head, body, arm and leg, dark straw cords round the neck, waist, wrist and ankle,
@@ -2085,6 +2133,7 @@ TEXTURES = {
     "entity/arrancar_digits.png": arrancar_digits,
     "entity/arrancar.png": arrancar_npc,
     "entity/duty_shinigami.png": duty_shinigami,
+    "entity/kisuke_urahara.png": kisuke_urahara,
     "entity/training_dummy.png": training_dummy,
     **{"entity/gate_keeper/%s.png" % name: gate_keeper(gate) for gate, name in enumerate(GATE_NAMES)},
     "entity/inner_hollow.png": inner_hollow,

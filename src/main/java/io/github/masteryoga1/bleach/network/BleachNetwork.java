@@ -37,8 +37,9 @@ public final class BleachNetwork {
      * 22: the gatekeepers' dialogue views, and the passes won from them in ShinigamiProgress.
      * 23: the duty Shinigami's HOMEWARD view.
      * 24: the instructor's STUDENT_TRIAL view and {@code NpcAction.FIELD_TRIAL}, the Academy's field trial.
+     * 25: Kisuke Urahara's SHOP_* views.
      */
-    private static final String VERSION = "24";
+    private static final String VERSION = "25";
 
     private BleachNetwork() {
     }

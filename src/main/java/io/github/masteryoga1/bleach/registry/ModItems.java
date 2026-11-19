@@ -274,6 +274,9 @@ public final class ModItems {
     public static final DeferredItem<DeferredSpawnEggItem> ARRANCAR_SPAWN_EGG = ITEMS.register(
             "arrancar_spawn_egg",
             () -> new DeferredSpawnEggItem(ModEntities.ARRANCAR, 0xF0F0EC, 0x1A1A1A, new Item.Properties()));
+    public static final DeferredItem<DeferredSpawnEggItem> KISUKE_URAHARA_SPAWN_EGG = ITEMS.register(
+            "kisuke_urahara_spawn_egg",
+            () -> new DeferredSpawnEggItem(ModEntities.KISUKE_URAHARA, 0x2E5A3A, 0xEDEDE0, new Item.Properties()));
 
     private ModItems() {
     }
