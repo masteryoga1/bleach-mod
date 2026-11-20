@@ -370,7 +370,7 @@ public final class RukongaiTests {
     @GameTest(template = "empty", timeoutTicks = 400)
     public static void aSoulIsToldWhereItIsInSoulSociety(GameTestHelper helper) {
         ServerLevel soul = SiteTests.soul(helper);
-        // The two columns' chunks: a lawn in Seireitei, and the south gate's gap, grass at 71 and air above.
+        // The two columns' chunks: Seireitei's inner ring road, paved at 71, and the south gate's gap, grass at 71.
         hold(soul, new ChunkPos(6, 6));
         hold(soul, new ChunkPos(0, 32));
         ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
@@ -667,7 +667,7 @@ public final class RukongaiTests {
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void konsoInSoulSocietyMovesNoOne(GameTestHelper helper) {
         ServerLevel soul = SiteTests.soul(helper);
-        // District 2 of the South on its ground, and Seireitei's lawn, each column's chunk loaded first.
+        // District 2 of the South on its ground, and Seireitei's inner ring road, each column's chunk loaded first.
         soul.getChunk(0, 35);
         soul.getChunk(6, 6);
         int top = soul.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, 0, 560);
@@ -783,7 +783,7 @@ public final class RukongaiTests {
                     helper.assertTrue(lawn != null && court.newLevel() == soul && court.pos().distanceTo(lawn) < 0.01
                                     && court.yRot() == 0.0F,
                             "the Shinigami wakes in " + court.newLevel().dimension().location() + " at " + court.pos()
-                                    + " facing " + court.yRot() + ", not on the court's lawn at " + lawn);
+                                    + " facing " + court.yRot() + ", not on the court's square at " + lawn);
 
                     player.setData(SoulAttachments.SOUL, ShinigamiTests.substitute(60.0F));
                     helper.assertTrue(AcademyTests.respawn(player, spawn, false) == spawn,
@@ -886,7 +886,7 @@ public final class RukongaiTests {
         }
         helper.assertTrue(left != null, "a villager dead in the Overworld left no Plus");
 
-        // Seireitei's lawn at radius 141, grass at 71 and air above, away from the Academy, the court and their NPCs.
+        // Seireitei's inner ring road at radius 141, paved at 71, away from the Academy, the court and their NPCs.
         hold(soul, new ChunkPos(new BlockPos(-100, SeireiteiPlan.PLATEAU_Y, 100)));
         ServerPlayer player = chainedPlus(helper, new Vec3(1.5, 1.0, 1.5));
         long[] chain = {0L};

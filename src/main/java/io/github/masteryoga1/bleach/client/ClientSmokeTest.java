@@ -238,7 +238,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * choose it on the server, which the action bar and chat must show, and the page's Back button must go back to the
  * soul screen. Last, handed a Jigokuchō, holding the Gate key must turn the blade, which the action bar must say, and
  * open a Senkaimon that reaches the client two blocks south of the player, facing it, 3 wide and 4 tall. Standing in it
- * must bring the player to the Senkaimon court on Seireitei's lawn at exactly y 72. A tp across the lawn must stand it
+ * must bring the player to the Senkaimon court in Seireitei at exactly y 72. A tp onto Seireitei's lawn must stand it
  * where the south wall reaches the client in Sekkiseki to its top beside the gate's 16-block gap. A tp must then stand
  * it two blocks inside the Academy's gate in Seireitei, where the Academy and its instructor must reach the client,
  * and another must stand it on the lawn again. Once the first gate's wait has run, a gate opened in Soul Society must
@@ -2246,7 +2246,7 @@ public final class ClientSmokeTest {
                 "the turned blade never opened a Senkaimon two blocks south of the player, facing it, 3 wide and 4 tall"
                         + " (the action bar's last lines: " + recentActionBar() + ")");
         expectWithin(minecraft, 6665, COURT_BY_TICK, () -> atCourt(minecraft, player),
-                "the Senkaimon never brought the player to its court on Seireitei's lawn at y 72 (it is in "
+                "the Senkaimon never brought the player to its court in Seireitei at y 72 (it is in "
                         + minecraft.level.dimension().location() + " at " + player.blockPosition().toShortString()
                         + ", its chunk " + (minecraft.level.hasChunkAt(player.blockPosition()) ? "loaded" : "not loaded")
                         + ", the court's block " + minecraft.level.getBlockState(BlockPos.containing(TravelLogic.COURT)
@@ -2581,7 +2581,7 @@ public final class ClientSmokeTest {
         }
     }
 
-    /** Whether the player stands in the Senkaimon's court on Seireitei's lawn at y 72, where the gate brings it. */
+    /** Whether the player stands in the Senkaimon's court in Seireitei at y 72, where the gate brings it. */
     private static boolean atCourt(Minecraft minecraft, LocalPlayer player) {
         return minecraft.level.dimension() == BleachWorlds.SOUL_SOCIETY && player.onGround()
                 && Math.abs(player.getY() - SeireiteiPlan.PLATEAU_Y) < 0.01
