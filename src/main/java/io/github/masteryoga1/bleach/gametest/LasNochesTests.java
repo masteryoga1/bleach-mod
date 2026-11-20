@@ -3,14 +3,19 @@ package io.github.masteryoga1.bleach.gametest;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
+import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModWorldgen;
+import io.github.masteryoga1.bleach.soul.TravelEvents;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import io.github.masteryoga1.bleach.world.LasNoches;
 import io.github.masteryoga1.bleach.world.gen.LasNochesPiece;
 import io.github.masteryoga1.bleach.world.gen.LasNochesStructure;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +42,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.tags.TagKey;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -53,6 +64,8 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -63,14 +76,17 @@ import net.minecraft.world.level.levelgen.structure.TerrainAdjustment;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
 import net.minecraft.world.level.levelgen.structure.placement.ConcentricRingsStructurePlacement;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
 /**
- * Tests for Las Noches: the plan's shell, the structure that sets it out about Hueco Mundo's centre, its blocks and its
- * data. The test server's Hueco Mundo is made with structures off, so worldgen lays none of it there; test B lays one
- * chunk of it by hand and takes it away again as it ends, so it runs in a batch of its own.
+ * Tests for Las Noches: the plan's shell, the structure that sets it out about Hueco Mundo's centre, the stamp that lays
+ * it a chunk at a time, its blocks and its data. The test server's Hueco Mundo is made with structures off, as an old
+ * world's chunks were, so worldgen lays none of it there; tests B, C and E lay a chunk or two of it, by hand or by the
+ * stamp, and take them away again as they end, so they run in a batch of their own.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -80,9 +96,14 @@ public final class LasNochesTests {
     private static final TagKey<Biome> STARTS_IN = TagKey.create(Registries.BIOME, BleachMod.id("has_structure/las_noches"));
     /** Test B's chunk, x and z -32 to -17: the shoulder tower about (-28, -28), the dome under it and the air it shuts in. */
     private static final ChunkPos SHOULDER = new ChunkPos(-2, -2);
+    /** Test C's chunks: the east gateway's southern half and the wall south of it, and the dome's foot west of them. */
+    private static final ChunkPos EAST = new ChunkPos(7, 0), DOME_FOOT = new ChunkPos(3, 0);
+    /** Test E's chunk: the north gateway's eastern half and the wall east of it, x 0 to 15 and z -128 to -113. */
+    private static final ChunkPos NORTH = new ChunkPos(0, -8);
     /** The three blocks, with the colour each shows on a map. */
     private static final Map<String, MapColor> BLOCKS = Map.of("las_noches_stone", MapColor.QUARTZ,
             "las_noches_tiles", MapColor.QUARTZ, "las_noches_trim", MapColor.COLOR_BLACK);
+    private static final double SAME = 1.0E-6;
 
     private LasNochesTests() {
     }
@@ -119,6 +140,21 @@ public final class LasNochesTests {
         return (LasNochesPiece) pieces.get(0);
     }
 
+    /** Whether this chunk holds the reference to Las Noches that worldgen and the stamp leave once it is laid. */
+    private static boolean referenced(ServerLevel hueco, Structure structure, ChunkPos pos) {
+        return hueco.getChunk(pos.x, pos.z).getReferencesForStructure(structure).contains(LasNoches.HOME.toLong());
+    }
+
+    /** The stamp's site for this chunk: its sites run across x and then z from the box's first chunk, one chunk each. */
+    private static int site(GameTestHelper helper, ChunkPos pos) {
+        BoundingBox box = HuecoMundoPlan.SHELL_BOX;
+        int site = pos.x - (box.minX() >> 4) + (pos.z - (box.minZ() >> 4)) * ((box.maxX() >> 4) - (box.minX() >> 4) + 1);
+        helper.assertTrue(LasNoches.STAMP.covered(site).equals(List.of(pos))
+                        && LasNoches.STAMP.startChunk(site).equals(LasNoches.HOME),
+                "the stamp's site " + site + " covers " + LasNoches.STAMP.covered(site) + ", not " + pos);
+        return site;
+    }
+
     /** Asserts that every cell of this chunk's column of the box holds what the plan lays, or air; counts each kind. */
     private static Map<HuecoMundoPlan.Shell, Integer> assertLaidAsPlanned(GameTestHelper helper, ServerLevel hueco,
                                                                          ChunkPos pos) {
@@ -138,6 +174,40 @@ public final class LasNochesTests {
             }
         }
         return laid;
+    }
+
+    /**
+     * Asserts that this body set down at this spot stands where expected, on white sand, with no cell of the shell in its
+     * box and nothing in its way.
+     */
+    private static void onSandOutside(GameTestHelper helper, ServerLevel hueco, Entity body, @Nullable Vec3 at,
+                                      Vec3 expected, String what) {
+        helper.assertTrue(at != null && at.distanceTo(expected) < SAME, what + " is at " + at + ", not " + expected);
+        AABB box = body.getDimensions(Pose.STANDING).makeBoundingBox(at);
+        for (BlockPos cell : BlockPos.betweenClosed(BlockPos.containing(box.minX, box.minY, box.minZ),
+                BlockPos.containing(box.maxX - SAME, box.maxY - SAME, box.maxZ - SAME))) {
+            helper.assertTrue(HuecoMundoPlan.shellAt(cell.getX(), cell.getY(), cell.getZ()) == null,
+                    what + " stands in the shell at " + cell.toShortString());
+        }
+        helper.assertTrue(hueco.noCollision(body, box)
+                && hueco.getBlockState(BlockPos.containing(at).below()).is(ModBlocks.WHITE_SAND.get()),
+                what + " is not free on white sand");
+    }
+
+    /** Asserts that a Garganta from this x and z sets this body down here, outside the wall. */
+    private static void landsOutside(GameTestHelper helper, ServerLevel hueco, Entity body, double x, double z,
+                                     Vec3 expected) {
+        String what = "a body " + body.getBbWidth() + " wide from (" + x + ", " + z + ")";
+        onSandOutside(helper, hueco, body, TravelEvents.huecoMundoLanding(body, hueco, x, z), expected, what);
+    }
+
+    /** A pig with no will of its own, made at this spot of Hueco Mundo and not yet set down there. */
+    private static Pig pig(GameTestHelper helper, ServerLevel hueco, double x, double y, double z) {
+        Pig pig = EntityType.PIG.create(hueco);
+        helper.assertTrue(pig != null, "no pig could be made");
+        pig.setNoAi(true);
+        pig.moveTo(x, y, z, 0.0F, 0.0F);
+        return pig;
     }
 
     // ---- The plan ----
@@ -226,14 +296,30 @@ public final class LasNochesTests {
 
     /**
      * Holds a chunk of the real Hueco Mundo with the chunks beside it, and as its test ends, passed or failed, lets them
-     * go and sets every cell of the shell in that chunk back to air, the open air of the level ground there.
+     * go, discards what the test set down, sets every cell of the shell in that chunk back to air, the open air of the
+     * level ground there, and takes its reference to Las Noches away.
      */
-    private record Held(ServerLevel hueco, ChunkPos chunk) implements GameTestListener {
-        /** Holds this chunk and those beside it till the test ends, made now, so a cell laid at its edge reads them. */
-        static void hold(GameTestHelper helper, ServerLevel hueco, ChunkPos chunk) {
-            helper.testInfo.addListener(new Held(hueco, chunk));
+    private record Held(ServerLevel hueco, ChunkPos chunk, List<Entity> placed) implements GameTestListener {
+        /**
+         * Holds this chunk and those beside it till the test ends, made now, so a cell laid at its edge reads them. Each
+         * is made under this ticket alone, with none of the one-tick tickets a load by getChunk leaves to outlast it.
+         */
+        static Held hold(GameTestHelper helper, ServerLevel hueco, ChunkPos chunk) {
+            Held held = new Held(hueco, chunk, new ArrayList<>());
+            helper.testInfo.addListener(held);
             hueco.getChunkSource().addRegionTicket(TicketType.FORCED, chunk, 1, chunk);
-            ChunkPos.rangeClosed(chunk, 1).forEach(each -> hueco.getChunk(each.x, each.z));
+            // The ticket's levels are set now rather than at the level's next tick, so the chunks may be made under it.
+            hueco.getChunkSource().pollTask();
+            ChunkPos.rangeClosed(chunk, 1)
+                    .forEach(each -> hueco.getChunkSource().getChunkFuture(each.x, each.z, ChunkStatus.FULL, false));
+            return held;
+        }
+
+        /** Sets this down in Hueco Mundo, to be discarded as the test ends. */
+        <T extends Entity> T add(T entity) {
+            placed.add(entity);
+            hueco.addFreshEntity(entity);
+            return entity;
         }
 
         @Override
@@ -254,9 +340,13 @@ public final class LasNochesTests {
         public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
         }
 
-        /** Lets the chunks go first, then takes the shell's blocks from the chunk. */
+        /**
+         * Lets the chunks go, discards what the test set down, clears the shell's cells and takes the reference away, then
+         * has the ticket's removal run at once, so no check of the stamp's still queued finds all nine loaded to lay it.
+         */
         private void end() {
             hueco.getChunkSource().removeRegionTicket(TicketType.FORCED, chunk, 1, chunk);
+            TravelTests.discard(placed.toArray(new Entity[0]));
             BlockState air = Blocks.AIR.defaultBlockState();
             BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
             for (int x = chunk.getMinBlockX(); x <= chunk.getMaxBlockX(); x++) {
@@ -268,6 +358,13 @@ public final class LasNochesTests {
                     }
                 }
             }
+            LevelChunk laid = hueco.getChunk(chunk.x, chunk.z);
+            Map<Structure, LongSet> others = new HashMap<>(laid.getAllReferences());
+            others.remove(hueco.registryAccess().registryOrThrow(Registries.STRUCTURE).get(LasNoches.STRUCTURE));
+            laid.setAllReferences(others);
+            // Else run at the level's next tick, after the checks queued this tick: a chunk the test has not read in its
+            // last two ticks, as no step reads a corner, is then no longer loaded when they run.
+            hueco.getChunkSource().pollTask();
         }
     }
 
@@ -316,6 +413,110 @@ public final class LasNochesTests {
         helper.assertTrue(tally.equals(Map.of(HuecoMundoPlan.Shell.STONE, 3_183, HuecoMundoPlan.Shell.TILES, 575,
                 HuecoMundoPlan.Shell.TRIM, 144)), "the shoulder tower's chunk " + SHOULDER + " holds " + tally);
         helper.succeed();
+    }
+
+    // ---- The stamp ----
+
+    /**
+     * Test C. The east gateway's chunk and the dome's foot of the real Hueco Mundo, made with structures off as an old
+     * world's were, are laid by the stamp once those beside them have loaded, cell for cell as planned, and the chunks
+     * beside them, whose own neighbours are not all loaded, are not; a pig where the wall goes, one the dome shuts in and
+     * one that joins in the laid wall are set down on the sand where a Garganta from there lands. The chunk keeps its
+     * reference and is not laid again, a stone gone or not.
+     */
+    @GameTest(template = "empty", batch = "las_noches", timeoutTicks = 900)
+    public static void theStampLaysAChunkOnce(GameTestHelper helper) {
+        ServerLevel hueco = hueco(helper);
+        Structure structure = lasNoches(helper, hueco);
+        int site = site(helper, EAST);
+        site(helper, DOME_FOOT);
+        Held east = Held.hold(helper, hueco, EAST), foot = Held.hold(helper, hueco, DOME_FOOT);
+        // Where the wall goes, r 121.95 and 10.5 off the gateway's middle, on the sand: as it joins, nothing buries it yet.
+        Pig walled = east.add(pig(helper, hueco, 121.5, HuecoMundoPlan.LEVEL_Y, 10.5));
+        // Under the dome, 53.4 from its centre: it joins over the shell's box and is moved in, so only the lay frees it.
+        Pig shut = foot.add(pig(helper, hueco, 50.5, HuecoMundoPlan.SHELL_BOX.maxY() + 2.0, 5.5));
+        shut.moveTo(50.5, HuecoMundoPlan.LEVEL_Y, 5.5, 0.0F, 0.0F);
+        Pig joining = pig(helper, hueco, 121.5, HuecoMundoPlan.LEVEL_Y, 8.5);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(referenced(hueco, structure, EAST)
+                        && referenced(hueco, structure, DOME_FOOT), "the stamp has not laid " + EAST + " and " + DOME_FOOT))
+                .thenExecute(() -> {
+                    Map<HuecoMundoPlan.Shell, Integer> gateway = assertLaidAsPlanned(helper, hueco, EAST),
+                            dome = assertLaidAsPlanned(helper, hueco, DOME_FOOT);
+                    helper.assertTrue(gateway.equals(Map.of(HuecoMundoPlan.Shell.STONE, 664, HuecoMundoPlan.Shell.TILES, 128,
+                                    HuecoMundoPlan.Shell.TRIM, 128)) && dome.equals(Map.of(HuecoMundoPlan.Shell.TILES, 878)),
+                            "the east gateway's chunk holds " + gateway + " and the dome's foot " + dome);
+                    // The wall's stone would stand here in the chunks north and south of it, were they laid.
+                    for (BlockPos beside : List.of(new BlockPos(121, 100, 20), new BlockPos(121, 100, -8))) {
+                        helper.assertTrue(hueco.getBlockState(beside).isAir()
+                                        && !referenced(hueco, structure, new ChunkPos(beside)),
+                                "the chunk beside it at " + beside.toShortString() + " was laid too");
+                    }
+                    // Each out on its bearing to r 136 and grounded, as a Garganta from its spot sets a soul down.
+                    onSandOutside(helper, hueco, walled, walled.position(), new Vec3(135.5, HuecoMundoPlan.LEVEL_Y, 11.5),
+                            "the pig the wall was laid over");
+                    onSandOutside(helper, hueco, shut, shut.position(), new Vec3(135.5, HuecoMundoPlan.LEVEL_Y, 14.5),
+                            "the pig the dome shut in");
+                    BlockPos wall = new BlockPos(121, 100, 8);
+                    helper.assertTrue(hueco.getBlockState(wall).is(ModBlocks.LAS_NOCHES_STONE.get()),
+                            "the wall at " + wall.toShortString() + " is " + hueco.getBlockState(wall));
+                    hueco.setBlock(wall, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+                    helper.assertFalse(LasNoches.STAMP.ensureBuilt(hueco, site), "the stamp laid the chunk again");
+                    helper.assertTrue(hueco.getBlockState(wall).isAir() && referenced(hueco, structure, EAST),
+                            "the stamp set back a stone of a chunk it had laid, or took its reference");
+                    // In the wall's stone, as a soul saved there before it stood joins with its chunk.
+                    east.add(joining);
+                })
+                .thenExecuteAfter(5, () -> onSandOutside(helper, hueco, joining, joining.position(),
+                        new Vec3(135.5, HuecoMundoPlan.LEVEL_Y, 9.5), "the pig that joined in the wall"))
+                .thenSucceed();
+    }
+
+    /**
+     * Test E. Once the stamp has laid the north gateway's chunk, a Garganta from inside the wall, from the gateway and
+     * from the dome's foot sets a person and a Gillian's body down on the sand outside, as it sets down a Menos or an
+     * Arrancar waking there, and Urahara's far end steps further out from the first landing, 4 blocks at a time.
+     */
+    @GameTest(template = "empty", batch = "las_noches", timeoutTicks = 900)
+    public static void arrivalsLandPastTheWall(GameTestHelper helper) {
+        ServerLevel hueco = hueco(helper);
+        Structure structure = lasNoches(helper, hueco);
+        site(helper, NORTH);
+        Held.hold(helper, hueco, NORTH);
+        // Mock players, never added to the world: a person, and one at scale 6, a Gillian's 3.6 by 10.8.
+        Player soul = HuecoMundoTests.mockIn(hueco, new Vec3(10.5, HuecoMundoPlan.LEVEL_Y, -121.5), GargantaTests.arrancar());
+        Player giant = HuecoMundoTests.mockIn(hueco, new Vec3(10.5, HuecoMundoPlan.LEVEL_Y, -121.5),
+                GargantaTests.arrancar());
+        giant.getAttribute(Attributes.SCALE).setBaseValue(6.0);
+        giant.refreshDimensions();
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(referenced(hueco, structure, NORTH),
+                        "the north gateway's chunk " + NORTH + " is not laid"))
+                .thenExecute(() -> {
+                    // The wall stands where the first landing starts, and the gateway is open under its band.
+                    helper.assertTrue(hueco.getBlockState(new BlockPos(10, 100, -122)).is(ModBlocks.LAS_NOCHES_STONE.get())
+                                    && hueco.getBlockState(new BlockPos(2, 100, -122)).isAir()
+                                    && hueco.getBlockState(new BlockPos(2, 111, -122)).is(ModBlocks.LAS_NOCHES_TRIM.get()),
+                            "the north wall and its gateway do not stand as the plan has them");
+                    Vec3 first = new Vec3(11.5, HuecoMundoPlan.LEVEL_Y, -135.5);
+                    Vec3 gateway = new Vec3(2.5, HuecoMundoPlan.LEVEL_Y, -135.5);
+                    landsOutside(helper, hueco, soul, 10.5, -121.5, first);
+                    landsOutside(helper, hueco, giant, 10.5, -121.5, first);
+                    landsOutside(helper, hueco, soul, 2.5, -121.5, gateway);
+                    landsOutside(helper, hueco, giant, 2.5, -121.5, gateway);
+                    landsOutside(helper, hueco, soul, 2.5, -60.5, new Vec3(5.5, HuecoMundoPlan.LEVEL_Y, -135.5));
+                    // As UraharaGates.farEnd steps out: r 140, 144, 148 and 152.
+                    double out = Math.hypot(first.x, first.z);
+                    List<Vec3> far = List.of(new Vec3(11.5, HuecoMundoPlan.LEVEL_Y, -139.5),
+                            new Vec3(12.5, HuecoMundoPlan.LEVEL_Y, -143.5), new Vec3(12.5, HuecoMundoPlan.LEVEL_Y, -147.5),
+                            new Vec3(12.5, HuecoMundoPlan.LEVEL_Y, -151.5));
+                    for (int step = 1; step <= far.size(); step++) {
+                        double further = 1.0 + 4.0 * step / out;
+                        onSandOutside(helper, hueco, soul, TravelEvents.groundUnder(soul, hueco, Mth.floor(first.x * further),
+                                Mth.floor(first.z * further)), far.get(step - 1), "his far end's step " + step);
+                    }
+                })
+                .thenSucceed();
     }
 
     // ---- The blocks ----

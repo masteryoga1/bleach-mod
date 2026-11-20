@@ -1,5 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
+import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
@@ -32,7 +34,7 @@ public final class SafeLanding {
      * in a long fall.
      *
      * @return false, leaving the player where they are, if that spot is in a wall, a liquid or
-     *         something harmful, outside the world border, or over the void
+     *         something harmful, outside the world border, over the void, or shut in Las Noches
      */
     public static boolean tryMoveTo(ServerPlayer player, ServerLevel level, Vec3 target) {
         Vec3 spot = landingSpot(player, level, target);
@@ -72,6 +74,11 @@ public final class SafeLanding {
         // The drop above moves in whole blocks; settle the rest of the way onto what the feet will rest on.
         box = box.move(Entity.collideBoundingBox(entity, new Vec3(0.0, -1.0, 0.0), box, level, List.of()));
         if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, entity, box)) {
+            return null;
+        }
+        // The air Las Noches' sealed shell shuts in, which a soul could only leave by digging.
+        if (level.dimension() == BleachWorlds.HUECO_MUNDO
+                && HuecoMundoPlan.enclosed(Mth.floor(target.x), Mth.floor(box.minY), Mth.floor(target.z))) {
             return null;
         }
         return new Vec3(target.x, box.minY, target.z);

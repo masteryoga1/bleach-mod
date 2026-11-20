@@ -106,7 +106,7 @@ public final class GateHouses {
     }
 
     /** Whether every chunk under this body's box is loaded, so that its blocks can be read. */
-    private static boolean loadedUnder(ServerLevel level, Entity entity) {
+    static boolean loadedUnder(ServerLevel level, Entity entity) {
         AABB box = entity.getBoundingBox();
         for (int x = Mth.floor(box.minX) >> 4; x <= Mth.floor(box.maxX) >> 4; x++) {
             for (int z = Mth.floor(box.minZ) >> 4; z <= Mth.floor(box.maxZ) >> 4; z++) {

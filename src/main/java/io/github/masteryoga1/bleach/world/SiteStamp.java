@@ -29,10 +29,14 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * One structure's planned sites in one world, stamped into chunks made before a site existed, or made with structures
  * off: once the chunks a site covers and those beside them are loaded, and the creatures saved in those it covers, each
  * that never placed its part places it then. A part an operator placed by command is known by its marker blocks and kept.
+ * A chunkwise stamp, for one structure too wide to wait on whole, lays each chunk it covers alone once that chunk and
+ * those beside it are loaded, and keeps no start, so its reference alone says a chunk was laid.
  */
 public final class SiteStamp {
     /** How many further checks, one a tick, a chunk's load gives a site while its chunks load: 5 seconds. */
     private static final int LOAD_TRIES = 100;
+    /** How many chunks a chunkwise stamp lays in one tick at most; the rest wait for the ticks after. */
+    private static final int LAYS_PER_TICK = 4;
 
     private final ResourceKey<Level> world;
     private final ResourceKey<Structure> structure;
@@ -43,11 +47,16 @@ public final class SiteStamp {
     private final Placed placed;
     private final Guard guard;
     private final List<List<ChunkPos>> covered = new ArrayList<>(), around = new ArrayList<>();
+    /** A chunkwise stamp's start chunk, where its structure is set out from afresh for each chunk; else null. */
+    @Nullable
+    private final ChunkPos chunkwiseHome;
     /**
      * For each site, how many further checks, one a tick, are still to run since a check found what it needs not yet
      * loaded; 0 for none. Server thread only. Some left over from a world closed since cost checks that load nothing.
      */
     private final int[] triesLeft;
+    /** The server tick a chunkwise stamp last counted its lays in, and how many it has laid in it. Server thread only. */
+    private int layTick = -1, laidThisTick;
 
     /**
      * The stamp for this structure's sites in this world, each a template of this size before its turn, its parts known
@@ -69,6 +78,7 @@ public final class SiteStamp {
         this.markers = List.copyOf(markers);
         this.placed = placed;
         this.guard = guard;
+        this.chunkwiseHome = null;
         for (int i = 0; i < this.sites.size(); i++) {
             BoundingBox box = box(i, 0);
             // Along x, a row of z at a time, as ChunkPos.rangeClosed runs.
@@ -80,7 +90,36 @@ public final class SiteStamp {
         triesLeft = new int[this.sites.size()];
     }
 
-    /** The sites, in the plan's order. */
+    /** A chunkwise stamp (see {@link #chunkwise}). */
+    private SiteStamp(ResourceKey<Level> world, ResourceKey<Structure> structure, String name, ChunkPos home,
+                      BoundingBox box, Placed placed) {
+        this.world = world;
+        this.structure = structure;
+        this.name = name;
+        this.sites = List.of();
+        this.size = Vec3i.ZERO;
+        this.markers = List.of();
+        this.placed = placed;
+        this.guard = Guard.ANY;
+        this.chunkwiseHome = home;
+        ChunkPos.rangeClosed(new ChunkPos(box.minX() >> 4, box.minZ() >> 4), new ChunkPos(box.maxX() >> 4, box.maxZ() >> 4))
+                .forEach(pos -> {
+                    covered.add(List.of(pos));
+                    around.add(ChunkPos.rangeClosed(pos, 1).toList());
+                });
+        triesLeft = new int[covered.size()];
+    }
+
+    /**
+     * The stamp for one structure in this world, set out from {@code home} and covering {@code box}, with no template or
+     * markers: each chunk it covers is a site of its own, across x and then z, laid alone (see {@link #ensureBuilt}).
+     */
+    public static SiteStamp chunkwise(ResourceKey<Level> world, ResourceKey<Structure> structure, String name,
+                                      ChunkPos home, BoundingBox box, Placed placed) {
+        return new SiteStamp(world, structure, name, home, box, placed);
+    }
+
+    /** The sites, in the plan's order; none for a chunkwise stamp. */
     public List<SeireiteiPlan.Site> sites() {
         return sites;
     }
@@ -90,13 +129,14 @@ public final class SiteStamp {
         return covered.get(index);
     }
 
-    /** The chunk this site's structure starts in, the one holding its corner. */
+    /** The chunk this site's structure starts in: the one holding its corner, or a chunkwise stamp's home. */
     public ChunkPos startChunk(int index) {
-        return sites.get(index).chunk();
+        return chunkwiseHome != null ? chunkwiseHome : sites.get(index).chunk();
     }
 
-    /** This site's box, its template turned about its corner, standing on y. */
+    /** This site's box, its template turned about its corner, standing on y. Not for a chunkwise stamp. */
     public BoundingBox box(int index, int y) {
+        templateSites();
         SeireiteiPlan.Site site = sites.get(index);
         BlockPos corner = new BlockPos(site.x(), y, site.z());
         return BoundingBox.fromCorners(corner,
@@ -111,7 +151,7 @@ public final class SiteStamp {
      */
     public void onChunkLoad(ChunkEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel level && level.dimension() == world) {
-            for (int i = 0; i < sites.size(); i++) {
+            for (int i = 0; i < covered.size(); i++) {
                 if (around.get(i).contains(event.getChunk().getPos())) {
                     queueCheck(level, i, true);
                 }
@@ -122,7 +162,7 @@ public final class SiteStamp {
     /** Queues this tick's further check of each site a check left tries, counting one off. */
     public void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
-        for (int i = 0; i < sites.size(); i++) {
+        for (int i = 0; i < covered.size(); i++) {
             if (triesLeft[i] > 0) {
                 triesLeft[i]--;
                 ServerLevel level = server.getLevel(world);
@@ -166,6 +206,7 @@ public final class SiteStamp {
      * that holds no reference to it, which then gains one. A part that stands already, placed by command, only gains the
      * reference. Those chunks are loaded, and made, first, unless the site is whole already. Server thread only.
      * Its guard is asked before anything is set, with the chunks still bare; on a no, nothing is set or placed.
+     * A chunkwise stamp's site is its one chunk, laid alone unless it holds the reference, from a start never kept.
      *
      * @return whether any part was placed
      */
@@ -173,6 +214,9 @@ public final class SiteStamp {
         Structure laid = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(structure);
         if (laid == null) {
             return false;
+        }
+        if (chunkwiseHome != null) {
+            return layAlone(level, laid, index);
         }
         if (whole(level, laid, index)) {
             // With no chunk bare, the guard learns the site stands whole, as worldgen or a stamp left it.
@@ -210,18 +254,57 @@ public final class SiteStamp {
             level.onStructureStartsAvailable(homeChunk);
         }
         for (LevelChunk chunk : bare) {
-            ChunkPos pos = chunk.getPos();
-            if (chunk.getInhabitedTime() > 0) {
-                BleachMod.LOGGER.warn("{} is built over chunk {}, where souls have spent {} ticks", name, pos,
-                        chunk.getInhabitedTime());
-            }
-            BoundingBox column = new BoundingBox(pos.getMinBlockX(), level.getMinBuildHeight(), pos.getMinBlockZ(),
-                    pos.getMaxBlockX(), level.getMaxBuildHeight(), pos.getMaxBlockZ());
-            start.placeInChunk(level, level.structureManager(), generator, level.getRandom(), column, pos);
-            placed.placed(level, column);
+            lay(level, start, generator, chunk);
         }
         unreferenced.forEach(chunk -> chunk.addReferenceForStructure(laid, home.toLong()));
         return !bare.isEmpty();
+    }
+
+    /**
+     * A chunkwise stamp's site: its one chunk, unless it holds the reference, laid from a start set out afresh and never
+     * kept, then given the reference. Past this tick's share it is left for the next tick's check.
+     */
+    private boolean layAlone(ServerLevel level, Structure laid, int index) {
+        ChunkPos pos = covered.get(index).get(0), home = chunkwiseHome;
+        LevelChunk chunk = level.getChunk(pos.x, pos.z);
+        if (chunk.getReferencesForStructure(laid).contains(home.toLong())) {
+            return false;
+        }
+        int tick = level.getServer().getTickCount();
+        if (tick != layTick) {
+            layTick = tick;
+            laidThisTick = 0;
+        }
+        if (laidThisTick >= LAYS_PER_TICK) {
+            triesLeft[index] = Math.max(triesLeft[index], 1);
+            return false;
+        }
+        ChunkGenerator generator = level.getChunkSource().getGenerator();
+        // Kept in the home chunk, a start would give chunks made later a reference, though with structures off no part.
+        StructureStart start = laid.generate(level.registryAccess(), generator, generator.getBiomeSource(),
+                level.getChunkSource().randomState(), level.getStructureManager(), level.getSeed(), home, 0, level,
+                biome -> true);
+        if (!start.isValid()) {
+            BleachMod.LOGGER.warn("{} could not be laid out from chunk {}; chunk {} was not built", name, home, pos);
+            return false;
+        }
+        laidThisTick++;
+        lay(level, start, generator, chunk);
+        chunk.addReferenceForStructure(laid, home.toLong());
+        return true;
+    }
+
+    /** Places this start's part in this chunk's full-height column, after a warning if souls have spent time there. */
+    private void lay(ServerLevel level, StructureStart start, ChunkGenerator generator, LevelChunk chunk) {
+        ChunkPos pos = chunk.getPos();
+        if (chunk.getInhabitedTime() > 0) {
+            BleachMod.LOGGER.warn("{} is built over chunk {}, where souls have spent {} ticks", name, pos,
+                    chunk.getInhabitedTime());
+        }
+        BoundingBox column = new BoundingBox(pos.getMinBlockX(), level.getMinBuildHeight(), pos.getMinBlockZ(),
+                pos.getMaxBlockX(), level.getMaxBuildHeight(), pos.getMaxBlockZ());
+        start.placeInChunk(level, level.structureManager(), generator, level.getRandom(), column, pos);
+        placed.placed(level, column);
     }
 
     /** Whether every chunk the site covers is loaded and holds its reference, and its start is valid: nothing to do. */
@@ -261,8 +344,10 @@ public final class SiteStamp {
     /**
      * Whether this site stands in every chunk it covers, each loaded already: the chunk holds its reference, as worldgen
      * and the stamp leave it, or its markers stand about this corner, as a /place leaves them. Nothing is loaded for it.
+     * Not for a chunkwise stamp.
      */
     public boolean stands(ServerLevel level, int index, BlockPos corner) {
+        templateSites();
         Structure laid = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(structure);
         long home = startChunk(index).toLong();
         for (ChunkPos pos : covered.get(index)) {
@@ -275,14 +360,28 @@ public final class SiteStamp {
         return true;
     }
 
-    /** Where this marker stands in this site once its template is set at this corner and turned with the site. */
+    /**
+     * Where this marker stands in this site once its template is set at this corner and turned with the site. Not for a
+     * chunkwise stamp.
+     */
     public BlockPos markerAt(int index, Marker marker, BlockPos corner) {
         return turned(index, marker.at(), corner);
     }
 
-    /** Where this place of the template stands in this site once it is set at this corner and turned with the site. */
+    /**
+     * Where this place of the template stands in this site once it is set at this corner and turned with the site. Not for
+     * a chunkwise stamp.
+     */
     public BlockPos turned(int index, BlockPos place, BlockPos corner) {
+        templateSites();
         return corner.offset(place.rotate(sites.get(index).rotation()));
+    }
+
+    /** Refuses a template site's question to a chunkwise stamp, whose sites are chunks with no template, corner or turn. */
+    private void templateSites() {
+        if (chunkwiseHome != null) {
+            throw new UnsupportedOperationException(name + " lays chunks alone and has no template sites");
+        }
     }
 
     /** A block that only a site's own part puts here, in template coordinates before the turn. */
