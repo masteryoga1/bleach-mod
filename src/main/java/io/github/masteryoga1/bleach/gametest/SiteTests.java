@@ -339,8 +339,8 @@ public final class SiteTests {
         SiteStamp.Marker low = new SiteStamp.Marker(new BlockPos(3, 1, 6), () -> Blocks.STONE);
         SiteStamp.Marker high = new SiteStamp.Marker(new BlockPos(12, 2, 1), () -> Blocks.STONE);
         SiteStamp made = new SiteStamp(BleachWorlds.SOUL_SOCIETY, AcademySite.STRUCTURE, "A made-up site",
-                List.of(new SeireiteiPlan.Site("made", 100, -40, BleachMod.id("made"), Rotation.NONE),
-                        new SeireiteiPlan.Site("made", -50, 300, BleachMod.id("made"), Rotation.COUNTERCLOCKWISE_90)),
+                List.of(new SeireiteiPlan.Site("made", 100, -40, BleachMod.id("made"), Rotation.NONE, 16, 8),
+                        new SeireiteiPlan.Site("made", -50, 300, BleachMod.id("made"), Rotation.COUNTERCLOCKWISE_90, 16, 8)),
                 new Vec3i(16, 40, 8), List.of(low, high), SiteStamp.Placed.NOTHING);
         // Unturned: x 100 to 115 and z -40 to -33, chunks 6 and 7 of row -3; a marker (x, y, z) lands at the corner plus it.
         stampReads(helper, made, 0, List.of(new ChunkPos(6, -3), new ChunkPos(7, -3)), new ChunkPos(6, -3),
