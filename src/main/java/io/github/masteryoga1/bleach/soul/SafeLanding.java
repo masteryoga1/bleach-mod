@@ -1,7 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.world.BleachWorlds;
-import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
+import io.github.masteryoga1.bleach.world.LasNoches;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
@@ -76,9 +76,9 @@ public final class SafeLanding {
         if (!level.getWorldBorder().isWithinBounds(box) || level.containsAnyLiquid(box) || isHarmful(level, entity, box)) {
             return null;
         }
-        // The air Las Noches' sealed shell shuts in, which a soul could only leave by digging.
+        // The air Las Noches' shell still shuts in, where the halls do not yet stand: a soul could only leave by digging.
         if (level.dimension() == BleachWorlds.HUECO_MUNDO
-                && HuecoMundoPlan.enclosed(Mth.floor(target.x), Mth.floor(box.minY), Mth.floor(target.z))) {
+                && LasNoches.shutIn(level, Mth.floor(target.x), Mth.floor(box.minY), Mth.floor(target.z))) {
             return null;
         }
         return new Vec3(target.x, box.minY, target.z);

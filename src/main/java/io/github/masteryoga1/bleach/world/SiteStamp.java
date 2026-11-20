@@ -30,7 +30,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * off: once the chunks a site covers and those beside them are loaded, and the creatures saved in those it covers, each
  * that never placed its part places it then. A part an operator placed by command is known by its marker blocks and kept.
  * A chunkwise stamp, for one structure too wide to wait on whole, lays each chunk it covers alone once that chunk and
- * those beside it are loaded, and keeps no start, so its reference alone says a chunk was laid.
+ * those beside it are loaded and its guard allows it, and keeps no start, so its reference alone says a chunk was laid.
  */
 public final class SiteStamp {
     /** How many further checks, one a tick, a chunk's load gives a site while its chunks load: 5 seconds. */
@@ -92,7 +92,7 @@ public final class SiteStamp {
 
     /** A chunkwise stamp (see {@link #chunkwise}). */
     private SiteStamp(ResourceKey<Level> world, ResourceKey<Structure> structure, String name, ChunkPos home,
-                      BoundingBox box, Placed placed) {
+                      BoundingBox box, Placed placed, Guard guard) {
         this.world = world;
         this.structure = structure;
         this.name = name;
@@ -100,7 +100,7 @@ public final class SiteStamp {
         this.size = Vec3i.ZERO;
         this.markers = List.of();
         this.placed = placed;
-        this.guard = Guard.ANY;
+        this.guard = guard;
         this.chunkwiseHome = home;
         ChunkPos.rangeClosed(new ChunkPos(box.minX() >> 4, box.minZ() >> 4), new ChunkPos(box.maxX() >> 4, box.maxZ() >> 4))
                 .forEach(pos -> {
@@ -116,7 +116,16 @@ public final class SiteStamp {
      */
     public static SiteStamp chunkwise(ResourceKey<Level> world, ResourceKey<Structure> structure, String name,
                                       ChunkPos home, BoundingBox box, Placed placed) {
-        return new SiteStamp(world, structure, name, home, box, placed);
+        return new SiteStamp(world, structure, name, home, box, placed, Guard.ANY);
+    }
+
+    /**
+     * As the chunkwise stamp above, which lays a chunk only when {@code guard} allows it, asked with that one chunk; one
+     * held back waits for its next check, which a chunk's load beside it or {@link #recheck} brings.
+     */
+    public static SiteStamp chunkwise(ResourceKey<Level> world, ResourceKey<Structure> structure, String name,
+                                      ChunkPos home, BoundingBox box, Placed placed, Guard guard) {
+        return new SiteStamp(world, structure, name, home, box, placed, guard);
     }
 
     /** The sites, in the plan's order; none for a chunkwise stamp. */
@@ -154,6 +163,17 @@ public final class SiteStamp {
             for (int i = 0; i < covered.size(); i++) {
                 if (around.get(i).contains(event.getChunk().getPos())) {
                     queueCheck(level, i, true);
+                }
+            }
+        }
+    }
+
+    /** Checks again, once the tick is done, each site this chunk is covered by or lies beside, as its load would. */
+    public void recheck(ServerLevel level, ChunkPos pos) {
+        if (level.dimension() == world) {
+            for (int i = 0; i < covered.size(); i++) {
+                if (around.get(i).contains(pos)) {
+                    queueCheck(level, i, false);
                 }
             }
         }
@@ -206,7 +226,8 @@ public final class SiteStamp {
      * that holds no reference to it, which then gains one. A part that stands already, placed by command, only gains the
      * reference. Those chunks are loaded, and made, first, unless the site is whole already. Server thread only.
      * Its guard is asked before anything is set, with the chunks still bare; on a no, nothing is set or placed.
-     * A chunkwise stamp's site is its one chunk, laid alone unless it holds the reference, from a start never kept.
+     * A chunkwise stamp's site is its one chunk, laid alone unless it holds the reference or its guard says no, from a
+     * start never kept.
      *
      * @return whether any part was placed
      */
@@ -268,6 +289,10 @@ public final class SiteStamp {
         ChunkPos pos = covered.get(index).get(0), home = chunkwiseHome;
         LevelChunk chunk = level.getChunk(pos.x, pos.z);
         if (chunk.getReferencesForStructure(laid).contains(home.toLong())) {
+            return false;
+        }
+        // Asked before this tick's share is counted, so a chunk held back costs none of it, and keeps no try.
+        if (!guard.mayBuild(level, List.of(chunk))) {
             return false;
         }
         int tick = level.getServer().getTickCount();
@@ -399,7 +424,7 @@ public final class SiteStamp {
 
     /**
      * Asked at each check, before anything is set or built, with the site's chunks still bare, or with none once it
-     * stands whole: nothing is set or placed on a no.
+     * stands whole; a chunkwise stamp asks with its one chunk, still bare. Nothing is set or placed on a no.
      */
     @FunctionalInterface
     public interface Guard {

@@ -16,6 +16,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -26,20 +27,29 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
- * Las Noches at Hueco Mundo's centre, the structure {@code bleach:las_noches}: worldgen lays its wall, dome and towers,
- * from {@link HuecoMundoPlan}'s table, in chunks made since it was added with structures on, and a stamp lays them a
- * chunk at a time into chunks made before, or with structures off. A soul or creature the shell is laid over, or shuts
- * in, is set down outside the wall, as a Garganta sets one down.
+ * Las Noches at Hueco Mundo's centre, the structures {@code bleach:las_noches} and {@code bleach:las_noches_halls}:
+ * worldgen lays its wall, dome and towers, then the halls under the dome, from {@link HuecoMundoPlan}'s tables, in chunks
+ * made since each was added with structures on, and two stamps lay them a chunk at a time into chunks made before, or
+ * with structures off, the halls once the shell stands about the chunk. A soul or creature the shell or the halls are
+ * laid over, or that the shell shuts in where the halls do not yet stand, is set down outside the wall, as a Garganta
+ * sets one down.
  */
 public final class LasNoches {
     /** Its structure, whose one piece lays the plan's shell. */
     public static final ResourceKey<Structure> STRUCTURE =
             ResourceKey.create(Registries.STRUCTURE, BleachMod.id("las_noches"));
-    /** The chunk it starts in, the centre's: its references reach every chunk the shell covers, 8 at most away. */
+    /** Its halls, whose one piece lays them under the dome and cuts its doors and the stair through the crown. */
+    public static final ResourceKey<Structure> HALLS =
+            ResourceKey.create(Registries.STRUCTURE, BleachMod.id("las_noches_halls"));
+    /** The chunk both start in, the centre's: its references reach every chunk either covers, 8 at most away. */
     public static final ChunkPos HOME = new ChunkPos(0, 0);
     /** The stamp that lays each of the shell's 256 chunks alone, once it and those beside it have loaded. */
     public static final SiteStamp STAMP = SiteStamp.chunkwise(BleachWorlds.HUECO_MUNDO, STRUCTURE,
             "Las Noches in Hueco Mundo", HOME, HuecoMundoPlan.SHELL_BOX, LasNoches::placed);
+    /** The stamp that lays each of the halls' 64 chunks alone, once the shell stands in it and in the 8 beside it. */
+    public static final SiteStamp HALLS_STAMP = SiteStamp.chunkwise(BleachWorlds.HUECO_MUNDO, HALLS,
+            "Las Noches' halls in Hueco Mundo", HOME, HuecoMundoPlan.HALLS_BOX, LasNoches::hallsPlaced,
+            LasNoches::shellAround);
     /** How many ticks a soul that joined in the shell's box waits for the chunks under it to load before it is let be. */
     private static final int JOIN_WAIT = 600;
     /**
@@ -51,14 +61,16 @@ public final class LasNoches {
     private LasNoches() {
     }
 
-    /** Lays a chunk of the shell once it and the chunks beside it have loaded (see {@link SiteStamp#onChunkLoad}). */
+    /** Lays a chunk of the shell, then of the halls, once it and the chunks beside it have loaded (see {@link SiteStamp}). */
     public static void onChunkLoad(ChunkEvent.Load event) {
         STAMP.onChunkLoad(event);
+        HALLS_STAMP.onChunkLoad(event);
     }
 
-    /** The further tries the stamp's checks asked for, and the souls that joined in the shell whose chunks have loaded. */
+    /** The further tries the stamps' checks asked for, and the souls that joined in the shell whose chunks have loaded. */
     public static void onServerTick(ServerTickEvent.Post event) {
         STAMP.onServerTick(event);
+        HALLS_STAMP.onServerTick(event);
         MinecraftServer server = event.getServer();
         List<LivingEntity> due = new ArrayList<>();
         for (Iterator<Map.Entry<LivingEntity, Integer>> each = JOINED.entrySet().iterator(); each.hasNext(); ) {
@@ -74,12 +86,12 @@ public final class LasNoches {
                 joined.setValue(joined.getValue() - 1);
             }
         }
-        due.forEach(living -> free((ServerLevel) living.level(), living));
+        due.forEach(living -> free((ServerLevel) living.level(), living, true));
     }
 
     /**
      * A soul or creature joining Hueco Mundo in the shell's box, as one saved there before the shell stood, is judged at
-     * the end of a tick once the chunks under it have loaded, and freed if buried or shut in. Elsewhere it costs a few
+     * the end of a tick once the chunks under it have loaded, and freed if buried or still shut in. Elsewhere it costs a few
      * comparisons.
      */
     public static void onEntityJoin(EntityJoinLevelEvent event) {
@@ -90,20 +102,51 @@ public final class LasNoches {
         }
     }
 
-    /** A chunk's part of the shell the stamp has just laid: every soul or creature in its column it buries is moved. */
+    /**
+     * A chunk's part of the shell the stamp has just laid: every soul or creature in its column it buries or shuts in is
+     * moved, and the halls about the chunk are checked again, as they wait for the shell.
+     */
     private static void placed(ServerLevel level, BoundingBox part) {
-        level.getEntitiesOfClass(LivingEntity.class, AABB.of(part)).forEach(living -> free(level, living));
+        level.getEntitiesOfClass(LivingEntity.class, AABB.of(part)).forEach(living -> free(level, living, true));
+        HALLS_STAMP.recheck(level, new ChunkPos(part.minX() >> 4, part.minZ() >> 4));
+    }
+
+    /** A chunk's part of the halls their stamp has just laid, which opens it: every soul or creature they bury is moved. */
+    private static void hallsPlaced(ServerLevel level, BoundingBox part) {
+        level.getEntitiesOfClass(LivingEntity.class, AABB.of(part)).forEach(living -> free(level, living, false));
+    }
+
+    /** Whether the shell stands, by its reference, in each chunk bare of the halls and in the 8 beside it, all loaded. */
+    private static boolean shellAround(ServerLevel level, List<? extends ChunkAccess> bare) {
+        Structure shell = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(STRUCTURE);
+        return shell != null && bare.stream().allMatch(chunk -> ChunkPos.rangeClosed(chunk.getPos(), 1).allMatch(pos -> {
+            ChunkAccess beside = level.getChunkSource().getChunkNow(pos.x, pos.z);
+            return beside != null && beside.getReferencesForStructure(shell).contains(HOME.toLong());
+        }));
     }
 
     /**
-     * If the shell's blocks bury this soul or creature, or it stands in the air the shell shuts in, moves it with what it
-     * rides to where a Garganta from there sets one down, past the wall on its bearing, else to the top of its own column.
+     * Whether this cell is air the shell still shuts in, so that a soul there could leave only by digging: under the dome
+     * or in the fifth tower's room, in a chunk whose halls are not laid yet. The chunk is loaded first if it is not.
      */
-    private static void free(ServerLevel level, LivingEntity living) {
+    public static boolean shutIn(ServerLevel level, int x, int y, int z) {
+        if (!HuecoMundoPlan.enclosed(x, y, z)) {
+            return false;
+        }
+        Structure halls = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(HALLS);
+        return halls == null || !level.getChunk(x >> 4, z >> 4).getReferencesForStructure(halls).contains(HOME.toLong());
+    }
+
+    /**
+     * If the shell's or the halls' blocks bury this soul or creature, or it stands where the shell still shuts it in and
+     * {@code shutInToo}, moves it with what it rides to where a Garganta from there sets one down, past the wall on its
+     * bearing, else to the top of its own column.
+     */
+    private static void free(ServerLevel level, LivingEntity living, boolean shutInToo) {
         BlockPos feet = living.blockPosition();
         if (living.isRemoved() || living.level() != level || living.isSpectator()
-                || !(inShell(level, living.getBoundingBox())
-                        || HuecoMundoPlan.enclosed(feet.getX(), feet.getY(), feet.getZ()))) {
+                || !(buried(level, living.getBoundingBox())
+                        || shutInToo && shutIn(level, feet.getX(), feet.getY(), feet.getZ()))) {
             return;
         }
         // A rider moved alone is set back on its seat by its vehicle's next tick, so the whole stack goes.
@@ -113,7 +156,7 @@ public final class LasNoches {
             body = body.minmax(rider.getBoundingBox());
         }
         Vec3 at = moved.position();
-        // The one place the stamp may load a chunk: the landing's, at r 136, made first if it never was.
+        // The one place the stamps may load a chunk: the landing's, at r 136, made first if it never was.
         Vec3 to = TravelEvents.huecoMundoLanding(moved, level, at.x, at.z);
         if (to == null || !level.noBlockCollision(moved, body.move(to.subtract(at)))) {
             // The open sky over the wall, a tower or the dome, which the shell always leaves: over the highest column
@@ -132,14 +175,23 @@ public final class LasNoches {
         moved.teleportTo(to.x, to.y, to.z);
     }
 
-    /** Whether any cell this box takes up is the shell's and still holds a block: the ground or a dug hole buries no one. */
-    private static boolean inShell(ServerLevel level, AABB box) {
-        for (BlockPos cell : BlockPos.betweenClosed(Mth.floor(box.minX + 1.0E-7), Mth.floor(box.minY + 1.0E-7),
-                Mth.floor(box.minZ + 1.0E-7), Mth.floor(box.maxX - 1.0E-7), Mth.floor(box.maxY - 1.0E-7),
-                Mth.floor(box.maxZ - 1.0E-7))) {
-            if (HuecoMundoPlan.shellAt(cell.getX(), cell.getY(), cell.getZ()) != null
-                    && !level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
-                return true;
+    /**
+     * Whether this box reaches into a block the shell or the halls laid that still stands: a body on a step or a seat is
+     * not buried by it, and the ground or a dug hole buries no one.
+     */
+    private static boolean buried(ServerLevel level, AABB box) {
+        AABB inner = box.deflate(1.0E-7);
+        for (BlockPos cell : BlockPos.betweenClosed(Mth.floor(inner.minX), Mth.floor(inner.minY), Mth.floor(inner.minZ),
+                Mth.floor(inner.maxX), Mth.floor(inner.maxY), Mth.floor(inner.maxZ))) {
+            HuecoMundoPlan.Hall hall = HuecoMundoPlan.hallsAt(cell.getX(), cell.getY(), cell.getZ());
+            if (HuecoMundoPlan.shellAt(cell.getX(), cell.getY(), cell.getZ()) == null
+                    && (hall == null || hall == HuecoMundoPlan.Hall.CUT)) {
+                continue;
+            }
+            for (AABB part : level.getBlockState(cell).getCollisionShape(level, cell).toAabbs()) {
+                if (part.move(cell).intersects(inner)) {
+                    return true;
+                }
             }
         }
         return false;
