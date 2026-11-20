@@ -62,6 +62,15 @@ public final class ModBlocks {
             () -> new RotatedPillarBlock(quartz()));
     public static final DeferredBlock<Block> HUECO_QUARTZ_BRICKS =
             BLOCKS.registerSimpleBlock("hueco_quartz_bricks", quartz());
+    /** Las Noches' white stone, of its wall and towers: a fortress's, harder than any art carves at its defaults. */
+    public static final DeferredBlock<Block> LAS_NOCHES_STONE = BLOCKS.registerSimpleBlock("las_noches_stone",
+            lasNoches(MapColor.QUARTZ));
+    /** Its white tiles, of the dome and the courses that cap a wall or a tower. */
+    public static final DeferredBlock<Block> LAS_NOCHES_TILES = BLOCKS.registerSimpleBlock("las_noches_tiles",
+            lasNoches(MapColor.QUARTZ));
+    /** Its dark trim, the band under the top of a wall or a tower. */
+    public static final DeferredBlock<Block> LAS_NOCHES_TRIM = BLOCKS.registerSimpleBlock("las_noches_trim",
+            lasNoches(MapColor.COLOR_BLACK));
     /** Seireitei's white plaster, the walls of its halls and barracks: stone-like, as white concrete is. */
     public static final DeferredBlock<Block> WHITE_PLASTER = BLOCKS.registerSimpleBlock("white_plaster",
             plaster(MapColor.SNOW));
@@ -142,6 +151,12 @@ public final class ModBlocks {
     private static BlockBehaviour.Properties quartz() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).instrument(NoteBlockInstrument.BASEDRUM)
                 .requiresCorrectToolForDrops().strength(0.8F);
+    }
+
+    /** Las Noches' properties: stone of this colour on a map, a little harder than stone and as strong against blasts. */
+    private static BlockBehaviour.Properties lasNoches(MapColor colour) {
+        return BlockBehaviour.Properties.of().mapColor(colour).instrument(NoteBlockInstrument.BASEDRUM)
+                .requiresCorrectToolForDrops().strength(3.5F, 9.0F);
     }
 
     /** Plaster's properties, as white concrete's are, in this colour on a map. */

@@ -1,0 +1,7 @@
+{
+  "type": "bleach:las_noches",
+  "biomes": "#bleach:has_structure/las_noches",
+  "spawn_overrides": {},
+  "step": "surface_structures",
+  "terrain_adaptation": "none"
+}

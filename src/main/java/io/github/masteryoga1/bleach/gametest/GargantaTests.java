@@ -309,7 +309,7 @@ public final class GargantaTests {
                 "a person fits a small tear " + GargantaRift.fits(soul, 1.0F) + "; a body " + giant.getBbHeight()
                         + " tall fits it " + GargantaRift.fits(giant, 1.0F) + " and a Gillian's "
                         + GargantaRift.fits(giant, 3.0F));
-        // Every column within r 200 of Hueco Mundo's centre stands at y 96, open to the sky.
+        // Every column the landings read here, r 133 and more from Hueco Mundo's centre, stands at y 96, open to the sky.
         Vec3 levelGround = new Vec3(0.5, 96.0, 136.5);
         at(helper, TravelEvents.huecoMundoLanding(soul, hueco, 0.0, 0.0), levelGround, "a soul from the centre lands");
         at(helper, TravelEvents.huecoMundoLanding(giant, hueco, 0.0, 0.0), levelGround, "a Gillian's body lands");

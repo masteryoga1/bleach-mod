@@ -192,6 +192,14 @@ WHITE_SANDSTONE_BAND = rgb(208, 204, 191)
 HUECO_QUARTZ = rgb(240, 241, 238)
 HUECO_QUARTZ_GRAIN = rgb(218, 220, 218)
 HUECO_QUARTZ_SEAM = rgb(196, 198, 196)
+# Las Noches' stone and tiles, a cold white brighter than the sand, the sandstone, Hueco quartz and plaster, so the
+# fortress reads apart from the ground it stands on; and its dark band.
+LAS_NOCHES = rgb(246, 247, 250)
+LAS_NOCHES_GRAIN = rgb(234, 236, 241)
+LAS_NOCHES_LIT = rgb(253, 253, 254)
+LAS_NOCHES_SEAM = rgb(210, 213, 221)
+LAS_NOCHES_TRIM = rgb(38, 38, 44)
+LAS_NOCHES_TRIM_GRAIN = rgb(48, 48, 55)
 # Seireitei's building blocks: white plaster; black plaster, a dark grey; and blue-grey fired roof tiles.
 PLASTER = rgb(240, 238, 230)
 PLASTER_GRAIN = rgb(230, 228, 219)
@@ -1859,6 +1867,38 @@ def hueco_quartz_bricks():
     return c
 
 
+def las_noches_stone():
+    """Las Noches stone: long white blocks in two courses, the lower one's joint a quarter along, with a faint grain."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, LAS_NOCHES)
+    mottle(c, 0, 0, 16, 16, LAS_NOCHES_GRAIN, 9, seed=4)
+    c.rect(0, 7, 16, 8, LAS_NOCHES_SEAM)    # the joint between the courses
+    c.rect(0, 15, 16, 16, LAS_NOCHES_SEAM)  # the bottom joint, which meets the next block's top course
+    c.rect(11, 0, 12, 7, LAS_NOCHES_SEAM)   # the upper course's upright joint
+    c.rect(3, 8, 4, 15, LAS_NOCHES_SEAM)    # the lower course's, a quarter along
+    return c
+
+
+def las_noches_tiles():
+    """Las Noches tiles: four by four square white tiles, each lit along its top edge, with pale joints between."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, LAS_NOCHES)
+    for i in (0, 4, 8, 12):
+        c.rect(0, i, 16, i + 1, LAS_NOCHES_LIT)
+    for i in (3, 7, 11, 15):
+        c.rect(0, i, 16, i + 1, LAS_NOCHES_SEAM)
+        c.rect(i, 0, i + 1, 16, LAS_NOCHES_SEAM)
+    return c
+
+
+def las_noches_trim():
+    """Las Noches trim: a near-black stone with a faint grain and no joint, so two courses read as one band."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, LAS_NOCHES_TRIM)
+    mottle(c, 0, 0, 16, 16, LAS_NOCHES_TRIM_GRAIN, 7, seed=2)
+    return c
+
+
 def white_plaster():
     """White plaster: one flat white with a faint grain in a fixed scatter."""
     c = Canvas(16, 16)
@@ -2152,6 +2192,9 @@ TEXTURES = {
     "block/hueco_quartz.png": hueco_quartz,
     "block/hueco_quartz_top.png": hueco_quartz_top,
     "block/hueco_quartz_bricks.png": hueco_quartz_bricks,
+    "block/las_noches_stone.png": las_noches_stone,
+    "block/las_noches_tiles.png": las_noches_tiles,
+    "block/las_noches_trim.png": las_noches_trim,
     "block/white_plaster.png": white_plaster,
     "block/black_plaster.png": recoloured(white_plaster, {PLASTER: BLACK_PLASTER, PLASTER_GRAIN: BLACK_PLASTER_GRAIN},
                                           "black_plaster"),

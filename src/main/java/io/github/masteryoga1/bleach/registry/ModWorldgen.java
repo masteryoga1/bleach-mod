@@ -3,6 +3,8 @@ package io.github.masteryoga1.bleach.registry;
 import com.mojang.serialization.MapCodec;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.world.gen.DangaiLaneFeature;
+import io.github.masteryoga1.bleach.world.gen.LasNochesPiece;
+import io.github.masteryoga1.bleach.world.gen.LasNochesStructure;
 import io.github.masteryoga1.bleach.world.gen.RadialDensity;
 import io.github.masteryoga1.bleach.world.gen.SeireihekiFeature;
 import io.github.masteryoga1.bleach.world.gen.SeireiteiStreetsFeature;
@@ -19,8 +21,8 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * The mod's world-generation types: its density function, its features, and the planned sites' placement, structure and
- * piece.
+ * The mod's world-generation types: its density function, its features, the planned sites' placement, structure and
+ * piece, and Las Noches' structure and piece.
  */
 public final class ModWorldgen {
     public static final DeferredRegister<MapCodec<? extends DensityFunction>> DENSITY_FUNCTION_TYPES =
@@ -54,6 +56,12 @@ public final class ModWorldgen {
     /** {@code bleach:site}'s piece. Its id is saved in chunks, so it is registered for good. */
     public static final DeferredHolder<StructurePieceType, StructurePieceType> SITE_PIECE =
             STRUCTURE_PIECES.register("site", () -> (StructurePieceType.StructureTemplateType) SitePiece::new);
+    /** {@code bleach:las_noches}, Las Noches' shell. Its id is saved in chunks, so it is registered for good. */
+    public static final DeferredHolder<StructureType<?>, StructureType<LasNochesStructure>> LAS_NOCHES =
+            STRUCTURE_TYPES.register("las_noches", () -> (StructureType<LasNochesStructure>) () -> LasNochesStructure.CODEC);
+    /** {@code bleach:las_noches}'s piece. Its id is saved in chunks, so it is registered for good. */
+    public static final DeferredHolder<StructurePieceType, StructurePieceType> LAS_NOCHES_PIECE =
+            STRUCTURE_PIECES.register("las_noches", () -> (StructurePieceType.ContextlessType) LasNochesPiece::new);
 
     private ModWorldgen() {
     }
