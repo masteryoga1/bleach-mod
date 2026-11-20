@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.locks.LockSupport;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -73,6 +74,8 @@ public final class GateTests {
     private static final String[] GATE_KEYS = {"message.bleach.place.gate.east", "message.bleach.place.gate.south",
             "message.bleach.place.gate.west", "message.bleach.place.gate.north"};
     private static final String SEIREIHEKI_KEY = "message.bleach.place.seireiheki";
+    /** How long a wait on the world's loading lets its threads run, each tick it still fails: 10 ms. */
+    private static final long PATIENCE_NANOS = 10_000_000L;
 
     private GateTests() {
     }
@@ -83,6 +86,17 @@ public final class GateTests {
     static ShakonmakuTests.Cleanup hold(GameTestHelper helper, int gate) {
         ChunkPos home = GateHouses.STAMP.startChunk(gate);
         return dropped(ShakonmakuTests.hold(helper, home.x, home.z), gate);
+    }
+
+    /**
+     * Asserts as assertTrue does, but lets the world's loading run off this thread a while first if it would fail: the
+     * test server never waits between ticks, so a time-out's ticks can pass before a house's entities have loaded.
+     */
+    static void patiently(GameTestHelper helper, boolean ready, String failure) {
+        if (!ready) {
+            LockSupport.parkNanos(PATIENCE_NANOS);
+        }
+        helper.assertTrue(ready, failure);
     }
 
     /** Asserts that this gate is laid, and stands or waits as said at this height. */
@@ -316,7 +330,7 @@ public final class GateTests {
         Cow[] cows = new Cow[3];
         helper.startSequence()
                 .thenWaitUntil(() -> assertDown(helper, gates, WEST))
-                .thenWaitUntil(() -> helper.assertTrue(gates.keeper(WEST) != null, "the west gate has no keeper yet"))
+                .thenWaitUntil(() -> patiently(helper, gates.keeper(WEST) != null, "the west gate has no keeper yet"))
                 .thenExecute(() -> {
                     for (int row = 0; row < GateState.ROWS + LIFT; row++) {
                         for (BlockPos column : GateState.columns(WEST)) {
