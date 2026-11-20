@@ -88,6 +88,7 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> LAS_NOCHES_STONE = ITEMS.registerSimpleBlockItem(ModBlocks.LAS_NOCHES_STONE);
     public static final DeferredItem<BlockItem> LAS_NOCHES_TILES = ITEMS.registerSimpleBlockItem(ModBlocks.LAS_NOCHES_TILES);
     public static final DeferredItem<BlockItem> LAS_NOCHES_TRIM = ITEMS.registerSimpleBlockItem(ModBlocks.LAS_NOCHES_TRIM);
+    public static final DeferredItem<BlockItem> LAS_NOCHES_SKY = ITEMS.registerSimpleBlockItem(ModBlocks.LAS_NOCHES_SKY);
     public static final DeferredItem<BlockItem> WHITE_PLASTER = ITEMS.registerSimpleBlockItem(ModBlocks.WHITE_PLASTER);
     public static final DeferredItem<BlockItem> BLACK_PLASTER = ITEMS.registerSimpleBlockItem(ModBlocks.BLACK_PLASTER);
     public static final DeferredItem<BlockItem> ROOF_TILES = ITEMS.registerSimpleBlockItem(ModBlocks.ROOF_TILES);
