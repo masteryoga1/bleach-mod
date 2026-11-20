@@ -23,6 +23,8 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.SpiritClip;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.LasNochesResidents;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -181,6 +183,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
     private boolean pledged;
     /** The game time it pledged, read against {@link EspadaLedger#fraccionForgottenAt}; 0 when not pledged. */
     private long pledgedAt;
+    /** Whether it lives in Las Noches' halls, put there by {@link LasNochesResidents}; see {@link #makeResident}. */
+    private boolean resident;
 
     // Server side, not saved: a reloaded NPC starts these over.
     /** The seated Espada it kneels to now, beaten; null when it does not kneel. A kneel is never saved. */
@@ -525,6 +529,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
     public void pledgeTo(Player espada) {
         pledged = true;
         pledgedAt = level().getGameTime();
+        // A Fracción follows its Espada out of the halls and is written again like any.
+        resident = false;
         setLeader(espada.getUUID());
         // A mock player in a game test is never in the level, so only the cache can find it.
         cachedLeader = espada;
@@ -646,6 +652,48 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         }
     }
 
+    // ---- Las Noches ----
+
+    /** Whether it lives in Las Noches' halls: never written, kept to the dome's floor, and no hunter of an Arrancar. */
+    public boolean isResident() {
+        return resident;
+    }
+
+    /** Makes it one of Las Noches' residents: it stays until killed and keeps to the halls ({@link #keepHome}). */
+    public void makeResident() {
+        resident = true;
+        setLeaveAt(NEVER);
+        if (level() instanceof ServerLevel server) {
+            keepHome(server);
+        }
+    }
+
+    /** Whether it hunts this creature of its own will: a pledged Fracción nothing, a resident never an Arrancar. */
+    public boolean hunts(LivingEntity target) {
+        return !pledged && ArrancarNpcLogic.isPrey(target, resident);
+    }
+
+    /** Its Cero as it fires now: a resident's breaks no block, so the halls stand whatever the server allows. */
+    public CeroBeam.Spec ceroSpec() {
+        return ArrancarNpcLogic.ceroSpec(soul(), kind(), !resident);
+    }
+
+    /**
+     * For a resident in Hueco Mundo, once a second: its bound about the dome's floor, never saved, is set again when
+     * lost, and out of it with nothing to fight, it walks back to the court.
+     */
+    private void keepHome(ServerLevel server) {
+        if (server.dimension() != BleachWorlds.HUECO_MUNDO) {
+            return;
+        }
+        if (!hasRestriction()) {
+            restrictTo(LasNochesResidents.BOUND_CENTRE, LasNochesResidents.BOUND_RADIUS);
+        }
+        if (getTarget() == null && !isWithinRestriction() && getNavigation().isDone()) {
+            getNavigation().moveTo(LasNochesResidents.COURT.x, LasNochesResidents.COURT.y, LasNochesResidents.COURT.z, 0.8);
+        }
+    }
+
     // ---- Leaving ----
 
     /** When it leaves: {@link #NEVER}, {@link #UNTIMED} or a game time. */
@@ -737,8 +785,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
     /**
      * A Sonído step along the ground this way, at most {@code distance} and its reach ({@link Sonido#distance}, less
      * under Slowness), landing at least {@code minDistance} away on footing it can stand on, past nothing solid,
-     * harmful or unloaded. Refused without AI, while riding, held, leaving, under Gritz or a Bakudō's hold, or before
-     * its cooldown is over. Returns whether it stepped.
+     * harmful or unloaded. Refused without AI, while riding, held, leaving, under Gritz or a Bakudō's hold, before its
+     * cooldown is over, or for a resident, landing out of its bound. Returns whether it stepped.
      */
     public boolean sonido(Vec3 direction, double distance, double minDistance) {
         if (!(level() instanceof ServerLevel server) || isNoAi() || !isAlive() || departing || isPassenger()
@@ -759,7 +807,7 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         FlashStep.DashPath path = FlashStep.sweep(server, this, getBoundingBox(), flat.normalize(), step, true);
         Vec3 end = path.end();
         if (!path.supported() || !Double.isFinite(end.x) || !Double.isFinite(end.y) || !Double.isFinite(end.z)
-                || end.distanceTo(start) < minDistance) {
+                || end.distanceTo(start) < minDistance || resident && !LasNochesResidents.keeps(server, end)) {
             return false;
         }
         teleportTo(end.x, end.y, end.z);
@@ -829,6 +877,9 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
             if (departing) {
                 return;
             }
+        }
+        if (resident && tickCount % 20 == 0) {
+            keepHome(server);
         }
         // Looks the leader up again if it was not found, so the goals see it as soon as it is loaded.
         leader();
@@ -932,9 +983,8 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         goalSelector.addGoal(7, new RandomLookAroundGoal(this));
         targetSelector.addGoal(1, new HurtByTargetGoal(this, ArrancarNpc.class));
         targetSelector.addGoal(2, new GuardLeaderGoal(this));
-        // A pledged Fracción hunts nothing of its own: it fights only for itself and its Espada.
-        targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false,
-                target -> !isPledged() && ArrancarNpcLogic.isPrey(target)) {
+        // A pledged Fracción hunts nothing of its own, and a resident no Arrancar: it fights only what strikes it.
+        targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false, this::hunts) {
             // Vanilla fixes the reach for players when the goal is made, before the config's follow_range is applied.
             @Override
             protected void findTarget() {
@@ -1127,7 +1177,7 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
     }
 
     /**
-     * It goes after its prey ({@link ArrancarNpcLogic#isPrey}), strikes back at whoever just hurt it, and guards its
+     * It goes after its prey ({@link #hunts}), strikes back at whoever just hurt it, and guards its
      * leader: what struck the leader just now, what the leader fights, and what it took on for the leader (kept with
      * no leader left). Never another Arrancar NPC, its leader, or a player in creative or spectator mode. Every goal
      * asks this, so a target that stops being one is dropped. Kneeling, it fights nothing. A pledged Fracción has no
@@ -1144,7 +1194,7 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         if (yieldedTo != null || (pledged && !mayHarmForEspada(target))) {
             return false;
         }
-        if ((!pledged && ArrancarNpcLogic.isPrey(target)) || target == getLastHurtByMob() || target == guarding) {
+        if (hunts(target) || target == getLastHurtByMob() || target == guarding) {
             return true;
         }
         LivingEntity leader = leader();
@@ -1197,6 +1247,15 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
             EspadaLedger.get(server.getServer()).removeMember(leaderId, getUUID());
         }
         super.remove(reason);
+    }
+
+    /**
+     * A resident is never written: it goes when its chunk unloads or the world closes, and the halls fill again in time.
+     * It still counts as one to save, so an unloading chunk takes it away rather than leaving it frozen there.
+     */
+    @Override
+    public boolean saveAsPassenger(CompoundTag tag) {
+        return !resident && super.saveAsPassenger(tag);
     }
 
     /**
@@ -1337,13 +1396,14 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         tag.putLong("LeaveAt", leaveAt);
         tag.putBoolean("RecallRolled", recallRolled);
         tag.putBoolean("Dressed", dressed);
+        tag.putBoolean("Resident", resident);
     }
 
     /**
      * Every key is read leniently: a missing or bad rank reads as none (and is repaired on the first tick), an Espada
-     * seat as that seat's Privaron number, a missing time as {@link #NEVER}, a missing pledge as none (so an NPC from
-     * before the Fracción loads as it was). The config's body is applied again on the first tick. A kneel and an armed
-     * dismiss are never saved.
+     * seat as that seat's Privaron number, a missing time as {@link #NEVER}, a missing pledge or residence as none (so
+     * an NPC from before them loads as it was), and a resident to stay ({@link #makeResident}). The config's body is
+     * applied again on the first tick. A kneel and an armed dismiss are never saved.
      */
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
@@ -1359,6 +1419,10 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         leaveAt = tag.contains("LeaveAt", Tag.TAG_ANY_NUMERIC) ? tag.getLong("LeaveAt") : NEVER;
         recallRolled = tag.getBoolean("RecallRolled");
         dressed = tag.getBoolean("Dressed");
+        resident = tag.getBoolean("Resident");
+        if (resident) {
+            leaveAt = NEVER;
+        }
         endYield();
         dismissArmedUntil = -1L;
         lastDismissUse = -1L;
@@ -1408,7 +1472,7 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
             if (dx * dx + dz * dz < minRange * minRange) {
                 return false;
             }
-            CeroBeam.Spec next = ArrancarNpcLogic.ceroSpec(npc.soul(), npc.kind());
+            CeroBeam.Spec next = npc.ceroSpec();
             Vec3 muzzle = npc.ceroMuzzle(1.0F);
             if (muzzle.distanceToSqr(target.getBoundingBox().getCenter()) > next.range() * next.range()
                     || !npc.hasLineOfSight(target)) {
@@ -1430,7 +1494,7 @@ public class ArrancarNpc extends Monster implements CeroBeam.Caster, OwnableEnti
         @Override
         public void start() {
             lockedLook = null;
-            CeroBeam.Spec use = spec != null ? spec : ArrancarNpcLogic.ceroSpec(npc.soul(), npc.kind());
+            CeroBeam.Spec use = spec != null ? spec : npc.ceroSpec();
             spec = use;
             beam = npc.level() instanceof ServerLevel level ? CeroBeam.charge(level, npc, use) : null;
             if (beam == null) {

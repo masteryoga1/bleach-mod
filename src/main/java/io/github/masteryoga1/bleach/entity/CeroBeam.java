@@ -4,7 +4,6 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
-import io.github.masteryoga1.bleach.soul.ArrancarNpcLogic;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.KidoWard;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -708,11 +707,11 @@ public class CeroBeam extends Entity {
      * and never another Hollow, a Plus (spirit or player), a player in creative or spectator mode, or
      * anything it is allied to. So the mundane creatures about, the Academy's instructor and every Plus
      * are spared: a Plus is to be eaten, not blasted. An Arrancar NPC's (its Bala too, whose owner it is)
-     * strikes likewise only its target, whatever last hurt it, or its prey ({@link ArrancarNpcLogic#isPrey}),
-     * and never another Arrancar NPC, its leader, a Plus, a Shinigami or Quincy NPC, or a player in creative or
-     * spectator mode; a player's pledged Fracción has no prey of its own and spares what its Espada may not harm
-     * ({@link ArrancarNpc#mayHarmForEspada}). Anyone else's Cero keeps the rules of every soul's projectiles
-     * ({@link SpiritProjectiles#mayStrike}).
+     * strikes likewise only its target, whatever last hurt it, or its prey ({@link ArrancarNpc#hunts}: a resident of
+     * Las Noches hunts no Arrancar), and never another Arrancar NPC, its leader, a Plus, a Shinigami or Quincy NPC, or
+     * a player in creative or spectator mode; a player's pledged Fracción has no prey of its own and spares what its
+     * Espada may not harm ({@link ArrancarNpc#mayHarmForEspada}). Anyone else's Cero keeps the rules of every soul's
+     * projectiles ({@link SpiritProjectiles#mayStrike}).
      */
     public static boolean mayStrike(@Nullable Entity owner, LivingEntity target) {
         if (owner instanceof ArrancarNpc npc) {
@@ -727,8 +726,7 @@ public class CeroBeam extends Entity {
             if (npc.isPledged() && !npc.mayHarmForEspada(target)) {
                 return false;
             }
-            return target == npc.getTarget() || target == npc.getLastHurtByMob()
-                    || !npc.isPledged() && ArrancarNpcLogic.isPrey(target);
+            return target == npc.getTarget() || target == npc.getLastHurtByMob() || npc.hunts(target);
         }
         if (!(owner instanceof Hollow hollow)) {
             return SpiritProjectiles.mayStrike(owner, target);

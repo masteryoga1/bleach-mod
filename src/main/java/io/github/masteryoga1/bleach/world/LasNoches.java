@@ -1,12 +1,14 @@
 package io.github.masteryoga1.bleach.world;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.soul.SafeLanding;
 import io.github.masteryoga1.bleach.soul.TravelEvents;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -32,7 +34,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * made since each was added with structures on, and two stamps lay them a chunk at a time into chunks made before, or
  * with structures off, the halls once the shell stands about the chunk. A soul or creature the shell or the halls are
  * laid over, or that the shell shuts in where the halls do not yet stand, is set down outside the wall, as a Garganta
- * sets one down.
+ * sets one down. An Arrancar with no spawn of its own wakes on the court's floor ({@link #wakeSpot}).
  */
 public final class LasNoches {
     /** Its structure, whose one piece lays the plan's shell. */
@@ -50,6 +52,9 @@ public final class LasNoches {
     public static final SiteStamp HALLS_STAMP = SiteStamp.chunkwise(BleachWorlds.HUECO_MUNDO, HALLS,
             "Las Noches' halls in Hueco Mundo", HOME, HuecoMundoPlan.HALLS_BOX, LasNoches::hallsPlaced,
             LasNoches::shellAround);
+    /** Where an Arrancar wakes inside, in this order: the court's floor in the centre's chunk, about the tower's foot. */
+    public static final List<Vec3> WAKE_SPOTS = List.of(new Vec3(12.5, HuecoMundoPlan.LEVEL_Y, 12.5),
+            new Vec3(0.5, HuecoMundoPlan.LEVEL_Y, 12.5), new Vec3(12.5, HuecoMundoPlan.LEVEL_Y, 0.5));
     /** How many ticks a soul that joined in the shell's box waits for the chunks under it to load before it is let be. */
     private static final int JOIN_WAIT = 600;
     /**
@@ -133,8 +138,32 @@ public final class LasNoches {
         if (!HuecoMundoPlan.enclosed(x, y, z)) {
             return false;
         }
+        return !hallsStand(level, level.getChunk(x >> 4, z >> 4));
+    }
+
+    /** Whether the halls stand in this chunk, by its reference to them; never where their structure is missing. */
+    public static boolean hallsStand(ServerLevel level, ChunkAccess chunk) {
         Structure halls = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(HALLS);
-        return halls == null || !level.getChunk(x >> 4, z >> 4).getReferencesForStructure(halls).contains(HOME.toLong());
+        return halls != null && chunk.getReferencesForStructure(halls).contains(HOME.toLong());
+    }
+
+    /**
+     * Where a soul wakes inside the dome: the shell in the centre's chunk and the 8 beside it, then the halls in the
+     * centre's chunk, laid now where they are not yet, then the first wake spot where a soul can stand on the floor under
+     * the dome; null if none will hold it.
+     */
+    @Nullable
+    public static Vec3 wakeSpot(Entity soul, ServerLevel level) {
+        ChunkPos.rangeClosed(HOME, 1).forEach(pos -> STAMP.layNow(level, pos));
+        HALLS_STAMP.layNow(level, HOME);
+        for (Vec3 spot : WAKE_SPOTS) {
+            Vec3 landed = SafeLanding.landingSpot(soul, level, spot);
+            // Through a floor dug out, it would drop into the Forest of Menos.
+            if (landed != null && HuecoMundoPlan.enclosed(Mth.floor(landed.x), Mth.floor(landed.y), Mth.floor(landed.z))) {
+                return landed;
+            }
+        }
+        return null;
     }
 
     /**

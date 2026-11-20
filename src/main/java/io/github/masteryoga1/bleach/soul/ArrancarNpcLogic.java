@@ -112,6 +112,11 @@ public final class ArrancarNpcLogic {
                 BleachConfig.get(BleachConfig.HUNT_UNAWARE));
     }
 
+    /** As {@link #isPrey(LivingEntity)}; a resident of Las Noches hunts no Arrancar player, whatever the server allows. */
+    public static boolean isPrey(LivingEntity target, boolean resident) {
+        return isPrey(target) && !(resident && SoulLogic.get((Player) target).state() == SoulState.ARRANCAR);
+    }
+
     /** Whether Arrancar may come through a Garganta for this soul: one they hunt, with at least {@code min_reiatsu}. */
     public static boolean mayComeFor(SoulData drawer) {
         return huntsSoul(drawer, BleachConfig.get(BleachConfig.HUNT_HOLLOW_PLAYERS),
@@ -152,16 +157,16 @@ public final class ArrancarNpcLogic {
 
     /**
      * An Arrancar NPC's Cero: the Cero of the form its soul rose from ({@link HollowCero#spec}), with its kind's damage
-     * (times {@code damage_multiplier}) and gather, the NPCs' reach and aim lock, and blasting blocks only where both
-     * {@code [arrancar.npc] cero_breaks_blocks} and {@code [menos] cero_breaks_blocks} allow. The width, the blast,
-     * the blocks, the knockback and the red stay the form's.
+     * (times {@code damage_multiplier}) and gather, the NPCs' reach and aim lock, and blasting blocks only where
+     * {@code mayBreak} (never for a resident of Las Noches), {@code [arrancar.npc] cero_breaks_blocks} and
+     * {@code [menos] cero_breaks_blocks} allow. The width, the blast, the blocks, the knockback and the red stay the form's.
      */
-    public static CeroBeam.Spec ceroSpec(SoulData soul, ArrancarRank.Kind kind) {
+    public static CeroBeam.Spec ceroSpec(SoulData soul, ArrancarRank.Kind kind, boolean mayBreak) {
         CeroBeam.Spec form = HollowCero.spec(soul, ArrancarLogic.origin(soul));
         BleachConfig.ArrancarNpcKind numbers = numbers(kind);
         float damage = (float) (BleachConfig.get(numbers.ceroDamage())
                 * BleachConfig.get(BleachConfig.ARRANCAR_NPC_DAMAGE_MULTIPLIER));
-        boolean breaksBlocks = BleachConfig.get(BleachConfig.ARRANCAR_NPC_CERO_BREAKS_BLOCKS)
+        boolean breaksBlocks = mayBreak && BleachConfig.get(BleachConfig.ARRANCAR_NPC_CERO_BREAKS_BLOCKS)
                 && BleachConfig.get(BleachConfig.CERO_BREAKS_BLOCKS);
         return new CeroBeam.Spec(damage, BleachConfig.get(BleachConfig.ARRANCAR_NPC_CERO_RANGE), form.radius(),
                 form.blastRadius(), form.blastShare(), form.maxBlocks(), form.knockback(), form.colour(),

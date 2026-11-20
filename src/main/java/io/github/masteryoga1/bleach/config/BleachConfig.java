@@ -746,6 +746,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.BooleanValue DISTRICT_NAMES;
     public static final ModConfigSpec.DoubleValue HUECO_MUNDO_HUNGER_SHARE;
     public static final ModConfigSpec.BooleanValue HUECO_MUNDO_NATURAL_SPAWNS;
+    public static final ModConfigSpec.IntValue HUECO_MUNDO_RESIDENTS;
+    public static final ModConfigSpec.IntValue HUECO_MUNDO_RESIDENT_SECONDS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -3030,8 +3032,9 @@ public final class BleachConfig {
                 .defineInRange("konso_inner_bias", 2.0, 1.0, 10.0);
         HOME_WORLD_RESPAWN = builder
                 .comment("Whether a soul with no spawn of its own can wake in its home world when it dies: in Soul Society,"
-                        + " at the place that is home to a soul of its kind, or in Hueco Mundo for a Gillian, Adjuchas or"
-                        + " Vasto Lorde Hollow or an Arrancar; off, every soul wakes where vanilla puts it.")
+                        + " at the place that is home to a soul of its kind, or in Hueco Mundo, outside Las Noches for a"
+                        + " Gillian, Adjuchas or Vasto Lorde Hollow and inside it for an Arrancar; off, every soul wakes"
+                        + " where vanilla puts it.")
                 .define("home_world_respawn", true);
         DISTRICT_NAMES = builder
                 .comment("Whether the action bar names the place a soul comes into in Soul Society: Seireitei, the"
@@ -3050,6 +3053,14 @@ public final class BleachConfig {
                         + " white sand, Gillian and Adjuchas on the Forest of Menos's white sandstone, none in Peaceful."
                         + " Hueco Mundo holds at most [menos] max_alive Menos of its own, apart from the Human World's.")
                 .define("natural_spawns", true);
+        HUECO_MUNDO_RESIDENTS = builder
+                .comment("How many Números live in Las Noches' halls at once, counted in loaded chunks (0 for none). One"
+                        + " comes at a time onto the halls' floor, out of every soul's sight, never in Peaceful or with mob"
+                        + " spawning off; none is saved, so the halls fill again as souls come back.")
+                .defineInRange("residents", 6, 0, 24);
+        HUECO_MUNDO_RESIDENT_SECONDS = builder
+                .comment("Seconds between looks for a place for one more resident, while any soul is in Hueco Mundo.")
+                .defineInRange("resident_seconds", 20, 5, 600);
         builder.pop();
 
         SPEC = builder.build();

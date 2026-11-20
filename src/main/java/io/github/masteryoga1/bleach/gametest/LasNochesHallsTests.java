@@ -114,7 +114,7 @@ public final class LasNochesHallsTests {
     }
 
     /** Whether this chunk holds this structure's reference from the centre's chunk, as worldgen and the stamps leave it. */
-    private static boolean marked(ServerLevel hueco, ResourceKey<Structure> key, ChunkPos pos) {
+    static boolean marked(ServerLevel hueco, ResourceKey<Structure> key, ChunkPos pos) {
         Structure structure = hueco.registryAccess().registryOrThrow(Registries.STRUCTURE).get(key);
         return hueco.getChunk(pos.x, pos.z).getReferencesForStructure(structure).contains(LasNoches.HOME.toLong());
     }
@@ -135,8 +135,8 @@ public final class LasNochesHallsTests {
      * Asserts that every cell of this chunk's column from the floor to the shell's top holds what the shell, then the
      * halls if {@code halls}, lay there; counts each kind of the halls' cells.
      */
-    private static Map<HuecoMundoPlan.Hall, Integer> assertLaid(GameTestHelper helper, ServerLevel hueco, ChunkPos pos,
-                                                               boolean halls) {
+    static Map<HuecoMundoPlan.Hall, Integer> assertLaid(GameTestHelper helper, ServerLevel hueco, ChunkPos pos,
+                                                       boolean halls) {
         Map<HuecoMundoPlan.Hall, Integer> laid = new EnumMap<>(HuecoMundoPlan.Hall.class);
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
         for (int x = pos.getMinBlockX(); x <= pos.getMaxBlockX(); x++) {
@@ -159,8 +159,8 @@ public final class LasNochesHallsTests {
      * lets them go, discards what the test set down, sets the shell's and the halls' cells of the chunks it clears back to
      * the level ground, air over white sand, and takes both references away.
      */
-    private record Hold(ServerLevel hueco, List<ChunkPos> centres, List<Integer> radii, List<ChunkPos> cleared,
-                        List<Entity> placed) implements GameTestListener {
+    record Hold(ServerLevel hueco, List<ChunkPos> centres, List<Integer> radii, List<ChunkPos> cleared,
+                List<Entity> placed) implements GameTestListener {
         static Hold hold(GameTestHelper helper, ServerLevel hueco, List<ChunkPos> centres, int radius,
                          List<ChunkPos> cleared) {
             Hold hold = new Hold(hueco, new ArrayList<>(), new ArrayList<>(), cleared, new ArrayList<>());
