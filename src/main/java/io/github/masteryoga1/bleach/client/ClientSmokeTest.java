@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.client;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.AcademyInstructor;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
@@ -61,6 +62,7 @@ import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.DangaiPlan;
 import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
+import io.github.masteryoga1.bleach.world.LasNoches;
 import io.github.masteryoga1.bleach.world.MoonPhases;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
@@ -88,6 +90,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -98,10 +102,12 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.util.FastColor;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
@@ -119,6 +125,7 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -250,17 +257,19 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * down before it, must reach the client. Made an Arrancar by command on Seireitei's plateau, it holds the Gate key: the
  * action bar must say the air is torn at, and a Garganta of a person's size must open 1.8 blocks ahead, level with its
  * feet. Moved into it, it must come out on white sand on Las Noches' level ground in Hueco Mundo at exactly y 96, under
- * a black sky with the moon full overhead where the Overworld's is new. There, in creative, the key must tear a second
- * Garganta open the same way, and moved into it in survival, the soul must come out in the Overworld on the block it
- * last left the Overworld from by a gate, the third, before the run quits.
+ * a black sky with the moon full overhead where the Overworld's is new. Moved into Las Noches' court, once the dome's
+ * lining, the court's tiles and their light reach the client, the frame's centre must turn the sky's blue and the floor's
+ * light white; it looks up at the lit ceiling and goes back to the level ground. There, in creative, the key must tear a
+ * second Garganta open the same way, and moved into it in survival, the soul must come out in the Overworld on the block
+ * it last left the Overworld from by a gate, the third, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, dunes and moon, and HUD are drawn, and
- * screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and so does
- * anything that did not reach the client as expected.
+ * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, dunes and moon, Las Noches' sky, and HUD are
+ * drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and
+ * so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -289,6 +298,16 @@ public final class ClientSmokeTest {
     private static final double LANE_END_Z = DangaiPlan.EXIT_Z - 1.5;
     /** Where the player stands in Hueco Mundo: on Las Noches' level ground, 4.5 blocks inside its edge, due south. */
     private static final double HUECO_MUNDO_X = 0.5, HUECO_MUNDO_Z = HuecoMundoPlan.LEVEL_RADIUS - 4.5;
+    /** Where the player stands in Las Noches' court, on the tiles south-east of the fifth tower's foot. */
+    private static final Vec3 COURT = new Vec3(12.5, HuecoMundoPlan.LEVEL_Y, 12.5);
+    /** The dome's lining due west of the court, 70 blocks off and past the fog's end, and the court's tiles underfoot. */
+    private static final BlockPos COURT_LINING = new BlockPos(-58, 97, 12), COURT_FLOOR = new BlockPos(12, 95, 12);
+    /** The halls' floor at its dimmest: the lightmap's cell for this block light and no sky light. */
+    private static final int LIT_BLOCK = 7;
+    /** The lightmap's texture, as vanilla names the one its renderer registers. */
+    private static final ResourceLocation LIGHT_MAP = ResourceLocation.withDefaultNamespace("dynamic/light_map_1");
+    /** How long the sky beat may hold the clock at one of its steps before the run fails: 30 seconds. */
+    private static final int SKY_WAIT_TICKS = 600;
     /** How far south of an Arrancar its Garganta stands, and how far back it steps to see the whole tear. */
     private static final double RIFT_AHEAD = 0.3 + 1.0 + GargantaRift.PASSAGE_GAP, RIFT_STEP_BACK = 6.0;
     /** Where on Seireitei's plateau the Arrancar tears its Garganta: its tear stands over Hueco Mundo's arrival spot. */
@@ -334,6 +353,8 @@ public final class ClientSmokeTest {
     private static int bloodlineWaitTicks;
     /** How many ticks the clock has waited for the server before the Soul Society checks' last ticks. */
     private static int serverWaitTicks;
+    /** How many ticks the sky beat has held the clock at its current step. */
+    private static int skyWaitTicks;
     /** The first tick of each {@link #expectWithin} window that has already passed. */
     private static final Set<Integer> windowsPassed = new HashSet<>();
     /** When the player was sent into the third gate, by the clock and by the server's own tick count. */
@@ -448,7 +469,9 @@ public final class ClientSmokeTest {
         }
         LocalPlayer player = minecraft.player;
         SoulData soul = player.getData(SoulAttachments.SOUL);
-        if (waitsForServer(minecraft, player)) {
+        // The clock waits for a server that sends late before the Soul Society checks' last ticks, and the sky beat holds
+        // it at its steps until the court is drawn under the dome's sky, or the sand is reached.
+        if (waitsForServer(minecraft, player) || skyHeld(minecraft, player)) {
             return;
         }
         // The steps wait for the bloodline answer: the first one makes a Plus, who is never asked.
@@ -1627,8 +1650,12 @@ public final class ClientSmokeTest {
             // inside its edge.
             case GARGANTA_STEP_IN_TICK -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f", HUECO_MUNDO_X,
                     SeireiteiPlan.PLATEAU_Y, HUECO_MUNDO_Z));
-            // Facing south over the slope to the dunes, whatever rotation the landing kept.
-            case 8520 -> command(minecraft, "tp @s ~ ~ ~ 0 0");
+            // Facing south over the slope to the dunes, whatever rotation the landing kept. The centre's 9 by 9 chunks are
+            // held from now, so they are made with Las Noches' shell and halls and lit in the 200 ticks before the court.
+            case 8520 -> {
+                command(minecraft, "tp @s ~ ~ ~ 0 0");
+                holdCentre(minecraft, true);
+            }
             // The slope and the dunes beyond have had a hundred and eighty ticks or more to reach the client and be
             // drawn. The hand and the HUD are hidden for the shot, as in the blocks beat, so the held item covers none of
             // the plain.
@@ -1651,30 +1678,54 @@ public final class ClientSmokeTest {
                 shot(minecraft, "hueco_mundo_moon");
                 minecraft.options.hideGui = false;
             }
+            // Out on the sand the halls' dimmest light is still the night's, warm.
+            case 8692 -> {
+                int[] lit = lightmapCell(minecraft);
+                expect(minecraft, HuecoMundoEffects.tint(1.0F) == 0.0F && lit[0] - lit[2] >= 20,
+                        "on Hueco Mundo's sand the light is not the night's (tint " + HuecoMundoEffects.tint(1.0F)
+                                + ", the lightmap's cell " + Arrays.toString(lit) + ")");
+            }
+            // Into Las Noches' court, facing west along the floor to the lining, level, in first person since 8210.
+            case 8693 -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f 90 0", COURT.x,
+                    HuecoMundoPlan.LEVEL_Y, COURT.z));
+            case 8712 -> {
+                minecraft.getToasts().clear();
+                minecraft.options.hideGui = true;
+            }
+            // 8720 is held (skyHeld) until the court is drawn under the dome's sky; then a look up at the lit ceiling.
+            case 8780 -> command(minecraft, "tp @s ~ ~ ~ 90 -30");
+            case 8790 -> {
+                shot(minecraft, "las_noches_sky");
+                minecraft.options.hideGui = false;
+            }
+            // Back to the level ground for the tear home; 8799 is held until it stands on the sand there.
+            case 8792 -> command(minecraft, String.format(Locale.ROOT, "tp @s %.1f %d %.1f 0 0", HUECO_MUNDO_X,
+                    HuecoMundoPlan.LEVEL_Y, HUECO_MUNDO_Z));
             // The tear home: facing south again, in creative, as the first tear's wait still runs and creative never
-            // waits or pays. The last action-bar line is forgotten, so the window from 8707 needs a new one.
-            case 8695 -> {
+            // waits or pays. The last action-bar line is forgotten, so the window from 8812 needs a new one.
+            case 8800 -> {
                 command(minecraft, "tp @s ~ ~ ~ 0 0");
                 command(minecraft, "gamemode creative");
                 actionBar = null;
             }
-            // Pressed about 8706, the Garganta opens about 8726, 1.8 blocks south, at (0.5, 96, 197.3).
-            case 8705 -> GateKeys.OPEN.setDown(true);
-            case 8745 -> GateKeys.OPEN.setDown(false);
+            // Pressed about 8811, the Garganta opens about 8831, 1.8 blocks south, at (0.5, 96, 197.3).
+            case 8810 -> GateKeys.OPEN.setDown(true);
+            case 8850 -> GateKeys.OPEN.setDown(false);
             // Six blocks back, still on the level ground, so the whole tear stands in view against the dunes. The hand
             // and the HUD are hidden for the shot, as in the blocks beat.
-            case 8750 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~-%.1f", RIFT_STEP_BACK));
-            case 8755 -> minecraft.options.hideGui = true;
-            case 8760 -> {
+            case 8855 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~-%.1f", RIFT_STEP_BACK));
+            case 8860 -> minecraft.options.hideGui = true;
+            case 8865 -> {
                 shot(minecraft, "garganta_passage");
                 minecraft.options.hideGui = false;
             }
             // Survival again before it steps in, so the pass runs by survival's rules.
-            case 8762 -> command(minecraft, "gamemode survival");
-            // Into it: 11 ticks inside pass it, about 8775, to the block the third gate was taken from.
-            case 8764 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~%.1f", RIFT_STEP_BACK + RIFT_AHEAD));
-            case 8875 -> {
+            case 8867 -> command(minecraft, "gamemode survival");
+            // Into it: 11 ticks inside pass it, about 8880, to the block the third gate was taken from.
+            case 8869 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~%.1f", RIFT_STEP_BACK + RIFT_AHEAD));
+            case 8980 -> {
                 holdHuecoMundo(minecraft, false);
+                holdCentre(minecraft, false);
                 finished = true;
                 BleachMod.LOGGER.info(PASSED);
                 minecraft.stop();
@@ -2408,15 +2459,15 @@ public final class ClientSmokeTest {
                         + player.position() + ", under " + minecraft.level.effects().getClass().getSimpleName()
                         + " in moon phase " + minecraft.level.getMoonPhase() + "; the action bar's last lines: "
                         + recentActionBar() + ")");
-        expectWithin(minecraft, 8707, 8725, () -> actionBarShows(Component.translatable("message.bleach.garganta.turning")),
+        expectWithin(minecraft, 8812, 8830, () -> actionBarShows(Component.translatable("message.bleach.garganta.turning")),
                 "on Las Noches' level ground, holding the Gate key never tore at the air (the action bar's last lines: "
                         + recentActionBar() + ")");
-        expectWithin(minecraft, 8728, 8749, () -> riftAhead(minecraft, player),
+        expectWithin(minecraft, 8833, 8854, () -> riftAhead(minecraft, player),
                 "the torn air never opened a Garganta 1.8 blocks south of the Arrancar in Hueco Mundo (the action bar's"
                         + " last lines: " + recentActionBar() + ")");
         // Home to the bottom centre of the block the third gate was taken from, 2 blocks south of the first gate's.
         Vec3 home = gargantaHome();
-        expectWithin(minecraft, 8768, 8865, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
+        expectWithin(minecraft, 8873, 8970, () -> minecraft.level.dimension() == Level.OVERWORLD && player.isAlive()
                         && player.onGround() && horizontalDistance(player.position(), home) < 0.01
                         && Math.abs(player.getY() - home.y) < 0.01,
                 "the Garganta never brought the Arrancar home to where it last left the Overworld (it is in "
@@ -2864,6 +2915,101 @@ public final class ClientSmokeTest {
                 server.overworld().getChunkSource().removeRegionTicket(TicketType.FORCED, home, 1, home);
             }
         });
+    }
+
+    /**
+     * Holds (or lets go of) Hueco Mundo's centre, the 9 by 9 chunks about Las Noches' fifth tower that the court's view
+     * needs, with a forced ticket, as {@link #holdArrival} does for Soul Society.
+     */
+    private static void holdCentre(Minecraft minecraft, boolean hold) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        if (server == null) {
+            return;
+        }
+        server.execute(() -> {
+            ServerLevel level = server.getLevel(BleachWorlds.HUECO_MUNDO);
+            if (level != null && hold) {
+                level.getChunkSource().addRegionTicket(TicketType.FORCED, LasNoches.HOME, 4, LasNoches.HOME);
+            } else if (level != null) {
+                level.getChunkSource().removeRegionTicket(TicketType.FORCED, LasNoches.HOME, 4, LasNoches.HOME);
+            }
+        });
+    }
+
+    /**
+     * Whether the clock waits at a step of the sky beat: at 8720 until the court is drawn under the dome's sky, at 8799
+     * until the player stands on the sand again. Past {@link #SKY_WAIT_TICKS} the run fails, saying what it waited on.
+     */
+    private static boolean skyHeld(Minecraft minecraft, LocalPlayer player) {
+        Vec3 sand = new Vec3(HUECO_MUNDO_X, HuecoMundoPlan.LEVEL_Y, HUECO_MUNDO_Z);
+        String missing = switch (ticksInWorld) {
+            case 8720 -> courtMissing(minecraft, player);
+            case 8799 -> standsOn(player, sand)
+                    && minecraft.level.getBlockState(player.blockPosition().below()).is(ModBlocks.WHITE_SAND.get()) ? null
+                    : "the player never stood on the white sand again at " + sand + " (it is at " + player.position() + ")";
+            default -> null;
+        };
+        if (missing == null) {
+            skyWaitTicks = 0;
+            return false;
+        }
+        if (++skyWaitTicks > SKY_WAIT_TICKS) {
+            fail(minecraft, missing);
+        }
+        return true;
+    }
+
+    /**
+     * What the court still lacks of the dome's sky, or null once the player stands there, the client holds the lining,
+     * the tiles and their light, the tint has fully come, the frame's centre is the sky's blue and the floor's light white.
+     */
+    @Nullable
+    private static String courtMissing(Minecraft minecraft, LocalPlayer player) {
+        ClientLevel level = minecraft.level;
+        if (level.dimension() != BleachWorlds.HUECO_MUNDO || !standsOn(player, COURT)) {
+            return "the player never stood in Las Noches' court (it is in " + level.dimension().location() + " at "
+                    + player.position() + ")";
+        }
+        int light = level.getBrightness(LightLayer.BLOCK, COURT_FLOOR.above(2));
+        if (!level.getBlockState(COURT_LINING).is(ModBlocks.LAS_NOCHES_SKY.get())
+                || !level.getBlockState(COURT_FLOOR).is(ModBlocks.LAS_NOCHES_TILES.get()) || light < LIT_BLOCK) {
+            return "the client never held the dome's lining at " + COURT_LINING.toShortString() + " ("
+                    + level.getBlockState(COURT_LINING) + ") and the court's tiles at " + COURT_FLOOR.toShortString()
+                    + " (" + level.getBlockState(COURT_FLOOR) + ") lit " + LIT_BLOCK + " or more (" + light + ")";
+        }
+        if (HuecoMundoEffects.tint(0.0F) < 1.0F || HuecoMundoEffects.tint(1.0F) < 1.0F) {
+            return "the dome's sky never fully came in the court (its tint " + HuecoMundoEffects.tint(1.0F) + ")";
+        }
+        int[] sky = centrePixel(minecraft), lit = lightmapCell(minecraft);
+        boolean blue = Math.abs(sky[0] - 128) <= 3 && Math.abs(sky[1] - 176) <= 3 && Math.abs(sky[2] - 232) <= 3;
+        return blue && Math.abs(lit[0] - lit[2]) <= 2 && lit[0] >= 200 ? null : "under the dome the frame's centre is "
+                + Arrays.toString(sky) + ", not the sky's [128, 176, 232], or the floor's light " + Arrays.toString(lit)
+                + " is not a bright white";
+    }
+
+    /** Whether the player stands on the ground at this spot, within half a block across and at its height. */
+    private static boolean standsOn(LocalPlayer player, Vec3 spot) {
+        return player.onGround() && horizontalDistance(player.position(), spot) < 0.5
+                && Math.abs(player.getY() - spot.y) < 0.01;
+    }
+
+    /** The red, green and blue at the centre of the last frame drawn. */
+    private static int[] centrePixel(Minecraft minecraft) {
+        try (NativeImage frame = Screenshot.takeScreenshot(minecraft.getMainRenderTarget())) {
+            return rgb(frame.getPixelRGBA(frame.getWidth() / 2, frame.getHeight() / 2));
+        }
+    }
+
+    /** The red, green and blue of the lightmap's cell for {@link #LIT_BLOCK} and no sky light, or -1s with no lightmap. */
+    private static int[] lightmapCell(Minecraft minecraft) {
+        AbstractTexture texture = minecraft.getTextureManager().getTexture(LIGHT_MAP, null);
+        NativeImage pixels = texture instanceof DynamicTexture dynamic ? dynamic.getPixels() : null;
+        return pixels == null ? new int[] {-1, -1, -1} : rgb(pixels.getPixelRGBA(LIT_BLOCK, 0));
+    }
+
+    /** The red, green and blue of a pixel as a NativeImage holds it. */
+    private static int[] rgb(int abgr) {
+        return new int[] {FastColor.ABGR32.red(abgr), FastColor.ABGR32.green(abgr), FastColor.ABGR32.blue(abgr)};
     }
 
     /** Whether the integrated server's own copy of the soul has this spell chosen, read on its thread. */

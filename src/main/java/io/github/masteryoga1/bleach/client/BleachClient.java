@@ -100,6 +100,8 @@ public final class BleachClient {
         HollowPlayerClient.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(MenosPlayerRenderer::onRenderPlayer);
         NeoForge.EVENT_BUS.addListener(BleachClient::onClientTick);
+        // The sky under Las Noches' dome, ticked before the smoke test so its beat reads this tick's tint.
+        HuecoMundoEffects.registerTint(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onClientTickPre);
         NeoForge.EVENT_BUS.addListener(ReishiFootingClient::onPlayerTickPre);
         NeoForge.EVENT_BUS.addListener(BleachClient::onRenderLiving);
