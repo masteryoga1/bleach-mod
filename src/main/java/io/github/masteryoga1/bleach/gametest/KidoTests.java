@@ -376,7 +376,7 @@ public final class KidoTests {
     }
 
     /** Runs the body with this setting on or off, and puts it back, so it changes only within this one tick. */
-    private static void withConfig(ModConfigSpec.BooleanValue value, boolean set, Runnable body) {
+    static void withConfig(ModConfigSpec.BooleanValue value, boolean set, Runnable body) {
         boolean before = BleachConfig.get(value);
         value.set(set);
         try {

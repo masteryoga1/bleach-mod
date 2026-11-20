@@ -81,6 +81,11 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
     /** What this NPC says to a visitor with this soul. */
     public abstract DialogueView viewFor(SoulData visitor, long now);
 
+    /** What this NPC says to this visitor: by its soul alone, unless the NPC knows the visitor (see DutyShinigami). */
+    public DialogueView viewFor(Player visitor, SoulData data, long now) {
+        return viewFor(data, now);
+    }
+
     /** The part of {@code screen.bleach.dialogue.<npc>.<view>} that names this NPC. */
     @Override
     public abstract String dialogueKey();
@@ -98,10 +103,14 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
     /** The motes of light and the sound of a Shinigami passing between worlds, where this one stands. */
     public void showPassage() {
         if (level() instanceof ServerLevel serverLevel) {
-            serverLevel.sendParticles(ParticleTypes.END_ROD, getX(), getY() + 0.8, getZ(), 12, 0.3, 0.5, 0.3, 0.02);
-            serverLevel.playSound(null, getX(), getY(), getZ(), SoundEvents.SOUL_ESCAPE.value(), SoundSource.NEUTRAL,
-                    1.0F, 1.0F);
+            showPassage(serverLevel, getX(), getY(), getZ());
         }
+    }
+
+    /** The same motes and sound of a passing between worlds at this spot: a Shinigami's, or a soul's it sends home. */
+    public static void showPassage(ServerLevel level, double x, double y, double z) {
+        level.sendParticles(ParticleTypes.END_ROD, x, y + 0.8, z, 12, 0.3, 0.5, 0.3, 0.02);
+        level.playSound(null, x, y, z, SoundEvents.SOUL_ESCAPE.value(), SoundSource.NEUTRAL, 1.0F, 1.0F);
     }
 
     /**
@@ -156,7 +165,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
                 .map(art -> ShinigamiLogic.graduationRequirements().get(art))
                 .toList();
         List<NpcAction> unready = unreadyFor(visitor, data, now);
-        BleachNetwork.openDialogue(visitor, this, viewFor(data, now), required, unready, List.of());
+        BleachNetwork.openDialogue(visitor, this, viewFor(visitor, data, now), required, unready, List.of());
     }
 
     /**
@@ -187,7 +196,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
             return;
         }
         SoulData data = SoulLogic.get(visitor);
-        if (!SoulLogic.isAware(data) || !action.allowedIn(viewFor(data, level().getGameTime()))) {
+        if (!SoulLogic.isAware(data) || !action.allowedIn(viewFor(visitor, data, level().getGameTime()))) {
             return;
         }
         switch (action) {

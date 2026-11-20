@@ -711,6 +711,7 @@ public final class QuincyNpcTests {
         ordinals.put(NpcAction.CONTEST, 8);
         ordinals.put(DialogueView.HOLLOW_PURIFY, 24);
         ordinals.put(DialogueView.KEEPER_OPEN, 25);
+        ordinals.put(DialogueView.HOMEWARD, 30);
         ordinals.put(NpcAction.PURIFY, 9);
         ordinals.put(NpcAction.BUTTERFLY, 10);
         ordinals.forEach((value, ordinal) -> helper.assertTrue(value.ordinal() == ordinal,

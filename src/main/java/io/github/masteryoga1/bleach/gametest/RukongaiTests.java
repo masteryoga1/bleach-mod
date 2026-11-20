@@ -104,7 +104,7 @@ public final class RukongaiTests {
      * Soul Society's chunks within 2 of this one, loaded now and held entity-ticking, as {@code TravelTests.holdCourt}
      * holds the court's, so a soul set down there ticks at once. Never released: the test server ends with the run.
      */
-    private static void hold(ServerLevel soul, ChunkPos centre) {
+    static void hold(ServerLevel soul, ChunkPos centre) {
         for (int x = -2; x <= 2; x++) {
             for (int z = -2; z <= 2; z++) {
                 soul.getChunk(centre.x + x, centre.z + z);
@@ -122,7 +122,7 @@ public final class RukongaiTests {
      * Asserts that this line has the key and these arguments: a string stands for a translated line with that key, and
      * anything else must equal the argument.
      */
-    private static void assertKey(GameTestHelper helper, Component line, String key, Object... args) {
+    static void assertKey(GameTestHelper helper, Component line, String key, Object... args) {
         assertLeads(helper, line, key, args.length, args);
     }
 

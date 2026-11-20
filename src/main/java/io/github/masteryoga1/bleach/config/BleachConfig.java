@@ -66,6 +66,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue KONSO_REWARDED_PER_DAY;
     public static final ModConfigSpec.EnumValue<KonsoTarget> KONSO_SENDS_TO;
     public static final ModConfigSpec.BooleanValue KONSO_DUTY_SHINIGAMI;
+    public static final ModConfigSpec.BooleanValue KONSO_DUTY_SENDS_HOME;
     public static final ModConfigSpec.IntValue KONSO_DUTY_AFTER_MINUTES;
     public static final ModConfigSpec.IntValue KONSO_DUTY_REVISIT_MINUTES;
 
@@ -913,14 +914,21 @@ public final class BleachConfig {
                 .defineEnum("sends_to", KonsoTarget.RUKONGAI);
         KONSO_DUTY_SHINIGAMI = builder
                 .comment("Whether a Shinigami on duty comes down in the Overworld to a Plus whose chain has begun to wear,"
-                        + " to perform its Konsō. It comes at any hour, whatever the mob spawning rule.")
+                        + " to perform its Konsō, and to a soul that has passed on while duty_sends_home is on. It comes"
+                        + " at any hour, whatever the mob spawning rule.")
                 .define("duty_shinigami", true);
+        KONSO_DUTY_SENDS_HOME = builder
+                .comment("Whether the Shinigami on duty also sends home a soul that has passed on and lingers in the Human"
+                        + " World: one with no bed or anchor of its own in the Overworld that stays near it for half a"
+                        + " minute goes to its Rukongai home, or the Academy. Only while [soul_society] home_world_respawn"
+                        + " is on and sends_to is not NOWHERE.")
+                .define("duty_sends_home", true);
         KONSO_DUTY_AFTER_MINUTES = builder
                 .comment("Minutes of play a Plus's chain wears before a Shinigami on duty first comes, never more than a"
                         + " quarter of the chain.")
                 .defineInRange("duty_after_minutes", 5, 0, 1_440);
         KONSO_DUTY_REVISIT_MINUTES = builder
-                .comment("Minutes before a Shinigami on duty comes again to a Plus it came to, and before a Plus that"
+                .comment("Minutes before a Shinigami on duty comes again to a soul it came to, and before a Plus that"
                         + " none could reach, or one in another world but Soul Society, is told so again.")
                 .defineInRange("duty_revisit_minutes", 10, 1, 1_440);
         builder.pop();

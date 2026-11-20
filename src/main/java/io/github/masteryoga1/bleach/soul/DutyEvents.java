@@ -21,8 +21,9 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * The Shinigami on duty in the Human World. Once a minute, a Plus in the Overworld whose chain has begun to wear, and
- * who was not visited lately, is visited by one, who comes down nearby to perform its Konsō ({@link DutyShinigami}). A
- * Plus none can reach is told why. Not on the game-test server, whose tests place their own.
+ * who was not visited lately, is visited by one, who comes down nearby to perform its Konsō ({@link DutyShinigami}); so
+ * is a soul that has passed on, which it sends home if it stays near. A Plus none can reach is told why. Not on the
+ * game-test server, whose tests place their own.
  */
 public final class DutyEvents {
     private static final long TICKS_PER_MINUTE = 1200L;
@@ -48,6 +49,8 @@ public final class DutyEvents {
     public static final String UNREACHABLE_KEY = "message.bleach.duty_unreachable";
     public static final String ELSEWHERE_KEY = "message.bleach.duty_elsewhere";
     public static final String HOLDS_KEY = "message.bleach.duty_holds";
+    /** What a soul that has passed on is told when one comes down to send it home. Public for game tests. */
+    public static final String HOMEWARD_KEY = "message.bleach.duty_homeward";
 
     private DutyEvents() {
     }
@@ -97,14 +100,44 @@ public final class DutyEvents {
     }
 
     /**
-     * A Shinigami on duty comes down near this Plus if it is due one, stands in the Overworld outside creative and
-     * spectator mode, and no Shinigami NPC is near; the visit is marked and the Plus told which way to look. A due Plus
-     * none came to is told why, at most once a revisit's wait. Public for game tests.
+     * Whether a soul that has passed on is due a visit to send it home: in the Overworld with no bed or anchor of its own
+     * there, with a home in Soul Society (see {@link HomeWorldRespawn#passedOnHome}), while the server sends souls home,
+     * and its last visit {@code duty_revisit_minutes} ago or more. Public for game tests.
+     */
+    public static boolean dueHome(SoulData data, ResourceKey<Level> world, boolean spawnHere, long lastVisit, long now) {
+        return world == Level.OVERWORLD && !spawnHere && sendsHome() && HomeWorldRespawn.passedOnHome(data) != null
+                && now - lastVisit >= revisitTicks();
+    }
+
+    /** Whether this soul has a bed or anchor of its own in the Overworld: there it is at home, as death would wake it. */
+    public static boolean spawnsInOverworld(ServerPlayer soul) {
+        return soul.getRespawnPosition() != null && soul.getRespawnDimension() == Level.OVERWORLD;
+    }
+
+    /**
+     * Whether a Shinigami on duty sends a soul that has passed on home: while {@code duty_sends_home} is on, souls wake in
+     * their home worlds, and Konsō sends souls somewhere, since with {@code sends_to} NOWHERE the server keeps them where
+     * they were freed.
+     */
+    public static boolean sendsHome() {
+        return BleachConfig.get(BleachConfig.KONSO_DUTY_SENDS_HOME) && BleachConfig.get(BleachConfig.HOME_WORLD_RESPAWN)
+                && BleachConfig.get(BleachConfig.KONSO_SENDS_TO) != KonsoTarget.NOWHERE;
+    }
+
+    /**
+     * A Shinigami on duty comes down near this soul if it is due one, a Plus for its Konsō or a soul that has passed on to
+     * send it home, stands in the Overworld outside creative and spectator mode, and no Shinigami NPC is near; the visit
+     * is marked and the soul told which way to look. A due Plus none came to is told why, at most once a revisit's wait,
+     * and a soul that has passed on nothing; public for game tests.
      *
      * @return whether one came
      */
     public static boolean tryVisit(ServerPlayer player, SoulData data, long now) {
-        if (player.isCreative() || player.isSpectator() || !due(data, player.getData(SoulAttachments.DUTY_VISIT), now)
+        long last = player.getData(SoulAttachments.DUTY_VISIT);
+        // None comes to send a soul home where there is no Soul Society to send it to.
+        boolean homeward = dueHome(data, player.level().dimension(), spawnsInOverworld(player), last, now)
+                && BleachWorlds.level(player.server, BleachWorlds.SOUL_SOCIETY) != null;
+        if (player.isCreative() || player.isSpectator() || !homeward && !due(data, last, now)
                 || !player.serverLevel().getEntitiesOfClass(ShinigamiNpc.class,
                         player.getBoundingBox().inflate(EXCLUSION_RANGE)).isEmpty()) {
             return false;
@@ -112,7 +145,8 @@ public final class DutyEvents {
         ResourceKey<Level> world = player.level().dimension();
         DutyShinigami duty = world == Level.OVERWORLD ? comeDown(player) : null;
         if (duty == null) {
-            String key = unreachedKey(world);
+            // A soul that has passed on is told nothing, and looked for again a minute on.
+            String key = homeward ? null : unreachedKey(world);
             // A Plus gnawing at its chain wears it even where it would hold.
             if (HOLDS_KEY.equals(key) && DevourLogic.gnawing(data)) {
                 key = ELSEWHERE_KEY;
@@ -125,9 +159,12 @@ public final class DutyEvents {
         }
         duty.showPassage();
         player.setData(SoulAttachments.DUTY_VISIT, now);
+        if (homeward) {
+            duty.sendHomeLater(player);
+        }
         Component way = Component.translatable(ShinigamiLogic.compassKey(duty.getX() - player.getX(),
                 duty.getZ() - player.getZ()));
-        player.sendSystemMessage(Component.translatable(ARRIVES_KEY, way)
+        player.sendSystemMessage(Component.translatable(homeward ? HOMEWARD_KEY : ARRIVES_KEY, way)
                 .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         return true;
     }
@@ -158,7 +195,7 @@ public final class DutyEvents {
         return SpawnSpots.floorNear(level, player, type, FLOOR_MIN_DISTANCE, FLOOR_MAX_DISTANCE, TRIES, FLOOR_RISE);
     }
 
-    /** The wait between two visits to one Plus, and between two lines telling it why none came, in ticks. */
+    /** The wait between two visits to one soul, and between two lines telling a Plus why none came, in ticks. */
     private static long revisitTicks() {
         return BleachConfig.get(BleachConfig.KONSO_DUTY_REVISIT_MINUTES) * TICKS_PER_MINUTE;
     }
