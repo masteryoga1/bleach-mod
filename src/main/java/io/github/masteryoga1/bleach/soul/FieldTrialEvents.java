@@ -1,8 +1,13 @@
 package io.github.masteryoga1.bleach.soul;
 
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.entity.Senkaimon;
+import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.world.AcademyLocator;
+import io.github.masteryoga1.bleach.world.BleachWorlds;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,8 +15,10 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,10 +27,12 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
@@ -34,9 +43,11 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
- * The Academy's field trial, a hunt in the Human World: practice Hollows come for the student alone, two at a time, and
- * five slain within five minutes pass it. Time running out, death, leaving the Human World or logging out fails it, the
- * lesson's day marked; every end fades the practice Hollows, and the student stays where it stands.
+ * The Academy's field trial, a hunt in the Human World that the instructor offers at the stat bar, sending the student
+ * out by his Senkaimon from Soul Society: practice Hollows come for it alone, two at a time, and five slain within five
+ * minutes pass it. Time running out, death, leaving the Human World or logging out fails it, the lesson's day marked;
+ * every end fades the practice Hollows, and one the instructor sent out is owed gates home to the Academy until it
+ * leaves the Human World. Graduation asks for the pass unless the server says not.
  */
 public final class FieldTrialEvents {
     /** Practice Hollows a student must slay, the time it has, and how many come for it at once. The mod's numbers. */
@@ -60,6 +71,11 @@ public final class FieldTrialEvents {
     private static final String CUT_SHORT_KEY = "message.bleach.field_trial.failed.cut_short";
     private static final String NO_GROUND_KEY = "message.bleach.field_trial.no_ground";
     private static final String BAR_KEY = "bossbar.bleach.field_trial";
+    private static final String SET_OUT_KEY = "message.bleach.field_trial.set_out";
+    private static final String NOT_YOURS_KEY = "message.bleach.field_trial.not_yours";
+    private static final String GATE_HOME_KEY = "message.bleach.field_trial.gate_home";
+    private static final String LAST_GATE_KEY = "message.bleach.field_trial.gate_home.last";
+    private static final String ARRIVED_KEY = "message.bleach.konso.arrived";
 
     /** A trial's hunt while its student is here: when it began, its bar, how many it has slain, whether any came. */
     private static final class Hunt {
@@ -98,9 +114,149 @@ public final class FieldTrialEvents {
         return trial(player).running();
     }
 
+    // ---- The offer and graduation ----
+
+    /** Whether graduation asks for a passed field trial: {@code [academy] field_trial}. */
+    public static boolean required() {
+        return BleachConfig.get(BleachConfig.FIELD_TRIAL);
+    }
+
+    /** Whether this student may graduate as far as the trial goes: it passed one, or none is asked for. */
+    public static boolean mayGraduate(Player student) {
+        return !required() || trial(student).passed();
+    }
+
+    /**
+     * Whether an instructor in this world offers this soul its field trial now: the server asks for one, he stands in Soul
+     * Society or the Human World, the soul is a student at every exam's mark, and a trial is due on the lesson's day.
+     */
+    public static boolean offered(Player student, SoulData data, ResourceKey<Level> world, long now, long dayTime) {
+        return required() && (world == BleachWorlds.SOUL_SOCIETY || world == Level.OVERWORLD)
+                && ShinigamiLogic.canGraduate(data) && trial(student).dueOn(KidoLogic.lessonDay(now, dayTime));
+    }
+
+    /**
+     * The instructor sends a student out: from Soul Society by a Senkaimon he turns beyond it, which takes it alone to the
+     * Human World, its trial begun as it comes out, refused and told why where the gate would meet Sekkiseki or stand too
+     * close to another; in the Human World its trial begins where it stands, with no gate there or home.
+     */
+    public static void setOut(ShinigamiNpc instructor, Player student) {
+        if (!(student instanceof ServerPlayer passer) || passer.level() != instructor.level()) {
+            return;
+        }
+        ServerLevel level = passer.serverLevel();
+        if (level.dimension() == Level.OVERWORLD) {
+            begin(passer, level.getGameTime());
+            return;
+        }
+        TravelLogic.Refusal refusal = barred(passer, instructor);
+        if (refusal != null) {
+            passer.displayClientMessage(Component.translatable(refusal.messageKey()).withStyle(ChatFormatting.GRAY), true);
+            return;
+        }
+        Senkaimon gate = Senkaimon.open(level, passer, instructor, level.getGameTime());
+        if (gate != null) {
+            gate.forTrial(passer.getUUID());
+            passer.displayClientMessage(Component.translatable(SET_OUT_KEY).withStyle(ChatFormatting.GRAY), true);
+        }
+    }
+
+    /** Why no gate turned by this one (null: by none) may open before this soul now: Sekkiseki, or a gate too close. */
+    @Nullable
+    private static TravelLogic.Refusal barred(Entity soul, @Nullable Entity turner) {
+        if (SpiritClip.meets(soul.level(), Senkaimon.boxFor(soul, turner))) {
+            return TravelLogic.Refusal.SEKKISEKI;
+        }
+        return Senkaimon.crowded(soul, turner) ? TravelLogic.Refusal.CROWDED : null;
+    }
+
+    // ---- The gates ----
+
+    /**
+     * Where a trial's gate takes this soul ({@link TravelEvents#destination} hands every such gate here), or null, told
+     * why: only its student passes, out (only with a trial due) to where a Shinigami's gate home would set it down, or
+     * home to the Academy's landing. Never by the Dangai: the instructor's gate is his guidance.
+     */
+    @Nullable
+    static DimensionTransition destination(Senkaimon gate, ServerPlayer passer) {
+        if (!passer.getUUID().equals(gate.trialFor())) {
+            passer.displayClientMessage(Component.translatable(NOT_YOURS_KEY).withStyle(ChatFormatting.GRAY), true);
+            return null;
+        }
+        boolean out = gate.leadsTo() == Level.OVERWORLD;
+        // Due, as the offer asks, so a student back home while the gate stands, passed or failed today, is not sent again.
+        Level from = passer.level();
+        if (out && (!trial(passer).dueOn(KidoLogic.lessonDay(from.getGameTime(), from.getDayTime()))
+                || !ShinigamiLogic.isStudent(SoulLogic.get(passer)))) {
+            return null;
+        }
+        ServerLevel target = gate.leadsTo() == null ? null : BleachWorlds.level(passer.server, gate.leadsTo());
+        Vec3 spot = target == null ? null
+                : out ? TravelEvents.homeward(passer, target) : AcademyLocator.landing(passer, target);
+        if (spot == null) {
+            passer.displayClientMessage(Component.translatable(TravelEvents.NO_LANDING_KEY)
+                    .withStyle(ChatFormatting.GRAY), true);
+            return null;
+        }
+        GlobalPos left = GlobalPos.of(passer.level().dimension(), passer.blockPosition());
+        float yaw = out ? passer.getYRot() : AcademyLocator.LANDING_YAW;
+        return new DimensionTransition(target, spot, Vec3.ZERO, yaw, 0.0F, entity -> {
+            TravelEvents.arrived(entity, left);
+            if (entity instanceof ServerPlayer student) {
+                cameThrough(student, out);
+            }
+        });
+    }
+
+    /** Through a trial's gate: out, the trial begins there and every gate home is owed; home, none is, and it is told. */
+    private static void cameThrough(ServerPlayer student, boolean out) {
+        if (out) {
+            begin(student, student.level().getGameTime());
+            student.setData(SoulAttachments.FIELD_TRIAL, trial(student).sentOut());
+        } else {
+            student.setData(SoulAttachments.FIELD_TRIAL, trial(student).cameHome());
+            student.sendSystemMessage(Component.translatable(ARRIVED_KEY)
+                    .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        }
+    }
+
+    /**
+     * A student owed gates home is owed none once out of the Human World or no student; one standing in it, alive and
+     * here, gets the next before it, unless one of its own stands within {@link #STRAY} or the spot is barred.
+     */
+    private static void tendGateHome(ServerPlayer student, long now) {
+        if (student.level().dimension() != Level.OVERWORLD || !ShinigamiLogic.isStudent(SoulLogic.get(student))) {
+            student.setData(SoulAttachments.FIELD_TRIAL, trial(student).cameHome());
+            return;
+        }
+        // The dead wait to respawn; one logging out is leaving, and is owed it when it returns.
+        if (!student.isAlive() || student.isSpectator() || student.hasDisconnected() || !gatesFor(student).isEmpty()
+                || barred(student, null) != null) {
+            return;
+        }
+        Senkaimon gate = Senkaimon.open(student.serverLevel(), student, null, now);
+        if (gate != null) {
+            gate.forTrial(student.getUUID());
+            FieldTrial after = trial(student).gateHomeOpened();
+            student.setData(SoulAttachments.FIELD_TRIAL, after);
+            student.displayClientMessage(Component.translatable(after.gatesHome() > 0 ? GATE_HOME_KEY : LAST_GATE_KEY)
+                    .withStyle(ChatFormatting.GRAY), true);
+        }
+    }
+
+    /** This student's trial gates within {@link #STRAY}: the instructor's, or one home. */
+    private static List<Senkaimon> gatesFor(ServerPlayer student) {
+        UUID id = student.getUUID();
+        return student.serverLevel().getEntitiesOfClass(Senkaimon.class, student.getBoundingBox().inflate(STRAY),
+                gate -> id.equals(gate.trialFor()));
+    }
+
     // ---- The hunt ----
 
-    /** The trial begins where the student stands, as {@code /bleach trial} begins it: its record, its bar and the line. */
+    /**
+     * The trial begins where the student stands, as {@code /bleach trial} and the instructor begin it: its record, its bar
+     * and the line.
+     */
     public static void begin(ServerPlayer student, long now) {
         endHunt(student);
         student.setData(SoulAttachments.FIELD_TRIAL, trial(student).begun(now));
@@ -115,11 +271,15 @@ public final class FieldTrialEvents {
     /**
      * Once a second for each player, from its tick; public for tests. A trial under way ends quietly for a soul no longer
      * a student; fails, cut short, with no hunt left of it (the server stopped or crashed), or with its time up; ends
-     * unmarked if no practice Hollow could come in its first 30 seconds; and otherwise keeps them coming.
+     * unmarked if no practice Hollow could come in its first 30 seconds; and otherwise keeps them coming; with none
+     * under way, a gate home owed is tended.
      */
     public static void step(ServerPlayer student, long now) {
         FieldTrial trial = trial(student);
         if (!trial.running()) {
+            if (trial.gatesHome() > 0) {
+                tendGateHome(student, now);
+            }
             return;
         }
         Hunt hunt = HUNTS.get(student.getUUID());
@@ -240,12 +400,18 @@ public final class FieldTrialEvents {
         end(student, trial(student).lost(KidoLogic.lessonDay(level.getGameTime(), level.getDayTime())), key);
     }
 
-    /** The trial ends as {@code after} records it, and its hunt with it; the student is told this line (none for null). */
+    /**
+     * The trial ends as {@code after} records it, and its hunt with it; the student is told this line (none for null), and
+     * a gate home it is owed opens at once.
+     */
     private static void end(ServerPlayer student, FieldTrial after, @Nullable String key) {
         student.setData(SoulAttachments.FIELD_TRIAL, after);
         endHunt(student);
         if (key != null) {
             student.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        }
+        if (after.gatesHome() > 0) {
+            tendGateHome(student, student.level().getGameTime());
         }
     }
 
@@ -261,7 +427,7 @@ public final class FieldTrialEvents {
         practiceNear(student, null).forEach(hollow -> hollow.dissolve(student.serverLevel()));
     }
 
-    /** Takes the trial off this soul, under way or not, record and all: {@code /bleach reset}, and tests. */
+    /** Takes the trial off this soul, under way or not, record and all: {@code /bleach reset}, graduation, and tests. */
     public static void forget(Player player) {
         if (player instanceof ServerPlayer student) {
             endHunt(student);
@@ -283,9 +449,15 @@ public final class FieldTrialEvents {
         }
     }
 
+    /** Out of the Human World, a student is owed no gate home, and its trial under way fails. */
     private static void onChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
-        if (event.getEntity() instanceof ServerPlayer student && event.getFrom() == Level.OVERWORLD && running(student)) {
-            fail(student, LEFT_KEY);
+        if (event.getEntity() instanceof ServerPlayer student && event.getFrom() == Level.OVERWORLD) {
+            if (trial(student).gatesHome() > 0) {
+                student.setData(SoulAttachments.FIELD_TRIAL, trial(student).cameHome());
+            }
+            if (running(student)) {
+                fail(student, LEFT_KEY);
+            }
         }
     }
 

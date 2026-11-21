@@ -175,7 +175,10 @@ public final class ShinigamiEvents {
         return true;
     }
 
-    /** A student sits the exams: on a pass they become a Shinigami and receive the Shihakushō. */
+    /**
+     * A student sits the exams: on a pass, with its field trial passed where the server asks for one, they become a
+     * Shinigami and receive the Shihakushō, and the trial's record goes.
+     */
     public static boolean graduate(Player player) {
         SoulData data = SoulLogic.get(player);
         if (!ShinigamiLogic.isStudent(data)) {
@@ -188,7 +191,12 @@ public final class ShinigamiEvents {
             player.displayClientMessage(Component.translatable("message.bleach.graduation_failed", arts), true);
             return false;
         }
+        if (!FieldTrialEvents.mayGraduate(player)) {
+            player.displayClientMessage(Component.translatable("message.bleach.graduation_needs_trial"), true);
+            return false;
+        }
         ShinigamiLogic.graduate(data);
+        FieldTrialEvents.forget(player);
         SoulLogic.applyStatModifiers(player, data);
         give(player, new ItemStack(ModItems.SHIHAKUSHO_KOSODE.get()));
         give(player, new ItemStack(ModItems.SHIHAKUSHO_HAKAMA.get()));

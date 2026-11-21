@@ -714,6 +714,8 @@ public final class QuincyNpcTests {
         ordinals.put(DialogueView.HOMEWARD, 30);
         ordinals.put(NpcAction.PURIFY, 9);
         ordinals.put(NpcAction.BUTTERFLY, 10);
+        ordinals.put(DialogueView.STUDENT_TRIAL, 31);
+        ordinals.put(NpcAction.FIELD_TRIAL, 11);
         ordinals.forEach((value, ordinal) -> helper.assertTrue(value.ordinal() == ordinal,
                 value + " is number " + value.ordinal() + ", not " + ordinal));
         List<NpcAction> teach = NpcAction.offeredIn(DialogueView.ELDER_TEACH);

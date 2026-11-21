@@ -62,6 +62,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue ASAUCHI_REISSUE_MINUTES;
     public static final ModConfigSpec.IntValue KIDO_LESSON_XP;
     public static final ModConfigSpec.IntValue DUMMY_XP_PER_DAY;
+    public static final ModConfigSpec.BooleanValue FIELD_TRIAL;
 
     public static final ModConfigSpec.DoubleValue KONSO_GROWTH;
     public static final ModConfigSpec.IntValue KONSO_REWARDED_PER_DAY;
@@ -903,6 +904,11 @@ public final class BleachConfig {
                         + " can give it in a day (a new day comes each morning, or every 20 minutes of play). Each blow"
                         + " gives a quarter of [hollows] hit_stat_xp. 0 turns their training off.")
                 .defineInRange("dummy_xp_per_day", 80, 0, 1_000);
+        FIELD_TRIAL = builder
+                .comment("Whether a student must pass the field trial to graduate: a hunt of practice Hollows in the Human"
+                        + " World, which the Academy instructor offers once it stands at every exam's mark. False offers"
+                        + " no trial, and the exams alone graduate.")
+                .define("field_trial", true);
         builder.pop();
 
         builder.push("konso");

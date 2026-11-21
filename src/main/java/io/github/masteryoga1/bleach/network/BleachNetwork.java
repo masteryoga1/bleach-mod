@@ -36,8 +36,9 @@ public final class BleachNetwork {
      * 21: {@code NpcAction.BUTTERFLY}, the instructor's Jigokuchō, and academy_pos gone from ShinigamiProgress.
      * 22: the gatekeepers' dialogue views, and the passes won from them in ShinigamiProgress.
      * 23: the duty Shinigami's HOMEWARD view.
+     * 24: the instructor's STUDENT_TRIAL view and {@code NpcAction.FIELD_TRIAL}, the Academy's field trial.
      */
-    private static final String VERSION = "23";
+    private static final String VERSION = "24";
 
     private BleachNetwork() {
     }

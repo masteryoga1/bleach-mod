@@ -108,7 +108,8 @@ public final class NpcDialogueScreen extends Screen {
     private void buildExamLines() {
         examLines.clear();
         examColours.clear();
-        if (view != DialogueView.STUDENT || minecraft == null || minecraft.player == null) {
+        if ((view != DialogueView.STUDENT && view != DialogueView.STUDENT_TRIAL) || minecraft == null
+                || minecraft.player == null) {
             return;
         }
         SoulData data = minecraft.player.getData(SoulAttachments.SOUL);

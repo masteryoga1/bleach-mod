@@ -70,7 +70,9 @@ public enum DialogueView {
     /** A gatekeeper fights this soul, which may pass, for its blow, until it leaves his ground. */
     KEEPER_FOE,
     /** A Shinigami on duty tells the soul it came for, which has passed on, to stay near and be sent home, or walk off. */
-    HOMEWARD;
+    HOMEWARD,
+    /** The instructor offers a student at every exam's mark its field trial in the Human World, in place of the exams. */
+    STUDENT_TRIAL;
 
     private static final IntFunction<DialogueView> BY_ID =
             ByIdMap.continuous(DialogueView::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

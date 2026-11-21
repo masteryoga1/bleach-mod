@@ -182,11 +182,11 @@ public final class TravelLogic {
                 return Refusal.TOO_WEAK;
             }
         }
-        if (SpiritClip.meets(player.level(), Senkaimon.boxFor(player))) {
+        if (SpiritClip.meets(player.level(), Senkaimon.boxFor(player, player))) {
             return Refusal.SEKKISEKI;
         }
         // Last, so the entity search runs only when every other rule passes.
-        return Senkaimon.crowded(player) ? Refusal.CROWDED : null;
+        return Senkaimon.crowded(player, player) ? Refusal.CROWDED : null;
     }
 
     /**
