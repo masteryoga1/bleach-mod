@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.entity.CeroBeam;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
+import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -301,12 +302,13 @@ public final class KidoHeal {
     }
 
     /**
-     * Whether this healer may heal this creature: anyone alive but itself, a spectator, an armour stand, a Visored's
-     * inner Hollow and a body Negación or a Caja holds; and no one while the healer, or a player patient, fights its
-     * Hollow.
+     * Whether this healer may heal this creature: anyone alive but itself, a spectator, an armour stand, a training
+     * dummy, a Visored's inner Hollow and a body Negación or a Caja holds; and no one while the healer, or a player
+     * patient, fights its Hollow.
      */
     public static boolean mayHeal(Player healer, LivingEntity patient) {
-        return patient != healer && patient.isAlive() && !patient.isSpectator() && !(patient instanceof ArmorStand)
+        return patient != healer && patient.isAlive() && !patient.isSpectator()
+                && !(patient instanceof ArmorStand || patient instanceof TrainingDummy)
                 && !(patient instanceof InnerHollow) && !Negacion.held(patient) && !VisoredEvents.isDuelling(healer)
                 && !(patient instanceof Player host && VisoredEvents.isDuelling(host));
     }

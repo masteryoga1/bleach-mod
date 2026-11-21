@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.DankuWall;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
+import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.network.KidoKeyPayload;
 import io.github.masteryoga1.bleach.registry.ModEffects;
@@ -574,8 +575,9 @@ public final class KidoEvents {
      * {@link KidoLogic#misfireChance}: it bursts in the hand, hurting its caster, and nothing more happens. Otherwise
      * its shape strikes (a beam, a gust, or a bind) or wards (a smoke, a shield or a wall, which strike nothing), the
      * call goes on the caster's action bar (for a bind shrugged off, that it was), and Kidō trains, with the strike
-     * bonus when a creature was struck or bound and twice over for a chant; when a Hollow was among those struck or
-     * bound, an unbound Asauchi leans to kidō. Creative pays, waits, misfires, trains and leans nothing.
+     * bonus when a creature other than a training dummy was struck or bound and twice over for a chant; when a Hollow
+     * was among those struck or bound, an unbound Asauchi leans to kidō. Creative pays, waits, misfires, trains and
+     * leans nothing.
      *
      * <p>The one entry for every way of casting. Tells nothing; the caller does. Returns the refusal (a misfire is
      * {@link KidoLogic.Refusal#MISFIRED}), or null when cast. Takes the spell itself, not its holder, so a game test can
@@ -639,8 +641,10 @@ public final class KidoEvents {
         };
         player.displayClientMessage(said.copy().withStyle(ChatFormatting.GRAY), true);
         if (!creative) {
+            // A training dummy struck earns no strike bonus: a spell at one trains as a spell cast at the air.
+            boolean struckOne = struck.stream().anyMatch(target -> !(target instanceof TrainingDummy));
             // After the call, so a level-up line takes its place on the action bar.
-            SoulLogic.addStatXp(player, data, Stat.KIDO, KidoLogic.xp(spell, form, !struck.isEmpty()));
+            SoulLogic.addStatXp(player, data, Stat.KIDO, KidoLogic.xp(spell, form, struckOne));
             if (struck.stream().anyMatch(target -> target instanceof Hollow)) {
                 ZanpakutoEvents.lean(player, data, ZanpakutoType.KIDO, 1, now);
             }

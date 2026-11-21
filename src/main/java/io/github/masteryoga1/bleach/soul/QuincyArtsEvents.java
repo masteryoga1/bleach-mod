@@ -10,6 +10,7 @@ import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
+import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
@@ -1146,8 +1147,9 @@ public final class QuincyArtsEvents {
 
     /**
      * Fires only for hits that got past shields and invulnerability frames. A formed Seele's cut
-     * draws reishi back into a wielder Sekkiseki does not hold, twice as much from a Hollow or a released
-     * reiatsu; a hard hit, or anything that comes in at the head, breaks a Vollständig halo.
+     * draws reishi back into a wielder Sekkiseki does not hold, from anything but a training dummy, twice
+     * as much from a Hollow or a released reiatsu; a hard hit, or anything that comes in at the head,
+     * breaks a Vollständig halo.
      */
     private static void onDamagePost(LivingDamageEvent.Post event) {
         LivingEntity target = event.getEntity();
@@ -1157,7 +1159,7 @@ public final class QuincyArtsEvents {
         }
         DamageSource source = event.getSource();
         Player wielder = formedMelee(source);
-        if (wielder != null && wielder != target && SoulLogic.hasSoul(wielder)
+        if (wielder != null && wielder != target && !(target instanceof TrainingDummy) && SoulLogic.hasSoul(wielder)
                 && !SekkisekiLogic.held(SoulLogic.get(wielder))) {
             SoulData theirs = SoulLogic.get(wielder);
             boolean doubled = QuincyLogic.isHollowLike(target)

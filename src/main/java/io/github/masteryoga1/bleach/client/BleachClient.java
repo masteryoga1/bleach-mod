@@ -191,6 +191,7 @@ public final class BleachClient {
         ResourceLocation duty = BleachMod.id("textures/entity/duty_shinigami.png");
         event.registerEntityRenderer(ModEntities.DUTY_SHINIGAMI.get(),
                 context -> new ShinigamiNpcRenderer<DutyShinigami>(context, duty));
+        event.registerEntityRenderer(ModEntities.TRAINING_DUMMY.get(), TrainingDummyRenderer::new);
         ResourceLocation elder = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/zuri.png");
         ResourceLocation hunter = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/efe.png");
         event.registerEntityRenderer(ModEntities.QUINCY_ELDER.get(),

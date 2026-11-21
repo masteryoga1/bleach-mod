@@ -17,6 +17,7 @@ import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.network.KidoKeyPayload;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
@@ -1766,6 +1767,7 @@ public final class KidoTests {
                 "a student a point short of Kidō 5 is short of " + ShinigamiLogic.graduationShortfall(data));
         SpiderHollow spider = null;
         Pig pig = null;
+        TrainingDummy dummy = null;
         try {
             // At the air: Shō's own xp, and the point it lacked.
             assertRefusal(helper, press(student, now), null, "a student's Shō at the air");
@@ -1794,8 +1796,16 @@ public final class KidoTests {
             helper.assertTrue(data.xp(Stat.KIDO) == 4, "Shō on the pig left " + data.xp(Stat.KIDO) + " Kidō xp");
             helper.assertTrue(kidoLeaning(data) == 1, "Shō on a pig leaned the Asauchi " + kidoLeaning(data) + " to kidō");
 
-            // In creative, a strike on a Hollow pays, trains and leans nothing.
+            // At a training dummy: Shō's own xp, and none for the strike.
             discard(pig);
+            dummy = helper.spawn(ModEntities.TRAINING_DUMMY.get(), 4, 2, 8);
+            student.lookAt(EntityAnchorArgument.Anchor.EYES, dummy.getBoundingBox().getCenter());
+            assertRefusal(helper, press(student, now + 60L), null, "a student's Shō at a training dummy");
+            helper.assertTrue(dummy.hurtTime > 0, "the student's Shō did not strike the dummy");
+            helper.assertTrue(data.xp(Stat.KIDO) == 5, "Shō on a dummy left " + data.xp(Stat.KIDO) + " Kidō xp");
+
+            // In creative, a strike on a Hollow pays, trains and leans nothing.
+            discard(pig, dummy);
             spider = HollowPlayerTests.placed(helper, ModEntities.SPIDER_HOLLOW.get(), 4, 8);
             SoulData creativeData = ShinigamiTests.student(60.0F);
             Player creative = caster(helper, GameType.CREATIVE, creativeData);
@@ -1811,7 +1821,7 @@ public final class KidoTests {
             HollowPlayerTests.assertClose(helper, creativeData.reiryoku(), creativeData.maxReiryoku(),
                     "a creative student's reiryoku");
         } finally {
-            discard(spider, pig);
+            discard(spider, pig, dummy);
             discardBeams(helper);
         }
         helper.succeed();
