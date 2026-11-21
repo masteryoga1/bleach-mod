@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.soul.QuincyLogic;
+import io.github.masteryoga1.bleach.soul.ShinigamiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
@@ -12,6 +13,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.RelativeMovement;
@@ -22,8 +24,9 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The instructor at the Academy: performs Konsō for a Plus, enrolls souls that have passed on, sits
- * students' exams, gives each student a Kidō lesson once a day, hands out Asauchi, and cleanses a
- * Hollow who comes to him instead of to its prey, breaking its mask with his blade. He cannot be hurt
+ * students' exams, gives each student a Kidō lesson once a day, hands out Asauchi and, once, the
+ * Academy's uniform to a student never handed it, and cleanses a Hollow who comes to him instead of
+ * to its prey, breaking its mask with his blade. He cannot be hurt
  * or moved, so the Academy always works: whatever pulls, carries or pushes him away from where he first
  * stood, he is back there the next tick. Only a teleport by command moves him for good.
  */
@@ -85,6 +88,12 @@ public final class AcademyInstructor extends ShinigamiNpc {
     @Override
     protected boolean sendsOn() {
         return AcademyLocator.sendsOnFrom(level().dimension());
+    }
+
+    /** A student the Academy never handed its uniform, one enrolled before there was any, is handed it now. */
+    @Override
+    protected void onDialogueOpened(ServerPlayer visitor) {
+        ShinigamiEvents.uniformAtTalk(visitor);
     }
 
     /** Where he stands and returns to, once he has stood somewhere. */

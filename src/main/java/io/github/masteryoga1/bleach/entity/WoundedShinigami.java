@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
@@ -80,7 +81,7 @@ public final class WoundedShinigami extends ShinigamiNpc {
     }
 
     @Override
-    protected void onDialogueOpened() {
+    protected void onDialogueOpened(ServerPlayer visitor) {
         lifetime = Math.max(lifetime, LIFETIME_AFTER_TALKING);
     }
 

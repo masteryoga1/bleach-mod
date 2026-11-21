@@ -40,6 +40,14 @@ WHITE = rgb(240, 240, 236)
 STRAW = rgb(196, 160, 100)
 STRAW_DARK = rgb(150, 118, 66)
 
+# The Shin'o Academy's uniform: a white kosode trimmed in blue or red over a hakama of the trim's colour.
+ACADEMY_WHITE = rgb(242, 242, 238)
+ACADEMY_FOLD = rgb(212, 212, 206)
+ACADEMY_BLUE = rgb(44, 78, 160)
+ACADEMY_BLUE_FOLD = rgb(32, 58, 124)
+ACADEMY_RED = rgb(170, 40, 46)
+ACADEMY_RED_FOLD = rgb(128, 28, 34)
+
 # Hollows: black hides, bone-white masks, the hole that goes right through them.
 HOLLOW_BLACK = rgb(28, 26, 32)
 HOLLOW_SHADE = rgb(48, 44, 56)
@@ -476,6 +484,14 @@ def armor_layer_2():
     for x in (1, 5, 9, 13):        # pleats
         c.rect(x, 21, x + 1, 31, FOLD)
     return c
+
+
+def academy(base, trim, trim_fold, name):
+    """The Shihakusho's kosode or hakama in the Academy's colours: the kosode white with its collar in the trim, the
+    hakama all in the trim. Layer 1's leg rows (tabi and straw) are drawn only for boots, which the uniform has none of."""
+    top = base in (kosode_icon, armor_layer_1)
+    mapping = {BLACK: ACADEMY_WHITE, FOLD: ACADEMY_FOLD, WHITE: trim} if top else {BLACK: trim, FOLD: trim_fold}
+    return recoloured(base, mapping, name)
 
 
 # The vanilla spider's boxes (SpiderModel): body0 the waist, body1 the abdomen, the head, and one net
@@ -1983,6 +1999,16 @@ TEXTURES = {
     "item/waraji.png": waraji_icon,
     "models/armor/shihakusho_layer_1.png": armor_layer_1,
     "models/armor/shihakusho_layer_2.png": armor_layer_2,
+    "item/academy_kosode.png": academy(kosode_icon, ACADEMY_BLUE, ACADEMY_BLUE_FOLD, "academy_kosode_icon"),
+    "item/academy_kosode_red.png": academy(kosode_icon, ACADEMY_RED, ACADEMY_RED_FOLD, "academy_kosode_red_icon"),
+    "item/academy_hakama.png": academy(hakama_icon, ACADEMY_BLUE, ACADEMY_BLUE_FOLD, "academy_hakama_icon"),
+    "item/academy_hakama_red.png": academy(hakama_icon, ACADEMY_RED, ACADEMY_RED_FOLD, "academy_hakama_red_icon"),
+    "models/armor/academy_uniform_layer_1.png": academy(armor_layer_1, ACADEMY_BLUE, ACADEMY_BLUE_FOLD, "academy_layer_1"),
+    "models/armor/academy_uniform_layer_2.png": academy(armor_layer_2, ACADEMY_BLUE, ACADEMY_BLUE_FOLD, "academy_layer_2"),
+    "models/armor/academy_uniform_red_layer_1.png": academy(armor_layer_1, ACADEMY_RED, ACADEMY_RED_FOLD,
+                                                            "academy_red_layer_1"),
+    "models/armor/academy_uniform_red_layer_2.png": academy(armor_layer_2, ACADEMY_RED, ACADEMY_RED_FOLD,
+                                                            "academy_red_layer_2"),
     "entity/hollow/spider.png": spider,
     "entity/hollow/spider_mask.png": spider_mask,
     "entity/hollow/spider_mask_cracked.png": cracked(spider_mask, [(40, 9), (43, 13), (44, 17), (46, 19)]),

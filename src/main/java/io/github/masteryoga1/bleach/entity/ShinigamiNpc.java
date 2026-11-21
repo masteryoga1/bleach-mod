@@ -96,8 +96,8 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
     /** Whether a Plus this NPC performs Konsō on is sent on from outside Soul Society, where the server sends souls. */
     protected abstract boolean sendsOn();
 
-    /** Called when a visitor opens the dialogue. */
-    protected void onDialogueOpened() {
+    /** Called when a visitor opens the dialogue, before it is shown. */
+    protected void onDialogueOpened(ServerPlayer visitor) {
     }
 
     /** The motes of light and the sound of a Shinigami passing between worlds, where this one stands. */
@@ -159,7 +159,7 @@ public abstract class ShinigamiNpc extends PathfinderMob implements DialogueNpc 
     private void openDialogue(ServerPlayer visitor) {
         SoulData data = SoulLogic.get(visitor);
         long now = level().getGameTime();
-        onDialogueOpened();
+        onDialogueOpened(visitor);
         getLookControl().setLookAt(visitor, 30.0F, 30.0F);
         List<Integer> required = EXAMINED_ARTS.stream()
                 .map(art -> ShinigamiLogic.graduationRequirements().get(art))

@@ -76,7 +76,7 @@ public final class DutyShinigami extends ShinigamiNpc {
     }
 
     @Override
-    protected void onDialogueOpened() {
+    protected void onDialogueOpened(ServerPlayer visitor) {
         lifetime = Math.max(lifetime, LIFETIME_AFTER_TALKING);
     }
 

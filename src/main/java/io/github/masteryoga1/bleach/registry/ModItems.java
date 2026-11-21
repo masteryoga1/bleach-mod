@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.block.DivisionBannerBlock;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.CajaNegacion;
+import io.github.masteryoga1.bleach.item.AcademyUniformItem;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.item.EmptyGintoItem;
@@ -61,6 +62,19 @@ public final class ModItems {
             () -> new ShihakushoItem(ArmorItem.Type.LEGGINGS));
     public static final DeferredItem<ShihakushoItem> WARAJI = ITEMS.register("waraji",
             () -> new ShihakushoItem(ArmorItem.Type.BOOTS));
+
+    /**
+     * The Shin'ō Academy's uniform: a white kosode trimmed in blue or red and a hakama of that colour, each trim its own
+     * item, which the Tailoring Table turns into the other. See {@link AcademyUniformItem}.
+     */
+    public static final DeferredItem<AcademyUniformItem> ACADEMY_KOSODE = ITEMS.register("academy_kosode",
+            () -> new AcademyUniformItem(ArmorItem.Type.CHESTPLATE, false, ModItems.ACADEMY_KOSODE_RED));
+    public static final DeferredItem<AcademyUniformItem> ACADEMY_KOSODE_RED = ITEMS.register("academy_kosode_red",
+            () -> new AcademyUniformItem(ArmorItem.Type.CHESTPLATE, true, ModItems.ACADEMY_KOSODE));
+    public static final DeferredItem<AcademyUniformItem> ACADEMY_HAKAMA = ITEMS.register("academy_hakama",
+            () -> new AcademyUniformItem(ArmorItem.Type.LEGGINGS, false, ModItems.ACADEMY_HAKAMA_RED));
+    public static final DeferredItem<AcademyUniformItem> ACADEMY_HAKAMA_RED = ITEMS.register("academy_hakama_red",
+            () -> new AcademyUniformItem(ArmorItem.Type.LEGGINGS, true, ModItems.ACADEMY_HAKAMA));
 
     public static final DeferredItem<BlockItem> TAILORING_TABLE = ITEMS.registerSimpleBlockItem(ModBlocks.TAILORING_TABLE);
     public static final DeferredItem<BlockItem> SEKKISEKI = ITEMS.registerSimpleBlockItem(ModBlocks.SEKKISEKI);

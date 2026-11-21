@@ -40,6 +40,13 @@ public final class ModArmorMaterials {
      */
     public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ARRANCAR_UNIFORM = cloth("arrancar_uniform");
 
+    /**
+     * The Shin'ō Academy's uniform, cloth like the rest. Textures are
+     * {@code textures/models/armor/academy_uniform_layer_1.png} (the kosode trimmed in blue) and {@code _2} (the blue
+     * hakama); a red piece is drawn from {@code academy_uniform_red_layer_1.png} and {@code _2} instead.
+     */
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ACADEMY_UNIFORM = cloth("academy_uniform");
+
     private ModArmorMaterials() {
     }
 

@@ -1010,7 +1010,8 @@ public final class BleachConfig {
 
         builder.push("shihakusho");
         SHIHAKUSHO_SET_REGEN_BONUS = builder
-                .comment("Extra reiryoku regeneration from wearing the full Shihakushō, for Shinigami and Academy students (0.1 = +10%).")
+                .comment("Extra reiryoku regeneration from wearing the full Shihakushō, for Shinigami and Academy students,"
+                        + " or the Academy's whole uniform, for students; never both (0.1 = +10%).")
                 .defineInRange("set_regen_bonus", 0.1, 0.0, 10.0);
         builder.pop();
 

@@ -157,7 +157,7 @@ public final class DutyTests {
     }
 
     /** The chat lines with this key this joined player has been shown, oldest first. */
-    private static List<Component> said(ServerPlayer player, String key) {
+    static List<Component> said(ServerPlayer player, String key) {
         return TestPlayers.chat(player).stream().filter(line -> line.getContents() instanceof TranslatableContents told
                 && told.getKey().equals(key)).toList();
     }
