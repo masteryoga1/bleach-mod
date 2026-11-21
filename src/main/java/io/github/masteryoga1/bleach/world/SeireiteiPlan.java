@@ -91,6 +91,11 @@ public final class SeireiteiPlan {
     /** Every planned site: a template set whole at its corner, turned, on the ground there or at its own height. */
     public static final List<Site> SITES = List.of(
             new Site("academy", ACADEMY_X, ACADEMY_Z, BleachMod.id("academy/academy"), Rotation.CLOCKWISE_90, 15, 17),
+            // Its grounds in its reserve: the yard of training dummies south of the hall, its step on the hall's side; the
+            // dojo west of the hall, a door in each long side; the Kidō range west of the yard, its platform at the east.
+            new Site("academy", -212, 247, BleachMod.id("academy/yard"), Rotation.NONE, 24, 16),
+            new Site("academy", -231, 238, BleachMod.id("academy/dojo"), Rotation.COUNTERCLOCKWISE_90, 21, 15),
+            new Site("academy", -246, 247, BleachMod.id("academy/range"), Rotation.NONE, 26, 15),
             // The gate houses in the order of the Rukongai's regions, each the south one turned about the centre column.
             gateHouse(SEIREITEI_RADIUS, GATE_HALF_WIDTH - 1, Rotation.COUNTERCLOCKWISE_90),
             gateHouse(-GATE_HALF_WIDTH, SEIREITEI_RADIUS, Rotation.NONE),

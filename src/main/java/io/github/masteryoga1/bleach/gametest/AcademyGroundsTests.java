@@ -13,13 +13,23 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.world.AcademySite;
+import io.github.masteryoga1.bleach.world.SeireiteiPlan;
+import io.github.masteryoga1.bleach.world.SiteStamp;
+import io.github.masteryoga1.bleach.world.gen.SitePiece;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -33,19 +43,37 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * The Academy's training dummies: how a blow on one trains, up to the day's cap, and that no harm ends one or moves
- * it, though {@code /kill} takes it away.
+ * The Academy's grounds in Seireitei, the yard, the dojo and the Kidō range west and south of its hall, and the training
+ * dummies standing in them: where the plan lays them, how a blow on a dummy trains, up to the day's cap, and that no harm
+ * ends one or moves it, though {@code /kill} takes it away. Test 5's chunks build the grounds in the test world's Soul
+ * Society, so it runs in a batch of its own.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class AcademyGroundsTests {
+    /** The dummies each work's template sets, in {@link AcademySite#GROUNDS}' order: the yard's, the dojo's, the range's. */
+    private static final List<Integer> DUMMIES = List.of(8, 2, 2);
+    /** The markers of each work, in the same order. */
+    private static final List<List<SiteStamp.Marker>> MARKERS = List.of(AcademySite.YARD_MARKERS,
+            AcademySite.DOJO_MARKERS, AcademySite.RANGE_MARKERS);
+
     private AcademyGroundsTests() {
     }
 
@@ -63,6 +91,70 @@ public final class AcademyGroundsTests {
         target.invulnerableTime = 0;
         target.hurt(player.damageSources().playerAttack(player), 4.0F);
         player.tickCount += 10;
+    }
+
+    /** The dummies standing in this work's box in Soul Society. */
+    private static List<TrainingDummy> standing(ServerLevel soul, SiteStamp stamp) {
+        return soul.getEntities(ModEntities.TRAINING_DUMMY.get(), AABB.of(AcademySite.box(stamp)), dummy -> true);
+    }
+
+    /** Where this work's template is set from: its corner, on the lawn. */
+    private static BlockPos corner(SiteStamp stamp) {
+        SeireiteiPlan.Site site = stamp.sites().get(0);
+        return new BlockPos(site.x(), SeireiteiPlan.PLATEAU_Y, site.z());
+    }
+
+    // ---- The plan ----
+
+    /**
+     * Test 1. The yard, dojo and range follow the hall in the plan's academy group, each on the lawn and alone in its
+     * start chunk, its reserve inside the Academy's and west or south of the hall's row, so clear of the forecourt and
+     * the landing too; each is laid out at its corner as its stamp reads it, with a marker in each chunk it covers, and
+     * its template sets its dummies, each to take its UUID from its spot and none unhurtable.
+     */
+    @GameTest(template = "empty")
+    public static void theGroundsFollowThePlan(GameTestHelper helper) {
+        ServerLevel soul = SiteTests.soul(helper);
+        List<SeireiteiPlan.Site> academy = SeireiteiPlan.sites("academy");
+        helper.assertTrue(academy.size() == 4 && AcademySite.GROUNDS.stream().map(stamp -> stamp.sites().get(0))
+                .toList().equals(academy.subList(1, 4)), "the academy's sites are " + academy);
+        SeireiteiPlan.Reserve hall = academy.get(0).reserve(), grounds = SeireiteiPlan.RESERVES.get(1);
+        Structure structure = soul.registryAccess().registryOrThrow(Registries.STRUCTURE).get(AcademySite.STRUCTURE);
+        ChunkGenerator generator = soul.getChunkSource().getGenerator();
+        for (int i = 0; i < DUMMIES.size(); i++) {
+            SiteStamp stamp = AcademySite.GROUNDS.get(i);
+            SeireiteiPlan.Site site = stamp.sites().get(0);
+            SeireiteiPlan.Reserve own = site.reserve();
+            helper.assertTrue(site.y() == SeireiteiPlan.Site.GROUND && SeireiteiPlan.SITES.stream()
+                    .filter(other -> other.chunk().equals(site.chunk())).count() == 1, site + " is not alone on the lawn");
+            helper.assertTrue(grounds.group().equals("academy") && grounds.contains(own.minX(), own.minZ())
+                    && grounds.contains(own.maxX(), own.maxZ()) && (own.maxX() < hall.minX() || own.minZ() > hall.maxZ()),
+                    site + "'s reserve leaves the Academy's or meets the hall's row");
+            StructureStart start = structure.generate(soul.registryAccess(), generator, generator.getBiomeSource(),
+                    soul.getChunkSource().randomState(), soul.getStructureManager(), soul.getSeed(), site.chunk(), 0,
+                    soul, structure.biomes()::contains);
+            BoundingBox box = AcademySite.box(stamp);
+            helper.assertTrue(start.isValid() && start.getPieces().size() == 1 && start.getPieces().get(0) instanceof
+                    SitePiece piece && piece.templatePosition().equals(corner(stamp)) && piece.getBoundingBox()
+                    .equals(box), site + " is laid out as " + start.getPieces());
+            StructureTemplate template = soul.getStructureManager().get(site.template()).orElseThrow();
+            StructurePlaceSettings turn = new StructurePlaceSettings().setRotation(site.rotation());
+            Map<ChunkPos, Integer> marked = new HashMap<>();
+            for (SiteStamp.Marker marker : MARKERS.get(i)) {
+                BlockPos at = stamp.markerAt(0, marker, corner(stamp));
+                helper.assertTrue(template.filterBlocks(corner(stamp), turn, marker.block().get()).stream()
+                        .anyMatch(info -> info.pos().equals(at)), site + "'s marker at " + at + " is not in its template");
+                marked.merge(new ChunkPos(at), 1, Integer::sum);
+            }
+            helper.assertTrue(marked.keySet().equals(Set.copyOf(stamp.covered(0)))
+                    && marked.values().stream().allMatch(n -> n == 1), site + "'s markers lie in " + marked);
+            List<CompoundTag> dummies = template.save(new CompoundTag()).getList("entities", Tag.TAG_COMPOUND).stream()
+                    .map(entry -> ((CompoundTag) entry).getCompound("nbt")).toList();
+            helper.assertTrue(dummies.size() == DUMMIES.get(i) && dummies.stream().allMatch(nbt -> nbt.getString("id")
+                    .equals(BleachMod.id("training_dummy").toString()) && nbt.getBoolean("Spot")
+                    && !nbt.contains("Invulnerable")), site + " sets " + dummies);
+        }
+        helper.succeed();
     }
 
     // ---- Training ----
@@ -190,5 +282,51 @@ public final class AcademyGroundsTests {
                 dummy.discard();
             }
         }).thenSucceed();
+    }
+
+    // ---- In the world ----
+
+    /**
+     * Test 5. Built in a world made before them by their chunks' loads alone, the grounds stand once with every dummy
+     * their templates set, none saving its spot's flag: building again or setting the yard's template again where it
+     * stands doubles none, and a dummy killed is not set back when its chunk loads, only by that template set again. It
+     * leaves the grounds built in the shared test world with all 12 dummies, which no later test counts.
+     */
+    @GameTest(template = "empty", batch = "grounds", timeoutTicks = 400)
+    public static void theGroundsAreBuiltOnce(GameTestHelper helper) {
+        ServerLevel soul = ShakonmakuTests.hold(helper, -14, 15).soul;
+        List<SiteStamp> stamps = AcademySite.GROUNDS;
+        // Nothing here builds them: the checks the held chunks' loads queue do, each once its work's ring is loaded.
+        // The wait is patient, since the test server's ticks outrun the loading threads that lay those chunks.
+        StructureTemplate yard = soul.getStructureManager().get(AcademySite.YARD.sites().get(0).template()).orElseThrow();
+        BlockPos corner = corner(AcademySite.YARD);
+        Runnable placeYard = () -> yard.placeInWorld(soul, corner, corner, new StructurePlaceSettings(),
+                soul.getRandom(), Block.UPDATE_CLIENTS);
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, stamps.stream().allMatch(stamp -> stamp.stands(soul, 0,
+                        corner(stamp)) && stamp.covered(0).stream().allMatch(chunk -> soul.areEntitiesLoaded(
+                        chunk.toLong()))), "the grounds do not stand, or their chunks' creatures have not loaded"))
+                .thenExecute(() -> {
+                    for (int i = 0; i < stamps.size(); i++) {
+                        SiteStamp stamp = stamps.get(i);
+                        List<TrainingDummy> held = standing(soul, stamp);
+                        helper.assertTrue(held.size() == DUMMIES.get(i) && held.stream().noneMatch(each -> each
+                                .saveWithoutId(new CompoundTag()).contains("Spot")) && !stamp.ensureBuilt(soul, 0)
+                                && standing(soul, stamp).size() == DUMMIES.get(i), stamp.sites().get(0) + " holds " + held);
+                    }
+                    placeYard.run();
+                    helper.assertTrue(standing(soul, AcademySite.YARD).size() == 8, "the yard set again doubled a dummy");
+                    TrainingDummy killed = standing(soul, AcademySite.YARD).get(0);
+                    killed.kill();
+                    helper.assertFalse(AcademySite.YARD.ensureBuilt(soul, 0), "the yard was built again");
+                    AcademySite.onChunkLoad(new ChunkEvent.Load(soul.getChunkAt(killed.blockPosition()), false));
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    helper.assertTrue(standing(soul, AcademySite.YARD).size() == 7, "the killed dummy was set back");
+                    placeYard.run();
+                    helper.assertTrue(standing(soul, AcademySite.YARD).size() == 8, "the yard set again did not restore it");
+                })
+                .thenSucceed();
     }
 }

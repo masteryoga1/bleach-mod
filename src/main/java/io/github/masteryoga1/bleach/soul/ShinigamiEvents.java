@@ -86,8 +86,9 @@ public final class ShinigamiEvents {
         bus.addListener(ShinigamiEvents::onPlayerTick);
         bus.addListener(ShinigamiEvents::onChangedDimension);
         bus.addListener(ShinigamiEvents::onLoggedIn);
-        // The Academy in Seireitei and the gate houses are completed where their chunks were made before them, or with
-        // structures off; a soul a house is built over, or joins inside, is moved out of its blocks.
+        // The Academy in Seireitei, its grounds and the gate houses are completed where their chunks were made before
+        // them, or with structures off; a soul a work of the grounds or a house is built over, or joins inside a house,
+        // is moved out of its blocks.
         bus.addListener(AcademySite::onChunkLoad);
         bus.addListener(AcademySite::onServerTick);
         bus.addListener(GateHouses::onChunkLoad);
