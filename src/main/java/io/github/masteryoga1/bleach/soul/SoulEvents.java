@@ -116,6 +116,7 @@ public final class SoulEvents {
         // Jinzen counts too: its screen releases every key, so the soul no longer reads as crouching.
         boolean meditating = (player.isCrouching() && player.onGround() && movedSqr < 1.0E-4)
                 || JinzenLogic.isSitting(player, data);
+        SekkisekiLogic.tick(player, data);
         if (mayRegenerate(player, data)) {
             SoulLogic.regenTick(data, meditating || player.isSleeping(),
                     ShinigamiLogic.regenMultiplier(player, data, player.level().getGameTime()));
@@ -163,7 +164,7 @@ public final class SoulEvents {
      * Shikai that can seal, an Arrancar's Resurrección or a Visored's mask, or weaving Ransōtengai's
      * threads spends it as it comes; channelling Kaidō pours it out, and each pulse of it that does
      * something rests it for a second after (see {@link KidoHeal}). A Quincy's footing is paid in
-     * reishi instead.
+     * reishi instead. Shut in by Sekkiseki ({@link SekkisekiLogic}), it does not refill at all.
      */
     public static boolean mayRegenerate(Player player, SoulData data) {
         return mayRegenerate(player, data, player.level().getGameTime());
@@ -174,7 +175,8 @@ public final class SoulEvents {
         boolean footingOnReiryoku = ReishiFooting.isActive(player) && !QuincyLogic.footingOnReishi(data, now);
         return !data.isReiatsuReleased() && !ReiatsuEvents.isSettling(player, data) && !footingOnReiryoku
                 && !data.isShikaiActive() && !QuincyRansotengai.isWoven(data) && !ArrancarLogic.released(data)
-                && !VisoredLogic.isMasked(data) && data.kidoHeal == null && now >= data.kidoHealRestUntil;
+                && !VisoredLogic.isMasked(data) && data.kidoHeal == null && now >= data.kidoHealRestUntil
+                && !data.enclosed;
     }
 
     /**

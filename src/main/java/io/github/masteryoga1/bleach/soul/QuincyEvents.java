@@ -269,11 +269,11 @@ public final class QuincyEvents {
 
     /**
      * A second's worth of reishi gathering, when the soul can gather: not while Blut runs or on reishi
-     * footing (unless Letzt Stil burns, which gathers through both), nor as a spectator. Channelled
-     * reishi is seen drifting into the chest.
+     * footing (unless Letzt Stil burns, which gathers through both), nor as a spectator or shut in by
+     * Sekkiseki. Channelled reishi is seen drifting into the chest.
      */
     private static void gather(ServerPlayer player, SoulData data, boolean channelling) {
-        if (!QuincyLogic.canUsePowers(data) || player.isSpectator() || !player.isAlive()
+        if (!QuincyLogic.canUsePowers(data) || player.isSpectator() || !player.isAlive() || data.enclosed
                 || (!QuincyArtsLogic.gathersThroughEverything(data)
                         && (data.quincy().blut() != BlutMode.OFF || ReishiFooting.isActive(player)))) {
             return;

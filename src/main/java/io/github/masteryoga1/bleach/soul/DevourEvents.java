@@ -270,8 +270,9 @@ public final class DevourEvents {
     }
 
     /**
-     * What a meal gives its devourer: soul hunger, the count of what it has devoured, reiryoku, health,
-     * growth and souls, a Hollow's experience, and its road as a Menos (see {@link MenosEvolution#afterMeal}).
+     * What a meal gives its devourer: soul hunger, the count of what it has devoured, reiryoku (none while
+     * Sekkiseki holds it), health, growth and souls, a Hollow's experience, and its road as a Menos (see
+     * {@link MenosEvolution#afterMeal}).
      * A player feeds growth, the base souls and the road as a Menos only once in a while, as a player kill
      * does, but a Hollow player's lost souls always pass to its devourer.
      */
@@ -287,7 +288,7 @@ public final class DevourEvents {
         data.setHollow(hollow.withLastMealAt(now));
 
         float max = data.maxReiryoku();
-        double refill = max * BleachConfig.get(BleachConfig.DEVOUR_REIRYOKU_FRACTION);
+        double refill = SekkisekiLogic.held(data) ? 0.0 : max * BleachConfig.get(BleachConfig.DEVOUR_REIRYOKU_FRACTION);
         data.setReiryoku((float) Math.min(max, data.reiryoku() + refill));
         devourer.heal((float) (devourer.getMaxHealth() * BleachConfig.get(BleachConfig.DEVOUR_HEAL_FRACTION)));
 

@@ -111,7 +111,8 @@ public final class GateKeeperTests {
         return helper.startSequence()
                 .thenExecute(() -> clearBeasts(soul, gate))
                 .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), gate))
-                .thenWaitUntil(() -> helper.assertTrue(keeper(soul, gate) != null, "gate " + gate + " has no keeper yet"))
+                .thenWaitUntil(() -> GateTests.patiently(helper, keeper(soul, gate) != null,
+                        "gate " + gate + " has no keeper yet"))
                 .thenExecute(() -> keeper(soul, gate).discard())
                 .thenWaitUntil(() -> keeper[0] = assertKeeper(helper, soul, gate))
                 .thenExecute(() -> keeper[0].setNoAi(quiet));
