@@ -297,12 +297,13 @@ public final class AcademyGroundsTests {
         ServerLevel soul = ShakonmakuTests.hold(helper, -14, 15).soul;
         List<SiteStamp> stamps = AcademySite.GROUNDS;
         // Nothing here builds them: the checks the held chunks' loads queue do, each once its work's ring is loaded.
+        // The wait is patient, since the test server's ticks outrun the loading threads that lay those chunks.
         StructureTemplate yard = soul.getStructureManager().get(AcademySite.YARD.sites().get(0).template()).orElseThrow();
         BlockPos corner = corner(AcademySite.YARD);
         Runnable placeYard = () -> yard.placeInWorld(soul, corner, corner, new StructurePlaceSettings(),
                 soul.getRandom(), Block.UPDATE_CLIENTS);
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(stamps.stream().allMatch(stamp -> stamp.stands(soul, 0,
+                .thenWaitUntil(() -> GateTests.patiently(helper, stamps.stream().allMatch(stamp -> stamp.stands(soul, 0,
                         corner(stamp)) && stamp.covered(0).stream().allMatch(chunk -> soul.areEntitiesLoaded(
                         chunk.toLong()))), "the grounds do not stand, or their chunks' creatures have not loaded"))
                 .thenExecute(() -> {
