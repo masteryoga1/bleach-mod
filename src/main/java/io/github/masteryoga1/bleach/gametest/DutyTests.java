@@ -11,6 +11,7 @@ import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.DutyEvents;
+import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.HomeWorldRespawn;
 import io.github.masteryoga1.bleach.soul.KonsoTarget;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
@@ -627,8 +628,9 @@ public final class DutyTests {
 
     /**
      * A student the Shinigami on duty came for is let go, and told nothing, when the server stops sending souls home
-     * before its half minute is up. Come for again and still near when it is, it is sent to the gates of the Academy, the
-     * same player, alive and still a student, facing the hall, and told why; and none comes for it there.
+     * before its half minute is up, or when its field trial has begun. Come for again and still near when it is, it is
+     * sent to the gates of the Academy, the same player, alive and still a student, facing the hall, and told why; and
+     * none comes for it there.
      */
     @GameTest(template = "empty", batch = "duty_academy", timeoutTicks = 500)
     public static void aLingeringStudentIsSentToTheAcademy(GameTestHelper helper) {
@@ -652,6 +654,12 @@ public final class DutyTests {
                     lines[0] = TestPlayers.chat(player).size();
                     KidoTests.withConfig(BleachConfig.KONSO_DUTY_SENDS_HOME, false, duty::endErrand);
                     helper.assertTrue(duty.charge() == null, "the errand did not end");
+                    // Its trial begun, it is let go too; forgotten at once, as the errand's end queued no move.
+                    duty.sendHomeLater(player);
+                    FieldTrialEvents.begin(player, helper.getLevel().getGameTime());
+                    duty.endErrand();
+                    FieldTrialEvents.forget(player);
+                    lines[0] = TestPlayers.chat(player).size();
                 }, clear))
                 // Past the ticks a task between ticks may wait, it is still here and was told nothing; then came for again.
                 .thenIdle(5)

@@ -162,8 +162,9 @@ public final class DevourLogic {
 
     /**
      * Whether this prey is beyond the devourer's jaws for now: either of them held in a Negación light, a Plus
-     * or a Hollow leaving for good (or a Hollow dissolving), or a player in creative or spectator mode, unaware,
-     * kept safe by the server's PvP setting or a shared team, or on a server where players cannot be devoured.
+     * or a Hollow leaving for good (or a Hollow dissolving, or a student's practice Hollow), or a player in creative
+     * or spectator mode, unaware, kept safe by the server's PvP setting or a shared team, or on a server where players
+     * cannot be devoured.
      */
     public static boolean protectedPrey(Player devourer, LivingEntity prey) {
         if (Negacion.held(devourer) || Negacion.held(prey)) {
@@ -173,7 +174,7 @@ public final class DevourLogic {
             return plus.isDeparting();
         }
         if (prey instanceof Hollow hollow) {
-            return hollow.isPurifying() || hollow.isDeparting();
+            return hollow.isPurifying() || hollow.isDeparting() || hollow.isPractice();
         }
         if (prey instanceof Player player) {
             // canHarmPlayer is virtual: on the server it also asks whether PvP is on.

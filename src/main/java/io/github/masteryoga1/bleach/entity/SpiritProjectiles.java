@@ -28,8 +28,9 @@ public final class SpiritProjectiles {
      * riding with them or their tamed animals, never a Plus or a Shinigami, nor a player in creative
      * or spectator mode or one the owner may not harm (a teammate, with friendly fire off). A living
      * Quincy of the Human World is never struck, and their own arrows strike only the Hollows they
-     * hunt ({@link QuincyNpc#isQuarry}), so a miss passes through everyone else. A projectile whose
-     * owner is gone keeps only the rules that do not need one.
+     * hunt ({@link QuincyNpc#isQuarry}), so a miss passes through everyone else. A practice Hollow is
+     * struck by its own student's alone. A projectile whose owner is gone keeps only the rules that do
+     * not need one.
      */
     public static boolean mayStrike(@Nullable Entity owner, LivingEntity target) {
         if (!target.isAlive()) {
@@ -47,6 +48,10 @@ public final class SpiritProjectiles {
             }
         }
         if (target instanceof QuincyNpc) {
+            return false;
+        }
+        if (target instanceof Hollow hollow && hollow.isPractice()
+                && (owner == null || !owner.getUUID().equals(hollow.trialOf()))) {
             return false;
         }
         if (owner instanceof QuincyNpc) {

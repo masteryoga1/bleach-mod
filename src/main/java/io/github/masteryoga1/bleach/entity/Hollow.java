@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.BaitEvents;
+import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.PlusEvents;
@@ -30,6 +31,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
@@ -154,6 +156,11 @@ public abstract class Hollow extends Monster {
     private VillagerData formerVillager;
     /** Whether this Hollow was a Plus whose chain ran out. */
     private boolean fromPlus;
+    /** The student whose field trial this practice Hollow belongs to; null for a real Hollow. Never saved. */
+    @Nullable
+    private UUID trialOf;
+    /** When that trial began, so one from an earlier trial is never counted. */
+    private long trialStart;
 
     /** Ticks into the white dissolve, on both sides, so the renderer can follow it. */
     int dissolveTicks;
@@ -263,8 +270,8 @@ public abstract class Hollow extends Monster {
     }
 
     /**
-     * Server side, every tick, so it all still happens with NoAI: the soul, the crack wearing off, the
-     * mask forming, a missing departure tear, and healing when left alone.
+     * Server side, every tick, so it all still happens with NoAI: the soul, a practice Hollow its trial no
+     * longer wants fading, the crack wearing off, the mask forming, a missing departure tear, and healing when left alone.
      */
     @Override
     public void tick() {
@@ -274,6 +281,10 @@ public abstract class Hollow extends Monster {
         }
         if (!SoulLogic.hasSoul(this)) {
             initSoul(spawnScale());
+        }
+        if (isPractice() && tickCount % 10 == 0 && !FieldTrialEvents.keeps(this)) {
+            dissolve(server);
+            return;
         }
         long now = server.getGameTime();
         setFlag(FLAG_CRACKED, now < crackedUntil);
@@ -303,14 +314,18 @@ public abstract class Hollow extends Monster {
     /**
      * Gives up its prey while a bait's finale draws it under the tear: one set straight on it (by the
      * rift it came through, or a pack's call) is not let go by the target goals, which no longer run.
-     * Otherwise counts the time without prey, and leaves through a tear of its own when there has
-     * been too much.
+     * A practice Hollow with no prey goes after its student again. Otherwise counts the time without
+     * prey, and leaves through a tear of its own when there has been too much.
      */
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
         if (isBaitFinale() && getTarget() != null) {
             setTarget(null);
+        }
+        LivingEntity student = isPractice() && getTarget() == null ? FieldTrialEvents.studentOf(this) : null;
+        if (student != null && canAttack(student)) {
+            setTarget(student);
         }
         if (getTarget() != null) {
             idleTicks = 0;
@@ -326,12 +341,13 @@ public abstract class Hollow extends Monster {
     }
 
     /**
-     * Hollows someone wants kept stay: named ones, persistent ones, ones without AI, and ones a Hollow
-     * Bait still holds. So does any in Hueco Mundo, which is home: it goes only as any monster does.
+     * Hollows someone wants kept stay: named ones, persistent ones, ones without AI, ones a Hollow Bait
+     * still holds, and practice ones, which go with their trial. So does any in Hueco Mundo, which is home:
+     * it goes only as any monster does.
      */
     private boolean mayLeave() {
-        return !departing && !isPurifying() && !isPersistenceRequired() && !hasCustomName() && !isNoAi()
-                && !isBaitHeld() && level().dimension() != BleachWorlds.HUECO_MUNDO;
+        return !isPractice() && !departing && !isPurifying() && !isPersistenceRequired() && !hasCustomName()
+                && !isNoAi() && !isBaitHeld() && level().dimension() != BleachWorlds.HUECO_MUNDO;
     }
 
     /** A Hollow comes in any light: a natural spawn answers to its placement's ground rule alone (HuecoMundoSpawns). */
@@ -424,6 +440,41 @@ public abstract class Hollow extends Monster {
         boolean before = fragmentRolled;
         fragmentRolled = true;
         return before;
+    }
+
+    /**
+     * Makes this a practice Hollow of this student's field trial begun at {@code start}: it hunts and answers only that
+     * student, and gives nothing a slain Hollow gives (no count, growth, experience, kill score or fragment), though
+     * each blow on it trains as on any Hollow.
+     */
+    public void makePractice(UUID student, long start) {
+        trialOf = student;
+        trialStart = start;
+        fragmentRolled = true;
+        deathScore = -1;
+    }
+
+    /** The student whose field trial this practice Hollow belongs to; null for a real Hollow. */
+    @Nullable
+    public UUID trialOf() {
+        return trialOf;
+    }
+
+    /** The game time this practice Hollow's trial began. */
+    public long trialStart() {
+        return trialStart;
+    }
+
+    /** Whether this is a practice Hollow of a student's field trial, never saved and gone with it. */
+    public boolean isPractice() {
+        return trialOf != null;
+    }
+
+    /** Its trial is over: it fades into white ash only the aware see, and is gone, with no death and nothing counted. */
+    public void dissolve(ServerLevel server) {
+        SpiritSenses.particles(server, ParticleTypes.WHITE_ASH, getX(), getY() + getBbHeight() * 0.5, getZ(), 12,
+                getBbWidth() * 0.4, getBbHeight() * 0.4, getBbWidth() * 0.4, 0.02);
+        discard();
     }
 
     /** Whether the mask was struck on this very tick, so the blow that did it can count for more. */
@@ -647,12 +698,30 @@ public abstract class Hollow extends Monster {
 
     /**
      * As for any monster, except one fighting (hurt by a creature in the last 100 seconds) stays, and
-     * so does one a Hollow Bait holds.
+     * so do one a Hollow Bait holds and a practice one, which goes only with its trial.
      */
     @Override
     public boolean removeWhenFarAway(double distanceToClosestPlayer) {
-        return !isBaitHeld() && level().getGameTime() - lastHurtByMobAt > MOB_HURT_PROTECTION_TICKS
+        return !isPractice() && !isBaitHeld() && level().getGameTime() - lastHurtByMobAt > MOB_HURT_PROTECTION_TICKS
                 && super.removeWhenFarAway(distanceToClosestPlayer);
+    }
+
+    /** A practice Hollow stays in a peaceful world, where it cannot hurt its student; its trial takes it away. */
+    @Override
+    protected boolean shouldDespawnInPeaceful() {
+        return !isPractice() && super.shouldDespawnInPeaceful();
+    }
+
+    /** A practice Hollow is never written, so it goes with its chunk and none is left after a restart. */
+    @Override
+    public boolean saveAsPassenger(CompoundTag tag) {
+        return !isPractice() && super.saveAsPassenger(tag);
+    }
+
+    /** Nor does a practice Hollow take a portal away from its trial. */
+    @Override
+    public boolean canUsePortal(boolean allowPassengers) {
+        return !isPractice() && super.canUsePortal(allowPassengers);
     }
 
     /** Every sound, footsteps included, goes only to those who can hear spirits. Nothing is played on the client. */
@@ -700,7 +769,8 @@ public abstract class Hollow extends Monster {
      * Hollows go only after their prey ({@link HollowLogic#isPreyFor}: what every Hollow hunts, and the
      * Hollow player whose reiatsu drew this one), and strike back at whoever just hurt them, unless that
      * is a player in creative or spectator mode. Every goal asks this, so prey that stops being prey is
-     * dropped. While the sky cracks above a bait, a Hollow it holds goes after no one.
+     * dropped. While the sky cracks above a bait, a Hollow it holds goes after no one; a practice Hollow
+     * goes after its own student alone, and strikes back at no one else.
      */
     @Override
     public boolean canAttack(LivingEntity target) {
@@ -710,16 +780,35 @@ public abstract class Hollow extends Monster {
         if (!super.canAttack(target)) {
             return false;
         }
+        if (isPractice()) {
+            return HollowLogic.isPreyFor(this, target);
+        }
         if (HollowLogic.isPreyFor(this, target)) {
             return true;
         }
         return target == getLastHurtByMob() && !(target instanceof Player player && (player.isCreative() || player.isSpectator()));
     }
 
-    /** A spirit's body: walls and crowds cannot crush it. */
+    /**
+     * A practice Hollow takes no target but its own student, whoever would set one: a hurt hound's call to its pack, which
+     * asks no {@link #canAttack}, among them.
+     */
+    @Override
+    public void setTarget(@Nullable LivingEntity target) {
+        if (target == null || !isPractice() || target.getUUID().equals(trialOf)) {
+            super.setTarget(target);
+        }
+    }
+
+    /**
+     * A spirit's body: walls and crowds cannot crush it. Nothing but its own student's blows reaches a practice Hollow,
+     * save what passes every guard ({@code /kill}, the void).
+     */
     @Override
     public boolean isInvulnerableTo(DamageSource source) {
-        return super.isInvulnerableTo(source) || source.is(DamageTypes.IN_WALL) || source.is(DamageTypes.CRAMMING);
+        return super.isInvulnerableTo(source) || source.is(DamageTypes.IN_WALL) || source.is(DamageTypes.CRAMMING)
+                || isPractice() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)
+                && (source.getEntity() == null || !trialOf.equals(source.getEntity().getUUID()));
     }
 
     /** Big heads stick out of the hitbox, so the crosshair may aim a little wider. */

@@ -85,8 +85,14 @@ public final class HollowLogic {
         return false;
     }
 
-    /** Whether this Hollow hunts this creature: anything Hollows hunt ({@link #isPrey}), or its rival ({@link #isRival}). */
+    /**
+     * Whether this Hollow hunts this creature: anything Hollows hunt ({@link #isPrey}), or its rival ({@link #isRival});
+     * a practice Hollow hunts its own student alone.
+     */
     public static boolean isPreyFor(Hollow hunter, LivingEntity target) {
+        if (hunter.isPractice()) {
+            return isPrey(target) && target.getUUID().equals(hunter.trialOf());
+        }
         return isPrey(target) || isRival(hunter, target);
     }
 

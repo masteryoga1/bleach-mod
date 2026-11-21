@@ -668,8 +668,8 @@ public class Gillian extends Menos {
 
     /**
      * The nearest lesser Hollow within reach across the ground and in sight: no Menos, none held (in jaws or
-     * in Negación's light), dissolving, leaving or across the Shakonmaku, and none stronger than this Gillian. One a
-     * bait holds will do.
+     * in Negación's light), dissolving, leaving or across the Shakonmaku, no student's practice Hollow, and none
+     * stronger than this Gillian. One a bait holds will do.
      */
     @Nullable
     private Hollow nearestMeal() {
@@ -679,7 +679,8 @@ public class Gillian extends Menos {
                 getX() + reach, getY() + FEED_VERTICAL_REACH, getZ() + reach);
         List<Hollow> meals = new ArrayList<>(level().getEntitiesOfClass(Hollow.class, box,
                 hollow -> !(hollow instanceof Menos) && hollow.isAlive() && !hollow.isSeized() && !hollow.isPurifying()
-                        && !hollow.isDeparting() && !Negacion.held(hollow) && horizontalDistanceSqr(hollow) <= reach * reach
+                        && !hollow.isDeparting() && !hollow.isPractice() && !Negacion.held(hollow)
+                        && horizontalDistanceSqr(hollow) <= reach * reach
                         && SoulLogic.reiatsu(hollow) <= own
                         && !ShakonmakuEvents.stops(level(), hollow, hollow.position(), position())));
         meals.sort(Comparator.comparingDouble(this::distanceToSqr));

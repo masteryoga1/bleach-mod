@@ -141,7 +141,7 @@ public final class GateTests {
     }
 
     /** Runs this command as the server itself, in the Overworld, and gives back every line it said. */
-    private static List<Component> run(ServerLevel soul, String command) {
+    static List<Component> run(ServerLevel soul, String command) {
         List<Component> said = new ArrayList<>();
         CommandSource listener = new CommandSource() {
             @Override
@@ -170,7 +170,7 @@ public final class GateTests {
     }
 
     /** Whether this line, or one it holds, has this key and, unless the gate is -1, names that gate first. */
-    private static boolean says(Component line, String key, int gate) {
+    static boolean says(Component line, String key, int gate) {
         if (line.getContents() instanceof TranslatableContents words && words.getKey().equals(key)) {
             return gate < 0 || words.getArgs().length > 0 && words.getArgs()[0] instanceof Component name
                     && key(name).equals(GATE_KEYS[gate]);

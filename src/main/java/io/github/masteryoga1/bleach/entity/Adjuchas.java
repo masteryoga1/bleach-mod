@@ -148,11 +148,12 @@ public class Adjuchas extends Menos {
 
     /**
      * Whether, hungry, it would eat this: a Hollow weaker than itself, alive, not dissolving or
-     * leaving, and never a Menos.
+     * leaving, and never a Menos or a practice Hollow.
      */
     public boolean isEdible(LivingEntity entity) {
         return isHungry() && entity instanceof Hollow hollow && !(hollow instanceof Menos) && hollow.isAlive()
-                && !hollow.isPurifying() && !hollow.isDeparting() && SoulLogic.reiatsu(hollow) < SoulLogic.reiatsu(this);
+                && !hollow.isPurifying() && !hollow.isDeparting() && !hollow.isPractice()
+                && SoulLogic.reiatsu(hollow) < SoulLogic.reiatsu(this);
     }
 
     /** The pack's leader: of every Adjuchas within the pack's range, itself too, the one with the lowest id. */
