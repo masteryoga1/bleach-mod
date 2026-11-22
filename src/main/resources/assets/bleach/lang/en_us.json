@@ -661,6 +661,7 @@
   "message.bleach.field_trial.not_yours": "This Senkaimon was opened for another soul's field trial",
   "message.bleach.field_trial.gate_home": "A Senkaimon opens before you, back to the Academy",
   "message.bleach.field_trial.gate_home.last": "A Senkaimon opens before you, back to the Academy: the last the instructor opens for you",
+  "message.bleach.field_trial.break_in": "The sky tears open: a real Hollow is breaking into your field trial.",
   "message.bleach.konso.received": "The pommel touches your forehead. Your Chain of Fate falls away and your soul passes on.",
   "message.bleach.konso.performed": "You send %s on",
   "message.bleach.konso.untrained": "Only a Shinigami can perform Konsō",

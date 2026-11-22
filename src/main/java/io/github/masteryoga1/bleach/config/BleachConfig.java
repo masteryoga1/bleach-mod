@@ -63,6 +63,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue KIDO_LESSON_XP;
     public static final ModConfigSpec.IntValue DUMMY_XP_PER_DAY;
     public static final ModConfigSpec.BooleanValue FIELD_TRIAL;
+    public static final ModConfigSpec.DoubleValue FIELD_TRIAL_BREAK_IN_CHANCE;
 
     public static final ModConfigSpec.DoubleValue KONSO_GROWTH;
     public static final ModConfigSpec.IntValue KONSO_REWARDED_PER_DAY;
@@ -909,6 +910,11 @@ public final class BleachConfig {
                         + " World, which the Academy instructor offers once it stands at every exam's mark. False offers"
                         + " no trial, and the exams alone graduate.")
                 .define("field_trial", true);
+        FIELD_TRIAL_BREAK_IN_CHANCE = builder
+                .comment("Chance that a real Hollow tears into a field trial through a Garganta, one to three minutes in,"
+                        + " where Garganta may open and no instructor stands within [garganta] academy_safe_radius: 0.25 is"
+                        + " 25%. It counts as any Hollow does, not toward the five practice Hollows. 0 for never.")
+                .defineInRange("field_trial_break_in_chance", 0.25, 0.0, 1.0);
         builder.pop();
 
         builder.push("konso");

@@ -137,8 +137,14 @@ public final class GargantaEvents {
                 || FieldTrialEvents.running(player)) {
             return false;
         }
+        return !shelteredByInstructor(player);
+    }
+
+    /** Whether an Academy instructor stands within {@code [garganta] academy_safe_radius} of this soul: no tear opens. */
+    static boolean shelteredByInstructor(ServerPlayer player) {
         double safe = BleachConfig.get(BleachConfig.ACADEMY_SAFE_RADIUS);
-        return safe <= 0.0 || level.getEntitiesOfClass(AcademyInstructor.class, player.getBoundingBox().inflate(safe),
+        AABB near = player.getBoundingBox().inflate(safe);
+        return safe > 0.0 && !player.serverLevel().getEntitiesOfClass(AcademyInstructor.class, near,
                 instructor -> instructor.distanceToSqr(player) <= safe * safe).isEmpty();
     }
 
