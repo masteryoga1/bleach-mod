@@ -190,8 +190,10 @@ public final class UraharaShopTests {
             shops.put(site, start);
         }
         helper.startSequence()
-                .thenWaitUntil(() -> shops.values().forEach(start -> covered(box(start)).forEach(chunk -> helper.assertTrue(
-                        level.areEntitiesLoaded(chunk.toLong()), "chunk " + chunk + " has not loaded its creatures"))))
+                // Patiently, as the test server's ticks outrun the loading threads that bring those creatures in.
+                .thenWaitUntil(() -> shops.values().forEach(start -> covered(box(start)).forEach(chunk ->
+                        GateTests.patiently(helper, level.areEntitiesLoaded(chunk.toLong()),
+                                "chunk " + chunk + " has not loaded its creatures"))))
                 .thenExecute(() -> shops.forEach((site, start) -> {
                     for (int set = 0; set < 2; set++) {
                         placeEach(level, start);
