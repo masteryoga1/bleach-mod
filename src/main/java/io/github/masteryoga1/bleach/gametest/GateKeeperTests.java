@@ -110,7 +110,7 @@ public final class GateKeeperTests {
     static GameTestSequence fresh(GameTestHelper helper, ServerLevel soul, int gate, GateKeeper[] keeper, boolean quiet) {
         return helper.startSequence()
                 .thenExecute(() -> clearBeasts(soul, gate))
-                .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), gate))
+                .thenWaitUntil(() -> GateTests.assertLaidAndDown(helper, GateState.get(soul), gate))
                 .thenWaitUntil(() -> GateTests.patiently(helper, keeper(soul, gate) != null,
                         "gate " + gate + " has no keeper yet"))
                 .thenExecute(() -> keeper(soul, gate).discard())
@@ -848,7 +848,7 @@ public final class GateKeeperTests {
                 {v(0.5, 105.0, 518.5), v(0.5, 110.0, 518.5), v(0.5, 112.0, 518.5)}};
         ServerPlayer player = ShakonmakuTests.soulAt(helper, soul, GameType.SURVIVAL, ways[0][0]);
         GameTestSequence sequence = helper.startSequence()
-                .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), SOUTH))
+                .thenWaitUntil(() -> GateTests.assertLaidAndDown(helper, GateState.get(soul), SOUTH))
                 .thenExecute(() -> {
                     // Read only now: the gate down proves the house stamped, so it is the house that is put back.
                     List<BlockState> was = dug.stream().map(soul::getBlockState).toList();

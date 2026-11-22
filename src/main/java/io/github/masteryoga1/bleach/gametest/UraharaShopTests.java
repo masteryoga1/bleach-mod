@@ -494,7 +494,8 @@ public final class UraharaShopTests {
 
     /** Asserts every chunk this box covers has loaded its creatures, so that keepers are placed and counted there aright. */
     private static void entitiesLoaded(GameTestHelper helper, ServerLevel level, BoundingBox box) {
-        covered(box).forEach(chunk -> helper.assertTrue(level.areEntitiesLoaded(chunk.toLong()),
+        // Patiently, as the test server's ticks outrun the loading threads that bring those creatures in.
+        covered(box).forEach(chunk -> GateTests.patiently(helper, level.areEntitiesLoaded(chunk.toLong()),
                 "chunk " + chunk + " has not loaded its creatures"));
     }
 

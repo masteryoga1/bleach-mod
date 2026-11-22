@@ -278,13 +278,16 @@ public final class SiteTests {
      * The tests in {@link AcademyTests} that send a soul there wait for it to stand first, so whichever batch runs
      * first, only the chunks' loads build it.
      */
-    @GameTest(template = "empty", batch = "site", timeoutTicks = 100)
+    @GameTest(template = "empty", batch = "site", timeoutTicks = 400)
     public static void theSeireiteiAcademyStands(GameTestHelper helper) {
         ServerLevel soul = holdAcademy(helper);
         Structure structure = academy(helper, soul);
         // The checks the chunks' loads queued run once this tick is done.
         helper.startSequence()
                 .thenWaitUntil(() -> {
+                    GateTests.patiently(helper, AcademySite.COVERED.stream().allMatch(pos -> soul.getChunk(pos.x, pos.z)
+                                    .getReferencesForStructure(structure).contains(HOME.toLong())),
+                            "the Academy's chunks hold no reference to it yet, its stamp waiting on their creatures");
                     assertStands(helper, soul, structure, "from its chunks' loads alone");
                     helper.assertFalse(instructors(soul).isEmpty(),
                             "the Academy built from its chunks' loads has no instructor");

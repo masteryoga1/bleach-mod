@@ -110,6 +110,12 @@ public final class GateTests {
         assertIs(helper, gates, gate, GateState.Status.DOWN, 0);
     }
 
+    /** Waits patiently for this gate to be laid, as its house waits on its chunks' creatures, then for it down. */
+    static void assertLaidAndDown(GameTestHelper helper, GateState gates, int gate) {
+        patiently(helper, gates.laid(gate), "gate " + gate + " is not laid yet: its house waits on its chunks' creatures");
+        assertDown(helper, gates, gate);
+    }
+
     /**
      * Asserts that this gate stands so high, its block in exactly those of its cells, and that its wicket stands whole,
      * hinged on the right of a soul coming in from the Rukongai, turned with the house.
@@ -216,7 +222,7 @@ public final class GateTests {
         ServerLevel soul = hold(helper, EAST).soul;
         GateState gates = GateState.get(soul);
         helper.startSequence()
-                .thenWaitUntil(() -> assertDown(helper, gates, EAST))
+                .thenWaitUntil(() -> assertLaidAndDown(helper, gates, EAST))
                 .thenExecute(() -> {
                     assertGate(helper, soul, EAST, 0, "before the command");
                     assertSaid(helper, run(soul, "bleach gate shoryuumon lift"), "commands.bleach.unknown_gate", -1,
@@ -275,7 +281,7 @@ public final class GateTests {
         ServerPlayer spectator = TestPlayers.join(helper, GameType.SPECTATOR, new Vec3(1.5, 1.0, 1.5));
         Cow[] cow = new Cow[1];
         helper.startSequence()
-                .thenWaitUntil(() -> assertDown(helper, gates, SOUTH))
+                .thenWaitUntil(() -> assertLaidAndDown(helper, gates, SOUTH))
                 .thenExecute(() -> gates.lift(soul, SOUTH))
                 .thenWaitUntil(() -> assertIs(helper, gates, SOUTH, GateState.Status.LIFTED, LIFT))
                 .thenExecute(() -> {
@@ -329,7 +335,7 @@ public final class GateTests {
         Vec3 inSlot = inRow.add(0.0, 28.0, 0.0);
         Cow[] cows = new Cow[3];
         helper.startSequence()
-                .thenWaitUntil(() -> assertDown(helper, gates, WEST))
+                .thenWaitUntil(() -> assertLaidAndDown(helper, gates, WEST))
                 .thenWaitUntil(() -> patiently(helper, gates.keeper(WEST) != null, "the west gate has no keeper yet"))
                 .thenExecute(() -> {
                     for (int row = 0; row < GateState.ROWS + LIFT; row++) {
@@ -410,7 +416,7 @@ public final class GateTests {
         // Three blocks inside the gate's row, at the doorway's middle height, aimed out at the Rukongai.
         Vec3 from = new Vec3(column.getX() + 0.5, 90.5, column.getZ() + 3.5), out = new Vec3(0.0, 0.0, -1.0);
         helper.startSequence()
-                .thenWaitUntil(() -> assertDown(helper, gates, NORTH))
+                .thenWaitUntil(() -> assertLaidAndDown(helper, gates, NORTH))
                 .thenExecute(() -> {
                     CeroBeam.Shot shot = CeroBeam.fire(soul, null, null, from, out, spec);
                     helper.assertTrue(shot.negated() && !shot.hitBlock() && shot.blocksBroken() == 0
@@ -441,7 +447,7 @@ public final class GateTests {
         BlockHitResult touch = new BlockHitResult(Vec3.atCenterOf(wicket), Direction.EAST, wicket, false);
         int[] order = {2, 3, 4, 3, 2, 1, 0};
         var sequence = helper.startSequence()
-                .thenWaitUntil(() -> assertDown(helper, gates, EAST))
+                .thenWaitUntil(() -> assertLaidAndDown(helper, gates, EAST))
                 .thenIdle(5)
                 .thenExecute(() -> step(helper, player, way[1], way[1], "the soul in the wicket's way"))
                 .thenIdle(1)
