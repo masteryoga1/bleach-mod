@@ -72,7 +72,27 @@ public enum DialogueView {
     /** A Shinigami on duty tells the soul it came for, which has passed on, to stay near and be sent home, or walk off. */
     HOMEWARD,
     /** The instructor offers a student at every exam's mark its field trial in the Human World, in place of the exams. */
-    STUDENT_TRIAL;
+    STUDENT_TRIAL,
+    /** Kisuke Urahara greets a living Human who sees nothing of spirits: a customer for sweets. */
+    SHOP_STRANGER,
+    /** Kisuke Urahara greets a living Human aware of spirits, a Fullbringer among them. */
+    SHOP_AWARE,
+    /** Kisuke Urahara greets a Plus, its chain still on it. */
+    SHOP_PLUS,
+    /** Kisuke Urahara greets a soul that has passed on, not enrolled at the Academy. */
+    SHOP_SOUL,
+    /** Kisuke Urahara greets a student of the Academy. */
+    SHOP_STUDENT,
+    /** Kisuke Urahara greets a Shinigami, a Substitute among them. */
+    SHOP_SHINIGAMI,
+    /** Kisuke Urahara greets an awakened Quincy. */
+    SHOP_QUINCY,
+    /** Kisuke Urahara greets a Hollow. */
+    SHOP_HOLLOW,
+    /** Kisuke Urahara greets an Arrancar. */
+    SHOP_ARRANCAR,
+    /** Kisuke Urahara greets a Visored, who has beaten the Hollow inside. */
+    SHOP_VISORED;
 
     private static final IntFunction<DialogueView> BY_ID =
             ByIdMap.continuous(DialogueView::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

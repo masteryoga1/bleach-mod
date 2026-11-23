@@ -165,7 +165,8 @@ public final class AcademyTests {
                 case HOLLOW_PURIFY -> List.of(NpcAction.PURIFY);
                 case LIVING, HOLLOW, RESTING, QUINCY, ELDER_TRIAL, ELDER_IDLE, ELDER_STRANGER, ELDER_HOLLOW,
                         HUNTER_CONTEST, HUNTER_RESTING, HUNTER_PLAIN, HUNTER_HOLLOW, KEEPER_OPEN, KEEPER_BARRED,
-                        KEEPER_WON, KEEPER_BEATEN, KEEPER_FOE, HOMEWARD -> List.of();
+                        KEEPER_WON, KEEPER_BEATEN, KEEPER_FOE, HOMEWARD, SHOP_STRANGER, SHOP_AWARE, SHOP_PLUS, SHOP_SOUL,
+                        SHOP_STUDENT, SHOP_SHINIGAMI, SHOP_QUINCY, SHOP_HOLLOW, SHOP_ARRANCAR, SHOP_VISORED -> List.of();
             };
             helper.assertTrue(offered.equals(expected), view + " offers " + offered);
         }

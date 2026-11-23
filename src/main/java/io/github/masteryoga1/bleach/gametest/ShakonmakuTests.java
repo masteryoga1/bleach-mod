@@ -74,15 +74,19 @@ public final class ShakonmakuTests {
      * the test ends.
      */
     static Cleanup hold(GameTestHelper helper, int chunkX, int chunkZ) {
-        ServerLevel soul = SiteTests.soul(helper);
+        return hold(helper, SiteTests.soul(helper), chunkX, chunkZ);
+    }
+
+    /** As above, in this world, which need not be Soul Society. */
+    static Cleanup hold(GameTestHelper helper, ServerLevel level, int chunkX, int chunkZ) {
         for (int x = -2; x <= 2; x++) {
             for (int z = -2; z <= 2; z++) {
-                soul.getChunk(chunkX + x, chunkZ + z);
+                level.getChunk(chunkX + x, chunkZ + z);
             }
         }
         ChunkPos centre = new ChunkPos(chunkX, chunkZ);
-        soul.getChunkSource().addRegionTicket(TicketType.FORCED, centre, HOLD_DISTANCE, centre);
-        Cleanup cleanup = new Cleanup(soul, centre);
+        level.getChunkSource().addRegionTicket(TicketType.FORCED, centre, HOLD_DISTANCE, centre);
+        Cleanup cleanup = new Cleanup(level, centre);
         helper.testInfo.addListener(cleanup);
         return cleanup;
     }
@@ -125,7 +129,7 @@ public final class ShakonmakuTests {
                 spray && spray.getParticle().getType() == ParticleTypes.SCRAPE).count();
     }
 
-    /** Lets a test's chunks go and takes away what it set down in Soul Society when it passes or fails, however it ends. */
+    /** Lets a test's chunks go and takes away what it set down in the world held when it passes or fails, however it ends. */
     static final class Cleanup implements GameTestListener {
         final ServerLevel soul;
         private final ChunkPos centre;
@@ -137,7 +141,7 @@ public final class ShakonmakuTests {
             this.centre = centre;
         }
 
-        /** Sets this down in Soul Society, to be taken away when the test ends. */
+        /** Sets this down in the world held, to be taken away when the test ends. */
         <T extends Entity> T add(T entity) {
             placed.add(entity);
             soul.addFreshEntity(entity);
@@ -167,11 +171,21 @@ public final class ShakonmakuTests {
         public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
         }
 
-        /** Takes away what the test set down, runs what it asked to at its end, and lets its chunks go. */
+        /** Takes away what the test set down, runs each thing it asked to at its end, and lets its chunks go. */
         private void end() {
-            TravelTests.discard(placed.toArray(new Entity[0]));
-            ends.forEach(Runnable::run);
-            soul.getChunkSource().removeRegionTicket(TicketType.FORCED, centre, HOLD_DISTANCE, centre);
+            try {
+                TravelTests.discard(placed.toArray(new Entity[0]));
+                for (Runnable action : ends) {
+                    // Each alone, so one that fails neither stops the rest nor keeps the chunks held.
+                    try {
+                        action.run();
+                    } catch (RuntimeException failed) {
+                        BleachMod.LOGGER.error("A test's clean-up at its end failed", failed);
+                    }
+                }
+            } finally {
+                soul.getChunkSource().removeRegionTicket(TicketType.FORCED, centre, HOLD_DISTANCE, centre);
+            }
         }
     }
 

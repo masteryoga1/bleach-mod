@@ -25,7 +25,7 @@ public final class SpiritProjectiles {
 
     /**
      * Whether a projectile fired by {@code owner} may strike this creature: never its owner, anything
-     * riding with them or their tamed animals, never a Plus or a Shinigami, nor a player in creative
+     * riding with them or their tamed animals, never a Plus, a Shinigami or Kisuke Urahara, nor a player in creative
      * or spectator mode or one the owner may not harm (a teammate, with friendly fire off). A living
      * Quincy of the Human World is never struck, and their own arrows strike only the Hollows they
      * hunt ({@link QuincyNpc#isQuarry}), so a miss passes through everyone else. A practice Hollow is
@@ -57,7 +57,7 @@ public final class SpiritProjectiles {
         if (owner instanceof QuincyNpc) {
             return QuincyNpc.isQuarry(target);
         }
-        if (target instanceof PlusSpirit || target instanceof ShinigamiNpc) {
+        if (target instanceof PlusSpirit || target instanceof ShinigamiNpc || target instanceof KisukeUrahara) {
             return false;
         }
         if (target instanceof Player player) {
