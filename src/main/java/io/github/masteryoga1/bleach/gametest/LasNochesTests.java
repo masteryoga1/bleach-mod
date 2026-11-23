@@ -438,7 +438,8 @@ public final class LasNochesTests {
         shut.moveTo(50.5, HuecoMundoPlan.LEVEL_Y, 5.5, 0.0F, 0.0F);
         Pig joining = pig(helper, hueco, 121.5, HuecoMundoPlan.LEVEL_Y, 8.5);
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(referenced(hueco, structure, EAST)
+                // Patiently, as the stamp waits on chunks asked for by future, which load off the server's thread.
+                .thenWaitUntil(() -> GateTests.patiently(helper, referenced(hueco, structure, EAST)
                         && referenced(hueco, structure, DOME_FOOT), "the stamp has not laid " + EAST + " and " + DOME_FOOT))
                 .thenExecute(() -> {
                     Map<HuecoMundoPlan.Shell, Integer> gateway = assertLaidAsPlanned(helper, hueco, EAST),
@@ -490,7 +491,8 @@ public final class LasNochesTests {
         giant.getAttribute(Attributes.SCALE).setBaseValue(6.0);
         giant.refreshDimensions();
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(referenced(hueco, structure, NORTH),
+                // Patiently, as the stamp waits on a chunk asked for by future, which loads off the server's thread.
+                .thenWaitUntil(() -> GateTests.patiently(helper, referenced(hueco, structure, NORTH),
                         "the north gateway's chunk " + NORTH + " is not laid"))
                 .thenExecute(() -> {
                     // The wall stands where the first landing starts, and the gateway is open under its band.
