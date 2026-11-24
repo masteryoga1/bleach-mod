@@ -640,7 +640,7 @@ public final class HillTests {
         GameTestSequence steps = helper.startSequence();
         for (int gate = 0; gate < gates; gate++) {
             int g = gate;
-            steps.thenWaitUntil(() -> GateTests.assertDown(helper, state, g))
+            steps.thenWaitUntil(() -> GateTests.assertLaidAndDown(helper, state, g))
                     .thenExecute(() -> {
                         scan(helper, soul, g, "shut");
                         stand(low, soul, g, 8, 0, 3);

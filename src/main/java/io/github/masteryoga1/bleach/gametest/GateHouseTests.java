@@ -88,9 +88,11 @@ public final class GateHouseTests {
         Structure structure = gate(helper, soul);
         ChunkPos home = GateHouses.STAMP.startChunk(house);
         StructureStart start = soul.getChunk(home.x, home.z).getStartForStructure(structure);
-        helper.assertTrue(start != null && start.isValid(), "house " + house + " has no valid start " + when);
+        // Patiently, as the house's stamp waits on its chunks' creatures, which load off the server's thread.
+        GateTests.patiently(helper, start != null && start.isValid(), "house " + house + " has no valid start " + when);
         for (ChunkPos pos : GateHouses.STAMP.covered(house)) {
-            helper.assertTrue(soul.getChunk(pos.x, pos.z).getReferencesForStructure(structure).contains(home.toLong()),
+            GateTests.patiently(helper,
+                    soul.getChunk(pos.x, pos.z).getReferencesForStructure(structure).contains(home.toLong()),
                     "chunk " + pos + " holds no reference to house " + house + " " + when);
         }
     }

@@ -71,7 +71,7 @@ public final class GateHouses {
         }
     }
 
-    /** The one further try a stamp's check asked for, and the souls that joined in a house whose chunks have loaded. */
+    /** The further tries a stamp's check asked for, and the souls that joined in a house whose chunks have loaded. */
     public static void onServerTick(ServerTickEvent.Post event) {
         STAMP.onServerTick(event);
         MinecraftServer server = event.getServer();

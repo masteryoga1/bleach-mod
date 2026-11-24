@@ -530,9 +530,11 @@ public final class AcademyTests {
         Structure structure = soul.registryAccess().registryOrThrow(Registries.STRUCTURE).get(AcademySite.STRUCTURE);
         ChunkPos home = AcademySite.startChunk();
         StructureStart start = structure == null ? null : soul.getChunk(home.x, home.z).getStartForStructure(structure);
-        helper.assertTrue(start != null && start.isValid(), "the Academy in Soul Society has no valid start yet");
+        // Patiently, as its stamp waits on its chunks' creatures, which load off the server's thread.
+        GateTests.patiently(helper, start != null && start.isValid(), "the Academy in Soul Society has no valid start yet");
         for (ChunkPos pos : AcademySite.COVERED) {
-            helper.assertTrue(soul.getChunk(pos.x, pos.z).getReferencesForStructure(structure).contains(home.toLong()),
+            GateTests.patiently(helper,
+                    soul.getChunk(pos.x, pos.z).getReferencesForStructure(structure).contains(home.toLong()),
                     "chunk " + pos + " holds no reference to the Academy in Soul Society yet");
         }
     }
@@ -682,7 +684,7 @@ public final class AcademyTests {
      * at its gate facing the hall, unless it is back from the End's fight, the server has the rule off, or it has a
      * spawn of its own; a basic Hollow where vanilla puts it. The player is never killed.
      */
-    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 100)
+    @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 400)
     public static void respawnWakesAtTheAcademy(GameTestHelper helper) {
         SoulData withPower = ShinigamiTests.soul(SoulState.RUKONGAI, 40.0F);
         withPower.setTier(PowerPath.SHINIGAMI, 1);

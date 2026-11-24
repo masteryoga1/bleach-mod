@@ -317,7 +317,7 @@ public final class ShakonmakuTests {
         ServerPlayer player = soulAt(helper, soul, GameType.SURVIVAL, way[0]);
         int[] order = {1, 2, 3, 2, 1, 0, 1, 2, 3};
         var sequence = helper.startSequence()
-                .thenWaitUntil(() -> GateTests.assertDown(helper, gates, north))
+                .thenWaitUntil(() -> GateTests.assertLaidAndDown(helper, gates, north))
                 .thenExecute(() -> gates.lift(soul, north))
                 .thenWaitUntil(() -> GateTests.assertIs(helper, gates, north, GateState.Status.LIFTED,
                         SeireiteiPlan.GATE_LIFT))

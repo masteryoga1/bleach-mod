@@ -18,7 +18,10 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
+import io.github.masteryoga1.bleach.world.SiteStamp;
 import io.github.masteryoga1.bleach.world.UraharaShop;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -59,15 +62,18 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.biome.FixedBiomeSource;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureCheckResult;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.levelgen.structure.placement.ConcentricRingsStructurePlacement;
@@ -80,9 +86,9 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * The Urahara Shop and its keeper (7n, 7n2): the shop's data, its ring's one spot and its template as worldgen places it,
- * in far chunks of the test world held while a test runs, and Kisuke Urahara's rules and words. Each test takes away the
- * keepers it set down, the players it joined and the blocks it placed, however it ends.
+ * The Urahara Shop and its keeper (7n to 7n3): the shop's data, its ring's one spot, its template as worldgen places it
+ * and the stamp that builds it into old worlds, in far chunks of the test world held while a test runs, and Kisuke
+ * Urahara's rules and words. Each test takes away what it set down, joined, placed or marked, however it ends.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -190,16 +196,116 @@ public final class UraharaShopTests {
             shops.put(site, start);
         }
         helper.startSequence()
-                // Patiently, as the test server's ticks outrun the loading threads that bring those creatures in.
-                .thenWaitUntil(() -> shops.values().forEach(start -> covered(box(start)).forEach(chunk ->
-                        GateTests.patiently(helper, level.areEntitiesLoaded(chunk.toLong()),
-                                "chunk " + chunk + " has not loaded its creatures"))))
+                .thenWaitUntil(() -> shops.values().forEach(start -> entitiesLoaded(helper, level, box(start))))
                 .thenExecute(() -> shops.forEach((site, start) -> {
                     for (int set = 0; set < 2; set++) {
                         placeEach(level, start);
                     }
                     holdsItsKeeper(helper, level, site, box(start));
                 }))
+                .thenSucceed();
+    }
+
+    /**
+     * Test 4. In an untouched spot of an old world the stamp builds the shop, its start, references, sign and one keeper,
+     * moves a creature it is built over out before its door, marks it built and tells /locate at once; a stamp finding the
+     * shop whole builds nothing and marks it built too.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void theStampBuildsAnUntouchedShopOnce(GameTestHelper helper) {
+        Shop shop = shopAt(helper, 300, 300);
+        ServerLevel level = shop.level();
+        SeireiteiPlan.Site site = shop.site();
+        ChunkPos home = site.chunk();
+        Structure laid = laid(level);
+        helper.startSequence()
+                .thenWaitUntil(() -> entitiesLoaded(helper, level, shop.box()))
+                .thenExecute(() -> {
+                    // In the front wall, west of the doorway.
+                    Entity pig = EntityType.PIG.create(level);
+                    pig.moveTo(Vec3.atBottomCenterOf(shop.at(new BlockPos(3, 1, 2))));
+                    shop.held().add(pig);
+                    helper.assertTrue(shop.stamp().ensureBuilt(level, 0) && shop.mark().built() && shop.warned().isEmpty(),
+                            "the stamp did not build an untouched spot, or warned " + shop.warned());
+                    StructureStart start = level.getChunk(home.x, home.z).getStartForStructure(laid);
+                    helper.assertTrue(start != null && start.isValid() && covered(shop.box()).stream().allMatch(pos -> level
+                            .getChunk(pos.x, pos.z).getReferencesForStructure(laid).contains(home.toLong())),
+                            "the shop's start or a chunk's reference to it is missing");
+                    // The check /locate makes of a ring's chunk, with the registry's own placement; on the server's thread
+                    // the stamp tells it at once.
+                    StructureCheckResult located = level.structureManager().checkStructurePresence(home, laid, level
+                            .registryAccess().registryOrThrow(Registries.STRUCTURE_SET).getOrThrow(UraharaShop.SET)
+                            .placement(), false);
+                    helper.assertTrue(located == StructureCheckResult.START_PRESENT,
+                            "/locate is not told of the stamped shop at once: " + located);
+                    holdsItsKeeper(helper, level, site, shop.box());
+                    BlockPos front = shop.at(UraharaShop.DOOR);
+                    BlockPos door = front.atY(level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, front.getX(),
+                            front.getZ()));
+                    helper.assertTrue(pig.blockPosition().equals(door), "the pig the shop was built over stands at "
+                            + pig.blockPosition() + ", not before its door at " + door);
+                    UraharaShop.Mark whole = new UraharaShop.Mark();
+                    helper.assertTrue(!UraharaShop.stamp(site, whole, shop.warned()::add).ensureBuilt(level, 0)
+                            && whole.built(), "a stamp finding the shop whole built it again, or did not mark it built");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Test 5. Where players have spent a minute near a chunk the shop would cover, it is not built: asked twice, nothing is
+     * set or placed, the log is told once where it is and how an operator builds it, and the mark says so; at a tick short
+     * of a minute, it is built.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void aLivedInSpotIsLeftForAnOperator(GameTestHelper helper) {
+        Shop shop = shopAt(helper, 300, 340);
+        ChunkPos home = shop.site().chunk();
+        LevelChunk lived = shop.level().getChunk(home.x, home.z);
+        long was = lived.getInhabitedTime();
+        shop.held().atEnd(() -> lived.setInhabitedTime(was));
+        lived.setInhabitedTime(UraharaShop.LIVED_IN_TICKS);
+        helper.startSequence()
+                .thenWaitUntil(() -> entitiesLoaded(helper, shop.level(), shop.box()))
+                .thenExecute(() -> {
+                    refused(helper, shop, "players have spent " + UraharaShop.LIVED_IN_TICKS + " ticks");
+                    lived.setInhabitedTime(UraharaShop.LIVED_IN_TICKS - 1);
+                    UraharaShop.Mark fresh = new UraharaShop.Mark();
+                    helper.assertTrue(UraharaShop.stamp(shop.site(), fresh, shop.warned()::add).ensureBuilt(shop.level(), 0)
+                            && fresh.built() && shop.warned().size() == 1,
+                            "a tick short of a minute, the shop was not built");
+                    holdsItsKeeper(helper, shop.level(), shop.site(), shop.box());
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Test 8. Where the land will not hold the shop, a stamp gives it up, logged and marked, setting nothing down: over
+     * water under ice at one corner, and where a corner's land falls away more than 6 blocks, dug here to the void, as a
+     * default flat world's land is only 4 blocks deep.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void aShopNeedsGroundUnderIt(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Shop wet = shopAt(helper, 300, 380);
+        Shop sheer = shopAt(helper, 340, 380);
+        BlockPos pool = new BlockPos(wet.box().minX(), wet.site().y(), wet.box().minZ());
+        // Walled in by the land beside it, so it does not spread; the ice over it is no land.
+        putBackAtEnd(wet.held(), level, BoundingBox.fromCorners(pool.below(), pool));
+        level.setBlock(pool.below(), Blocks.WATER.defaultBlockState(), Block.UPDATE_CLIENTS);
+        level.setBlock(pool, Blocks.ICE.defaultBlockState(), Block.UPDATE_CLIENTS);
+        BlockPos edge = new BlockPos(sheer.box().maxX(), sheer.site().y(), sheer.box().maxZ());
+        putBackAtEnd(sheer.held(), level, new BoundingBox(edge.getX(), level.getMinBuildHeight(), edge.getZ(), edge.getX(),
+                edge.getY(), edge.getZ()));
+        for (int y = level.getMinBuildHeight(); y <= edge.getY(); y++) {
+            level.setBlock(edge.atY(y), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+        }
+        helper.startSequence()
+                .thenWaitUntil(() -> List.of(wet, sheer).forEach(shop -> entitiesLoaded(helper, level, shop.box())))
+                .thenExecute(() -> {
+                    refused(helper, wet, "it would stand over water or lava at " + pool.getX() + ", " + pool.getZ());
+                    refused(helper, sheer, "there is no land within 6 blocks below the level its floor rests on at "
+                            + edge.getX() + ", " + edge.getZ());
+                })
                 .thenSucceed();
     }
 
@@ -311,7 +417,7 @@ public final class UraharaShopTests {
     /** The shop's start in this chunk, laid out as worldgen lays it there. */
     private static StructureStart startAt(ServerLevel level, ChunkPos chunk) {
         ChunkGenerator generator = level.getChunkSource().getGenerator();
-        return level.registryAccess().registryOrThrow(Registries.STRUCTURE).getOrThrow(UraharaShop.STRUCTURE).generate(
+        return laid(level).generate(
                 level.registryAccess(), generator, generator.getBiomeSource(), level.getChunkSource().randomState(),
                 level.getStructureManager(), level.getSeed(), chunk, 0, level, biome -> true);
     }
@@ -339,9 +445,7 @@ public final class UraharaShopTests {
 
     /** Remembers every block of this box, and when the test ends takes away the keepers there and sets each block back. */
     private static void putBackAtEnd(ShakonmakuTests.Cleanup held, ServerLevel level, BoundingBox box) {
-        Map<BlockPos, BlockState> before = new HashMap<>();
-        BlockPos.betweenClosed(box.minX(), box.minY(), box.minZ(), box.maxX(), box.maxY(), box.maxZ())
-                .forEach(pos -> before.put(pos.immutable(), level.getBlockState(pos)));
+        Map<BlockPos, BlockState> before = blocks(level, box);
         held.atEnd(() -> {
             TravelTests.discard(level.getEntitiesOfClass(KisukeUrahara.class, AABB.of(box.inflatedBy(1)))
                     .toArray(new Entity[0]));
@@ -375,6 +479,86 @@ public final class UraharaShopTests {
                 && name.getKey().equals("sign.bleach.urahara_shop"), "the sign at " + sign + " does not name the shop");
     }
 
+    /** The shop's structure. */
+    private static Structure laid(ServerLevel level) {
+        return level.registryAccess().registryOrThrow(Registries.STRUCTURE).getOrThrow(UraharaShop.STRUCTURE);
+    }
+
+    /** Every block of this box as it stands. */
+    private static Map<BlockPos, BlockState> blocks(ServerLevel level, BoundingBox box) {
+        Map<BlockPos, BlockState> blocks = new HashMap<>();
+        BlockPos.betweenClosed(box.minX(), box.minY(), box.minZ(), box.maxX(), box.maxY(), box.maxZ())
+                .forEach(pos -> blocks.put(pos.immutable(), level.getBlockState(pos)));
+        return blocks;
+    }
+
+    /** Asserts every chunk this box covers has loaded its creatures, so that keepers are placed and counted there aright. */
+    private static void entitiesLoaded(GameTestHelper helper, ServerLevel level, BoundingBox box) {
+        // Patiently, as the test server's ticks outrun the loading threads that bring those creatures in.
+        covered(box).forEach(chunk -> GateTests.patiently(helper, level.areEntitiesLoaded(chunk.toLong()),
+                "chunk " + chunk + " has not loaded its creatures"));
+    }
+
+    /**
+     * The shop as worldgen lays it out at this far chunk of the test world, held, with a stamp keeping a mark never saved
+     * and a log of its own; its blocks, keepers, start and references are put back when the test ends.
+     */
+    private static Shop shopAt(GameTestHelper helper, int chunkX, int chunkZ) {
+        ServerLevel level = helper.getLevel();
+        ShakonmakuTests.Cleanup held = ShakonmakuTests.hold(helper, level, chunkX, chunkZ);
+        ChunkPos chunk = new ChunkPos(chunkX, chunkZ);
+        SeireiteiPlan.Site site = UraharaShop.site(level, chunk);
+        helper.assertTrue(site != null, "the shop lays out nothing in chunk " + chunk);
+        UraharaShop.Mark mark = new UraharaShop.Mark();
+        List<String> warned = new ArrayList<>();
+        SiteStamp stamp = UraharaShop.stamp(site, mark, warned::add);
+        BoundingBox box = box(startAt(level, chunk));
+        putBackAtEnd(held, level, box);
+        held.atEnd(() -> forget(level, stamp));
+        return new Shop(level, held, site, stamp, mark, warned, box);
+    }
+
+    /**
+     * Takes the shop's start and its chunks' references to it away. The stamp's word to /locate's cache stays, which is
+     * harmless: the test world has no ring for the shop, so nothing there asks it.
+     */
+    private static void forget(ServerLevel level, SiteStamp stamp) {
+        Structure laid = laid(level);
+        for (ChunkPos pos : stamp.covered(0)) {
+            LevelChunk chunk = level.getChunk(pos.x, pos.z);
+            Map<Structure, LongSet> others = new HashMap<>(chunk.getAllReferences());
+            others.remove(laid);
+            chunk.setAllReferences(others);
+        }
+        ChunkPos home = stamp.startChunk(0);
+        level.getChunk(home.x, home.z).setStartForStructure(laid, StructureStart.INVALID_START);
+    }
+
+    /**
+     * Asserts the stamp, asked twice, set nothing down at this shop and gave it up, and told the log once where it is, why,
+     * and the command that builds it.
+     */
+    private static void refused(GameTestHelper helper, Shop shop, String why) {
+        ServerLevel level = shop.level();
+        Map<BlockPos, BlockState> before = blocks(level, shop.box());
+        Structure laid = laid(level);
+        ChunkPos home = shop.site().chunk();
+        for (int ask = 1; ask <= 2; ask++) {
+            boolean built = shop.stamp().ensureBuilt(level, 0);
+            StructureStart start = level.getChunk(home.x, home.z).getStartForStructure(laid);
+            helper.assertTrue(!built && shop.mark().decided() && !shop.mark().built()
+                    && blocks(level, shop.box()).equals(before) && (start == null || !start.isValid())
+                    && level.getEntitiesOfClass(KisukeUrahara.class, AABB.of(shop.box())).isEmpty()
+                    && covered(shop.box()).stream().noneMatch(pos -> level.getChunk(pos.x, pos.z)
+                    .getReferencesForStructure(laid).contains(home.toLong())),
+                    "asked " + ask + " times, the stamp set something down at " + home + ", or did not give it up");
+        }
+        String place = "/place structure bleach:urahara_shop " + shop.site().x() + " ~ " + shop.site().z();
+        helper.assertTrue(shop.warned().size() == 1 && shop.warned().get(0).contains(home.toString())
+                && shop.warned().get(0).contains(why) && shop.warned().get(0).contains(place),
+                "the log was told " + shop.warned() + ", not once of " + why + " and " + place);
+    }
+
     /** The visitor talks to him: his dialogue opens in this view, its one note an aside of that view's. */
     private static void talks(GameTestHelper helper, KisukeUrahara urahara, ServerPlayer visitor, DialogueView view,
                               int talks) {
@@ -400,5 +584,14 @@ public final class UraharaShopTests {
         Stream.of(180.0F, 0.0F).map(FloatTag::valueOf).forEach(rotation::add);
         data.put("Rotation", rotation);
         return (KisukeUrahara) EntityType.create(data, level).orElseThrow();
+    }
+
+    /** A test's shop: its world and hold, its site, its stamp with the mark and log it keeps, and its piece's box. */
+    private record Shop(ServerLevel level, ShakonmakuTests.Cleanup held, SeireiteiPlan.Site site, SiteStamp stamp,
+                        UraharaShop.Mark mark, List<String> warned, BoundingBox box) {
+        /** Where this place of the template stands in the world. */
+        BlockPos at(BlockPos place) {
+            return new BlockPos(site.x(), site.y(), site.z()).offset(place.rotate(site.rotation()));
+        }
     }
 }

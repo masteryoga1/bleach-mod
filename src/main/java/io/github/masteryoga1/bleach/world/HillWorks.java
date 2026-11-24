@@ -75,7 +75,7 @@ public final class HillWorks {
         STAMPS.forEach(stamp -> stamp.onChunkLoad(event));
     }
 
-    /** The one further try a stamp's check asked for. */
+    /** The further tries, one a tick, that a stamp's check asked for. */
     public static void onServerTick(ServerTickEvent.Post event) {
         STAMPS.forEach(stamp -> stamp.onServerTick(event));
     }
