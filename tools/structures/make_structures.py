@@ -8,12 +8,13 @@ Run from the repository root:
 The check compares the uncompressed NBT, not the gzip bytes, so a different zlib build does not trip
 it. Templates are written for Minecraft 1.21.1 (data version 3955) and list every position in their
 box, air included, so placing one clears whatever was there, but for any position left as structure_void, which keeps
-the ground it is set over.
+the ground it is set over. A block may carry block entity data, as a structure block saves a sign's text.
 
 Uses only the standard library.
 """
 import functools
 import gzip
+import json
 import math
 import struct
 import sys
@@ -103,6 +104,7 @@ class Template:
     def __init__(self, width, height, depth):
         self.size = (width, height, depth)
         self.blocks = {}
+        self.block_data = {}
         self.entities = []
 
     def set(self, x, y, z, block, **properties):
@@ -120,6 +122,10 @@ class Template:
 
     def get(self, x, y, z):
         return self.blocks.get((x, y, z), ("minecraft:air", ()))[0]
+
+    def set_data(self, x, y, z, data):
+        """Gives the block set here this block entity data, a compound, as a structure block saves it."""
+        self.block_data[(x, y, z)] = data
 
     def add_entity(self, x, y, z, **entity_nbt):
         self.entities.append(compound(
@@ -143,7 +149,10 @@ class Template:
                         if properties:
                             entry["Properties"] = compound(**{k: string(v) for k, v in properties})
                         palette.append(compound(**entry))
-                    blocks.append(compound(pos=ints(x, y, z), state=integer(index[state])))
+                    entry = dict(pos=ints(x, y, z), state=integer(index[state]))
+                    if (x, y, z) in self.block_data:
+                        entry["nbt"] = self.block_data[(x, y, z)]
+                    blocks.append(compound(**entry))
         return nbt(compound(
             DataVersion=integer(DATA_VERSION),
             size=ints(*self.size),
@@ -741,6 +750,128 @@ def cavern():
     return t
 
 
+def sign_lines(*lines):
+    """A sign face's four lines as SignText saves them, each a component as JSON: a dict, or a string as plain text."""
+    return compound(messages=Tag(LIST, [string(json.dumps(line)) for line in lines], STRING), color=string("black"),
+                    has_glowing_text=byte(0))
+
+
+def urahara_shop():
+    """
+    The stand-in for the Urahara Shop: a small two-storey sweets shop of dark posts, plaster and shōji under a tiled hip
+    roof, its open front (low z) on a paved strip under a lower eave, with a waxed sign over the door. Inside, shelves
+    of barrels and bookcases line a packed-mud floor before a counter, behind which Kisuke Urahara stands facing the door;
+    a shōji door leads to a tatami room with a ladder up to the room above. The floor at (2, 0, 9), behind the counter's
+    west end, is kept clear above for a hatch to a room beneath. The ground beside and behind the walls stays.
+    """
+    t = Template(13, 13, 16)
+    log = dict(block="minecraft:stripped_dark_oak_log", axis="y")
+    pane = dict(block="minecraft:glass_pane", east="true", north="false", south="false", west="true",
+                waterlogged="false")
+    hang = dict(block="minecraft:lantern", hanging="true", waterlogged="false")
+
+    # Ground: a paved strip before the shop; its walls' footing; packed mud in the shop, planks behind the counter and
+    # tatami in the back room, the weave crossed. Under the side and back eaves the land is kept.
+    t.fill(0, 0, 0, 12, 0, 1, "minecraft:stone_bricks")
+    t.fill(1, 0, 2, 11, 0, 14, "minecraft:stone_bricks")
+    t.fill(2, 0, 3, 10, 0, 7, "minecraft:packed_mud")
+    t.fill(2, 0, 8, 10, 0, 10, "minecraft:spruce_planks")
+    for x in range(2, 11):
+        for z in range(11, 14):
+            t.set(x, 0, z, "bleach:tatami", facing="north" if (x + z) % 2 == 0 else "east")
+    for z in range(2, 16):
+        t.set(0, 0, z, VOID)
+        t.set(12, 0, z, VOID)
+    t.fill(1, 0, 15, 11, 0, 15, VOID)
+
+    # Both storeys' walls: posts at the corners and between bays, black plaster at the foot, white plaster above.
+    for y in range(1, 9):
+        if y == 5:
+            continue
+        for x in range(1, 12):
+            for z in range(2, 15):
+                on_x, on_z = x in (1, 11), z in (2, 14)
+                if not (on_x or on_z):
+                    continue
+                post = on_x and on_z or on_z and x in ((4, 8) if z == 2 and y < 5 else (6,)) or on_x and z in (6, 10)
+                if post:
+                    t.set(x, y, z, **log)
+                else:
+                    t.set(x, y, z, "bleach:black_plaster" if y == 1 else "bleach:white_plaster")
+    # The band between the storeys, and the lower eave over the paved strip.
+    ring(t, 5, 1, 2, 11, 14, "minecraft:dark_oak_planks")
+    t.fill(0, 5, 1, 12, 5, 1, "bleach:roof_tile_slab", type="bottom", waterlogged="false")
+
+    # The shopfront: glass either side of a doorway three wide and three high, under a lintel, and the sign over it.
+    for x in (2, 3, 9, 10):
+        t.fill(x, 2, 2, x, 3, 2, **pane)
+    t.fill(5, 1, 2, 7, 3, 2, "minecraft:air")
+    for x in (2, 3, 5, 6, 7, 9, 10):
+        t.set(x, 4, 2, "minecraft:dark_oak_planks")
+    t.set(6, 4, 1, "minecraft:spruce_wall_sign", facing="north", waterlogged="false")
+    t.set_data(6, 4, 1, compound(id=string("minecraft:sign"), is_waxed=byte(1),
+                                 front_text=sign_lines("", {"translate": "sign.bleach.urahara_shop"},
+                                                       {"translate": "sign.bleach.urahara_shop.sweets"}, "")))
+
+    # Windows of shōji: the back room's sides and back, and the upper room's front, sides and back.
+    for z in range(11, 14):
+        for x in (1, 11):
+            t.fill(x, 2, z, x, 3, z, "bleach:shoji")
+    for x in (3, 4, 5, 7, 8, 9):
+        t.fill(x, 2, 14, x, 3, 14, "bleach:shoji")
+    for x in (2, 3, 4, 5, 7, 8, 9, 10):
+        t.set(x, 7, 2, "bleach:shoji")
+    for z in (4, 5, 11, 12):
+        for x in (1, 11):
+            t.set(x, 7, z, "bleach:shoji")
+    for x in (3, 4, 5):
+        t.set(x, 7, 14, "bleach:shoji")
+
+    # The shop: shelves of barrels under empty bookcases along both sides, two bins on the floor, a lantern overhead.
+    for z in range(3, 8):
+        t.set(2, 1, z, "minecraft:barrel", facing="up", open="false")
+        t.set(10, 1, z, "minecraft:barrel", facing="up", open="false")
+        for x, facing in ((2, "east"), (10, "west")):
+            t.set(x, 2, z, "minecraft:chiseled_bookshelf", facing=facing,
+                  **{"slot_%d_occupied" % slot: "false" for slot in range(6)})
+    for x in (4, 8):
+        t.set(x, 1, 5, "minecraft:barrel", facing="up", open="false")
+    t.set(6, 4, 5, **hang)
+
+    # The counter, open at its east end, with a lantern and a cake on it; behind it the keeper's floor and the hatch's.
+    t.fill(2, 1, 8, 7, 1, 8, "minecraft:stripped_spruce_log", axis="x")
+    t.set(3, 2, 8, "minecraft:lantern", hanging="false", waterlogged="false")
+    t.set(6, 2, 8, "minecraft:cake", bites="0")
+
+    # The partition of shōji with its door, and the back room: a low table, a lantern and the ladder up.
+    for x in range(2, 11):
+        if x != 6:
+            t.fill(x, 1, 10, x, 3, 10, "bleach:shoji")
+    t.set(6, 3, 10, "bleach:shoji")
+    door = dict(block="bleach:shoji_door", facing="south", hinge="left", open="false", powered="false")
+    t.set(6, 1, 10, half="lower", **door)
+    t.set(6, 2, 10, half="upper", **door)
+    t.fill(2, 4, 10, 10, 4, 10, "minecraft:dark_oak_planks")
+    t.fill(5, 1, 12, 7, 1, 12, "minecraft:dark_oak_slab", type="bottom", waterlogged="false")
+    t.set(6, 4, 12, **hang)
+
+    # The upper floor of tatami, the ladder through it, and the upper room: a barrel, a futon and a lantern.
+    for x in range(2, 11):
+        for z in range(3, 14):
+            t.set(x, 5, z, "bleach:tatami", facing="north" if (x + z) % 2 == 0 else "east")
+    for y in range(1, 6):
+        t.set(10, y, 13, "minecraft:ladder", facing="north", waterlogged="false")
+    t.set(2, 6, 13, "minecraft:barrel", facing="up", open="false")
+    t.fill(7, 6, 11, 8, 6, 12, "minecraft:white_carpet")
+    t.set(6, 8, 8, **hang)
+
+    hip_roof(t, 1, 2, 11, 14, 9)
+    join_panes(t)
+    t.add_entity(4.5, 1.0, 9.5, id=string("bleach:kisuke_urahara"), Rotation=floats(180.0, 0.0),
+                 PersistenceRequired=byte(1), Invulnerable=byte(1), Spot=byte(1))
+    return t
+
+
 TEMPLATES = {
     "academy/academy.nbt": academy,
     "academy/dojo.nbt": dojo,
@@ -753,6 +884,7 @@ TEMPLATES = {
     "hill/senzaikyu.nbt": senzaikyu,
     "hill/stair.nbt": stair,
     "lane.nbt": lane,
+    "urahara_shop.nbt": urahara_shop,
 }
 TEMPLATES.update((f"barracks/{name}.nbt", functools.partial(barracks, number))
                  for number, name in enumerate(DIVISIONS, 1))
