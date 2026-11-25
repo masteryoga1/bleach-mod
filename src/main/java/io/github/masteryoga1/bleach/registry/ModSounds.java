@@ -103,6 +103,9 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_SWOOP = variable("entity.shrieker.swoop");
     /** A Shrieker's wingbeat, every Shrieker.FLAP_TICKS while it flies. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_FLAP = variable("entity.shrieker.flap");
+    /** A Shrieker loosing its leeches from its chest, and a leech fastening on a back. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_LOOSE = variable("entity.shrieker.loose");
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_LEECH_CLING = variable("entity.shrieker_leech.cling");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */

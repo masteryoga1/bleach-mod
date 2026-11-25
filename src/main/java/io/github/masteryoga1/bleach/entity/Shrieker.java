@@ -3,13 +3,18 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -30,9 +35,10 @@ import net.minecraft.world.phys.Vec3;
  * prey, out of reach of a blade swung from the ground, swoops on it when its claws are ready, and keeps its claws low a
  * while after, its mask where a blade finds it, before it climbs back to its circle (see {@link ShriekerFlightGoal}). A
  * blow to its mask that makes it reel breaks off a swoop and drops it to that low height for as long. It moves against
- * blocks as any mob does, so walls, Sekkiseki and the Shakonmaku hold it. Its bar shows to the souls about it who see
- * spirits. It is always a sinner, as it was a killer in life. Its health and the damage of its swoop are the server's to
- * set. It is never saved, and for now comes only by command.
+ * blocks as any mob does, so walls, Sekkiseki and the Shakonmaku hold it. From its circle it looses its leeches at its
+ * prey a few at a time ({@link ShriekerLeech}). Its bar shows to the souls about it who see spirits. It is always a
+ * sinner, as it was a killer in life. Its health, the damage of its swoop and its brood are the server's to set. It is
+ * never saved, and for now comes only by command.
  */
 public class Shrieker extends Hollow {
     /** How far apart its wingbeats are, in ticks: the model's beat and the sound of it keep this time together. */
@@ -47,6 +53,16 @@ public class Shrieker extends Hollow {
     /** How far past its body its wings reach, in blocks, so it is still drawn while only a wing is in view. */
     private static final double WING_REACH = 1.5;
     private static final float FLAP_VOLUME = 0.6F;
+    /** How long after the last of its leeches is spent before it looses more. */
+    public static final int LOOSE_COOLDOWN_TICKS = 100;
+    /**
+     * Its leeches come from the hole in its chest, this high up its body (the hole on its model's texture), fanned out
+     * this far apart in degrees, a little up, at this speed.
+     */
+    private static final double CHEST = 0.55;
+    private static final float LOOSE_FAN = 35.0F;
+    private static final float LOOSE_PITCH = -20.0F;
+    private static final double LOOSE_SPEED = 0.3;
 
     private final BossBar bar = new BossBar(this, "bossbar.bleach.shrieker", BossEvent.BossBarColor.PURPLE,
             BossEvent.BossBarOverlay.PROGRESS);
@@ -54,6 +70,13 @@ public class Shrieker extends Hollow {
     private boolean basesSet;
     /** The game time until which a blow to its mask holds it low and keeps it from swooping. Not saved. */
     private long stalledUntil;
+    /**
+     * Its leeches out now, loosed and not yet spent, how many it holds back (drawn from the config when first asked, so a
+     * test may set it before) and when it may loose more. Server side, never shown and not saved.
+     */
+    private final List<ShriekerLeech> leeches = new ArrayList<>();
+    private int held = -1;
+    private long looseReadyAt;
 
     /** Its own move control, which reads none of its fields, so it may be made here (see {@link Hollow}). */
     public Shrieker(EntityType<? extends Shrieker> type, Level level) {
@@ -120,8 +143,8 @@ public class Shrieker extends Hollow {
     /**
      * Server side, every tick, so it runs with NoAI too: first the air holding it up or letting it fall, before it
      * moves; then the config's strength for one that skipped spawning (a summon with data, a game test), whole if it was
-     * whole, though without the difficulty and multipliers spawning adds; its wingbeat while it flies; and its bar,
-     * last, so the bar shows the health this tick left.
+     * whole, though without the difficulty and multipliers spawning adds; its wingbeat while it flies; its spent leeches
+     * let go, the wait for more begun once all are; and its bar, last, so the bar shows the health this tick left.
      */
     @Override
     public void tick() {
@@ -146,6 +169,9 @@ public class Shrieker extends Hollow {
         }
         if (isAlive() && !onGround() && !isSwooping() && (level().getGameTime() + getId() * 3L) % FLAP_TICKS == 0) {
             playSound(ModSounds.SHRIEKER_FLAP.get(), FLAP_VOLUME, 0.9F + random.nextFloat() * 0.2F);
+        }
+        if (!leeches.isEmpty() && leeches.removeIf(leech -> leech.isRemoved()) && leeches.isEmpty()) {
+            looseReadyAt = level().getGameTime() + LOOSE_COOLDOWN_TICKS;
         }
         bar.tick();
     }
@@ -193,6 +219,51 @@ public class Shrieker extends Hollow {
     /** Set by its fight as a dive begins and ends; public for the tests. */
     public void setSwooping(boolean swooping) {
         setFlag(FLAG_SWOOPING, swooping);
+    }
+
+    /** Its leeches out now, loosed and not yet spent. Server side. */
+    public List<ShriekerLeech> leeches() {
+        return Collections.unmodifiableList(leeches);
+    }
+
+    /** How many leeches it holds back still, never shown to anyone; public for the tests. Server side. */
+    public int leechesHeld() {
+        if (held < 0) {
+            held = BleachConfig.get(BleachConfig.SHRIEKER_LEECHES);
+        }
+        return held;
+    }
+
+    /** Sets how many leeches it holds back; for the tests, which keep a fight to its claws. */
+    public void setLeechesHeld(int count) {
+        held = Math.max(0, count);
+    }
+
+    /**
+     * Looses its next leeches at its prey from its chest, as many as it looses at once, if it holds any back, every one
+     * it loosed before is spent and its wait after them is over, and its prey is one it may strike. Its fight calls this
+     * from its circle; public so the tests and the smoke test drive a Shrieker with no will of its own by the same code.
+     * Returns how many it loosed.
+     */
+    public int looseLeeches() {
+        LivingEntity prey = getTarget();
+        if (!(level() instanceof ServerLevel server) || !isAlive() || prey == null || !leeches.isEmpty() || leechesHeld() <= 0
+                || server.getGameTime() < looseReadyAt || !CeroBeam.mayStrike(this, prey)) {
+            return 0;
+        }
+        int count = Math.min(held, BleachConfig.get(BleachConfig.SHRIEKER_LEECHES_AT_ONCE));
+        Vec3 chest = position().add(0.0, getBbHeight() * CHEST, 0.0);
+        for (int i = 0; i < count; i++) {
+            float yaw = yBodyRot + (i - (count - 1) * 0.5F) * LOOSE_FAN;
+            ShriekerLeech leech = ShriekerLeech.loose(server, this, prey, chest,
+                    Vec3.directionFromRotation(LOOSE_PITCH, yaw).scale(LOOSE_SPEED));
+            if (leech != null) {
+                leeches.add(leech);
+            }
+        }
+        held -= count;
+        playSound(ModSounds.SHRIEKER_LOOSE.get(), 1.0F, 0.9F + random.nextFloat() * 0.2F);
+        return leeches.size();
     }
 
     /** Every Shrieker was a sinner in life, whatever its data says. */

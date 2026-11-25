@@ -105,7 +105,7 @@ public final class ShriekerTests {
     // ---- Helpers ----
 
     /** A player joined at this spot in survival with a Human soul that sees spirits: prey for any Hollow. */
-    private static ServerPlayer aware(GameTestHelper helper, Vec3 at) {
+    static ServerPlayer aware(GameTestHelper helper, Vec3 at) {
         ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, at);
         player.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.HUMAN, AWARE));
         return player;
@@ -227,7 +227,8 @@ public final class ShriekerTests {
         helper.assertTrue(helper.getLevel().getServer().getAdvancements().get(BleachMod.id("shrieker")) != null,
                 "the Shrieker advancement did not load");
         List<DeferredHolder<SoundEvent, SoundEvent>> sounds = List.of(ModSounds.SHRIEKER_AMBIENT, ModSounds.SHRIEKER_HURT,
-                ModSounds.SHRIEKER_DEATH, ModSounds.SHRIEKER_SWOOP, ModSounds.SHRIEKER_FLAP);
+                ModSounds.SHRIEKER_DEATH, ModSounds.SHRIEKER_SWOOP, ModSounds.SHRIEKER_FLAP, ModSounds.SHRIEKER_LOOSE,
+                ModSounds.SHRIEKER_LEECH_CLING);
         for (DeferredHolder<SoundEvent, SoundEvent> sound : sounds) {
             helper.assertTrue(sound.isBound(), "the sound " + sound.getId() + " is not registered");
         }
@@ -309,6 +310,8 @@ public final class ShriekerTests {
                 .thenExecuteAfter(SPAWN_SAFE_TICKS, () -> {
                     shrieker[0] = helper.spawn(ModEntities.SHRIEKER.get(), new Vec3(3.5, 2.0, 8.5));
                     shrieker[0].setTarget(prey);
+                    // Its claws alone: it holds no leeches to loose.
+                    shrieker[0].setLeechesHeld(0);
                 })
                 .thenWaitUntil(() -> {
                     boolean struck = prey.getLastHurtByMob() == shrieker[0] && prey.getHealth() < prey.getMaxHealth();
@@ -508,6 +511,7 @@ public final class ShriekerTests {
         ServerPlayer prey = aware(helper, new Vec3(8.5, 2.0, 8.5));
         Shrieker shrieker = helper.spawn(ModEntities.SHRIEKER.get(), new Vec3(8.5, ROOF_Y + 2.5, 8.5));
         shrieker.setTarget(prey);
+        shrieker.setLeechesHeld(0);
         boolean[] into = {false};
         helper.succeedWhen(() -> {
             AABB body = shrieker.getBoundingBox();

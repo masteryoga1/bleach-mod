@@ -512,6 +512,8 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.DoubleValue SHRIEKER_HEALTH;
     public static final ModConfigSpec.DoubleValue SHRIEKER_DAMAGE;
+    public static final ModConfigSpec.IntValue SHRIEKER_LEECHES;
+    public static final ModConfigSpec.IntValue SHRIEKER_LEECHES_AT_ONCE;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2346,6 +2348,12 @@ public final class BleachConfig {
         SHRIEKER_DAMAGE = builder
                 .comment("Damage of a Shrieker's swoop on Normal, before the hollows damage multiplier.")
                 .defineInRange("damage", 7.0, 0.0, 200.0);
+        SHRIEKER_LEECHES = builder
+                .comment("Leeches a Shrieker carries in all. It looses a few at a time and hides how many it still holds.")
+                .defineInRange("leeches", 6, 0, 32);
+        SHRIEKER_LEECHES_AT_ONCE = builder
+                .comment("Leeches a Shrieker looses at once; it looses more only a while after those are spent.")
+                .defineInRange("leeches_at_once", 3, 1, 4);
         builder.pop();
         builder.pop();
 
