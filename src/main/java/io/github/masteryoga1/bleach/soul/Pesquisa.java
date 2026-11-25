@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModSounds;
@@ -241,7 +242,8 @@ public final class Pesquisa {
      * survival's rules, with a soul and not fresh from a Sonído; anything else only with a soul, or being a
      * spirit or a creature that sees them; and never with a block that undoes reiryoku or the Shakonmaku
      * ({@link SpiritClip}) between the caster's eyes and the middle of its box (or part) nearest the caster, though
-     * stone hides nothing. So mundane animals and monsters are never felt.
+     * stone hides nothing. So mundane animals and monsters are never felt, nor is Grand Fisher's lure with no body by
+     * her, as once it has escaped into her: it hides its reiatsu.
      */
     public static boolean senses(Player caster, LivingEntity target, long now) {
         if (!SoulLogic.hasSoul(caster)) {
@@ -344,7 +346,8 @@ public final class Pesquisa {
     }
 
     private static boolean senses(Player caster, LivingEntity target, long now, double rangeSqr, double minReiatsu) {
-        if (target == caster || !target.isAlive() || target.level() != caster.level()) {
+        if (target == caster || !target.isAlive() || target.level() != caster.level()
+                || target instanceof GrandFisherLure lure && lure.body() == null) {
             return false;
         }
         if (target instanceof Player player) {

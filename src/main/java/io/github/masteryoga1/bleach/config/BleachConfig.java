@@ -524,6 +524,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_LURE_REACH;
     public static final ModConfigSpec.IntValue GRAND_FISHER_LURE_FADE_SECONDS;
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_LURE_HEALTH;
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_FLOOR_SHARE;
+    public static final ModConfigSpec.IntValue GRAND_FISHER_ESCAPE_DAYS;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2397,6 +2399,15 @@ public final class BleachConfig {
                 .comment("The health of Grand Fisher's lure. A blade's blow cuts her from her stalk and does her no harm;"
                         + " every other blow hurts her, as a blade does once she is cut off.")
                 .defineInRange("lure_health", 15.0, 1.0, 1_000.0);
+        GRAND_FISHER_FLOOR_SHARE = builder
+                .comment("The share of its health at which Grand Fisher escapes into its lure while one of its lures lives,"
+                        + " on her stalk or cut off: no blow but /kill or the void takes it lower then. With none left it"
+                        + " dies as any Hollow. 0 never lets it escape.")
+                .defineInRange("floor_share", 0.1, 0.0, 0.9);
+        GRAND_FISHER_ESCAPE_DAYS = builder
+                .comment("Game days, of twenty minutes whether anyone sleeps or not, before Grand Fisher may come again"
+                        + " after it escapes into its lure. 0 lets it come again once she has faded.")
+                .defineInRange("escape_days", 1, 0, 365);
         builder.pop();
         builder.pop();
 

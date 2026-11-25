@@ -4,7 +4,13 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.BossLedger;
+import io.github.masteryoga1.bleach.soul.GrandFisherComing;
+import io.github.masteryoga1.bleach.soul.SpiritSenses;
+import java.util.List;
 import javax.annotation.Nullable;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -26,8 +32,12 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>On its first tick it grows its lure ({@link GrandFisherLure}) on a stalk from its brow, unless one was linked to it
  * first, and it never grows a second: a lure cut off, faded or slain leaves it with that lure or none.
+ *
+ * <p>While a lure of its lives, on her stalk or cut off, no blow takes it below the config's share of its health (a
+ * {@link BossFloor}); there it escapes into her, as canon's does (Ch. 21): she runs off and fades, and its body goes with
+ * no death, so it is credited to no one and away only {@code escape_days}. With no lure left it dies as any Hollow.
  */
-public class GrandFisher extends Hollow {
+public class GrandFisher extends Hollow implements BossFloor.Floored {
     /** Where the stalk leaves its brow, in blocks at size 1: this high, and this far ahead along its head's turn. */
     public static final double BROW_UP = 4.1;
     public static final double BROW_FORWARD = 1.0;
@@ -40,6 +50,8 @@ public class GrandFisher extends Hollow {
     @Nullable
     private GrandFisherLure lure;
     private boolean lureTaken;
+    /** Whether it has escaped into its lure, its body to go on its next tick. Server side. */
+    private boolean escaped;
 
     public GrandFisher(EntityType<? extends GrandFisher> type, Level level) {
         super(type, level);
@@ -63,10 +75,16 @@ public class GrandFisher extends Hollow {
 
     /**
      * Server side, every tick, so it runs with NoAI too: its lure grown on its first tick, and its bar, last, so the bar
-     * shows the health this tick left.
+     * shows the health this tick left. Escaped into its lure, its body breaks up into smoke only the aware see, and goes.
      */
     @Override
     public void tick() {
+        if (escaped && level() instanceof ServerLevel server && !isRemoved()) {
+            SpiritSenses.particles(server, ParticleTypes.SQUID_INK, getX(), getY() + getBbHeight() * 0.5, getZ(), 24,
+                    getBbWidth() * 0.5, getBbHeight() * 0.5, getBbWidth() * 0.5, 0.02);
+            discard();
+            return;
+        }
         super.tick();
         if (level() instanceof ServerLevel server) {
             if (!lureTaken && isAlive() && !isRemoved()) {
@@ -95,6 +113,33 @@ public class GrandFisher extends Hollow {
     @Nullable
     public GrandFisherLure lure() {
         return lure != null && lure.isAlive() ? lure : null;
+    }
+
+    /**
+     * The config's share of its health while a lure of its lives, on her stalk or cut off, and once it has escaped into
+     * her, so no later blow in the same tick kills a body already gone; none once she is gone and it has not.
+     */
+    @Override
+    public float floor() {
+        return escaped || lure() != null
+                ? (float) (getMaxHealth() * BleachConfig.get(BleachConfig.GRAND_FISHER_FLOOR_SHARE)) : 0.0F;
+    }
+
+    /**
+     * At its floor it escapes into its lure, once: the server marks it away {@code escape_days}, beaten by no one, and she
+     * runs off with it; its body goes on its next tick.
+     */
+    @Override
+    public void atFloor(DamageSource source) {
+        GrandFisherLure into = lure();
+        if (escaped || into == null || !(level() instanceof ServerLevel server)) {
+            return;
+        }
+        escaped = true;
+        MinecraftServer host = server.getServer();
+        BossLedger.get(host).markAway(GrandFisherComing.ID, BossLedger.now(host),
+                BleachConfig.get(BleachConfig.GRAND_FISHER_ESCAPE_DAYS), List.of());
+        into.flee();
     }
 
     /** Where the stalk leaves its brow at this partial tick, on both sides, along its head's turn. */
