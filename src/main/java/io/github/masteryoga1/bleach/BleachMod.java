@@ -18,6 +18,7 @@ import io.github.masteryoga1.bleach.registry.ModMenus;
 import io.github.masteryoga1.bleach.registry.ModRecipes;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.registry.ModWorldgen;
+import io.github.masteryoga1.bleach.soul.BossLedger;
 import io.github.masteryoga1.bleach.soul.HuecoMundoSpawns;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
@@ -64,6 +65,7 @@ public final class BleachMod {
 
         SoulEvents.register(NeoForge.EVENT_BUS);
         BossBar.register(NeoForge.EVENT_BUS);
+        BossLedger.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(BleachCommand::register);
     }
 
