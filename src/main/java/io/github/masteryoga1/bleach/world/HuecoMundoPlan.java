@@ -130,7 +130,7 @@ public final class HuecoMundoPlan {
 
     /**
      * Whether this cell lies under the dome or in the fifth tower's room, open or not: the air the shell shuts in until
-     * the halls that {@link #hallsAt} plans are laid and open it.
+     * the halls are laid. Whether a world's cell is still shut in is {@link LasNoches#shutIn}'s question.
      */
     public static boolean enclosed(int x, int y, int z) {
         return y >= LEVEL_Y && (fromDomeCentre(x, y, z) < DOME_INNER_RADIUS || inFifthRoom(x, y, z));

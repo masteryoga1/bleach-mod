@@ -71,7 +71,7 @@ public final class ModBlocks {
     /** Its dark trim, the band under the top of a wall or a tower. */
     public static final DeferredBlock<Block> LAS_NOCHES_TRIM = BLOCKS.registerSimpleBlock("las_noches_trim",
             lasNoches(MapColor.COLOR_BLACK));
-    /** Its sky, which the halls' plan lines the dome's inner face and rings their floor with: the fullest light, unshaded. */
+    /** Its sky, lining the dome's inner face and ringing the halls' floor: the fullest light, drawn unshaded. */
     public static final DeferredBlock<Block> LAS_NOCHES_SKY = BLOCKS.registerSimpleBlock("las_noches_sky",
             lasNoches(MapColor.COLOR_LIGHT_BLUE).lightLevel(state -> 15).emissiveRendering((state, level, pos) -> true));
     /** Seireitei's white plaster, the walls of its halls and barracks: stone-like, as white concrete is. */

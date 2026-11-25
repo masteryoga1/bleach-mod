@@ -111,22 +111,22 @@ public final class LasNochesTests {
     // ---- Shared helpers ----
 
     /** The test server's real Hueco Mundo. */
-    private static ServerLevel hueco(GameTestHelper helper) {
+    static ServerLevel hueco(GameTestHelper helper) {
         ServerLevel hueco = helper.getLevel().getServer().getLevel(BleachWorlds.HUECO_MUNDO);
         helper.assertTrue(hueco != null, "the test server has no Hueco Mundo");
         return hueco;
     }
 
     /** Las Noches' structure, as the registries hold it. */
-    private static Structure lasNoches(GameTestHelper helper, ServerLevel hueco) {
+    static Structure lasNoches(GameTestHelper helper, ServerLevel hueco) {
         Structure structure = hueco.registryAccess().registryOrThrow(Registries.STRUCTURE).get(LasNoches.STRUCTURE);
         helper.assertTrue(structure != null, "the structure " + LasNoches.STRUCTURE.location() + " did not load");
         return structure;
     }
 
     /** The structure set out afresh from this chunk, as worldgen or a command sets it out, where these biomes allow. */
-    private static StructureStart generate(ServerLevel hueco, Structure structure, ChunkPos chunk,
-                                           Predicate<Holder<Biome>> biomes) {
+    static StructureStart generate(ServerLevel hueco, Structure structure, ChunkPos chunk,
+                                   Predicate<Holder<Biome>> biomes) {
         ChunkGenerator generator = hueco.getChunkSource().getGenerator();
         return structure.generate(hueco.registryAccess(), generator, generator.getBiomeSource(),
                 hueco.getChunkSource().randomState(), hueco.getStructureManager(), hueco.getSeed(), chunk, 0, hueco, biomes);
@@ -180,8 +180,8 @@ public final class LasNochesTests {
      * Asserts that this body set down at this spot stands where expected, on white sand, with no cell of the shell in its
      * box and nothing in its way.
      */
-    private static void onSandOutside(GameTestHelper helper, ServerLevel hueco, Entity body, @Nullable Vec3 at,
-                                      Vec3 expected, String what) {
+    static void onSandOutside(GameTestHelper helper, ServerLevel hueco, Entity body, @Nullable Vec3 at,
+                              Vec3 expected, String what) {
         helper.assertTrue(at != null && at.distanceTo(expected) < SAME, what + " is at " + at + ", not " + expected);
         AABB box = body.getDimensions(Pose.STANDING).makeBoundingBox(at);
         for (BlockPos cell : BlockPos.betweenClosed(BlockPos.containing(box.minX, box.minY, box.minZ),
@@ -202,7 +202,7 @@ public final class LasNochesTests {
     }
 
     /** A pig with no will of its own, made at this spot of Hueco Mundo and not yet set down there. */
-    private static Pig pig(GameTestHelper helper, ServerLevel hueco, double x, double y, double z) {
+    static Pig pig(GameTestHelper helper, ServerLevel hueco, double x, double y, double z) {
         Pig pig = EntityType.PIG.create(hueco);
         helper.assertTrue(pig != null, "no pig could be made");
         pig.setNoAi(true);
@@ -578,7 +578,7 @@ public final class LasNochesTests {
     /**
      * Test F. Las Noches' data: its tag holds the one biome it starts in; it is its own type, laid with the surface
      * structures, the land unbent and no spawns of its own; its set rings it once at the centre's chunk for any seed, in
-     * Hueco Mundo and in no other world; and nothing else may stand in Hueco Mundo.
+     * Hueco Mundo and in no other world; and nothing else but its halls may stand in Hueco Mundo.
      */
     @GameTest(template = "empty")
     public static void lasNochesDataLoads(GameTestHelper helper) {
@@ -618,7 +618,7 @@ public final class LasNochesTests {
             helper.assertFalse(other == null || other.getChunkSource().getGeneratorState().possibleStructureSets().stream()
                     .anyMatch(possible -> possible.is(SET)), "Las Noches may start in " + world.location());
         }
-        // Nothing but Las Noches may stand in Hueco Mundo, and only its own set places it.
+        // Nothing but Las Noches and its halls may stand in Hueco Mundo, and only their own sets place them.
         Set<Holder<Biome>> ours = source.possibleBiomes();
         Registry<Structure> structures = access.registryOrThrow(Registries.STRUCTURE);
         List<String> standing = structures.stream().filter(each -> each.biomes().stream().anyMatch(ours::contains))
@@ -627,7 +627,7 @@ public final class LasNochesTests {
                 .filter(each -> each.getValue().structures().stream()
                         .anyMatch(entry -> standing.contains(entry.structure().getRegisteredName())))
                 .map(each -> each.getKey().location().toString()).sorted().toList();
-        List<String> only = List.of(LasNoches.STRUCTURE.location().toString());
+        List<String> only = List.of(LasNoches.STRUCTURE.location().toString(), LasNoches.HALLS.location().toString());
         helper.assertTrue(standing.equals(only) && sets.equals(only),
                 "the structures that may stand in Hueco Mundo are " + standing + ", placed by " + sets);
         helper.succeed();
