@@ -306,19 +306,21 @@ public final class AcademyGroundsTests {
     // ---- In the world ----
 
     /**
-     * Test 5. Built in a world made before them by the checks their chunks' loads queue, the grounds stand once with
-     * every dummy their templates set, none saving its spot's flag: building again or setting the yard's template again
-     * where it stands doubles none, and a dummy killed is not set back when its chunk loads, only by that template set
-     * again. It leaves the grounds built in the shared test world with all 12 dummies, which no later test counts.
+     * Test 5. Built in a world made before them by the checks their chunks' loads queue, or by their stamps' sweep where
+     * a chunk loaded before is made full again unheard, the grounds stand once with every dummy their templates set, none
+     * saving its spot's flag: building again or setting the yard's template again where it stands doubles none, and a
+     * dummy killed is not set back when its chunk loads, only by that template set again. It leaves the grounds built in
+     * the shared test world with all 12 dummies, which no later test counts.
      */
-    @GameTest(template = "empty", batch = "grounds", timeoutTicks = 400)
+    @GameTest(template = "empty", batch = "grounds", timeoutTicks = 600)
     public static void theGroundsAreBuiltOnce(GameTestHelper helper) {
         ServerLevel soul = ShakonmakuTests.hold(helper, -14, 15).soul;
         List<SiteStamp> stamps = AcademySite.GROUNDS;
         // Nothing here builds them: the checks a chunk's load queues do, each once its work's ring is loaded. A chunk an
         // earlier test made full and let fall back, kept loaded by the Academy's own ticket, fires no second load event as
-        // it is made full again, so once every ring chunk is loaded each work's check is queued as its first chunk's load
-        // queues it. SiteTests' Academy, built by the same listener, shows real loads queue these checks.
+        // it is made full again; a work whose check found its ring not loaded then is looked at again by its stamp's sweep,
+        // within SWEEP_TICKS of the ring standing loaded. SiteTests' Academy shows real loads queue these checks, and its
+        // test E the sweep.
         // The waits are patient, since the test server's ticks outrun the loading threads that lay those chunks.
         StructureTemplate yard = soul.getStructureManager().get(AcademySite.YARD.sites().get(0).template()).orElseThrow();
         BlockPos corner = corner(AcademySite.YARD);
@@ -331,8 +333,6 @@ public final class AcademyGroundsTests {
                     GateTests.patiently(helper, unloaded.isEmpty(), "the grounds' chunks and those beside them are not all"
                             + " loaded: " + unloaded);
                 })
-                .thenExecute(() -> stamps.forEach(stamp -> AcademySite.onChunkLoad(new ChunkEvent.Load(
-                        soul.getChunk(stamp.startChunk(0).x, stamp.startChunk(0).z), false))))
                 .thenWaitUntil(() -> {
                     List<String> lacking = lacking(soul, stamps);
                     GateTests.patiently(helper, lacking.isEmpty(), "the grounds are not all built: " + lacking);
