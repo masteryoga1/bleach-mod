@@ -7,17 +7,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
-import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.BossEvent;
-import net.minecraft.world.Difficulty;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
@@ -77,8 +73,6 @@ public class Shrieker extends Hollow {
 
     private final BossBar bar = new BossBar(this, "bossbar.bleach.shrieker", BossEvent.BossBarColor.PURPLE,
             BossEvent.BossBarOverlay.PROGRESS);
-    /** Whether its health and damage are the config's yet. Not saved: it never is. */
-    private boolean basesSet;
     /** The game time until which a blow to its mask holds it low and keeps it from swooping. Not saved. */
     private long stalledUntil;
     /**
@@ -135,32 +129,18 @@ public class Shrieker extends Hollow {
         targetSelector.addGoal(2, new HollowHuntGoal(this, true));
     }
 
-    /** Its health and damage from the config, as the base its size, the difficulty and the multipliers work on. */
+    /** Its health and the damage of its swoop are the config's ([bosses.shrieker]). */
     @Override
-    public void applySpawnStats(Difficulty difficulty, float scale) {
-        setBases();
-        super.applySpawnStats(difficulty, scale);
-    }
-
-    private void setBases() {
-        basesSet = true;
-        setBase(Attributes.MAX_HEALTH, BleachConfig.get(BleachConfig.SHRIEKER_HEALTH));
-        setBase(Attributes.ATTACK_DAMAGE, BleachConfig.get(BleachConfig.SHRIEKER_DAMAGE));
-    }
-
-    private void setBase(Holder<Attribute> attribute, double value) {
-        AttributeInstance instance = getAttribute(attribute);
-        if (instance != null && instance.getBaseValue() != value) {
-            instance.setBaseValue(value);
-        }
+    protected ConfigBases configBases() {
+        return new ConfigBases(BleachConfig.get(BleachConfig.SHRIEKER_HEALTH),
+                BleachConfig.get(BleachConfig.SHRIEKER_DAMAGE));
     }
 
     /**
      * Server side, every tick, so it runs with NoAI too: first the air holding it up or letting it fall, before it
-     * moves; then the config's strength for one that skipped spawning (a summon with data, a game test), whole if it was
-     * whole, though without the difficulty and multipliers spawning adds; its wingbeat while it flies; its spent leeches
-     * let go, the wait for more begun once all are; the end of its ring, at which each clinging leech bursts until one by
-     * its head kills it; and its bar, last, so the bar shows the health this tick left.
+     * moves; then its wingbeat while it flies; its spent leeches let go, the wait for more begun once all are; the end
+     * of its ring, at which each clinging leech bursts until one by its head kills it; and its bar, last, so the bar
+     * shows the health this tick left. Hollow's tick has set the config's strength for one that skipped spawning.
      */
     @Override
     public void tick() {
@@ -175,13 +155,6 @@ public class Shrieker extends Hollow {
         super.tick();
         if (level().isClientSide) {
             return;
-        }
-        if (!basesSet && isAlive()) {
-            boolean whole = getHealth() >= getMaxHealth();
-            setBases();
-            if (whole) {
-                setHealth(getMaxHealth());
-            }
         }
         if (isAlive() && !onGround() && !isSwooping() && (level().getGameTime() + getId() * 3L) % FLAP_TICKS == 0) {
             playSound(ModSounds.SHRIEKER_FLAP.get(), FLAP_VOLUME, 0.9F + random.nextFloat() * 0.2F);

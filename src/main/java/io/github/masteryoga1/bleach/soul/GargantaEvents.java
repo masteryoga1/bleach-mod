@@ -156,7 +156,8 @@ public final class GargantaEvents {
      * a Gillian down through its own tear and an Adjuchas pack as lesser Hollows do, and the Hunter
      * never follows one.
      *
-     * @return false, changing nothing, if there was no open ground for the Hollows to land on
+     * @return false, changing nothing, if there was no open ground for the Hollows to land on, or the kind given
+     *         comes by no tear (Grand Fisher)
      */
     public static boolean openArrival(ServerPlayer player, SoulData data, @Nullable HollowKind forced, long now,
                                       boolean byCommand) {
@@ -164,6 +165,9 @@ public final class GargantaEvents {
         float reiatsu = data.maxReiryoku();
         HollowKind kind = forced != null ? forced
                 : HollowLogic.pickArrival(reiatsu, plusesNear(level, player), level.getRandom());
+        if (!kind.comesByTear()) {
+            return false;
+        }
         int room = byCommand ? Integer.MAX_VALUE
                 : BleachConfig.get(BleachConfig.MAX_NEARBY_HOLLOWS) - hollowsNear(level, player.position());
         if (kind.isMenos()) {

@@ -53,7 +53,14 @@ public enum HollowKind implements StringRepresentable {
      */
     SHRIEKER("shrieker", new Stats(120.0, 7.0, 4.0, 0.25, 40.0, 0.3, 0.5, 1.0), 60, 1.0, 150.0F, 40,
             null, 1.0F, 1.0F,
-            new MaskSpot(0.55, 1.85, 0.6), new Look(1.0F, 0.0F, 0.3F, 1.0F), 0, Float.MAX_VALUE);
+            new MaskSpot(0.55, 1.85, 0.6), new Look(1.0F, 0.0F, 0.3F, 1.0F), 0, Float.MAX_VALUE),
+    /**
+     * Grand Fisher, a great furred Hollow and a boss: it comes alone and by no tear (see {@link #comesByTear}). Its health
+     * and attack here are only the config's defaults ([bosses.grand_fisher]), which set them as it spawns.
+     */
+    GRAND_FISHER("grand_fisher", new Stats(180.0, 8.0, 4.0, 0.25, 40.0, 0.6, 1.0, 1.0), 30, 1.0, 200.0F, 50,
+            null, 1.0F, 1.0F,
+            new MaskSpot(1.15, 3.1, 1.2), new Look(2.0F, 0.25F, 0.4F, 1.6F), 0, Float.MAX_VALUE);
 
     public static final Codec<HollowKind> CODEC = StringRepresentable.fromEnum(HollowKind::values);
 
@@ -140,6 +147,14 @@ public enum HollowKind implements StringRepresentable {
     /** Whether this kind is a Menos Grande: a Gillian or an Adjuchas. */
     public boolean isMenos() {
         return this == GILLIAN || this == ADJUCHAS;
+    }
+
+    /**
+     * Whether a Garganta may bring this kind, by chance or by command: every kind but Grand Fisher, which lies hidden in
+     * the ground while its lure works, so no tear is ever seen for it.
+     */
+    public boolean comesByTear() {
+        return this != GRAND_FISHER;
     }
 
     /** A size for a new Hollow of this kind, anywhere in its range. */

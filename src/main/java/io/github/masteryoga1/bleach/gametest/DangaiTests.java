@@ -156,7 +156,7 @@ public final class DangaiTests {
     }
 
     /** Whether this player has earned the advancement {@code bleach:<name>}. */
-    private static boolean earned(ServerPlayer player, String name) {
+    static boolean earned(ServerPlayer player, String name) {
         AdvancementHolder advancement = player.server.getAdvancements().get(BleachMod.id(name));
         return advancement != null && player.getAdvancements().getOrStartProgress(advancement).isDone();
     }

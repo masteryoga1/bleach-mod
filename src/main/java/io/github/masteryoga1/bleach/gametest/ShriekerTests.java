@@ -124,7 +124,7 @@ public final class ShriekerTests {
     }
 
     /** Whether this creature would run from released reiatsu: it was given the goal as it joined the world. */
-    private static boolean frightens(PathfinderMob mob) {
+    static boolean frightens(PathfinderMob mob) {
         return mob.goalSelector.getAvailableGoals().stream().anyMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal);
     }
 

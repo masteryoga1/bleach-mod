@@ -517,6 +517,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SHRIEKER_LEECH_DAMAGE;
     public static final ModConfigSpec.DoubleValue SHRIEKER_HEAD_DAMAGE;
 
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_HEALTH;
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_DAMAGE;
+
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
     public static final ModConfigSpec.DoubleValue VASTO_TEAR_CHANCE;
@@ -2362,6 +2365,14 @@ public final class BleachConfig {
         SHRIEKER_HEAD_DAMAGE = builder
                 .comment("Damage a Shrieker takes when one of its own leeches bursts by its head.")
                 .defineInRange("head_damage", 20.0, 0.0, 1_000.0);
+        builder.pop();
+        builder.push("grand_fisher");
+        GRAND_FISHER_HEALTH = builder
+                .comment("Grand Fisher's health on Normal, before the hollows health multiplier. Easy takes some away.")
+                .defineInRange("health", 180.0, 1.0, 10_000.0);
+        GRAND_FISHER_DAMAGE = builder
+                .comment("Damage of Grand Fisher's blow on Normal, before the hollows damage multiplier.")
+                .defineInRange("damage", 8.0, 0.0, 200.0);
         builder.pop();
         builder.pop();
 

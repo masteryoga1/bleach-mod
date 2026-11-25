@@ -133,6 +133,8 @@ public final class Milestones {
     public static final String MENOS_GRANDE = "menos_grande";
     /** Brought a Shrieker down: killed or purified one by a blow of one's own. Granted when it happens. */
     public static final String SHRIEKER = "shrieker";
+    /** Brought Grand Fisher down: killed or purified it by a blow of one's own. Granted when it happens. */
+    public static final String GRAND_FISHER = "grand_fisher";
     /**
      * Became a Gillian by devouring. Granted when it happens and by {@link #check}, as are the two below,
      * which also count a form set by command or reached before a purification.

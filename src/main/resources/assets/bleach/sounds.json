@@ -439,6 +439,69 @@
       }
     ]
   },
+  "entity.grand_fisher.ambient": {
+    "subtitle": "subtitles.bleach.entity.grand_fisher.ambient",
+    "sounds": [
+      {
+        "name": "minecraft:entity/witch/ambient1",
+        "pitch": 0.55
+      },
+      {
+        "name": "minecraft:entity/witch/ambient2",
+        "pitch": 0.55
+      },
+      {
+        "name": "minecraft:entity/witch/ambient3",
+        "pitch": 0.55
+      },
+      {
+        "name": "minecraft:entity/witch/ambient4",
+        "pitch": 0.55
+      },
+      {
+        "name": "minecraft:entity/witch/ambient5",
+        "pitch": 0.55
+      }
+    ]
+  },
+  "entity.grand_fisher.hurt": {
+    "subtitle": "subtitles.bleach.entity.grand_fisher.hurt",
+    "sounds": [
+      {
+        "name": "minecraft:mob/polarbear/hurt1",
+        "pitch": 0.7
+      },
+      {
+        "name": "minecraft:mob/polarbear/hurt2",
+        "pitch": 0.7
+      },
+      {
+        "name": "minecraft:mob/polarbear/hurt3",
+        "pitch": 0.7
+      },
+      {
+        "name": "minecraft:mob/polarbear/hurt4",
+        "pitch": 0.7
+      }
+    ]
+  },
+  "entity.grand_fisher.death": {
+    "subtitle": "subtitles.bleach.entity.grand_fisher.death",
+    "sounds": [
+      {
+        "name": "minecraft:mob/polarbear/death1",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/polarbear/death2",
+        "pitch": 0.6
+      },
+      {
+        "name": "minecraft:mob/polarbear/death3",
+        "pitch": 0.6
+      }
+    ]
+  },
   "entity.shrieker_leech.cling": {
     "subtitle": "subtitles.bleach.entity.shrieker_leech.cling",
     "sounds": [

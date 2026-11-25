@@ -9,6 +9,7 @@ import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.DutyShinigami;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.Gillian;
+import io.github.masteryoga1.bleach.entity.GrandFisher;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.HoundHollow;
@@ -269,6 +270,10 @@ public final class BleachClient {
                         new ShriekerModel(context.bakeLayer(BleachModelLayers.SHRIEKER)),
                         HollowKind.SHRIEKER, 90.0F));
         event.registerEntityRenderer(ModEntities.SHRIEKER_LEECH.get(), ShriekerLeechRenderer::new);
+        event.registerEntityRenderer(ModEntities.GRAND_FISHER.get(),
+                context -> new HollowRenderer<GrandFisher, GrandFisherModel>(context,
+                        new GrandFisherModel(context.bakeLayer(BleachModelLayers.GRAND_FISHER)),
+                        HollowKind.GRAND_FISHER, 90.0F));
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
         event.registerEntityRenderer(ModEntities.CAJA_NEGACION.get(), CajaNegacionRenderer::new);

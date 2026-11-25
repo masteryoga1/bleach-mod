@@ -163,6 +163,8 @@ public abstract class Hollow extends Monster {
     private UUID trialOf;
     /** When that trial began, so one from an earlier trial is never counted. */
     private long trialStart;
+    /** Whether its {@link #configBases}, if it has any, are in yet. Not saved: they go in again as it loads. */
+    private boolean basesSet;
 
     /** Ticks into the white dissolve, on both sides, so the renderer can follow it. */
     int dissolveTicks;
@@ -221,6 +223,7 @@ public abstract class Hollow extends Monster {
      * top. Leaves it at full health with a soul to match. Calling it again replaces what it set before.
      */
     public void applySpawnStats(Difficulty difficulty, float scale) {
+        setConfigBases();
         AttributeInstance size = getAttribute(Attributes.SCALE);
         if (size != null) {
             size.setBaseValue(scale);
@@ -248,6 +251,37 @@ public abstract class Hollow extends Monster {
         }
     }
 
+    /** A boss's base health and attack damage, as the server's config sets them in place of its row's. */
+    protected record ConfigBases(double health, double damage) {
+    }
+
+    /**
+     * The config's base health and damage for a kind whose strength is the server's to set, a boss's; none, the default,
+     * for a kind whose row's stand. They go in as it spawns, the base its size, the difficulty and the multipliers work
+     * on, and on its first server tick for one that skipped spawning (a summon with data, a game test), which is left
+     * whole if it was whole, though without what spawning adds.
+     */
+    @Nullable
+    protected ConfigBases configBases() {
+        return null;
+    }
+
+    private void setConfigBases() {
+        basesSet = true;
+        ConfigBases bases = configBases();
+        if (bases != null) {
+            setBase(Attributes.MAX_HEALTH, bases.health());
+            setBase(Attributes.ATTACK_DAMAGE, bases.damage());
+        }
+    }
+
+    private void setBase(Holder<Attribute> attribute, double value) {
+        AttributeInstance instance = getAttribute(attribute);
+        if (instance != null && instance.getBaseValue() != value) {
+            instance.setBaseValue(value);
+        }
+    }
+
     /** A Hollow's soul: tier one of the Hollow path, with its kind's reiatsu for its size. */
     private void initSoul(float scale) {
         SoulData soul = getData(SoulAttachments.SOUL);
@@ -272,8 +306,9 @@ public abstract class Hollow extends Monster {
     }
 
     /**
-     * Server side, every tick, so it all still happens with NoAI: the soul, a practice Hollow its trial no
-     * longer wants fading, the crack wearing off, the mask forming, a missing departure tear, and healing when left alone.
+     * Server side, every tick, so it all still happens with NoAI: the soul, a boss's config bases for one that
+     * skipped spawning, a practice Hollow its trial no longer wants fading, the crack wearing off, the mask
+     * forming, a missing departure tear, and healing when left alone.
      */
     @Override
     public void tick() {
@@ -283,6 +318,13 @@ public abstract class Hollow extends Monster {
         }
         if (!SoulLogic.hasSoul(this)) {
             initSoul(spawnScale());
+        }
+        if (!basesSet && isAlive()) {
+            boolean whole = getHealth() >= getMaxHealth();
+            setConfigBases();
+            if (whole) {
+                setHealth(getMaxHealth());
+            }
         }
         if (isPractice() && tickCount % 10 == 0 && !FieldTrialEvents.keeps(this)) {
             dissolve(server);
