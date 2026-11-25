@@ -200,6 +200,10 @@ LAS_NOCHES_LIT = rgb(253, 253, 254)
 LAS_NOCHES_SEAM = rgb(210, 213, 221)
 LAS_NOCHES_TRIM = rgb(38, 38, 44)
 LAS_NOCHES_TRIM_GRAIN = rgb(48, 48, 55)
+# Las Noches' sky, the clear day blue that lines the dome, with a paler haze and a near-white wisp.
+LAS_NOCHES_SKY = rgb(122, 172, 230)
+LAS_NOCHES_SKY_HAZE = rgb(136, 184, 236)
+LAS_NOCHES_SKY_WISP = rgb(176, 208, 244)
 # Seireitei's building blocks: white plaster; black plaster, a dark grey; and blue-grey fired roof tiles.
 PLASTER = rgb(240, 238, 230)
 PLASTER_GRAIN = rgb(230, 228, 219)
@@ -1899,6 +1903,15 @@ def las_noches_trim():
     return c
 
 
+def las_noches_sky():
+    """Las Noches sky: a clear day blue crossed by fine diagonal stripes of haze, every fourth fleck a pale wisp."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, LAS_NOCHES_SKY)
+    mottle(c, 0, 0, 16, 16, LAS_NOCHES_SKY_HAZE, 4, seed=1)
+    mottle(c, 0, 0, 16, 16, LAS_NOCHES_SKY_WISP, 16, seed=5)
+    return c
+
+
 def white_plaster():
     """White plaster: one flat white with a faint grain in a fixed scatter."""
     c = Canvas(16, 16)
@@ -2195,6 +2208,7 @@ TEXTURES = {
     "block/las_noches_stone.png": las_noches_stone,
     "block/las_noches_tiles.png": las_noches_tiles,
     "block/las_noches_trim.png": las_noches_trim,
+    "block/las_noches_sky.png": las_noches_sky,
     "block/white_plaster.png": white_plaster,
     "block/black_plaster.png": recoloured(white_plaster, {PLASTER: BLACK_PLASTER, PLASTER_GRAIN: BLACK_PLASTER_GRAIN},
                                           "black_plaster"),
