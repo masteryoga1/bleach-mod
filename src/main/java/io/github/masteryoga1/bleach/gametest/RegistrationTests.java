@@ -127,7 +127,7 @@ public final class RegistrationTests {
     @GameTest(template = "empty")
     public static void hollowsAndPlusesAreRegistered(GameTestHelper helper) {
         for (String name : List.of("spider_hollow", "hexapodus", "hound_hollow", "serpent_hollow", "fishbone_d", "plus",
-                "garganta", "shrieker")) {
+                "garganta", "shrieker", "shrieker_leech")) {
             helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.containsKey(BleachMod.id(name)), "bleach:" + name + " is not an entity type");
         }
         for (String name : List.of("spider_hollow_spawn_egg", "hexapodus_spawn_egg", "hound_hollow_spawn_egg",
@@ -137,11 +137,14 @@ public final class RegistrationTests {
         for (String name : List.of("entity.hollow.ambient", "entity.hollow.hurt", "entity.hollow.death",
                 "entity.hollow.mask_crack", "entity.fishbone_d.roar", "entity.garganta.open", "item.denreishinki.ping",
                 "entity.shrieker.ambient", "entity.shrieker.hurt", "entity.shrieker.death", "entity.shrieker.swoop",
-                "entity.shrieker.flap")) {
+                "entity.shrieker.flap", "entity.shrieker.loose", "entity.shrieker_leech.cling")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");
         }
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("denreishinki")).isPresent(),
                 "the Denreishinki has no recipe");
+        EntityType<?> leech = ModEntities.SHRIEKER_LEECH.get();
+        helper.assertTrue(leech.is(SoulLogic.SPIRITS) && !leech.canSerialize() && !leech.canSummon(),
+                "bleach:shrieker_leech is not a spirit, or is saved or summoned");
         helper.succeed();
     }
 

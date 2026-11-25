@@ -33,6 +33,7 @@ import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.Shrieker;
+import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
@@ -213,6 +214,21 @@ public final class ModEntities {
                     .noSave()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("shrieker").toString()));
+
+    /**
+     * A Shrieker's leech, loosed from its chest at its prey. Never saved and never summoned: it lives only while its
+     * Shrieker does, and comes only from one. It moves every tick, so its updates go every tick too.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<ShriekerLeech>> SHRIEKER_LEECH =
+            ENTITY_TYPES.register("shrieker_leech", () -> EntityType.Builder
+                    .<ShriekerLeech>of(ShriekerLeech::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(1)
+                    .build(BleachMod.id("shrieker_leech").toString()));
 
     // ---- Arrancar ----
 

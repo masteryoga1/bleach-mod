@@ -27,6 +27,7 @@
     "bleach:senkaimon",
     "bleach:kototsu",
     "bleach:gate_keeper",
-    "bleach:shrieker"
+    "bleach:shrieker",
+    "bleach:shrieker_leech"
   ]
 }

@@ -27,6 +27,7 @@ import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.Shrieker;
+import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
@@ -264,15 +265,16 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * second Garganta open the same way, and moved into it in survival, the soul must come out in the Overworld on the block
  * it last left the Overworld from by a gate, the third. There a Shrieker, summoned standing still in the air before it,
  * must reach the client unhidden, the soul looks at it for a shot that shows its bar as well, and it must be gone once
- * killed by command, before the run quits.
+ * killed by command. A second, set on the soul from the server, must loose its leeches, which must cling at the soul's
+ * back on its client; killed, it and its leeches must be gone before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, dunes and moon, Las Noches' sky, the Shrieker
- * and HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code fails
- * the run, and so does anything that did not reach the client as expected.
+ * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, dunes and moon, Las Noches' sky, the Shrieker,
+ * its leeches in flight and HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the
+ * mod's client code fails the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -1737,7 +1739,9 @@ public final class ClientSmokeTest {
             // Its body, mask and spread wings, and its bar at the top of the screen.
             case 9020 -> shot(minecraft, "shrieker");
             case 9022 -> command(minecraft, "kill @e[type=bleach:shrieker]");
-            case 9065 -> {
+            // A second, standing still in the air nearer the soul, for its leeches (see checkBosses).
+            case 9065 -> command(minecraft, "summon bleach:shrieker ~ ~3 ~-6 " + STILL);
+            case 9165 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2488,7 +2492,11 @@ public final class ClientSmokeTest {
                         + minecraft.level.dimension().location() + " at " + player.position() + ", not at " + home + ")");
     }
 
-    /** The checks of the bosses, each window from the step it follows: the Shrieker reaching the client, then gone. */
+    /**
+     * The checks of the bosses, each window from the step it follows: the Shrieker reaching the client, then gone; then a
+     * second, set on the soul on the server, its leeches clinging at the soul's back, and the two gone once it is killed.
+     * Each of these last opens a tick after the window whose pass sets it going, so it is open when that can first show.
+     */
     private static void checkBosses(Minecraft minecraft) {
         if (expectWithin(minecraft, 8982, 9015, () -> nearest(minecraft, Shrieker.class, SUMMONED_RANGE,
                         shrieker -> shrieker.isAlive() && !ClientSouls.isHiddenFromViewer(shrieker)) != null,
@@ -2502,6 +2510,49 @@ public final class ClientSmokeTest {
         expectWithin(minecraft, 9024, 9060,
                 () -> nearest(minecraft, Shrieker.class, SUMMONED_RANGE, Shrieker::isAlive) == null,
                 "the Shrieker killed by command still lives");
+        // A still Shrieker fights no one by itself: the server sets it on the soul and has it loose its leeches.
+        if (expectWithin(minecraft, 9067, 9100, () -> nearest(minecraft, Shrieker.class, SUMMONED_RANGE,
+                        shrieker -> shrieker.isAlive() && !ClientSouls.isHiddenFromViewer(shrieker)) != null,
+                "the second Shrieker never reached the Arrancar's client unhidden")) {
+            MinecraftServer server = minecraft.getSingleplayerServer();
+            LocalPlayer local = minecraft.player;
+            if (server != null) {
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                    if (player != null) {
+                        player.level().getEntitiesOfClass(Shrieker.class, player.getBoundingBox().inflate(SUMMONED_RANGE),
+                                Shrieker::isAlive).forEach(shrieker -> {
+                            shrieker.setTarget(player);
+                            shrieker.looseLeeches();
+                        });
+                    }
+                });
+            }
+        }
+        if (expectWithin(minecraft, 9068, 9145, () -> leechesCling(minecraft),
+                "the Shrieker's leeches never all clung, unhidden, at the Arrancar's back on its client")) {
+            command(minecraft, "kill @e[type=bleach:shrieker]");
+        }
+        expectWithin(minecraft, 9069, 9160, () -> windowsPassed.contains(9068)
+                        && nearest(minecraft, Shrieker.class, SUMMONED_RANGE, Shrieker::isAlive) == null
+                        && nearest(minecraft, ShriekerLeech.class, SUMMONED_RANGE, Entity::isAlive) == null,
+                "the second Shrieker killed by command still lives, or its leeches are still about");
+    }
+
+    /**
+     * Whether a leech is near and every leech near clings to the local player, unhidden, as its client knows: by the
+     * synced bearer, and set by the client itself behind the player's body, within a block of it.
+     */
+    private static boolean leechesCling(Minecraft minecraft) {
+        LocalPlayer player = minecraft.player;
+        Vec3 ahead = Vec3.directionFromRotation(0.0F, player.yBodyRot);
+        List<ShriekerLeech> leeches = minecraft.level.getEntitiesOfClass(ShriekerLeech.class,
+                player.getBoundingBox().inflate(SUMMONED_RANGE), Entity::isAlive);
+        return !leeches.isEmpty() && leeches.stream().allMatch(leech -> {
+            Vec3 off = leech.position().subtract(player.position());
+            return leech.bearer() == player && !ClientSouls.isHiddenFromViewer(leech)
+                    && off.x * ahead.x + off.z * ahead.z < 0.0 && off.horizontalDistance() < 1.0;
+        });
     }
 
     /**

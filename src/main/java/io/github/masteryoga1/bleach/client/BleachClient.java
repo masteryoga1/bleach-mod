@@ -268,6 +268,7 @@ public final class BleachClient {
                 context -> new HollowRenderer<Shrieker, ShriekerModel>(context,
                         new ShriekerModel(context.bakeLayer(BleachModelLayers.SHRIEKER)),
                         HollowKind.SHRIEKER, 90.0F));
+        event.registerEntityRenderer(ModEntities.SHRIEKER_LEECH.get(), ShriekerLeechRenderer::new);
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
         event.registerEntityRenderer(ModEntities.CAJA_NEGACION.get(), CajaNegacionRenderer::new);

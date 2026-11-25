@@ -16,7 +16,8 @@ import net.minecraft.world.phys.Vec3;
  * keeps its claws low a while, its mask near the height of the prey's eyes, where a blade swung at it meets the mask
  * before its body; then it climbs back to its circle. A swoop that misses gives up when it comes to the ground, runs
  * into a wall or takes too long. While a blow to its mask holds it, it sinks where it is to that low height, and any
- * swoop it was in is over.
+ * swoop it was in is over. From its circle, before any swoop, it looses its leeches at its prey a few at a time
+ * ({@link Shrieker#looseLeeches}).
  *
  * <p>With its prey far off or long out of sight it flies to it by a path, round what stands between; near and in sight
  * it steers straight. Held where it is while it steers (by a hill, a tree, a wall), it wishes itself higher, a little
@@ -175,7 +176,11 @@ final class ShriekerFlightGoal extends Goal {
         }
         Vec3 at = low ? circlePoint(prey, CLAWS_LOW_RADIUS, CLAWS_LOW_HEIGHT) : circlePoint(prey, HOVER_RADIUS, HOVER_HEIGHT);
         wish(at.add(0.0, liftFor(at), 0.0), HOVER_SPEED);
-        if (!low && phaseTicks >= MIN_HOVER_TICKS && shrieker.attackReady() && distance <= SWOOP_RANGE && seen) {
+        if (low || !seen || distance > SWOOP_RANGE) {
+            return;
+        }
+        // Its next leeches before any swoop, once the last are spent and their wait is over.
+        if (shrieker.looseLeeches() == 0 && phaseTicks >= MIN_HOVER_TICKS && shrieker.attackReady()) {
             swooping = true;
             phaseTicks = 0;
             shrieker.setSwooping(true);

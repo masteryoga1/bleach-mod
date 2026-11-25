@@ -384,6 +384,32 @@
       }
     ]
   },
+  "entity.shrieker.loose": {
+    "subtitle": "subtitles.bleach.entity.shrieker.loose",
+    "sounds": [
+      {
+        "name": "minecraft:random/fizz",
+        "pitch": 0.6
+      }
+    ]
+  },
+  "entity.shrieker_leech.cling": {
+    "subtitle": "subtitles.bleach.entity.shrieker_leech.cling",
+    "sounds": [
+      {
+        "name": "minecraft:mob/ravager/bite1",
+        "pitch": 1.8
+      },
+      {
+        "name": "minecraft:mob/ravager/bite2",
+        "pitch": 1.8
+      },
+      {
+        "name": "minecraft:mob/ravager/bite3",
+        "pitch": 1.8
+      }
+    ]
+  },
   "entity.cero.charge": {
     "subtitle": "subtitles.bleach.entity.cero.charge",
     "sounds": [

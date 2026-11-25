@@ -818,6 +818,26 @@ def shrieker_mask():
     return c
 
 
+# A Shrieker's leech (ShriekerLeechModel), as (u, v, w, h, d): its body, the sucker at its front, and a wing (the left
+# one mirrored).
+LEECH_BODY = rgb(56, 34, 48)
+LEECH_BODY_BOX = (0, 0, 5, 4, 7)
+LEECH_SUCKER = (24, 0, 3, 3, 1)
+LEECH_WING = (0, 11, 5, 0, 4)
+
+
+def shrieker_leech():
+    """A swollen body of dark, oily hide flecked with shade, a small bone mask over its front about a red sucker, and
+    wings of the Shrieker's own membrane."""
+    c = Canvas(32, 16)
+    box(c, *LEECH_BODY_BOX, LEECH_BODY)
+    mottle(c, 0, 0, 24, 11, HOLLOW_SHADE, 4)
+    c.rect(*faces(*LEECH_BODY_BOX)[3], BONE)   # the front: a mask about the sucker
+    box(c, *LEECH_SUCKER, SHRIEKER_TONGUE)
+    box(c, *LEECH_WING, SHRIEKER_WING)
+    return c
+
+
 def garganta():
     """A tear in the air: black, ragged at the edges and narrow at both ends."""
     c = Canvas(32, 64)
@@ -2185,6 +2205,7 @@ TEXTURES = {
     "entity/hollow/shrieker.png": shrieker,
     "entity/hollow/shrieker_mask.png": shrieker_mask,
     "entity/hollow/shrieker_mask_cracked.png": cracked(shrieker_mask, [(57, 7), (58, 10), (57, 13), (59, 15)]),
+    "entity/hollow/shrieker_leech.png": shrieker_leech,
     "entity/garganta.png": garganta,
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,
