@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
 import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -26,7 +27,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
@@ -148,6 +148,11 @@ public final class GateTests {
 
     /** Runs this command as the server itself, in the Overworld, and gives back every line it said. */
     static List<Component> run(ServerLevel soul, String command) {
+        return run(soul.getServer().createCommandSourceStack(), command);
+    }
+
+    /** Runs this command as this source, at its permission, and gives back every line it said, refusals too. */
+    static List<Component> run(CommandSourceStack as, String command) {
         List<Component> said = new ArrayList<>();
         CommandSource listener = new CommandSource() {
             @Override
@@ -170,8 +175,7 @@ public final class GateTests {
                 return false;
             }
         };
-        MinecraftServer server = soul.getServer();
-        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSource(listener), command);
+        as.getServer().getCommands().performPrefixedCommand(as.withSource(listener), command);
         return said;
     }
 

@@ -29,6 +29,8 @@ import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.BaitLogic;
 import io.github.masteryoga1.bleach.soul.BaitSite;
 import io.github.masteryoga1.bleach.soul.BaitSites;
+import io.github.masteryoga1.bleach.soul.Boss;
+import io.github.masteryoga1.bleach.soul.BossLedger;
 import io.github.masteryoga1.bleach.soul.DevourEvents;
 import io.github.masteryoga1.bleach.soul.FieldTrialEvents;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
@@ -85,6 +87,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
@@ -128,6 +131,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach reset &lt;players&gt;
  * /bleach academy                   (where the Academy stands in Soul Society; a click suggests the teleport there)
  * /bleach gate &lt;gate&gt; &lt;lift|drop|status&gt;   (hakutomon, kokuryomon, shoryumon or shuwaimon, from any world)
+ * /bleach boss &lt;boss&gt; &lt;status|reset|summon [player]&gt;   (shrieker; summon skips the wait, never on Peaceful
+ *                                    or with one about; reset lets it come now and forgets who beat it)
  * /bleach garganta &lt;players&gt; [kind|numero|privaron]   (a tear now; not on Peaceful)
  *                                    (kind: spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas|shrieker)
  *                                    (numero: a lone Número; privaron: a Privaron Espada and its Fracción)
@@ -200,6 +205,9 @@ public final class BleachCommand {
     /** The great gates, by the names a command takes. */
     private static final SuggestionProvider<CommandSourceStack> GATES = (context, builder) ->
             SharedSuggestionProvider.suggest(GateState.NAMES, builder);
+    /** The bosses the ledger lists, by the ids a command takes. */
+    private static final SuggestionProvider<CommandSourceStack> BOSSES = (context, builder) ->
+            SharedSuggestionProvider.suggest(BossLedger.bosses().stream().map(Boss::id), builder);
     /** The spirits the world loaded, read from the server's registry. */
     private static final SuggestionProvider<CommandSourceStack> SPIRITS = (context, builder) ->
             SharedSuggestionProvider.suggestResource(ZanpakutoSpirits.registry(context.getSource().getLevel())
@@ -261,6 +269,16 @@ public final class BleachCommand {
                                 .then(Commands.literal("lift").executes(context -> gate(context, true, true)))
                                 .then(Commands.literal("drop").executes(context -> gate(context, true, false)))
                                 .then(Commands.literal("status").executes(context -> gate(context, false, false)))))
+                .then(Commands.literal("boss")
+                        .then(Commands.argument("boss", StringArgumentType.word())
+                                .suggests(BOSSES)
+                                .then(Commands.literal("status").executes(BleachCommand::bossStatus))
+                                .then(Commands.literal("reset").executes(BleachCommand::bossReset))
+                                .then(Commands.literal("summon")
+                                        .executes(context -> bossSummon(context, context.getSource().getPlayer()))
+                                        .then(Commands.argument("player", EntityArgument.player())
+                                                .executes(context -> bossSummon(context,
+                                                        EntityArgument.getPlayer(context, "player")))))))
                 .then(Commands.literal("garganta")
                         .then(Commands.argument("players", EntityArgument.players())
                                 .executes(context -> garganta(context, null))
@@ -609,6 +627,82 @@ public final class BleachCommand {
         return 1;
     }
 
+    /** The boss this command names, in any case, or null, the operator told so. */
+    @Nullable
+    private static Boss boss(CommandContext<CommandSourceStack> context) {
+        String name = StringArgumentType.getString(context, "boss");
+        Boss boss = BossLedger.boss(name.toLowerCase(Locale.ROOT));
+        if (boss == null) {
+            context.getSource().sendFailure(Component.translatable("commands.bleach.unknown_boss", name));
+        }
+        return boss;
+    }
+
+    /**
+     * Says how a boss stands, to the one who asked only: how many are about, whether it may come again or how long it
+     * is away, how many souls have beaten it, its kept id if it has one, then its own lines.
+     */
+    private static int bossStatus(CommandContext<CommandSourceStack> context) {
+        Boss boss = boss(context);
+        if (boss == null) {
+            return 0;
+        }
+        CommandSourceStack source = context.getSource();
+        MinecraftServer server = source.getServer();
+        BossLedger ledger = BossLedger.get(server);
+        Consumer<Component> line = text -> source.sendSuccess(() -> text, false);
+        line.accept(Component.translatable("commands.bleach.boss.status", boss.name(), boss.present(server)));
+        long left = ledger.waitLeft(boss.id(), BossLedger.now(server));
+        line.accept(left <= 0L ? Component.translatable("commands.bleach.boss.status.free")
+                : Component.translatable("commands.bleach.boss.status.away",
+                        String.format(Locale.ROOT, "%.1f", left / (double) BossLedger.TICKS_PER_DAY), left));
+        int beaten = ledger.beatenBy(boss.id()).size();
+        line.accept(beaten == 0 ? Component.translatable("commands.bleach.boss.status.unbeaten")
+                : Component.translatable("commands.bleach.boss.status.beaten", beaten));
+        UUID kept = ledger.kept(boss.id());
+        if (kept != null) {
+            line.accept(Component.translatable("commands.bleach.boss.status.kept", kept.toString()));
+        }
+        boss.status(server).forEach(line);
+        return 1;
+    }
+
+    /** Lets a boss come again now and forgets who beat it; a kept boss keeps its one id. */
+    private static int bossReset(CommandContext<CommandSourceStack> context) {
+        Boss boss = boss(context);
+        if (boss == null) {
+            return 0;
+        }
+        BossLedger.get(context.getSource().getServer()).reset(boss.id());
+        context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.boss.reset", boss.name()), true);
+        return 1;
+    }
+
+    /**
+     * Brings a boss now, for the player given or else the one who ran it (none from the console), whatever its wait,
+     * which it leaves as it was. Peaceful refuses it, since it would vanish at once, and so does whatever the boss
+     * itself refuses for ({@link Boss#summonRefusal}): by default one already about, as the server holds one at a time.
+     */
+    private static int bossSummon(CommandContext<CommandSourceStack> context, @Nullable ServerPlayer near) {
+        Boss boss = boss(context);
+        CommandSourceStack source = context.getSource();
+        if (boss == null || peaceful(source, "commands.bleach.boss.peaceful")) {
+            return 0;
+        }
+        Component refused = boss.summonRefusal(source.getServer());
+        if (refused == null) {
+            refused = boss.summon(source.getServer(), near);
+        }
+        if (refused != null) {
+            source.sendFailure(refused);
+            return 0;
+        }
+        source.sendSuccess(() -> near != null
+                ? Component.translatable("commands.bleach.boss.summon.success", boss.name(), near.getDisplayName())
+                : Component.translatable("commands.bleach.boss.summon.success_alone", boss.name()), true);
+        return 1;
+    }
+
     /**
      * Opens a Garganta near each player now, with Hollows of the kind given or of one their reiatsu
      * draws. It ignores the chance, the cooldown, the cap on nearby Hollows and whether the soul could
@@ -630,7 +724,7 @@ public final class BleachCommand {
                 return 0;
             }
         }
-        if (peaceful(context.getSource())) {
+        if (peaceful(context.getSource(), "commands.bleach.garganta.peaceful")) {
             return 0;
         }
         int opened = 0;
@@ -658,7 +752,7 @@ public final class BleachCommand {
      */
     private static int arrancarGarganta(CommandContext<CommandSourceStack> context, boolean group)
             throws CommandSyntaxException {
-        if (peaceful(context.getSource())) {
+        if (peaceful(context.getSource(), "commands.bleach.garganta.peaceful")) {
             return 0;
         }
         int opened = 0;
@@ -693,7 +787,7 @@ public final class BleachCommand {
 
     /** Sends Fishbone D after each player now, as if their first Hollow were due. */
     private static int startFirstHollow(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        if (peaceful(context.getSource())) {
+        if (peaceful(context.getSource(), "commands.bleach.garganta.peaceful")) {
             return 0;
         }
         int started = 0;
@@ -713,12 +807,12 @@ public final class BleachCommand {
         return count;
     }
 
-    /** Refuses, with a message, when the world is on Peaceful, where every Hollow would vanish at once. */
-    private static boolean peaceful(CommandSourceStack source) {
+    /** Refuses, with this key's line, when the world is on Peaceful, where every Hollow and boss would vanish at once. */
+    private static boolean peaceful(CommandSourceStack source, String key) {
         if (source.getLevel().getDifficulty() != Difficulty.PEACEFUL) {
             return false;
         }
-        source.sendFailure(Component.translatable("commands.bleach.garganta.peaceful"));
+        source.sendFailure(Component.translatable(key));
         return true;
     }
 
@@ -892,7 +986,8 @@ public final class BleachCommand {
             return 0;
         }
         // A wave's Hollows, like the ones a bait draws, would vanish at once.
-        if ((action == BaitAction.START || action == BaitAction.WAVE) && peaceful(source)) {
+        if ((action == BaitAction.START || action == BaitAction.WAVE)
+                && peaceful(source, "commands.bleach.garganta.peaceful")) {
             return 0;
         }
         ServerLevel overworld = source.getServer().overworld();
