@@ -820,6 +820,45 @@ def shrieker_mask():
     return c
 
 
+# The Gate of Hell (HellGateModel), as (u, v, w, h, d): a post (both share it), the lintel, a door (the right one
+# mirrored), the dark behind them, a door's skull and the blade; and its colours, bone-grey stone and darker doors.
+HELL_POST = (0, 0, 2, 26, 10)
+HELL_LINTEL = (24, 0, 20, 2, 10)
+HELL_DOOR_BOX = (24, 12, 8, 26, 1)
+HELL_DARK = (42, 12, 16, 26, 1)
+HELL_SKULL = (76, 12, 3, 3, 1)
+HELL_BLADE = (0, 40, 16, 2, 16)
+HELL_STONE = rgb(118, 110, 102)
+HELL_STONE_SHADE = rgb(90, 84, 78)
+HELL_DOOR = rgb(66, 58, 56)
+
+
+def hell_gate():
+    """Two posts and a lintel of mottled bone-grey stone, two dark doors with a spine and ribs of bone down each, a skull
+    on each door, the dark behind them, and the blade, steel with a darker edge down both its long sides."""
+    c = Canvas(128, 64)
+    for frame in (HELL_POST, HELL_LINTEL):
+        box(c, *frame, HELL_STONE)
+        u, v, w, h, d = frame
+        mottle(c, u, v, u + 2 * (w + d), v + h + d, HELL_STONE_SHADE, 5)
+    box(c, *HELL_DOOR_BOX, HELL_DOOR)
+    x0, y0, x1, y1 = faces(*HELL_DOOR_BOX)[3]   # the front: a spine down the middle, ribs off it
+    line(c, (x0 + x1) // 2, y0 + 2, (x0 + x1) // 2, y1 - 3, BONE_SHADE)
+    for y in range(y0 + 4, y1 - 4, 3):
+        line(c, x0 + 1, y, x1 - 2, y, BONE_SHADE)
+    box(c, *HELL_DARK, VOID)
+    box(c, *HELL_SKULL, BONE)
+    x0, y0, _, _ = faces(*HELL_SKULL)[3]        # the skull's face: two dark eyes over a dark mouth
+    c.put(x0, y0, BLACK)
+    c.put(x0 + 2, y0, BLACK)
+    c.put(x0 + 1, y0 + 2, BLACK)
+    box(c, *HELL_BLADE, STEEL)
+    for x0, y0, x1, y1 in faces(*HELL_BLADE)[:2]:   # its two broad faces: the long edges darker
+        line(c, x0, y0, x0, y1 - 1, HOLLOW_SHADE)
+        line(c, x1 - 1, y0, x1 - 1, y1 - 1, HOLLOW_SHADE)
+    return c
+
+
 # A Shrieker's leech (ShriekerLeechModel), as (u, v, w, h, d): its body, the sucker at its front, and a wing (the left
 # one mirrored).
 LEECH_BODY = rgb(56, 34, 48)
@@ -2313,6 +2352,7 @@ TEXTURES = {
     "entity/hollow/shrieker.png": shrieker,
     "entity/hollow/shrieker_mask.png": shrieker_mask,
     "entity/hollow/shrieker_mask_cracked.png": cracked(shrieker_mask, [(57, 7), (58, 10), (57, 13), (59, 15)]),
+    "entity/hell_gate.png": hell_gate,
     "entity/hollow/shrieker_leech.png": shrieker_leech,
     "entity/hollow/grand_fisher.png": grand_fisher,
     "entity/hollow/grand_fisher_mask.png": grand_fisher_mask,

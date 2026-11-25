@@ -517,6 +517,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue SHRIEKER_LEECHES_AT_ONCE;
     public static final ModConfigSpec.DoubleValue SHRIEKER_LEECH_DAMAGE;
     public static final ModConfigSpec.DoubleValue SHRIEKER_HEAD_DAMAGE;
+    public static final ModConfigSpec.DoubleValue SINNER_SHARE;
 
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_HEALTH;
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_DAMAGE;
@@ -2353,6 +2354,11 @@ public final class BleachConfig {
         builder.pop();
 
         builder.push("bosses");
+        SINNER_SHARE = builder
+                .comment("Share of the lesser Hollows that were sinners in life, whom the Gate of Hell takes when"
+                        + " a zanpakutō cuts them down. Never a Menos, Fishbone D or Grand Fisher; every Shrieker is"
+                        + " one, whatever this says.")
+                .defineInRange("sinner_share", 0.0, 0.0, 1.0);
         builder.push("shrieker");
         SHRIEKER_HEALTH = builder
                 .comment("A Shrieker's health on Normal, before the hollows health multiplier. Easy takes some away.")

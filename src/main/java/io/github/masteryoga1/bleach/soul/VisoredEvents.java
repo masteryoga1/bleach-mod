@@ -651,9 +651,9 @@ public final class VisoredEvents {
      * Whether a push this way leaves this body somewhere safe. Whatever flies always is. Anything else is followed a
      * block at a time for {@link #PUSH_CHECK_BLOCKS} blocks, until a wall that would stop it: each step needs ground
      * within {@link #PUSH_DROP_BLOCKS} below, with no lava, fire or the like where it would land. So no one is pushed
-     * off a ledge, into the void or into lava.
+     * off a ledge, into the void or into lava. The Gate of Hell pushes aside by it too.
      */
-    private static boolean safeOutward(ServerLevel level, Entity entity, Vec3 direction) {
+    public static boolean safeOutward(ServerLevel level, Entity entity, Vec3 direction) {
         if (entity.isNoGravity() || entity instanceof FlyingMob || entity instanceof FlyingAnimal) {
             return true;
         }
@@ -700,7 +700,7 @@ public final class VisoredEvents {
      * Sets the entity moving this way along the ground at {@link VisoredLogic#PUSH_STRENGTH}, and a little up, and has
      * it sent to the clients.
      */
-    private static void push(Entity entity, Vec3 direction) {
+    public static void push(Entity entity, Vec3 direction) {
         entity.setDeltaMovement(direction.x * VisoredLogic.PUSH_STRENGTH, PUSH_LIFT,
                 direction.z * VisoredLogic.PUSH_STRENGTH);
         entity.hurtMarked = true;

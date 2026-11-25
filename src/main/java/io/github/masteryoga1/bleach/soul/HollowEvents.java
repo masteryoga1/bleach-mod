@@ -228,7 +228,7 @@ public final class HollowEvents {
      * trains Zanjutsu, and a nameless Asauchi that did it bonds. The purified soul's light eases the
      * Hollow poison of Quincy nearby. Called once the Hollow has started to dissolve; techniques that
      * purify (Getsuga Tenshō) come through here too. A sinner the Gate of Hell took instead counts the
-     * same, but sets no light free.
+     * same, but sets no light free, and its killer is told of the Gate and earns its advancement.
      */
     public static void onPurified(Player killer, Hollow hollow, ItemStack weapon) {
         SoulData data = SoulLogic.get(killer);
@@ -236,10 +236,14 @@ public final class HollowEvents {
         SoulLogic.addStatXp(killer, data, Stat.ZANJUTSU, BleachConfig.get(BleachConfig.PURIFICATION_ZANJUTSU_XP));
         data.setHunt(data.hunt().withPurified(data.hunt().purified() + 1));
         killer.giveExperiencePoints(hollow.kind().xp);
-        killer.displayClientMessage(Component.translatable("message.bleach.hollow.purified")
-                .withStyle(ChatFormatting.AQUA), true);
+        killer.displayClientMessage(hollow.isHellbound()
+                ? Component.translatable("message.bleach.hollow.hell_gate").withStyle(ChatFormatting.DARK_RED)
+                : Component.translatable("message.bleach.hollow.purified").withStyle(ChatFormatting.AQUA), true);
         if (killer instanceof ServerPlayer player) {
             Milestones.grant(player, Milestones.PURIFIED);
+            if (hollow.isHellbound()) {
+                Milestones.grant(player, Milestones.HELL_GATE);
+            }
             if (hollow instanceof FishboneD) {
                 Milestones.grant(player, Milestones.FISHBONE_D);
             }

@@ -131,6 +131,8 @@ public final class Milestones {
      * Granted when it happens.
      */
     public static final String MENOS_GRANDE = "menos_grande";
+    /** Cut down a sinner, whom the Gate of Hell rises to take. Granted at the killing blow, beside {@link #PURIFIED}. */
+    public static final String HELL_GATE = "hell_gate";
     /** Brought a Shrieker down: killed or purified one by a blow of one's own. Granted when it happens. */
     public static final String SHRIEKER = "shrieker";
     /** Brought Grand Fisher down: killed or purified it by a blow of one's own. Granted when it happens. */

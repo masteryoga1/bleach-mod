@@ -20,6 +20,7 @@ public final class BleachModelLayers {
     public static final ModelLayerLocation GILLIAN = layer("gillian");
     public static final ModelLayerLocation ADJUCHAS = layer("adjuchas");
     public static final ModelLayerLocation SHRIEKER = layer("shrieker");
+    public static final ModelLayerLocation HELL_GATE = layer("hell_gate");
     public static final ModelLayerLocation SHRIEKER_LEECH = layer("shrieker_leech");
     public static final ModelLayerLocation GRAND_FISHER = layer("grand_fisher");
     public static final ModelLayerLocation SANREI_GLOVE = layer("sanrei_glove");
@@ -45,6 +46,7 @@ public final class BleachModelLayers {
         event.registerLayerDefinition(GILLIAN, GillianModel::createBodyLayer);
         event.registerLayerDefinition(ADJUCHAS, AdjuchasModel::createBodyLayer);
         event.registerLayerDefinition(SHRIEKER, ShriekerModel::createBodyLayer);
+        event.registerLayerDefinition(HELL_GATE, HellGateModel::createLayer);
         event.registerLayerDefinition(SHRIEKER_LEECH, ShriekerLeechModel::createLayer);
         event.registerLayerDefinition(GRAND_FISHER, GrandFisherModel::createBodyLayer);
         event.registerLayerDefinition(SANREI_GLOVE, SanreiGloveModel::createLayer);

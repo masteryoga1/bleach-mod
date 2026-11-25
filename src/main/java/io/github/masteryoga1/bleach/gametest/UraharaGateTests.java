@@ -138,11 +138,18 @@ public final class UraharaGateTests {
                         TravelTests.discard(Kototsu.inLane(dangai, lane).toArray(new Entity[0]));
                         dangai.getChunkSource().removeRegionTicket(TicketType.FORCED, start, 2, start);
                     });
+                })
+                // His gate stands a chunk off the held middle one, so it ticks only once every chunk within 2 of its
+                // own has loaded, the far row off this thread, which can be many ticks after it opens. The souls step
+                // in after.
+                .thenWaitUntil(() -> GateTests.patiently(helper, gate[0].tickCount > 0 && !gate[0].isRemoved()
+                        && level.isPositionEntityTicking(gate[0].blockPosition()), "his Senkaimon has not ticked yet"))
+                .thenExecute(() -> {
                     for (ServerPlayer soul : List.of(asker, shinigami, human)) {
-                        soul.teleportTo(level, opened.getX(), opened.getY(), opened.getZ(), 0.0F, 0.0F);
+                        soul.teleportTo(level, gate[0].getX(), gate[0].getY(), gate[0].getZ(), 0.0F, 0.0F);
                     }
                 })
-                // In from the gate's first tick, the next, each passes on its 21st inside.
+                // In from the gate's next tick, each passes on its 21st inside.
                 .thenExecuteAfter(15, () -> helper.assertTrue(Stream.of(asker, shinigami, human)
                         .allMatch(soul -> soul.level() == level), "a soul passed his gate within 15 ticks"))
                 .thenExecuteAfter(15, () -> {
@@ -152,7 +159,10 @@ public final class UraharaGateTests {
                             && last(keeper, shinigami).equals("standing")
                             && shinigami.getData(SoulAttachments.SHOP_SENKAIMON_DAY) == ShinigamiProgress.NEVER,
                             "the guided Shinigami is at " + TravelTests.where(shinigami) + ", told " + told(keeper, shinigami)
-                                    + ", not at the court and refused beside the open gate");
+                                    + ", not at the court and refused beside the open gate; its cooldown is "
+                                    + shinigami.getPortalCooldown() + ", it was shown " + TravelTests.said(shinigami)
+                                    + ", the gate has ticked " + gate[0].tickCount + " times, the soul is at "
+                                    + TravelTests.where(asker) + " and the Human at " + TravelTests.where(human));
                     helper.assertTrue(inLane(asker, gate[0]) && inLane(human, gate[0]), "the soul is at "
                             + TravelTests.where(asker) + " and the Human at " + TravelTests.where(human)
                             + ", not at the start of lane " + gate[0].lane() + " crossing to Soul Society");
