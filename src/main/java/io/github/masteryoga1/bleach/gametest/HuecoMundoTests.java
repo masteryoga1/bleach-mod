@@ -776,7 +776,7 @@ public final class HuecoMundoTests {
             assertClock(helper, forest, open, "in the Forest of Menos");
             assertClock(helper, mockIn(hueco, levelGround, adjuchas), false, "on Las Noches' level ground");
             assertClock(helper, mockIn(hueco, new Vec3(0.5, HuecoMundoPlan.LEVEL_Y, 0.5), adjuchas), false,
-                    "where Las Noches will stand");
+                    "under Las Noches' dome");
             assertClock(helper, mockIn(society, new Vec3(0.5, 72.0, 544.5), adjuchas), false, "in the Rukongai");
             boolean natural = BleachConfig.get(BleachConfig.HUECO_MUNDO_NATURAL_SPAWNS);
             try {

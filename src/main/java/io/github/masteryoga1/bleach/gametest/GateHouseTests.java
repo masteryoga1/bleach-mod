@@ -308,7 +308,11 @@ public final class GateHouseTests {
             sequence = sequence.thenExecute(() -> hold(helper, house))
                     .thenWaitUntil(() -> assertPlaced(helper, soul, house, "from its chunks' loads alone"))
                     .thenExecute(() -> assertHouse(helper, soul, house, "once it stood"))
-                    .thenExecute(() -> GateState.get(soul).drop(soul, house))
+                    .thenExecute(() -> {
+                        // A Rukongai beast that wandered under the lifted gate as its chunks were made would hold its fall.
+                        GateKeeperTests.clearBeasts(soul, house);
+                        GateState.get(soul).drop(soul, house);
+                    })
                     .thenWaitUntil(() -> GateTests.assertDown(helper, GateState.get(soul), house))
                     .thenExecute(() -> GateTests.assertGate(helper, soul, house, 0, "once its house stood"))
                     .thenWaitUntil(() -> GateKeeperTests.assertKeeper(helper, soul, house));

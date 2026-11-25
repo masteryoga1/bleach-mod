@@ -104,6 +104,25 @@ public final class AcademyGroundsTests {
         return new BlockPos(site.x(), SeireiteiPlan.PLATEAU_Y, site.z());
     }
 
+    /** The chunks this work covers and those beside them, all of which its stamp waits to see loaded. */
+    private static List<ChunkPos> ring(SiteStamp stamp) {
+        return stamp.covered(0).stream().flatMap(pos -> ChunkPos.rangeClosed(pos, 1)).distinct().toList();
+    }
+
+    /** Each work of the grounds not yet standing with its chunks' creatures loaded, and what it lacks; empty once none. */
+    private static List<String> lacking(ServerLevel soul, List<SiteStamp> stamps) {
+        List<String> lacking = new ArrayList<>();
+        for (SiteStamp stamp : stamps) {
+            boolean stands = stamp.stands(soul, 0, corner(stamp));
+            List<ChunkPos> joining = stamp.covered(0).stream().filter(pos -> !soul.areEntitiesLoaded(pos.toLong())).toList();
+            if (!stands || !joining.isEmpty()) {
+                lacking.add(stamp.sites().get(0).template().getPath() + (stands ? " stands" : " does not stand")
+                        + ", its creatures still to load in " + joining);
+            }
+        }
+        return lacking;
+    }
+
     // ---- The plan ----
 
     /**
@@ -287,25 +306,37 @@ public final class AcademyGroundsTests {
     // ---- In the world ----
 
     /**
-     * Test 5. Built in a world made before them by their chunks' loads alone, the grounds stand once with every dummy
-     * their templates set, none saving its spot's flag: building again or setting the yard's template again where it
-     * stands doubles none, and a dummy killed is not set back when its chunk loads, only by that template set again. It
-     * leaves the grounds built in the shared test world with all 12 dummies, which no later test counts.
+     * Test 5. Built in a world made before them by the checks their chunks' loads queue, the grounds stand once with
+     * every dummy their templates set, none saving its spot's flag: building again or setting the yard's template again
+     * where it stands doubles none, and a dummy killed is not set back when its chunk loads, only by that template set
+     * again. It leaves the grounds built in the shared test world with all 12 dummies, which no later test counts.
      */
     @GameTest(template = "empty", batch = "grounds", timeoutTicks = 400)
     public static void theGroundsAreBuiltOnce(GameTestHelper helper) {
         ServerLevel soul = ShakonmakuTests.hold(helper, -14, 15).soul;
         List<SiteStamp> stamps = AcademySite.GROUNDS;
-        // Nothing here builds them: the checks the held chunks' loads queue do, each once its work's ring is loaded.
-        // The wait is patient, since the test server's ticks outrun the loading threads that lay those chunks.
+        // Nothing here builds them: the checks a chunk's load queues do, each once its work's ring is loaded. A chunk an
+        // earlier test made full and let fall back, kept loaded by the Academy's own ticket, fires no second load event as
+        // it is made full again, so once every ring chunk is loaded each work's check is queued as its first chunk's load
+        // queues it. SiteTests' Academy, built by the same listener, shows real loads queue these checks.
+        // The waits are patient, since the test server's ticks outrun the loading threads that lay those chunks.
         StructureTemplate yard = soul.getStructureManager().get(AcademySite.YARD.sites().get(0).template()).orElseThrow();
         BlockPos corner = corner(AcademySite.YARD);
         Runnable placeYard = () -> yard.placeInWorld(soul, corner, corner, new StructurePlaceSettings(),
                 soul.getRandom(), Block.UPDATE_CLIENTS);
         helper.startSequence()
-                .thenWaitUntil(() -> GateTests.patiently(helper, stamps.stream().allMatch(stamp -> stamp.stands(soul, 0,
-                        corner(stamp)) && stamp.covered(0).stream().allMatch(chunk -> soul.areEntitiesLoaded(
-                        chunk.toLong()))), "the grounds do not stand, or their chunks' creatures have not loaded"))
+                .thenWaitUntil(() -> {
+                    List<ChunkPos> unloaded = stamps.stream().flatMap(stamp -> ring(stamp).stream()).distinct()
+                            .filter(pos -> soul.getChunkSource().getChunkNow(pos.x, pos.z) == null).toList();
+                    GateTests.patiently(helper, unloaded.isEmpty(), "the grounds' chunks and those beside them are not all"
+                            + " loaded: " + unloaded);
+                })
+                .thenExecute(() -> stamps.forEach(stamp -> AcademySite.onChunkLoad(new ChunkEvent.Load(
+                        soul.getChunk(stamp.startChunk(0).x, stamp.startChunk(0).z), false))))
+                .thenWaitUntil(() -> {
+                    List<String> lacking = lacking(soul, stamps);
+                    GateTests.patiently(helper, lacking.isEmpty(), "the grounds are not all built: " + lacking);
+                })
                 .thenExecute(() -> {
                     for (int i = 0; i < stamps.size(); i++) {
                         SiteStamp stamp = stamps.get(i);
