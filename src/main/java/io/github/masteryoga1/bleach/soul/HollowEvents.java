@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.FishboneD;
+import io.github.masteryoga1.bleach.entity.HellGate;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
@@ -194,12 +195,19 @@ public final class HollowEvents {
             return;
         }
         // A devoured Hollow is eaten, not purified or slain: its devourer was fed in DevourEvents.
-        if (!DevourLogic.isDevoured(source) && source.getEntity() instanceof Player killer && !hollow.isPurifying()) {
+        if (!DevourLogic.isDevoured(source) && source.getEntity() instanceof Player killer && !hollow.isPurifying()
+                && !hollow.isHellbound()) {
             if (!SoulLogic.hasSoul(killer)) {
                 // No soul to grow, but the experience a Hollow is worth is still the killer's.
                 killer.giveExperiencePoints(hollow.kind().xp);
             } else if (HollowLogic.purifies(source, SoulLogic.get(killer), hollow.level().getGameTime())) {
-                hollow.startPurification();
+                // No blade washes a sinner's sins away: the Gate of Hell takes it instead, with no soul set free. One
+                // whose Gate cannot rise is purified as any Hollow.
+                boolean gate = hollow.isSinner() && hollow.level() instanceof ServerLevel server
+                        && HellGate.open(server, hollow, killer);
+                if (!gate) {
+                    hollow.startPurification();
+                }
                 ItemStack weapon = source.getWeaponItem();
                 onPurified(killer, hollow, weapon != null ? weapon : ItemStack.EMPTY);
             } else {
@@ -219,7 +227,8 @@ public final class HollowEvents {
      * A soul purified a Hollow: its reiryoku grows by half as much again as for slaying it, and it
      * trains Zanjutsu, and a nameless Asauchi that did it bonds. The purified soul's light eases the
      * Hollow poison of Quincy nearby. Called once the Hollow has started to dissolve; techniques that
-     * purify (Getsuga Tenshō) come through here too.
+     * purify (Getsuga Tenshō) come through here too. A sinner the Gate of Hell took instead counts the
+     * same, but sets no light free.
      */
     public static void onPurified(Player killer, Hollow hollow, ItemStack weapon) {
         SoulData data = SoulLogic.get(killer);
@@ -236,7 +245,7 @@ public final class HollowEvents {
             }
         }
         ZanpakutoEvents.onPurified(killer, hollow, weapon);
-        if (hollow.level() instanceof ServerLevel level) {
+        if (!hollow.isHellbound() && hollow.level() instanceof ServerLevel level) {
             QuincyEvents.onPurifiedNearby(level, hollow.position());
         }
     }

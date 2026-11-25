@@ -17,6 +17,7 @@ import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
 import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
+import io.github.masteryoga1.bleach.entity.HellGate;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowKind;
@@ -257,6 +258,22 @@ public final class ModEntities {
                     .fireImmune()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("grand_fisher_lure").toString()));
+
+    /**
+     * The Gate of Hell, rising behind a sinner a zanpakutō cut down, to take it. Never saved and never summoned: it comes
+     * only for its body, and stands six seconds. It never moves, so no updates of where it is go out once it is there;
+     * its synced data still goes out as it changes.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<HellGate>> HELL_GATE =
+            ENTITY_TYPES.register("hell_gate", () -> EntityType.Builder
+                    .<HellGate>of(HellGate::new, MobCategory.MISC)
+                    .sized((float) HellGate.WIDTH, (float) HellGate.HEIGHT)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(Integer.MAX_VALUE)
+                    .build(BleachMod.id("hell_gate").toString()));
 
     // ---- Arrancar ----
 

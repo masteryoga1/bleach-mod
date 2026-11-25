@@ -178,11 +178,11 @@ public class Shrieker extends Hollow {
     }
 
     /**
-     * Whether the air holds it up: while it lives, and while it dissolves, purified, so it hangs where the blade found it
-     * and its soul rises there; one slain falls. A kind of end that keeps the body would hold it up here too.
+     * Whether the air holds it up: while it lives, while it dissolves, purified, so it hangs where the blade found it and
+     * its soul rises there, and while its Gate of Hell holds it, hellbound, until the Gate takes it; one slain falls.
      */
     protected boolean holdsAloft() {
-        return isAlive() || isPurifying();
+        return isAlive() || isPurifying() || isHellbound();
     }
 
     /** A soul that stops seeing it loses its bar at once. */

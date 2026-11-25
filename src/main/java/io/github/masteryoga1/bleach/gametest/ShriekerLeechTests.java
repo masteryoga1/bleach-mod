@@ -82,7 +82,7 @@ public final class ShriekerLeechTests {
     }
 
     /** Whether every chunk the test stands in ticks its entities: one at each corner of its box. */
-    private static boolean groundTicks(GameTestHelper helper) {
+    static boolean groundTicks(GameTestHelper helper) {
         AABB box = helper.getBounds();
         ServerLevel level = helper.getLevel();
         return level.isPositionEntityTicking(BlockPos.containing(box.minX, box.minY, box.minZ))

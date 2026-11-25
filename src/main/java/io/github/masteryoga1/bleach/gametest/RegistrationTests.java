@@ -129,7 +129,7 @@ public final class RegistrationTests {
     @GameTest(template = "empty")
     public static void hollowsAndPlusesAreRegistered(GameTestHelper helper) {
         for (String name : List.of("spider_hollow", "hexapodus", "hound_hollow", "serpent_hollow", "fishbone_d", "plus",
-                "garganta", "shrieker", "shrieker_leech", "grand_fisher", "grand_fisher_lure")) {
+                "garganta", "shrieker", "shrieker_leech", "grand_fisher", "grand_fisher_lure", "hell_gate")) {
             helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.containsKey(BleachMod.id(name)), "bleach:" + name + " is not an entity type");
         }
         for (String name : List.of("spider_hollow_spawn_egg", "hexapodus_spawn_egg", "hound_hollow_spawn_egg",
@@ -156,6 +156,9 @@ public final class RegistrationTests {
         helper.assertTrue(lure.is(SoulLogic.SPIRITS) && !lure.is(BleachTags.HOLLOWS) && !lure.canSerialize()
                 && !lure.canSummon(), "bleach:grand_fisher_lure is no spirit, is a Hollow, or is saved or summoned");
         helper.assertTrue(lure.is(EntityTypeTags.CAN_BREATHE_UNDER_WATER), "bleach:grand_fisher_lure drowns");
+        EntityType<?> gate = ModEntities.HELL_GATE.get();
+        helper.assertTrue(gate.is(SoulLogic.SPIRITS) && !gate.canSerialize() && !gate.canSummon(),
+                "bleach:hell_gate is not a spirit, or is saved or summoned");
         Optional<Holder.Reference<DamageType>> burst = helper.getLevel().registryAccess()
                 .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(ShriekerLeech.BURST);
         // Every leech that bursts at once lands, through the hurt cooldown the one before it left.
