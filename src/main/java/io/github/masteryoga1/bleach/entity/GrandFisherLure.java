@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.GrandFisherComing;
 import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import javax.annotation.Nullable;
@@ -17,10 +18,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -43,10 +46,12 @@ import net.minecraft.world.phys.Vec3;
  * <p>A blade's blow from a soul who sees her cuts the stalk, not the girl, and a lure whose stalk tears, or whose body
  * is gone or dead, is cut off as if by a blade: she cries out, the stalk withdraws to the brow, and she lies limp and
  * silent until the config's time passes, then fades away with no death. Any other blow only hurts her, by her own
- * health. A lure laid with no body yet waits for one; only its body links it ({@link GrandFisher#takeLure}). Its link is
- * its body's entity id, synced so the client draws the stalk; both are never saved, so the id never outlives the session
- * that gave it. Her body escaped into her ({@link #flee}), she gets up if she lay cut off and runs from the souls about
- * her, then fades as a cut lure does.
+ * health. A lure laid with no body yet waits, sobbing, for her prey: one who sees her coming within a few blocks of her,
+ * or striking her, brings her body bursting out of the ground beside her; none coming within the config's time, or on
+ * Peaceful, she fades. Only its body links it ({@link GrandFisher#takeLure}). Its link is its body's entity id, synced so
+ * the client draws the stalk; both are never saved, so the id never outlives the session that gave it. Her body escaped
+ * into her ({@link #flee}), she gets up if she lay cut off and runs from the souls about her, then fades as a cut lure
+ * does.
  */
 public class GrandFisherLure extends Mob {
     /** Its body's entity id while it is linked, kept once it is cut off; -1 for none. */
@@ -76,6 +81,9 @@ public class GrandFisherLure extends Mob {
     private static final double RUN_FROM = 24.0;
     private static final double RUN_STEP = 8.0;
     private static final int RUN_TICKS = 20;
+    /** Laid alone, how near a soul who sees her must come to bring her body out, and how often she looks. */
+    private static final double BURST_DISTANCE = 4.0;
+    private static final int LOOK_TICKS = 5;
 
     public GrandFisherLure(EntityType<? extends GrandFisherLure> type, Level level) {
         super(type, level);
@@ -144,6 +152,11 @@ public class GrandFisherLure extends Mob {
         return entityData.get(DATA_FLED);
     }
 
+    /** Whether she was laid alone and waits for her prey, her body not yet come: no body linked, and not fading. */
+    public boolean isWaiting() {
+        return entityData.get(DATA_BODY) < 0 && !isFading();
+    }
+
     /** Whether she is on her way to fading, cut off or fled. */
     public boolean isFading() {
         return entityData.get(DATA_FADE) > 0;
@@ -202,6 +215,14 @@ public class GrandFisherLure extends Mob {
         playSound(ModSounds.GRAND_FISHER_AMBIENT.get(), 1.0F, 1.0F);
     }
 
+    /** She fades now, into soul wisps only the aware see, with no death. Server side. */
+    public void fadeNow() {
+        if (level() instanceof ServerLevel server && !isRemoved()) {
+            wisps(server, ParticleTypes.SOUL, 4);
+            discard();
+        }
+    }
+
     /** How many ticks it has lain cut off, or run. */
     private long lain() {
         return level().getGameTime() - entityData.get(DATA_CUT);
@@ -233,9 +254,10 @@ public class GrandFisherLure extends Mob {
 
     /**
      * Server side, every tick, so it runs with NoAI too. Cut off or fled, it fades once its time is up; fled, it sets off
-     * again each second. On its stalk: its body gone, dead or in another world cuts it off; a stalk stretched past
-     * {@link #TEAR} times the reach tears; and past the reach from the brow it is drawn back across the ground to the
-     * reach, if the brow is not so far above or below it that no spot across the ground is near enough.
+     * again each second. Laid alone, it waits for its prey, and fades on Peaceful. On its stalk: its body gone, dead or in
+     * another world cuts it off; a stalk stretched past {@link #TEAR} times the reach tears; and past the reach from the
+     * brow it is drawn back across the ground to the reach, if the brow is not so far above or below it that no spot
+     * across the ground is near enough.
      */
     @Override
     public void tick() {
@@ -245,14 +267,24 @@ public class GrandFisherLure extends Mob {
         }
         if (isFading()) {
             if (lain() >= entityData.get(DATA_FADE)) {
-                wisps(server, ParticleTypes.SOUL, 4);
-                discard();
+                fadeNow();
             } else if (hasFled() && tickCount % RUN_TICKS == 0) {
                 runFrom(server);
             }
             return;
         }
-        if (entityData.get(DATA_BODY) < 0 || !isAlive()) {
+        if (!isAlive()) {
+            return;
+        }
+        if (entityData.get(DATA_BODY) < 0) {
+            // Laid alone: her time up, or on Peaceful, she fades, and a soul who sees her come near brings her body out.
+            ServerPlayer prey = tickCount % LOOK_TICKS == 0 ? nearestSoul(server, BURST_DISTANCE) : null;
+            if (tickCount >= BleachConfig.get(BleachConfig.GRAND_FISHER_LURE_WAIT_SECONDS) * 20
+                    || server.getDifficulty() == Difficulty.PEACEFUL) {
+                fadeNow();
+            } else if (prey != null) {
+                GrandFisherComing.burst(server, this, prey);
+            }
             return;
         }
         GrandFisher body = body();
@@ -275,22 +307,40 @@ public class GrandFisherLure extends Mob {
     /**
      * A blow of a blade from a soul who sees her cuts her stalk and does her no harm. It lands as any blow does, even in
      * the half second after another, or not at all, as the rules that turn blows aside decide; an unaware soul's passes
-     * through her. Any other blow, or any blow once she is cut off or fled, hurts her by its damage.
+     * through her. Any other blow, or any blow once she is cut off or fled, hurts her by its damage. Laid alone, a blow
+     * that lands from anyone is spent bringing her body out, and does her no harm.
      */
     @Override
     public boolean hurt(DamageSource source, float amount) {
+        if (isWaiting() && source.getEntity() instanceof LivingEntity prey && level() instanceof ServerLevel server) {
+            if (!lands(source)) {
+                return false;
+            }
+            GrandFisherComing.burst(server, this, prey);
+            return true;
+        }
         if (isFading() || !cuts(source)) {
             return super.hurt(source, amount);
         }
-        // The blade cuts the stalk, not the girl, so the blow carries no damage, which a hurt cooldown always refuses: the
-        // cooldown is lifted for it, and put back if the blow is turned aside.
+        if (!lands(source)) {
+            return false;
+        }
+        sever();
+        return true;
+    }
+
+    /**
+     * Whether this blow lands on her as a blow with no damage: one that cuts the stalk, not the girl, or brings her body
+     * out. A hurt cooldown always refuses a blow of no damage, so it is lifted for it, and put back if the blow is turned
+     * aside.
+     */
+    private boolean lands(DamageSource source) {
         int cooldown = invulnerableTime;
         invulnerableTime = 0;
         if (!super.hurt(source, 0.0F)) {
             invulnerableTime = cooldown;
             return false;
         }
-        sever();
         return true;
     }
 

@@ -243,7 +243,7 @@ public final class Pesquisa {
      * spirit or a creature that sees them; and never with a block that undoes reiryoku or the Shakonmaku
      * ({@link SpiritClip}) between the caster's eyes and the middle of its box (or part) nearest the caster, though
      * stone hides nothing. So mundane animals and monsters are never felt, nor is Grand Fisher's lure with no body by
-     * her, as once it has escaped into her: it hides its reiatsu.
+     * her, laid alone or fled: it hides its reiatsu.
      */
     public static boolean senses(Player caster, LivingEntity target, long now) {
         if (!SoulLogic.hasSoul(caster)) {

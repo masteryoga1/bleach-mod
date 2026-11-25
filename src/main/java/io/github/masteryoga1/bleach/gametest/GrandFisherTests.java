@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.BossBar;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
 import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.HollowKind;
+import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModSounds;
@@ -25,6 +26,7 @@ import java.util.UUID;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,6 +37,7 @@ import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -58,11 +61,11 @@ public final class GrandFisherTests {
     private static final float BLOW = 20.0F;
     private static final float FATAL = 1000.0F;
     /**
-     * Where a summoned Grand Fisher may land from its player, its centre to theirs: 4 to 8 blocks, give or take the most a
-     * spot's move to its block's centre adds. And how squarely it faces them.
+     * Where a summoned lure may be laid from her prey, her centre to theirs: 12 to 24 blocks, give or take the most a
+     * spot's move to its block's centre adds. And how squarely she faces them.
      */
-    private static final double SUMMON_NEAREST = 3.25;
-    private static final double SUMMON_FURTHEST = 8.75;
+    private static final double LAID_NEAREST = 11.25;
+    private static final double LAID_FURTHEST = 24.75;
     private static final double FACING = 0.99;
     /** The tag that names this test's Shinigami in a command. */
     private static final String TAG = "bleach_grand_fisher_test";
@@ -203,48 +206,67 @@ public final class GrandFisherTests {
 
     /**
      * Grand Fisher in the ledger: listed, and only its body is its. With no player a summon brings nothing; for a
-     * Shinigami it lands on open ground a few blocks off, facing them, as one more about, so a second summon is refused.
-     * On its first tick it grows its lure, who adds none while her body lives; her body gone, she still holds it about,
-     * and with her gone it is about no more. Counted within one call each, so no other test's Grand Fisher comes between.
-     * Under the open sky, as a summon seeks open ground.
+     * Shinigami it lays its lure alone, as its ambush does: 12 to 24 blocks off, out of the Shinigami's sight and facing
+     * them, with no body come, as one more about, so a second summon is refused. She is no body of the boss's, no pager by
+     * her takes her for a Hollow, and with her gone it is about no more. In one call, so no other test's Grand Fisher comes
+     * between, and she is gone before any soul of another test's can come near her. Under the open sky, with the ground
+     * about the Shinigami ticking, as a summon seeks open ground.
      */
-    @GameTest(template = "field", skyAccess = true, timeoutTicks = 60)
-    public static void aSummonedGrandFisherIsAboutUntilItsLureGoes(GameTestHelper helper) {
+    @GameTest(template = "field", skyAccess = true, timeoutTicks = 400)
+    public static void aSummonLaysItsLureAloneOutOfSight(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         MinecraftServer server = level.getServer();
         GrandFisherComing boss = GrandFisherComing.BOSS;
         helper.assertTrue(BossLedger.boss(GrandFisherComing.ID) == boss, "the ledger does not list Grand Fisher");
         ServerPlayer near = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(8.5, 2.0, 8.5));
         near.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, AWARE));
-        List<? extends GrandFisher> already = level.getEntities(ModEntities.GRAND_FISHER.get(), GrandFisher::isAlive);
-        helper.assertTrue(boss.summon(server, null) != null && level.getEntities(ModEntities.GRAND_FISHER.get(),
-                GrandFisher::isAlive).size() == already.size(), "a summon for no player brought Grand Fisher");
-        int before = boss.present(server);
-        Component failed = boss.summon(server, near);
-        helper.assertTrue(failed == null, "the summon failed: " + (failed == null ? "" : failed.getString()));
-        List<? extends GrandFisher> came = level.getEntities(ModEntities.GRAND_FISHER.get(),
-                fisher -> fisher.isAlive() && !already.contains(fisher));
-        helper.assertTrue(came.size() == 1 && boss.present(server) == before + 1 && boss.summonRefusal(server) != null,
-                came.size() + " Grand Fishers came, " + boss.present(server) + " about after " + before
-                        + ", or a second summon is not refused");
-        GrandFisher fisher = came.get(0);
-        Vec3 toward = near.position().subtract(fisher.position()).multiply(1.0, 0.0, 1.0);
-        double off = toward.length();
-        helper.assertTrue(off >= SUMMON_NEAREST && off <= SUMMON_FURTHEST
-                        && Vec3.directionFromRotation(0.0F, fisher.getYRot()).dot(toward.normalize()) > FACING,
-                "the summoned Grand Fisher landed " + off + " blocks off, or does not face the Shinigami");
-        helper.assertTrue(boss.isBody(fisher), "the summoned body is not the boss's");
+        Vec3 start = near.position();
+        List<ChunkPos> forced = HollowBaitTests.forceAround(level, start, LAID_FURTHEST);
         helper.startSequence()
-                .thenWaitUntil(() -> GateTests.patiently(helper, fisher.lure() != null,
-                        "the summoned Grand Fisher grew no lure"))
+                .thenWaitUntil(() -> GateTests.patiently(helper, HollowBaitTests.allTicking(level, start, LAID_FURTHEST),
+                        "the ground about the Shinigami never started ticking"))
                 .thenExecute(() -> {
-                    GrandFisherLure lure = fisher.lure();
-                    helper.assertFalse(boss.isBody(lure), "its lure's death would be the boss's");
-                    int with = boss.present(server);
-                    fisher.discard();
-                    helper.assertTrue(boss.present(server) == with, "a lure left alone does not hold Grand Fisher about");
-                    lure.discard();
-                    helper.assertTrue(boss.present(server) == with - 1, "with its lure gone Grand Fisher is still about");
+                    try {
+                        List<? extends GrandFisher> bodies = level.getEntities(ModEntities.GRAND_FISHER.get(),
+                                GrandFisher::isAlive);
+                        List<? extends GrandFisherLure> waiting = level.getEntities(ModEntities.GRAND_FISHER_LURE.get(),
+                                GrandFisherLure::isWaiting);
+                        helper.assertTrue(boss.summon(server, null) != null, "a summon for no player was not refused");
+                        int before = boss.present(server);
+                        Component failed = boss.summon(server, near);
+                        helper.assertTrue(failed == null, "the summon failed: " + (failed == null ? "" : failed.getString()));
+                        List<? extends GrandFisherLure> laid = level.getEntities(ModEntities.GRAND_FISHER_LURE.get(),
+                                lure -> lure.isWaiting() && !waiting.contains(lure));
+                        int now = level.getEntities(ModEntities.GRAND_FISHER.get(), GrandFisher::isAlive).size();
+                        helper.assertTrue(laid.size() == 1 && now == bodies.size() && boss.present(server) == before + 1
+                                        && boss.summonRefusal(server) != null, "the summon laid " + laid.size()
+                                        + " lures and brought " + (now - bodies.size()) + " bodies, " + boss.present(server)
+                                        + " about after " + before + ", or a second summon is not refused");
+                        GrandFisherLure lure = laid.get(0);
+                        Vec3 toward = near.position().subtract(lure.position()).multiply(1.0, 0.0, 1.0);
+                        double off = toward.length();
+                        helper.assertTrue(off >= LAID_NEAREST && off <= LAID_FURTHEST
+                                        && GrandFisherComing.outOfSight(level, near, lure.position())
+                                        && Vec3.directionFromRotation(0.0F, lure.getYRot()).dot(toward.normalize()) > FACING,
+                                "the lure was laid " + off + " blocks off, in the Shinigami's sight, or facing away");
+                        helper.assertFalse(boss.isBody(lure), "its lure's death would be the boss's");
+                        // A block east of a reader in the box, where a pager that took her for a Hollow would point.
+                        lure.moveTo(helper.absoluteVec(new Vec3(4.5, 2.0, 8.5)));
+                        Player reader = HollowTests.shinigami(helper, AWARE);
+                        reader.moveTo(helper.absoluteVec(new Vec3(3.5, 2.0, 8.5)));
+                        Component reading = DenreishinkiItem.reading(reader);
+                        helper.assertFalse(reading.getContents() instanceof TranslatableContents read
+                                        && read.getKey().equals("message.bleach.denreishinki.hollow")
+                                        && read.getArgs()[0] instanceof Component way
+                                        && way.getContents() instanceof TranslatableContents compass
+                                        && compass.getKey().equals("message.bleach.direction.east")
+                                        && String.valueOf(read.getArgs()[1]).equals("5"),
+                                "the pager by the laid lure points at her: " + reading.getString());
+                        lure.discard();
+                        helper.assertTrue(boss.present(server) == before, "with its lure gone Grand Fisher is still about");
+                    } finally {
+                        forced.forEach(chunk -> level.setChunkForced(chunk.x, chunk.z, false));
+                    }
                 })
                 .thenSucceed();
     }
