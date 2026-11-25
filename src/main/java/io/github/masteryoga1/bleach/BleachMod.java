@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.advancement.BleachTriggers;
 import io.github.masteryoga1.bleach.command.BleachCommand;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.BossBar;
+import io.github.masteryoga1.bleach.entity.BossFloor;
 import io.github.masteryoga1.bleach.kido.KidoSpell;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModArmorMaterials;
@@ -65,6 +66,7 @@ public final class BleachMod {
 
         SoulEvents.register(NeoForge.EVENT_BUS);
         BossBar.register(NeoForge.EVENT_BUS);
+        BossFloor.register(NeoForge.EVENT_BUS);
         BossLedger.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(BleachCommand::register);
     }
