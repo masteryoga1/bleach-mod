@@ -141,6 +141,14 @@ public final class HuecoMundoPlan {
         return radius(x, z) < FIFTH_ROOM_RADIUS && y >= DOME_TOP_Y && y < FIFTH_TOWER_TOP_Y - 2;
     }
 
+    /**
+     * Whether a camera in this cell sees the dome's sky: under the dome or in the fifth tower's room, or in that tower's
+     * column from the floor up, so the stair through the crown never leaves it. A door's cut and all outside do not.
+     */
+    public static boolean underSky(int x, int y, int z) {
+        return enclosed(x, y, z) || radius(x, z) < FIFTH_ROOM_RADIUS && y >= LEVEL_Y && y < FIFTH_TOWER_TOP_Y - 2;
+    }
+
     /** A course of the wall or a tower by its depth under that top: tiles, tiles, stone, trim, trim, then stone. */
     private static Shell course(int y, int top) {
         int under = top - 1 - y;
