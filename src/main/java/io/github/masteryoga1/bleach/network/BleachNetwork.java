@@ -40,8 +40,9 @@ public final class BleachNetwork {
      * 25: Kisuke Urahara's SHOP_* views.
      * 26: {@code NpcAction.TRADE}, Kisuke Urahara's wares.
      * 27: {@code NpcAction.SENKAIMON}, Kisuke Urahara's Senkaimon.
+     * 28: {@code NpcAction.GARGANTA}, Kisuke Urahara's Garganta.
      */
-    private static final String VERSION = "27";
+    private static final String VERSION = "28";
 
     private BleachNetwork() {
     }

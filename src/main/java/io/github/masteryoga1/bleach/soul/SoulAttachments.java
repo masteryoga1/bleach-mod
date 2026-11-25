@@ -80,6 +80,11 @@ public final class SoulAttachments {
             "shop_senkaimon_day", () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
                     .serialize(Codec.LONG, day -> day != ShinigamiProgress.NEVER).copyOnDeath().build());
 
+    /** As {@link #SHOP_SENKAIMON_DAY}, for his Garganta between the Keikaigi's posts. */
+    public static final Supplier<AttachmentType<Long>> SHOP_GARGANTA_DAY = ATTACHMENT_TYPES.register(
+            "shop_garganta_day", () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
+                    .serialize(Codec.LONG, day -> day != ShinigamiProgress.NEVER).copyOnDeath().build());
+
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());
