@@ -156,6 +156,8 @@ public abstract class Hollow extends Monster {
     private VillagerData formerVillager;
     /** Whether this Hollow was a Plus whose chain ran out. */
     private boolean fromPlus;
+    /** Whether this Hollow was a sinner in life. Saved, and read leniently: a missing or odd value is none. */
+    private boolean sinner;
     /** The student whose field trial this practice Hollow belongs to; null for a real Hollow. Never saved. */
     @Nullable
     private UUID trialOf;
@@ -634,6 +636,15 @@ public abstract class Hollow extends Monster {
         fromPlus = value;
     }
 
+    /** Whether this Hollow was a sinner in life. None is yet but the Shrieker, which always is. */
+    public boolean isSinner() {
+        return sinner;
+    }
+
+    public void setSinner(boolean value) {
+        sinner = value;
+    }
+
     protected boolean getFlag(int flag) {
         return (entityData.get(DATA_FLAGS) & flag) != 0;
     }
@@ -728,11 +739,16 @@ public abstract class Hollow extends Monster {
     @Override
     public void playSound(SoundEvent sound, float volume, float pitch) {
         if (!isSilent() && !level().isClientSide) {
-            SpiritSenses.play(this, sound, getSoundSource(), volume, pitch, isScream(sound));
+            SpiritSenses.play(this, sound, getSoundSource(), volume, pitch, screams(sound));
         }
     }
 
-    /** Whether a soul just below the threshold of awareness hears this sound faintly, from far away. */
+    /** Whether a soul just below the threshold of awareness hears this sound of this Hollow's faintly, from far away. */
+    protected boolean screams(SoundEvent sound) {
+        return isScream(sound);
+    }
+
+    /** The cries every Hollow's {@link #screams} hears; a kind with cries of its own adds them there. */
     private static boolean isScream(SoundEvent sound) {
         return sound == ModSounds.HOLLOW_AMBIENT.get() || sound == ModSounds.HOLLOW_HURT.get()
                 || sound == ModSounds.HOLLOW_DEATH.get() || sound == ModSounds.FISHBONE_D_ROAR.get()
@@ -896,6 +912,9 @@ public abstract class Hollow extends Monster {
         if (fragmentRolled) {
             tag.putBoolean("FragmentRolled", true);
         }
+        if (sinner) {
+            tag.putBoolean("Sinner", true);
+        }
     }
 
     @Override
@@ -911,5 +930,6 @@ public abstract class Hollow extends Monster {
         }
         fromPlus = tag.getBoolean("FromPlus");
         fragmentRolled = tag.getBoolean("FragmentRolled");
+        sinner = tag.getBoolean("Sinner");
     }
 }

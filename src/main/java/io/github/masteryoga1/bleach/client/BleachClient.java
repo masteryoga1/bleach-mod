@@ -19,6 +19,7 @@ import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
+import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
@@ -263,6 +264,10 @@ public final class BleachClient {
                 context -> new HollowRenderer<Adjuchas, AdjuchasModel<Adjuchas>>(context,
                         new AdjuchasModel<>(context.bakeLayer(BleachModelLayers.ADJUCHAS)),
                         HollowKind.ADJUCHAS, 90.0F));
+        event.registerEntityRenderer(ModEntities.SHRIEKER.get(),
+                context -> new HollowRenderer<Shrieker, ShriekerModel>(context,
+                        new ShriekerModel(context.bakeLayer(BleachModelLayers.SHRIEKER)),
+                        HollowKind.SHRIEKER, 90.0F));
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
         event.registerEntityRenderer(ModEntities.CAJA_NEGACION.get(), CajaNegacionRenderer::new);

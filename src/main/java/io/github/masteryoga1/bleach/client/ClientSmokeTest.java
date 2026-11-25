@@ -26,6 +26,7 @@ import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
+import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
@@ -261,15 +262,17 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * lining, the court's tiles and their light reach the client, the frame's centre must turn the sky's blue and the floor's
  * light white; it looks up at the lit ceiling and goes back to the level ground. There, in creative, the key must tear a
  * second Garganta open the same way, and moved into it in survival, the soul must come out in the Overworld on the block
- * it last left the Overworld from by a gate, the third, before the run quits.
+ * it last left the Overworld from by a gate, the third. There a Shrieker, summoned standing still in the air before it,
+ * must reach the client unhidden, the soul looks at it for a shot that shows its bar as well, and it must be gone once
+ * killed by command, before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
  * Hollow body, Menos, Cero, Arrancar, Arrancar NPCs, Negación light, Caja Negación, inner Hollow, Visored
  * mask, masked Cero, black Getsuga Tenshō, half mask, Kidō traces, orb, smoke, shield and wall, the Senkaimon, the
- * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, dunes and moon, Las Noches' sky, and HUD are
- * drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code fails the run, and
- * so does anything that did not reach the client as expected.
+ * Seireiheki, the Dangai's lane, Kōryū and Kōtotsu, Hueco Mundo's blocks, dunes and moon, Las Noches' sky, the Shrieker
+ * and HUD are drawn, and screenshots of the main moments are saved for review. Any crash in the mod's client code fails
+ * the run, and so does anything that did not reach the client as expected.
  */
 public final class ClientSmokeTest {
     public static final String PASSED = "Bleach client smoke test passed";
@@ -596,6 +599,7 @@ public final class ClientSmokeTest {
         checkWaking(minecraft, player);
         checkHuecoMundoBlocks(minecraft);
         checkHuecoMundo(minecraft, player);
+        checkBosses(minecraft);
         if (finished) {
             return;
         }
@@ -1723,7 +1727,17 @@ public final class ClientSmokeTest {
             case 8867 -> command(minecraft, "gamemode survival");
             // Into it: 11 ticks inside pass it, about 8880, to the block the third gate was taken from.
             case 8869 -> command(minecraft, String.format(Locale.ROOT, "tp @s ~ ~ ~%.1f", RIFT_STEP_BACK + RIFT_AHEAD));
+            // The bosses, home in the Overworld: a Shrieker summoned standing still in the air before the soul, facing it,
+            // so the shot is the same every run. The air before the soul is cleared first, whatever stands there.
             case 8980 -> {
+                command(minecraft, "tp @s ~ ~ ~ 180 -12");
+                command(minecraft, "fill ~-3 ~ ~-12 ~3 ~7 ~-1 air");
+                command(minecraft, "summon bleach:shrieker ~ ~3 ~-9 " + STILL);
+            }
+            // Its body, mask and spread wings, and its bar at the top of the screen.
+            case 9020 -> shot(minecraft, "shrieker");
+            case 9022 -> command(minecraft, "kill @e[type=bleach:shrieker]");
+            case 9065 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2472,6 +2486,22 @@ public final class ClientSmokeTest {
                         && Math.abs(player.getY() - home.y) < 0.01,
                 "the Garganta never brought the Arrancar home to where it last left the Overworld (it is in "
                         + minecraft.level.dimension().location() + " at " + player.position() + ", not at " + home + ")");
+    }
+
+    /** The checks of the bosses, each window from the step it follows: the Shrieker reaching the client, then gone. */
+    private static void checkBosses(Minecraft minecraft) {
+        if (expectWithin(minecraft, 8982, 9015, () -> nearest(minecraft, Shrieker.class, SUMMONED_RANGE,
+                        shrieker -> shrieker.isAlive() && !ClientSouls.isHiddenFromViewer(shrieker)) != null,
+                "the summoned Shrieker never reached the Arrancar's client unhidden")) {
+            Shrieker shrieker = nearest(minecraft, Shrieker.class, SUMMONED_RANGE, Shrieker::isAlive);
+            if (shrieker != null) {
+                // Its middle, so the whole of it, wings and all, is in the shot.
+                look(minecraft, shrieker.position().add(0.0, shrieker.getBbHeight() * 0.5, 0.0));
+            }
+        }
+        expectWithin(minecraft, 9024, 9060,
+                () -> nearest(minecraft, Shrieker.class, SUMMONED_RANGE, Shrieker::isAlive) == null,
+                "the Shrieker killed by command still lives");
     }
 
     /**

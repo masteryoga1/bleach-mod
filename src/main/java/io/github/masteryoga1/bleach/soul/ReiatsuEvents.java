@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
+import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import java.util.List;
 import net.minecraft.ChatFormatting;
@@ -58,13 +59,13 @@ public final class ReiatsuEvents {
     /**
      * Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC,
      * a Quincy NPC, who stands their ground, Fishbone D, who has come for one soul and does not back
-     * down, an Arrancar NPC, who has come to fight, an inner Hollow, which is its host's own power, and a
-     * gatekeeper, who keeps his post.
+     * down, an Arrancar NPC, who has come to fight, an inner Hollow, which is its host's own power, a
+     * gatekeeper, who keeps his post, and a Shrieker, a boss that does not leave the fight it came for.
      */
     private static void onEntityJoin(EntityJoinLevelEvent event) {
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob && !(mob instanceof ShinigamiNpc)
                 && !(mob instanceof QuincyNpc) && !(mob instanceof FishboneD) && !(mob instanceof ArrancarNpc)
-                && !(mob instanceof InnerHollow) && !(mob instanceof GateKeeper)
+                && !(mob instanceof InnerHollow) && !(mob instanceof GateKeeper) && !(mob instanceof Shrieker)
                 && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
             mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
         }

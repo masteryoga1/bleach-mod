@@ -78,6 +78,11 @@ ADJ_HIDE = rgb(46, 48, 64)
 ADJ_STRIPE = rgb(34, 36, 50)
 ADJ_BELLY = rgb(84, 86, 104)
 
+# The Shrieker: dark fur, wings of purple-grey membrane on bone spars, and a red tongue.
+SHRIEKER_FUR = rgb(40, 34, 38)
+SHRIEKER_WING = rgb(60, 48, 66)
+SHRIEKER_TONGUE = rgb(150, 60, 70)
+
 # The Denreishinki: a dark flip phone with a green screen.
 DEVICE = rgb(44, 44, 52)
 DEVICE_EDGE = rgb(80, 80, 92)
@@ -764,6 +769,52 @@ def adjuchas_mask():
         c.put(x, 11, BONE)
     box(c, *ADJ_HORN, BONE)
     box(c, *ADJ_SPIKE, BONE)
+    return c
+
+
+# The Shrieker's boxes (ShriekerModel), as (u, v, w, h, d). Each wing is a spar and a flat membrane; the left ones are
+# mirrored, so one net serves both, as it does for the arms and legs.
+SHRIEKER_BODY = (0, 0, 14, 16, 10)
+SHRIEKER_HEAD = (48, 0, 8, 10, 7)
+SHRIEKER_JAW = (78, 0, 6, 2, 5)
+SHRIEKER_TONGUE_BOX = (100, 0, 2, 1, 8)
+SHRIEKER_ARM = (0, 26, 4, 18, 4)
+SHRIEKER_LEG = (16, 26, 4, 9, 4)
+SHRIEKER_SPAR = (60, 26, 22, 2, 2)
+SHRIEKER_MEMBRANE = (0, 48, 22, 0, 16)
+
+
+def shrieker():
+    """Dark fur over a hunched body, long arms and short legs, bone claws, the hole through the chest, wings of dark
+    membrane ribbed with shade on spars of bone, and a red tongue for later."""
+    c = Canvas(128, 64)
+    for part in (SHRIEKER_BODY, SHRIEKER_HEAD, SHRIEKER_JAW, SHRIEKER_ARM, SHRIEKER_LEG):
+        box(c, *part, SHRIEKER_FUR)
+    mottle(c, 0, 0, 78, 48, HOLLOW_SHADE, 5)
+    box(c, *SHRIEKER_SPAR, BONE_SHADE)
+    box(c, *SHRIEKER_MEMBRANE, SHRIEKER_WING)
+    paint_where(c, faces(*SHRIEKER_MEMBRANE), HOLLOW_SHADE, lambda x, y: x % 5 == 0)  # the ribs
+    box(c, *SHRIEKER_TONGUE_BOX, SHRIEKER_TONGUE)
+    c.rect(0, 45, 16, 48, BONE_SHADE)   # claws, round the bottom of the arms
+    c.rect(15, 14, 19, 18, VOID)        # the hole, through the chest
+    return c
+
+
+def shrieker_mask():
+    """A tall, narrow bone face over the front of the head: dark eyes either side of a ridge, and bared teeth along its
+    foot; the front of the crown is bone too, so the mask shows from above."""
+    c = Canvas(128, 64)
+    x0, y0, x1, y1 = faces(*SHRIEKER_HEAD)[3]   # the front: (55, 7) to (63, 17)
+    c.rect(x0, y0, x1, y1, BONE)
+    c.rect(x0 + 3, y0 + 1, x1 - 3, y0 + 6, BONE_SHADE)   # the ridge down the middle
+    c.rect(x0 + 1, y0 + 2, x0 + 3, y0 + 4, VOID)         # eyes
+    c.rect(x1 - 3, y0 + 2, x1 - 1, y0 + 4, VOID)
+    c.rect(x0 + 1, y1 - 3, x1 - 1, y1 - 1, VOID)         # the mouth, and the teeth across it
+    for x in range(x0 + 1, x1 - 1, 2):
+        c.put(x, y1 - 3, BONE)
+        c.put(x + 1, y1 - 2, BONE)
+    tx0, ty0, tx1, ty1 = faces(*SHRIEKER_HEAD)[0]   # the top: its front rows, nearest v + d
+    c.rect(tx0, ty1 - 3, tx1, ty1, BONE)
     return c
 
 
@@ -2131,6 +2182,9 @@ TEXTURES = {
     "entity/hollow/adjuchas.png": adjuchas,
     "entity/hollow/adjuchas_mask.png": adjuchas_mask,
     "entity/hollow/adjuchas_mask_cracked.png": cracked(adjuchas_mask, [(63, 6), (64, 9), (66, 10), (65, 12)]),
+    "entity/hollow/shrieker.png": shrieker,
+    "entity/hollow/shrieker_mask.png": shrieker_mask,
+    "entity/hollow/shrieker_mask_cracked.png": cracked(shrieker_mask, [(57, 7), (58, 10), (57, 13), (59, 15)]),
     "entity/garganta.png": garganta,
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,

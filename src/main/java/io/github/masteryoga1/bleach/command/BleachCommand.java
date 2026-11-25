@@ -129,7 +129,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach academy                   (where the Academy stands in Soul Society; a click suggests the teleport there)
  * /bleach gate &lt;gate&gt; &lt;lift|drop|status&gt;   (hakutomon, kokuryomon, shoryumon or shuwaimon, from any world)
  * /bleach garganta &lt;players&gt; [kind|numero|privaron]   (a tear now; not on Peaceful)
- *                                    (kind: spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas)
+ *                                    (kind: spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas|shrieker)
  *                                    (numero: a lone Número; privaron: a Privaron Espada and its Fracción)
  * /bleach firsthollow &lt;players&gt; &lt;reset|skip|start&gt;   (the Fishbone D encounter)
  * /bleach hollow &lt;players&gt; satiety &lt;0..100&gt;   (soul hunger, started if it had not; Hollow players only)

@@ -510,6 +510,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue CERO_MAX_DAMAGE;
     public static final ModConfigSpec.DoubleValue CERO_RANGE;
 
+    public static final ModConfigSpec.DoubleValue SHRIEKER_HEALTH;
+    public static final ModConfigSpec.DoubleValue SHRIEKER_DAMAGE;
+
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
     public static final ModConfigSpec.DoubleValue VASTO_TEAR_CHANCE;
@@ -2333,6 +2336,17 @@ public final class BleachConfig {
         ADJUCHAS_FORM = form(builder, "adjuchas", "an Adjuchas", 1.5, 40.0, 1.3, 1.3, 2.0, 6.0, 1.5, 0.4, 0.4, 12.0, 25, 0.8);
         VASTO_LORDE_FORM = form(builder, "vasto_lorde", "a Vasto Lorde", 1.0, 60.0, 1.2, 1.6, 2.5, 10.0, 2.0, 0.0, 0.65, 16.0,
                 15, 1.0);
+        builder.pop();
+
+        builder.push("bosses");
+        builder.push("shrieker");
+        SHRIEKER_HEALTH = builder
+                .comment("A Shrieker's health on Normal, before the hollows health multiplier. Easy takes some away.")
+                .defineInRange("health", 120.0, 1.0, 10_000.0);
+        SHRIEKER_DAMAGE = builder
+                .comment("Damage of a Shrieker's blow on Normal, before the hollows damage multiplier.")
+                .defineInRange("damage", 7.0, 0.0, 200.0);
+        builder.pop();
         builder.pop();
 
         builder.push("arrancar");

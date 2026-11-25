@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:mask_strike",
+  "display": {
+    "icon": {
+      "id": "minecraft:phantom_membrane"
+    },
+    "title": {
+      "translate": "advancements.bleach.shrieker.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.shrieker.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "shrieker": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "shrieker"
+      }
+    }
+  }
+}

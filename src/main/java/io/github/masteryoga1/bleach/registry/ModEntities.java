@@ -32,6 +32,7 @@ import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
+import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
@@ -201,6 +202,17 @@ public final class ModEntities {
                     .noSave()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("adjuchas").toString()));
+
+    /** A Shrieker, a great winged Hollow and a boss. Never saved; only its body is hit, never its wings. */
+    public static final DeferredHolder<EntityType<?>, EntityType<Shrieker>> SHRIEKER =
+            ENTITY_TYPES.register("shrieker", () -> EntityType.Builder
+                    .<Shrieker>of(Shrieker::new, MobCategory.MONSTER)
+                    .sized(1.4F, 2.2F)
+                    .eyeHeight(1.9F)
+                    .fireImmune()
+                    .noSave()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("shrieker").toString()));
 
     // ---- Arrancar ----
 
@@ -460,6 +472,7 @@ public final class ModEntities {
             case FISHBONE_D -> FISHBONE_D.get();
             case GILLIAN -> GILLIAN.get();
             case ADJUCHAS -> ADJUCHAS.get();
+            case SHRIEKER -> SHRIEKER.get();
         };
     }
 
@@ -478,6 +491,7 @@ public final class ModEntities {
         event.put(FISHBONE_D.get(), FishboneD.createAttributes().build());
         event.put(GILLIAN.get(), Gillian.createAttributes().build());
         event.put(ADJUCHAS.get(), Adjuchas.createAttributes().build());
+        event.put(SHRIEKER.get(), Shrieker.createAttributes().build());
         event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
         event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());

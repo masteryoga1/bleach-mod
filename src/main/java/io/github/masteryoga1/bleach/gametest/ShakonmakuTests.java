@@ -58,7 +58,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class ShakonmakuTests {
-    private static final String BATCH = "shakonmaku";
+    /** The batch these tests run in, apart from every other; shared, so a test elsewhere joins it by this name. */
+    static final String BATCH = "shakonmaku";
     /** Room for the float steps of a position. */
     private static final double SAME = 1.0E-6;
     /** How far a test's ticket holds Soul Society's chunks: its own and the ring about it tick entities. */
