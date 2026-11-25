@@ -44,7 +44,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * The training room under the Urahara Shop: its data and template, laid under the shop at every turn; built once under a
  * shop with its hatch and ladder leading down and back; given up where players have built, below the world's floor, in
- * bedrock or under thin land; and laid over a wet site holding no water or lava. Each test takes away what it set down.
+ * bedrock or under thin land; laid over a wet site holding no water or lava; and looked at again, with no load heard,
+ * once its shop stands. Each test takes away what it set down.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -305,6 +306,34 @@ public final class UraharaRoomTests {
                     outside.forEach(pocket -> helper.assertTrue(level.getFluidState(pocket).isSource(),
                             "the pocket at " + pocket + " ran out"));
                 })
+                .thenSucceed();
+    }
+
+    /**
+     * Test 5. Its 25 chunks loaded and its tries spent with no shop standing over it, the room is looked at again by its
+     * stamp's sweep, told of no load, once the shop stands, and built under it.
+     */
+    @GameTest(template = "empty", timeoutTicks = 300)
+    public static void aRoomIsLookedAtAgainOnceItsShopStands(GameTestHelper helper) {
+        Room room = roomAt(helper, 700, 420, LIFT, true);
+        ServerLevel level = room.level();
+        Asked asked = asked(room, () -> false);
+        UraharaRoom.Stamp stamp = asked.stamp();
+        helper.startSequence()
+                .thenWaitUntil(() -> UraharaShopTests.entitiesLoaded(helper, level, room.box()))
+                .thenExecute(() -> {
+                    // A check no load asked for gives no tries: with no shop, the room is left to choose later.
+                    stamp.ensureBuiltIfLoaded(level, false);
+                    helper.assertTrue(!asked.mark().decided() && stamp.triesLeft() == 0,
+                            "with no shop standing, the room chose, or kept tries");
+                    UraharaShopTests.placeEach(level, room.shop());
+                    helper.onEachTick(() -> stamp.onServerTick(level.getServer()));
+                })
+                .thenWaitUntil(() -> helper.assertTrue(asked.mark().decided(),
+                        "the sweep did not look at the room again once its shop stood"))
+                .thenExecute(() -> helper.assertTrue(asked.mark().built() && asked.warned().isEmpty()
+                        && level.getBlockState(stamp.at(UraharaRoom.HATCH)).is(Blocks.SPRUCE_TRAPDOOR),
+                        "the room was not built under the shop, or warned " + asked.warned()))
                 .thenSucceed();
     }
 

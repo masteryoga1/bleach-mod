@@ -31,12 +31,19 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * that never placed its part places it then. A part an operator placed by command is known by its marker blocks and kept.
  * A chunkwise stamp, for one structure too wide to wait on whole, lays each chunk it covers alone once that chunk and
  * those beside it are loaded and its guard allows it, and keeps no start, so its reference alone says a chunk was laid.
+ * A site whose check found them not all loaded is looked at again now and then, as a chunk made full again while it
+ * stays in memory fires no second load event.
  */
 public final class SiteStamp {
     /** How many further checks, one a tick, a chunk's load gives a site while its chunks load: 5 seconds. */
     private static final int LOAD_TRIES = 100;
     /** How many chunks a chunkwise stamp lays in one tick at most; the rest wait for the ticks after. */
     private static final int LAYS_PER_TICK = 4;
+    /**
+     * How often a site still waiting with no tries left is looked at again, if its chunks and those beside them are all
+     * loaded by then: once every 5 seconds, on server ticks that are a multiple of it.
+     */
+    public static final int SWEEP_TICKS = 100;
 
     private final ResourceKey<Level> world;
     private final ResourceKey<Structure> structure;
@@ -55,6 +62,11 @@ public final class SiteStamp {
      * loaded; 0 for none. Server thread only. Some left over from a world closed since cost checks that load nothing.
      */
     private final int[] triesLeft;
+    /**
+     * For each site, whether its last check found its chunks, or the creatures saved in them, not all loaded, and no check
+     * has reached its build since. Server thread only; one left over from a world closed since costs a check there.
+     */
+    private final boolean[] waiting;
     /** The server tick a chunkwise stamp last counted its lays in, and how many it has laid in it. Server thread only. */
     private int layTick = -1, laidThisTick;
 
@@ -88,6 +100,7 @@ public final class SiteStamp {
             around.add(chunks.stream().flatMap(pos -> ChunkPos.rangeClosed(pos, 1)).distinct().toList());
         }
         triesLeft = new int[this.sites.size()];
+        waiting = new boolean[this.sites.size()];
     }
 
     /** A chunkwise stamp (see {@link #chunkwise}). */
@@ -108,6 +121,7 @@ public final class SiteStamp {
                     around.add(ChunkPos.rangeClosed(pos, 1).toList());
                 });
         triesLeft = new int[covered.size()];
+        waiting = new boolean[covered.size()];
     }
 
     /**
@@ -156,7 +170,7 @@ public final class SiteStamp {
      * A chunk of the world, one a site covers or one beside them, has loaded: once the tick is done, that site is checked,
      * and if its chunks are not all loaded yet it is checked again once a tick, up to {@link #LOAD_TRIES} times, and while
      * only the creatures saved in those it covers are still to join, once a tick until they have. Nothing is loaded or
-     * made for it, so whichever loads last completes it.
+     * made for it, so whichever loads last completes it, or the sweep, once one loaded before is made full again.
      */
     public void onChunkLoad(ChunkEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel level && level.dimension() == world) {
@@ -179,18 +193,34 @@ public final class SiteStamp {
         }
     }
 
-    /** Queues this tick's further check of each site a check left tries, counting one off. */
+    /** As {@link #tick}. */
     public void onServerTick(ServerTickEvent.Post event) {
-        MinecraftServer server = event.getServer();
+        tick(event.getServer());
+    }
+
+    /**
+     * Queues this tick's further check of each site a check left tries, counting one off, and every {@link #SWEEP_TICKS}
+     * one of each site still waiting with none left whose chunks and those beside them are all loaded now. Public for
+     * tests.
+     */
+    public void tick(MinecraftServer server) {
+        ServerLevel level = server.getLevel(world);
+        boolean sweep = level != null && server.getTickCount() % SWEEP_TICKS == 0;
         for (int i = 0; i < covered.size(); i++) {
             if (triesLeft[i] > 0) {
                 triesLeft[i]--;
-                ServerLevel level = server.getLevel(world);
                 if (level != null) {
                     queueCheck(level, i, false);
                 }
+            } else if (sweep && waiting[i] && loaded(level, i)) {
+                queueCheck(level, i, false);
             }
         }
+    }
+
+    /** Whether this site waits for its chunks, or the creatures saved in them, to load, as its last check found. */
+    public boolean waits(int index) {
+        return waiting[index];
     }
 
     /** Checks once the server's current work is done: a chunk's load event comes inside the load itself. */
@@ -205,20 +235,28 @@ public final class SiteStamp {
      * still to load gets the tries a chunk's load gives; creatures still to join, the tries renewed while the chunks stay.
      */
     private void ensureBuiltIfLoaded(ServerLevel level, int index, boolean fromLoad) {
-        if (!around.get(index).stream().allMatch(pos -> level.getChunkSource().getChunkNow(pos.x, pos.z) != null)) {
-            // A block placed at its edge would make a neighbour that is not loaded load; that one's own load checks again.
+        if (!loaded(level, index)) {
+            // A block placed at its edge would make a neighbour that is not loaded load; that one's own load checks again,
+            // or, if it loaded before and is only made full again, which fires no event, the sweep does.
             if (fromLoad) {
                 triesLeft[index] = LOAD_TRIES;
             }
+            waiting[index] = true;
             return;
         }
         if (!covered.get(index).stream().allMatch(pos -> level.areEntitiesLoaded(pos.toLong()))) {
             // Read off the thread, saved creatures may join many ticks after their chunk, and no event says when.
             triesLeft[index] = LOAD_TRIES;
+            waiting[index] = true;
             return;
         }
         triesLeft[index] = 0;
         ensureBuilt(level, index);
+    }
+
+    /** Whether every chunk this site covers, and every one beside them, is loaded. */
+    private boolean loaded(ServerLevel level, int index) {
+        return around.get(index).stream().allMatch(pos -> level.getChunkSource().getChunkNow(pos.x, pos.z) != null);
     }
 
     /**
@@ -227,11 +265,12 @@ public final class SiteStamp {
      * reference. Those chunks are loaded, and made, first, unless the site is whole already. Server thread only.
      * Its guard is asked before anything is set, with the chunks still bare; on a no, nothing is set or placed.
      * A chunkwise stamp's site is its one chunk, laid alone unless it holds the reference or its guard says no, from a
-     * start never kept.
+     * start never kept. The site no longer waits: a guard's no is not asked again by the sweep.
      *
      * @return whether any part was placed
      */
     public boolean ensureBuilt(ServerLevel level, int index) {
+        waiting[index] = false;
         Structure laid = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(structure);
         if (laid == null) {
             return false;

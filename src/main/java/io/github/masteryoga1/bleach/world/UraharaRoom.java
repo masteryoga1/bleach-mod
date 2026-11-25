@@ -203,11 +203,21 @@ public final class UraharaRoom {
             }
         }
 
-        /** Queues this tick's further check, if a check left tries, counting one off. */
-        void onServerTick(MinecraftServer server) {
+        /**
+         * Queues this tick's further check, if a check left tries, counting one off, or with none left, every
+         * {@link SiteStamp#SWEEP_TICKS}, one while the room's choice is still to make and its chunks and those beside them
+         * are all loaded: a chunk made full again while it stays in memory fires no second load, and the shop over it may
+         * be built after the tries ran out. Public for tests.
+         */
+        public void onServerTick(MinecraftServer server) {
             ServerLevel level = server.getLevel(Level.OVERWORLD);
-            if (triesLeft > 0 && level != null) {
+            if (level == null) {
+                return;
+            }
+            if (triesLeft > 0) {
                 triesLeft--;
+                queueCheck(level, false);
+            } else if (server.getTickCount() % SiteStamp.SWEEP_TICKS == 0 && !mark.decided() && loaded(level)) {
                 queueCheck(level, false);
             }
         }
@@ -224,8 +234,8 @@ public final class UraharaRoom {
          * shop the same load builds is found. Public for tests.
          */
         public void ensureBuiltIfLoaded(ServerLevel level, boolean fromLoad) {
-            if (!around.stream().allMatch(pos -> level.getChunkSource().getChunkNow(pos.x, pos.z) != null)) {
-                // The last of them to load checks again.
+            if (!loaded(level)) {
+                // The last of them to load checks again, or the sweep, once one loaded before is made full again.
                 if (fromLoad) {
                     triesLeft = LOAD_TRIES;
                 }
@@ -243,6 +253,11 @@ public final class UraharaRoom {
                 // No shop yet: the shop's own stamp, asked by this load too, may build it within the tries.
                 triesLeft = LOAD_TRIES;
             }
+        }
+
+        /** Whether every chunk the room covers, and every one beside them, is loaded. */
+        private boolean loaded(ServerLevel level) {
+            return around.stream().allMatch(pos -> level.getChunkSource().getChunkNow(pos.x, pos.z) != null);
         }
 
         /**

@@ -12,6 +12,7 @@ import io.github.masteryoga1.bleach.world.gen.SitePiece;
 import io.github.masteryoga1.bleach.world.gen.SitePlacement;
 import io.github.masteryoga1.bleach.world.gen.SiteStructure;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,9 +26,13 @@ import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.GameTestInfo;
+import net.minecraft.gametest.framework.GameTestListener;
+import net.minecraft.gametest.framework.GameTestRunner;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.entity.Entity;
@@ -58,7 +63,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Tests for Soul Society's sites: the placement that names the chunks they start in, the structure that sets each site's
  * template at its corner and turn, and the Academy in Seireitei, which a world whose chunks there were made before it, or
  * made with structures off as the test server's are, has built once both of its chunks are loaded. Test C changes the
- * test world's Academy, so A to C run in a batch of their own; test D reads a stamp's numbers with no world, in any batch.
+ * test world's Academy, so A to C run in a batch of their own; test D reads a stamp's numbers with no world, in any batch,
+ * and test E watches a stamp's sweep look again at a far site of the Overworld whose chunks loaded unheard.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -69,6 +75,8 @@ public final class SiteTests {
     private static final ChunkPos HOME = new ChunkPos(-12, 14);
     /** The chunk the plan's yard of training dummies starts in, the one academy site but the hall's near it. */
     private static final ChunkPos YARD = new ChunkPos(-14, 15);
+    /** The far Overworld chunk test E's stamp covers, which no other test loads. */
+    private static final ChunkPos FAR = new ChunkPos(1700, -1700);
     /** Where the Academy's template is set from: its corner, on the lawn. */
     private static final BlockPos CORNER = new BlockPos(-192, 72, 224);
     /** The Academy's box: its template, 15 by 9 by 17, turned clockwise about the corner. */
@@ -367,6 +375,71 @@ public final class SiteTests {
         helper.assertTrue(AcademySite.COVERED.equals(academy.covered(0)),
                 "the Academy's own stamp covers " + AcademySite.COVERED + ", not " + academy.covered(0));
         helper.succeed();
+    }
+
+    /**
+     * Test E. A site whose check found its chunks not loaded is looked at again by the sweep once they are, though no load
+     * is heard: a stamp of the test's own, of one far chunk of the Overworld and told of no load, its guard noting each ask
+     * and refusing. Once asked it waits no more, so the sweep does not ask its guard again.
+     */
+    @GameTest(template = "empty", timeoutTicks = 1200)
+    public static void aSiteLoadedUnheardIsLookedAtAgain(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        MinecraftServer server = level.getServer();
+        helper.assertTrue(ChunkPos.rangeClosed(FAR, 1).allMatch(pos -> level.getChunkSource().getChunkNow(pos.x, pos.z)
+                == null), "chunk " + FAR + " or one beside it is loaded already");
+        List<ChunkPos> asked = new ArrayList<>();
+        int[] seen = {0};
+        SiteStamp stamp = SiteStamp.chunkwise(level.dimension(), AcademySite.STRUCTURE, "A test's far site", FAR,
+                new BoundingBox(FAR.getMinBlockX(), 0, FAR.getMinBlockZ(), FAR.getMaxBlockX(), 0, FAR.getMaxBlockZ()),
+                SiteStamp.Placed.NOTHING, (each, bare) -> {
+                    bare.forEach(chunk -> asked.add(chunk.getPos()));
+                    return false;
+                });
+        helper.testInfo.addListener(new Ticket(level, FAR, 1));
+        helper.onEachTick(() -> stamp.tick(server));
+        // Queued for the tick's end, the check finds the chunks not loaded; asked by no load, it gives no tries.
+        stamp.recheck(level, FAR);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(stamp.waits(0), "the site does not wait for its chunks"))
+                .thenExecute(() -> {
+                    helper.assertTrue(asked.isEmpty(), "the guard was asked before the chunks loaded: " + asked);
+                    // The chunk made full, and those beside it, with no load told to the stamp.
+                    level.getChunkSource().addRegionTicket(TicketType.FORCED, FAR, 1, FAR);
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, !asked.isEmpty(),
+                        "the sweep did not look at the site again once its chunks loaded"))
+                // Checks the tries queued while the chunk's creatures were still to join run within 4 ticks.
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    helper.assertTrue(asked.stream().allMatch(FAR::equals) && !stamp.waits(0),
+                            "the guard was asked of " + asked + ", or the site still waits");
+                    seen[0] = asked.size();
+                })
+                .thenIdle(SiteStamp.SWEEP_TICKS + 5)
+                .thenExecute(() -> helper.assertTrue(asked.size() == seen[0], "the sweep asked a refusal again: " + asked))
+                .thenSucceed();
+    }
+
+    /** Lets test E's ticket go as its test ends, passed or failed; removing one never added does nothing. */
+    private record Ticket(ServerLevel level, ChunkPos centre, int radius) implements GameTestListener {
+        @Override
+        public void testStructureLoaded(GameTestInfo info) {
+        }
+
+        @Override
+        public void testPassed(GameTestInfo info, GameTestRunner runner) {
+            level.getChunkSource().removeRegionTicket(TicketType.FORCED, centre, radius, centre);
+        }
+
+        @Override
+        public void testFailed(GameTestInfo info, GameTestRunner runner) {
+            level.getChunkSource().removeRegionTicket(TicketType.FORCED, centre, radius, centre);
+        }
+
+        @Override
+        public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
+        }
     }
 
     /** Asserts that this stamp reads this site as worked by hand: its chunks, its start's, its box and its markers. */
