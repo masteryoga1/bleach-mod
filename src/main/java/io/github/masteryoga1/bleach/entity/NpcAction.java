@@ -35,7 +35,10 @@ public enum NpcAction {
     /** The instructor's Jigokuchō, for a Shinigami or a Substitute that has lost its own. */
     BUTTERFLY(DialogueView.SUBSTITUTE, DialogueView.SHINIGAMI),
     /** The instructor's field trial: his Senkaimon from Soul Society, or in the Human World a hunt where one stands. */
-    FIELD_TRIAL(DialogueView.STUDENT_TRIAL);
+    FIELD_TRIAL(DialogueView.STUDENT_TRIAL),
+    /** Kisuke Urahara's wares on the merchant screen, in the views of the souls he may sell something to. */
+    TRADE(DialogueView.SHOP_AWARE, DialogueView.SHOP_PLUS, DialogueView.SHOP_SOUL, DialogueView.SHOP_STUDENT,
+            DialogueView.SHOP_SHINIGAMI, DialogueView.SHOP_QUINCY, DialogueView.SHOP_VISORED);
 
     private static final IntFunction<NpcAction> BY_ID =
             ByIdMap.continuous(NpcAction::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);
