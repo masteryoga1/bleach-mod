@@ -230,9 +230,10 @@ public final class SekkisekiTests {
 
     /**
      * Puts back every block a test set through it, and clears what the test left in its box, when the test passes or
-     * fails: in 1.21.1 the framework does neither for a failed test, nor puts blocks back for a passed one.
+     * fails: in 1.21.1 the framework does neither for a failed test, nor puts blocks back for a passed one. Shared, so a
+     * test elsewhere that sets Sekkiseki down takes it up again too.
      */
-    private static final class Restore implements GameTestListener {
+    static final class Restore implements GameTestListener {
         private final GameTestHelper helper;
         private final Map<BlockPos, BlockState> before = new HashMap<>();
 

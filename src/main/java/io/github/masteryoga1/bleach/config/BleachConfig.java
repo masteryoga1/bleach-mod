@@ -2344,7 +2344,7 @@ public final class BleachConfig {
                 .comment("A Shrieker's health on Normal, before the hollows health multiplier. Easy takes some away.")
                 .defineInRange("health", 120.0, 1.0, 10_000.0);
         SHRIEKER_DAMAGE = builder
-                .comment("Damage of a Shrieker's blow on Normal, before the hollows damage multiplier.")
+                .comment("Damage of a Shrieker's swoop on Normal, before the hollows damage multiplier.")
                 .defineInRange("damage", 7.0, 0.0, 200.0);
         builder.pop();
         builder.pop();
