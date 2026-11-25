@@ -12,20 +12,22 @@ import net.minecraft.util.Mth;
 
 /**
  * Shrieker: a hunched, ape-like body on short legs with long arms, a tall narrow head behind its mask, and two broad
- * bat's wings from its shoulders, a bone spar each with dark membrane behind it. It never pitches its head, so the mask
- * is drawn where a blow finds it. On the ground the wings hang folded at its sides as it strides; off the ground (falling,
- * knocked into the air, or held still there) they spread and beat. Its tongue is in the mesh, hidden until it has a use. A
- * placeholder until the mod has real art.
+ * bat's wings from its shoulders, a bone spar each with dark membrane behind it, that beat in time with the wingbeats the
+ * aware hear. It never pitches its head, so the mask is drawn where a blow finds it. In a swoop the wings sweep back and
+ * the arms reach ahead, its jaw open; on the ground the wings hang folded at its sides as it strides. Its tongue is in the
+ * mesh, hidden until it has a use. A placeholder until the mod has real art.
  */
 public final class ShriekerModel extends HierarchicalModel<Shrieker> {
     private static final float STRIDE = 0.6662F;
     private static final float LEG_SWING = 1.0F;
     private static final float ARM_SWING = 0.6F;
-    /** How long one beat of the wings takes, in ticks. */
-    private static final int BEAT_TICKS = 18;
     /** How high the wings ride above level as they beat, and how far either way they beat, in radians. */
     private static final float WING_LIFT = 0.15F;
     private static final float WING_BEAT = 0.7F;
+    /** In a swoop: how far back the wings sweep, how much they still beat, and how far forward the arms reach. */
+    private static final float SWEEP = 0.9F;
+    private static final float SWOOP_BEAT = 0.15F;
+    private static final float REACH = -1.4F;
     /** How far forward the arms hang in the air. */
     private static final float HANG = -0.2F;
     /** How far the folded wings hang down at its sides on the ground. */
@@ -99,10 +101,11 @@ public final class ShriekerModel extends HierarchicalModel<Shrieker> {
     public void setupAnim(Shrieker shrieker, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw,
                           float headPitch) {
         root.getAllParts().forEach(ModelPart::resetPose);
+        boolean swooping = shrieker.isSwooping();
         head.yRot = netHeadYaw * Mth.DEG_TO_RAD;
         float blow = Mth.sin(attackTime * Mth.PI);
-        jaw.xRot = attackTime > 0.0F ? JAW_OPEN : JAW_REST;
-        if (shrieker.onGround()) {
+        jaw.xRot = swooping || attackTime > 0.0F ? JAW_OPEN : JAW_REST;
+        if (shrieker.onGround() && !swooping) {
             // On the ground: the wings folded, and a stride with the arms swinging against the legs.
             float stride = Mth.cos(limbSwing * STRIDE) * limbSwingAmount;
             rightLeg.xRot = stride * LEG_SWING;
@@ -113,23 +116,30 @@ public final class ShriekerModel extends HierarchicalModel<Shrieker> {
             leftWing.zRot = -FOLDED;
             return;
         }
-        float lift = WING_LIFT + Mth.cos(wingPhase(shrieker, ageInTicks)) * WING_BEAT;
+        float lift = WING_LIFT + Mth.cos(wingPhase(shrieker, ageInTicks)) * (swooping ? SWOOP_BEAT : WING_BEAT);
         // The right wing reaches to -x, so a positive turn about z raises its tip; the left wing's is the other way.
         rightWing.zRot = lift;
         leftWing.zRot = -lift;
+        if (swooping) {
+            // Turned about y, back towards the tail (+z), as a diving bat holds them.
+            rightWing.yRot = SWEEP;
+            leftWing.yRot = -SWEEP;
+        }
         rightLeg.xRot = TRAIL;
         leftLeg.xRot = TRAIL;
-        rightArm.xRot = HANG - blow;
-        leftArm.xRot = HANG - blow;
+        float arms = swooping ? REACH : HANG;
+        rightArm.xRot = arms - blow;
+        leftArm.xRot = arms - blow;
     }
 
     /**
-     * Where its wings are in their beat, in radians, from the world's time rather than its own age, so a Shrieker beats
-     * the same way however long it has been in view, and two side by side, by their ids, do not beat together.
+     * Where its wings are in their beat, in radians, from the world's time as the server reads it for the sound of the
+     * beat (Shrieker#tick), so the two keep time, the wings at the top of the stroke as the beat sounds; two side by
+     * side, by their ids, do not beat together.
      */
     private static float wingPhase(Shrieker shrieker, float ageInTicks) {
-        long beat = Math.floorMod(shrieker.level().getGameTime() + shrieker.getId() * 3L, (long) BEAT_TICKS);
+        long beat = Math.floorMod(shrieker.level().getGameTime() + shrieker.getId() * 3L, (long) Shrieker.FLAP_TICKS);
         float partial = ageInTicks - shrieker.tickCount;
-        return (beat + partial) / BEAT_TICKS * Mth.TWO_PI;
+        return (beat + partial) / Shrieker.FLAP_TICKS * Mth.TWO_PI;
     }
 }

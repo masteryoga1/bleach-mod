@@ -99,9 +99,9 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_AMBIENT = fixed("entity.shrieker.ambient", 48.0F);
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_HURT = variable("entity.shrieker.hurt");
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_DEATH = variable("entity.shrieker.death");
-    /** A Shrieker folding its wings to dive; nothing plays it until the Shrieker flies. */
+    /** A Shrieker folding its wings to dive. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_SWOOP = variable("entity.shrieker.swoop");
-    /** A Shrieker's wingbeat; nothing plays it until the Shrieker flies. */
+    /** A Shrieker's wingbeat, every Shrieker.FLAP_TICKS while it flies. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_FLAP = variable("entity.shrieker.flap");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
