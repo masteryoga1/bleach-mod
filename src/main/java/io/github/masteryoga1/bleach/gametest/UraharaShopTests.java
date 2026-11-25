@@ -458,7 +458,7 @@ public final class UraharaShopTests {
      * Asserts the shop at this site holds one keeper, at his spot with its UUID and facing out of the turned door, body
      * and head too, and that the sign over its door names it in the reader's own language.
      */
-    private static void holdsItsKeeper(GameTestHelper helper, ServerLevel level, SeireiteiPlan.Site site, BoundingBox box) {
+    static void holdsItsKeeper(GameTestHelper helper, ServerLevel level, SeireiteiPlan.Site site, BoundingBox box) {
         BlockPos corner = new BlockPos(site.x(), site.y(), site.z());
         BlockPos at = corner.offset(UraharaShop.KEEPER.rotate(site.rotation()));
         List<KisukeUrahara> keepers = level.getEntitiesOfClass(KisukeUrahara.class, AABB.of(box));
@@ -485,7 +485,7 @@ public final class UraharaShopTests {
     }
 
     /** Every block of this box as it stands. */
-    private static Map<BlockPos, BlockState> blocks(ServerLevel level, BoundingBox box) {
+    static Map<BlockPos, BlockState> blocks(ServerLevel level, BoundingBox box) {
         Map<BlockPos, BlockState> blocks = new HashMap<>();
         BlockPos.betweenClosed(box.minX(), box.minY(), box.minZ(), box.maxX(), box.maxY(), box.maxZ())
                 .forEach(pos -> blocks.put(pos.immutable(), level.getBlockState(pos)));
