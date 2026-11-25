@@ -82,6 +82,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -266,7 +267,8 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * it last left the Overworld from by a gate, the third. There a Shrieker, summoned standing still in the air before it,
  * must reach the client unhidden, the soul looks at it for a shot that shows its bar as well, and it must be gone once
  * killed by command. A second, set on the soul from the server, must loose its leeches, which must cling at the soul's
- * back on its client; killed, it and its leeches must be gone before the run quits.
+ * back on its client, and then ring its tongue there, the soul looking at it for a shot of the tongue; killed before the
+ * ring is out, it and its leeches must be gone before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -347,6 +349,8 @@ public final class ClientSmokeTest {
     private static final int CHAT_LINES_KEPT = 16;
     /** How many of the server's last action bar lines are kept for a failure to name. */
     private static final int ACTION_BAR_LINES_KEPT = 6;
+    /** How long after a Shrieker is first seen to ring its shot is taken, so a frame drawn since shows the tongue. */
+    private static final int RING_SHOT_TICKS = 5;
 
     private static boolean worldRequested;
     private static int ticksWaiting;
@@ -376,6 +380,8 @@ public final class ClientSmokeTest {
     private static int heldLane = -1;
     /** The tick the player was first seen over the Rukongai out of the Dangai, or -1 before then. */
     private static int skyFrom = -1;
+    /** The tick the second Shrieker was first seen to ring, or -1 before then. */
+    private static int rangFrom = -1;
     /** The player as the death beat killed it, to tell it from the one that wakes in its place, or null before then. */
     @Nullable
     private static LocalPlayer killed;
@@ -1739,9 +1745,9 @@ public final class ClientSmokeTest {
             // Its body, mask and spread wings, and its bar at the top of the screen.
             case 9020 -> shot(minecraft, "shrieker");
             case 9022 -> command(minecraft, "kill @e[type=bleach:shrieker]");
-            // A second, standing still in the air nearer the soul, for its leeches (see checkBosses).
+            // A second, standing still in the air nearer the soul, for its leeches and its ring (see checkBosses).
             case 9065 -> command(minecraft, "summon bleach:shrieker ~ ~3 ~-6 " + STILL);
-            case 9165 -> {
+            case 9175 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2494,8 +2500,9 @@ public final class ClientSmokeTest {
 
     /**
      * The checks of the bosses, each window from the step it follows: the Shrieker reaching the client, then gone; then a
-     * second, set on the soul on the server, its leeches clinging at the soul's back, and the two gone once it is killed.
-     * Each of these last opens a tick after the window whose pass sets it going, so it is open when that can first show.
+     * second, set on the soul on the server, its leeches clinging at the soul's back, its ring, the shot of it a few ticks
+     * on, and the two gone once it is killed. Each of these last opens a tick after the window whose pass sets it going,
+     * so it is open when that can first show.
      */
     private static void checkBosses(Minecraft minecraft) {
         if (expectWithin(minecraft, 8982, 9015, () -> nearest(minecraft, Shrieker.class, SUMMONED_RANGE,
@@ -2514,29 +2521,53 @@ public final class ClientSmokeTest {
         if (expectWithin(minecraft, 9067, 9100, () -> nearest(minecraft, Shrieker.class, SUMMONED_RANGE,
                         shrieker -> shrieker.isAlive() && !ClientSouls.isHiddenFromViewer(shrieker)) != null,
                 "the second Shrieker never reached the Arrancar's client unhidden")) {
-            MinecraftServer server = minecraft.getSingleplayerServer();
-            LocalPlayer local = minecraft.player;
-            if (server != null) {
-                server.execute(() -> {
-                    ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
-                    if (player != null) {
-                        player.level().getEntitiesOfClass(Shrieker.class, player.getBoundingBox().inflate(SUMMONED_RANGE),
-                                Shrieker::isAlive).forEach(shrieker -> {
-                            shrieker.setTarget(player);
-                            shrieker.looseLeeches();
-                        });
-                    }
-                });
+            Shrieker shrieker = nearest(minecraft, Shrieker.class, SUMMONED_RANGE, Shrieker::isAlive);
+            if (shrieker != null) {
+                look(minecraft, shrieker.position().add(0.0, shrieker.getBbHeight() * 0.5, 0.0));
             }
+            onServerShrieker(minecraft, Shrieker::looseLeeches);
         }
         if (expectWithin(minecraft, 9068, 9145, () -> leechesCling(minecraft),
                 "the Shrieker's leeches never all clung, unhidden, at the Arrancar's back on its client")) {
+            onServerShrieker(minecraft, Shrieker::startRing);
+        }
+        if (expectWithin(minecraft, 9069, 9150, () -> windowsPassed.contains(9068) && nearest(minecraft, Shrieker.class,
+                        SUMMONED_RANGE, shrieker -> shrieker.isAlive() && shrieker.isRinging()) != null,
+                "the Shrieker never rang its tongue on the Arrancar's client")) {
+            rangFrom = ticksInWorld;
+        }
+        // Its raised, forked tongue: the leeches at the soul's back are out of a first-person shot. Killed then, well
+        // inside the ring's 30 ticks, so no leech bursts on the soul.
+        if (expectWithin(minecraft, 9070, 9160, () -> windowsPassed.contains(9069)
+                && ticksInWorld >= rangFrom + RING_SHOT_TICKS, "the ringing Shrieker was never shot")) {
+            shot(minecraft, "shrieker_ring");
             command(minecraft, "kill @e[type=bleach:shrieker]");
         }
-        expectWithin(minecraft, 9069, 9160, () -> windowsPassed.contains(9068)
+        expectWithin(minecraft, 9071, 9170, () -> windowsPassed.contains(9070)
                         && nearest(minecraft, Shrieker.class, SUMMONED_RANGE, Shrieker::isAlive) == null
                         && nearest(minecraft, ShriekerLeech.class, SUMMONED_RANGE, Entity::isAlive) == null,
                 "the second Shrieker killed by command still lives, or its leeches are still about");
+    }
+
+    /**
+     * Sets every live Shrieker about the soul on the server on that soul, on the server thread, and has it act: a still
+     * Shrieker's own fight never sets it on anyone.
+     */
+    private static void onServerShrieker(Minecraft minecraft, Consumer<Shrieker> act) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server != null) {
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                if (player != null) {
+                    player.level().getEntitiesOfClass(Shrieker.class, player.getBoundingBox().inflate(SUMMONED_RANGE),
+                            Shrieker::isAlive).forEach(shrieker -> {
+                        shrieker.setTarget(player);
+                        act.accept(shrieker);
+                    });
+                }
+            });
+        }
     }
 
     /**

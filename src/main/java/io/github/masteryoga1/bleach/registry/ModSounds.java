@@ -8,11 +8,11 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * The mod's sound events. Their files are vanilla sounds, pitched and spread out in
- * {@code assets/bleach/sounds.json}. A Hollow's howl, a Shrieker's cry, Fishbone D's roar, a Menos Grande's
- * cries, a Cero, the tearing sky, a Shikai release, a loosed Getsuga Tenshō, a Quincy's awakening and the great
- * Quincy arts (Letzt Stil, the power's return, Heizen, Sprenger and Vollständig) carry much further than
- * a normal mob's sounds, so they are fixed-range events; the rest reach as far as their volume takes
- * them, as usual.
+ * {@code assets/bleach/sounds.json}. A Hollow's howl, a Shrieker's cry and its ringing tongue, Fishbone D's roar,
+ * a Menos Grande's cries, a Cero, the tearing sky, a Shikai release, a loosed Getsuga Tenshō, a Quincy's
+ * awakening and the great Quincy arts (Letzt Stil, the power's return, Heizen, Sprenger and Vollständig) carry
+ * much further than a normal mob's sounds, so they are fixed-range events; the rest reach as far as their volume
+ * takes them, as usual.
  */
 public final class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
@@ -106,6 +106,9 @@ public final class ModSounds {
     /** A Shrieker loosing its leeches from its chest, and a leech fastening on a back. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_LOOSE = variable("entity.shrieker.loose");
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_LEECH_CLING = variable("entity.shrieker_leech.cling");
+    /** A Shrieker's tongue ringing, heard well beyond the fight, and a leech bursting as the ring ends. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_RING = fixed("entity.shrieker.ring", 32.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_LEECH_BURST = variable("entity.shrieker_leech.burst");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */
