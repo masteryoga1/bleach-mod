@@ -896,6 +896,44 @@ def grand_fisher_mask():
     return c
 
 
+# Grand Fisher's lure: a small girl, on the slim player skin's layout.
+LURE_SKIN = rgb(238, 206, 186)
+LURE_HAIR = rgb(58, 40, 34)
+LURE_DRESS = rgb(176, 198, 224)
+LURE_SHOES = rgb(120, 52, 58)
+LURE_TEAR = rgb(150, 196, 236)
+
+
+def grand_fisher_lure():
+    """A small girl in the slim player skin's layout: pale skin, long dark hair over the top, back and sides of the head
+    and a fringe down the face, her eyes shut tight over tears running down her cheeks, a pale blue dress with short
+    sleeves and a skirt to the knee, and red shoes. Every overlay layer stays clear."""
+    c = Canvas(64, 64)
+    # Head, body, right arm, left arm (slim, three wide), right leg, left leg: where each net starts, and the box's size.
+    for u, v, w, h, d in ((0, 0, 8, 8, 8), (16, 16, 8, 12, 4), (40, 16, 3, 12, 4), (32, 48, 3, 12, 4),
+                          (0, 16, 4, 12, 4), (16, 48, 4, 12, 4)):
+        box(c, u, v, w, h, d, LURE_SKIN)
+    c.rect(8, 0, 16, 8, LURE_HAIR)        # the top of the head
+    c.rect(0, 8, 8, 16, LURE_HAIR)        # its right side, the hair down to the jaw
+    c.rect(16, 8, 32, 16, LURE_HAIR)      # its left side and back
+    c.rect(8, 8, 16, 10, LURE_HAIR)       # the fringe, two rows down the face
+    c.rect(9, 11, 11, 12, VOID)           # eyes shut tight, and the tears beneath them
+    c.rect(13, 11, 15, 12, VOID)
+    for x in (9, 14):
+        c.rect(x, 12, x + 1, 15, LURE_TEAR)
+    # The dress: over the whole body and the shoulders, the sleeves' top three rows and the skirt's top five on each leg.
+    for u, v, w, d, rows in ((16, 16, 8, 4, 12), (40, 16, 3, 4, 3), (32, 48, 3, 4, 3), (0, 16, 4, 4, 5),
+                             (16, 48, 4, 4, 5)):
+        for x0, y0, x1, y1 in faces(u, v, w, 12, d)[2:]:
+            c.rect(x0, y0, x1, y0 + rows, LURE_DRESS)
+        c.rect(*faces(u, v, w, 12, d)[0], LURE_DRESS)
+    for u, v in ((0, 16), (16, 48)):      # the shoes, round the bottom of each leg and under it
+        for x0, y0, x1, y1 in faces(u, v, 4, 12, 4)[2:]:
+            c.rect(x0, y1 - 2, x1, y1, LURE_SHOES)
+        c.rect(*faces(u, v, 4, 12, 4)[1], LURE_SHOES)
+    return c
+
+
 def garganta():
     """A tear in the air: black, ragged at the edges and narrow at both ends."""
     c = Canvas(32, 64)
@@ -2267,6 +2305,7 @@ TEXTURES = {
     "entity/hollow/grand_fisher.png": grand_fisher,
     "entity/hollow/grand_fisher_mask.png": grand_fisher_mask,
     "entity/hollow/grand_fisher_mask_cracked.png": cracked(grand_fisher_mask, [(66, 9), (67, 12), (65, 15), (67, 17)]),
+    "entity/grand_fisher_lure.png": grand_fisher_lure,
     "entity/garganta.png": garganta,
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,

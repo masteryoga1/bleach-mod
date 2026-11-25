@@ -519,6 +519,9 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_HEALTH;
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_DAMAGE;
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_LURE_REACH;
+    public static final ModConfigSpec.IntValue GRAND_FISHER_LURE_FADE_SECONDS;
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_LURE_HEALTH;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2373,6 +2376,16 @@ public final class BleachConfig {
         GRAND_FISHER_DAMAGE = builder
                 .comment("Damage of Grand Fisher's blow on Normal, before the hollows damage multiplier.")
                 .defineInRange("damage", 8.0, 0.0, 200.0);
+        GRAND_FISHER_LURE_REACH = builder
+                .comment("How far Grand Fisher's lure may stray from its brow, in blocks, before its stalk draws it back."
+                        + " Pulled half as far again, the stalk tears. At least 6: her head stands 3 below the brow.")
+                .defineInRange("lure_reach", 12.0, 6.0, 64.0);
+        GRAND_FISHER_LURE_FADE_SECONDS = builder
+                .comment("Seconds a lure cut off from its stalk lies before it fades away.")
+                .defineInRange("lure_fade_seconds", 20, 1, 600);
+        GRAND_FISHER_LURE_HEALTH = builder
+                .comment("The health of Grand Fisher's lure.")
+                .defineInRange("lure_health", 15.0, 1.0, 1_000.0);
         builder.pop();
         builder.pop();
 
