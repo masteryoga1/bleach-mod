@@ -91,6 +91,8 @@ public abstract class Hollow extends Monster {
     public static final int FLAG_CRACKED = 2;
     public static final int FLAG_MASK_FORMING = 4;
     public static final int FLAG_PURIFYING = 8;
+    /** Held for the Gate of Hell, which takes this body (see {@link #isHellbound}). A Shrieker's own are 16 and 32. */
+    public static final int FLAG_HELLBOUND = 64;
 
     /** How long the white dissolve of a purified Hollow lasts, and the tick its soul rises from it. */
     public static final int DISSOLVE_TICKS = 24;
@@ -135,6 +137,8 @@ public abstract class Hollow extends Monster {
     boolean departing;
     private long lastHurtByMobAt = NEVER;
     private int departTicks;
+    /** Ticks a hellbound body has been held, so one whose Gate is gone goes by itself. */
+    private int hellboundTicks;
     /** Held in a Hollow player's jaws until this game time. 0 is never: game time is never below it. */
     private long seizedUntil;
 
@@ -390,7 +394,7 @@ public abstract class Hollow extends Monster {
      * it goes only as any monster does.
      */
     private boolean mayLeave() {
-        return !isPractice() && !departing && !isPurifying() && !isPersistenceRequired() && !hasCustomName()
+        return !isPractice() && !departing && !isPurifying() && !isHellbound() && !isPersistenceRequired() && !hasCustomName()
                 && !isNoAi() && !isBaitHeld() && level().dimension() != BleachWorlds.HUECO_MUNDO;
     }
 
@@ -558,6 +562,29 @@ public abstract class Hollow extends Monster {
         return isPurifying() ? Math.min(1.0F, (dissolveTicks + partialTick) / DISSOLVE_TICKS) : 0.0F;
     }
 
+    /** Whether this body is held for the Gate of Hell, which takes it (see {@link #tickDeath}). Synced. */
+    public boolean isHellbound() {
+        return getFlag(FLAG_HELLBOUND);
+    }
+
+    /**
+     * The killing blow opened the Gate of Hell for this sinner ({@link HellGate#open}): it is held upright where the blow
+     * left it, neither falling nor dissolving, until its Gate takes it.
+     */
+    public void bindForHell() {
+        setFlag(FLAG_HELLBOUND, true);
+        hellboundTicks = 0;
+        deathTime = 0;
+        setNoGravity(true);
+        setDeltaMovement(Vec3.ZERO);
+    }
+
+    /** Its Gate let it go, as it lives again (its death undone after the Gate rose): it stands and falls as before. */
+    public void unbindFromHell() {
+        setFlag(FLAG_HELLBOUND, false);
+        setNoGravity(false);
+    }
+
     /** Whether this Hollow is leaving through a tear. Known on the server only. */
     public boolean isDeparting() {
         return departing;
@@ -678,7 +705,7 @@ public abstract class Hollow extends Monster {
         fromPlus = value;
     }
 
-    /** Whether this Hollow was a sinner in life. None is yet but the Shrieker, which always is. */
+    /** Whether this Hollow was a sinner in life, whom the Gate of Hell takes. None is yet but the Shrieker, always one. */
     public boolean isSinner() {
         return sinner;
     }
@@ -700,13 +727,28 @@ public abstract class Hollow extends Monster {
     }
 
     /**
-     * Dying, a Hollow never sends the usual puff of smoke, which every player would see. A purified one
-     * stays upright and dissolves, and its soul rises at {@link #ECHO_TICK}; any other falls over as a
-     * mob does and breaks into black smoke only the aware can see.
+     * Dying, a Hollow never sends the usual puff of smoke, which every player would see. A hellbound one is held upright
+     * and still for its Gate, which takes it, and goes by itself at {@link HellGate#HOLD_LIMIT} should the Gate be gone
+     * first; a purified one stays upright and dissolves, and its soul rises at {@link #ECHO_TICK}; any other falls over
+     * as a mob does and breaks into black smoke only the aware can see.
      */
     @Override
     protected void tickDeath() {
         ServerLevel server = level() instanceof ServerLevel serverLevel && !isRemoved() ? serverLevel : null;
+        if (isHellbound()) {
+            // Neither flashing red nor tipping over: its Gate holds it as the blow left it.
+            deathTime = 0;
+            hurtTime = 0;
+            if (server == null) {
+                return;
+            }
+            setDeltaMovement(Vec3.ZERO);
+            if (++hellboundTicks >= HellGate.HOLD_LIMIT) {
+                deathPuff(server, ParticleTypes.SQUID_INK, 12);
+                remove(RemovalReason.KILLED);
+            }
+            return;
+        }
         if (isPurifying()) {
             // No red flash from the killing blow, so the white of the dissolve shows from the start.
             deathTime = 0;
@@ -765,10 +807,13 @@ public abstract class Hollow extends Monster {
         return !isPractice() && super.shouldDespawnInPeaceful();
     }
 
-    /** A practice Hollow is never written, so it goes with its chunk and none is left after a restart. */
+    /**
+     * A practice Hollow is never written, so it goes with its chunk and none is left after a restart; nor is a hellbound
+     * body, dead and held for a Gate that is never saved either.
+     */
     @Override
     public boolean saveAsPassenger(CompoundTag tag) {
-        return !isPractice() && super.saveAsPassenger(tag);
+        return !isPractice() && !isHellbound() && super.saveAsPassenger(tag);
     }
 
     /** Nor does a practice Hollow take a portal away from its trial. */

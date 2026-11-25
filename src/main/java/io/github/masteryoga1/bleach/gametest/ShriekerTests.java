@@ -407,12 +407,12 @@ public final class ShriekerTests {
     }
 
     /**
-     * Two Shriekers in the air, with their wits and diving, cut down at once: one by a Shinigami's Asauchi hangs where it
-     * was as it dissolves and its soul rises there, and the Shinigami has brought a Shrieker down; one by an iron sword
-     * falls. Neither dives in death.
+     * Two Shriekers in the air, with their wits and diving, cut down at once: one by a Shinigami's Asauchi, a sinner as
+     * every Shrieker is, hangs where it was, held for the Gate of Hell, no soul rising, until the Gate takes it at 90
+     * ticks, and the Shinigami has brought a Shrieker down; one by an iron sword falls. Neither dives in death.
      */
-    @GameTest(template = "field", timeoutTicks = 100)
-    public static void aPurifiedShriekerHangsAsItDissolvesAndASlainOneFalls(GameTestHelper helper) {
+    @GameTest(template = "field", timeoutTicks = 200)
+    public static void aShriekerCutDownByAZanpakutoHangsForTheGateAndASlainOneFalls(GameTestHelper helper) {
         ServerPlayer purifier = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(8.5, 2.0, 2.5));
         purifier.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, AWARE));
         HollowTests.arm(purifier, ModItems.ASAUCHI.get());
@@ -427,7 +427,9 @@ public final class ShriekerTests {
         DamageSources damage = helper.getLevel().damageSources();
         purified.hurt(damage.playerAttack(purifier), 1000.0F);
         slain.hurt(damage.playerAttack(swordsman), 1000.0F);
-        helper.assertTrue(purified.isPurifying() && !slain.isPurifying(), "the Asauchi did not purify, or the sword did");
+        helper.assertTrue(purified.isHellbound() && !purified.isPurifying() && !slain.isHellbound() && !slain.isPurifying(),
+                "the Asauchi did not open the Gate for its Shrieker, or the sword did, or one dissolves");
+        HellGateTests.gateOf(helper, purified);
         helper.assertTrue(SoulLogic.get(purifier).hunt().purified() == 1, "the purifier's count did not grow");
         helper.assertTrue(broughtDown(purifier), "the purifier has not brought a Shrieker down");
         helper.assertTrue(SoulLogic.get(swordsman).hunt().slain() == 1, "the swordsman's count did not grow");
@@ -445,13 +447,13 @@ public final class ShriekerTests {
             }
             helper.assertTrue(purified.getRemovalReason() == Entity.RemovalReason.KILLED && slain.isRemoved(),
                     "a Shrieker is still there: " + purified.getRemovalReason() + ", " + slain.getRemovalReason());
-            helper.assertTrue(drift[0] <= 0.5, "the purified Shrieker moved " + drift[0] + " up or down as it dissolved");
+            helper.assertTrue(drift[0] <= 1.0E-3, "the held Shrieker moved " + drift[0] + " up or down for the Gate");
             helper.assertTrue(from - lowest[0] > 2.0, "the slain Shrieker fell only " + (from - lowest[0]));
             Vec3 where = last[0];
             AABB around = AABB.ofSize(where, 6.0, 6.0, 6.0);
             List<PlusSpirit> echoes = helper.getLevel().getEntitiesOfClass(PlusSpirit.class, around,
                     plus -> plus.isDeparting() && plus.position().distanceTo(where) <= 3.0);
-            helper.assertFalse(echoes.isEmpty(), "no soul rose where the purified Shrieker hung");
+            helper.assertTrue(echoes.isEmpty(), "a soul rose where the Shrieker hung for the Gate");
         });
     }
 
