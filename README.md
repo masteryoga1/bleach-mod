@@ -91,7 +91,7 @@ Admin commands (permission level 2):
 /bleach reset <players>
 /bleach academy
 /bleach gate <hakutomon|kokuryomon|shoryumon|shuwaimon> <lift|drop|status>
-/bleach boss <shrieker> <status|reset|summon [player]>
+/bleach boss <shrieker|grand_fisher> <status|reset|summon [player]>
 /bleach garganta <players> [spider|hexapodus|hound|serpent|fishbone_d|gillian|adjuchas|shrieker|numero|privaron]
 /bleach firsthollow <players> <reset|skip|start>
 /bleach hollow <players> satiety <0..100>
