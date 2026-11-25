@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.SoulEvents;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
@@ -13,6 +14,8 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
@@ -24,8 +27,10 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -34,10 +39,12 @@ import net.minecraft.world.phys.Vec3;
  * Hollows (the pager, a Quincy's aim, another Hollow's hunt) ever takes it for one. Its body keeps it within the
  * config's reach, drawing it back along the stalk, and a stalk pulled far past that tears.
  *
- * <p>A lure whose stalk tears, or whose body is gone or dead, is cut off: she cries out, falls still and silent, and
- * fades away with no death once the config's time passes. Every blow hurts her by her own health. A lure laid with no
- * body yet waits for one; only its body links it ({@link GrandFisher#takeLure}). Its link is its body's entity id,
- * synced so the client knows it too; both are never saved, so the id never outlives the session that gave it.
+ * <p>A blade's blow from a soul who sees her cuts the stalk, not the girl, and a lure whose stalk tears, or whose body
+ * is gone or dead, is cut off as if by a blade: she cries out, the stalk withdraws to the brow, and she lies limp and
+ * silent until the config's time passes, then fades away with no death. Any other blow only hurts her, by her own
+ * health. A lure laid with no body yet waits for one; only its body links it ({@link GrandFisher#takeLure}). Its link is
+ * its body's entity id, synced so the client draws the stalk; both are never saved, so the id never outlives the session
+ * that gave it.
  */
 public class GrandFisherLure extends Mob {
     /** Its body's entity id while it is linked, kept once it is cut off; -1 for none. */
@@ -46,11 +53,17 @@ public class GrandFisherLure extends Mob {
     /** 0 while it hangs on its stalk; once cut off, how long it lies before it fades, in ticks. */
     private static final EntityDataAccessor<Integer> DATA_FADE =
             SynchedEntityData.defineId(GrandFisherLure.class, EntityDataSerializers.INT);
-    /** The game time it was cut off, so either side knows how long it has lain; unread while it hangs on its stalk. */
+    /**
+     * The game time it was cut off, so either side knows how long it has lain, and a client that first sees it late draws
+     * its stalk and its whitening as far along as they are; unread while it hangs on its stalk.
+     */
     private static final EntityDataAccessor<Long> DATA_CUT =
             SynchedEntityData.defineId(GrandFisherLure.class, EntityDataSerializers.LONG);
     /** How far past the reach its stalk stretches before it tears, as a share of the reach. */
     public static final double TEAR = 1.5;
+    /** How long a cut stalk takes to withdraw to the brow, and how long before it fades the lure whitens. */
+    public static final int WITHDRAW_TICKS = 10;
+    public static final int WHITEN_TICKS = 20;
     private static final int DEATH_TICKS = 20;
     private static final float LOOK_RANGE = 8.0F;
 
@@ -120,7 +133,18 @@ public class GrandFisherLure extends Mob {
         return getPosition(partialTick).add(0.0, getBbHeight(), 0.0);
     }
 
-    /** Cuts it off from its stalk: it cries out, falls still and fades after the config's time. */
+    /** How far its cut stalk has withdrawn to the brow, from 0 on the stalk to 1 gone, for the renderer. */
+    public float withdrawn(float partialTick) {
+        return isSevered() ? Mth.clamp((lain() + partialTick) / WITHDRAW_TICKS, 0.0F, 1.0F) : 0.0F;
+    }
+
+    /** How white it has turned as it fades, from 0 to 1 over its last {@link #WHITEN_TICKS}, for the renderer. */
+    public float fadeProgress(float partialTick) {
+        int fade = entityData.get(DATA_FADE);
+        return fade > 0 ? Mth.clamp((lain() + partialTick - (fade - WHITEN_TICKS)) / WHITEN_TICKS, 0.0F, 1.0F) : 0.0F;
+    }
+
+    /** Cuts it off from its stalk: it cries out, goes limp and fades after the config's time. */
     public void sever() {
         sever(BleachConfig.get(BleachConfig.GRAND_FISHER_LURE_FADE_SECONDS) * 20);
     }
@@ -181,6 +205,43 @@ public class GrandFisherLure extends Mob {
         }
     }
 
+    /**
+     * A blow of a blade from a soul who sees her cuts her stalk and does her no harm. It lands as any blow does, even in
+     * the half second after another, or not at all, as the rules that turn blows aside decide; an unaware soul's passes
+     * through her. Any other blow, or any blow once she is cut off, hurts her by its damage.
+     */
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        if (isSevered() || !cuts(source)) {
+            return super.hurt(source, amount);
+        }
+        // The blade cuts the stalk, not the girl, so the blow carries no damage, which a hurt cooldown always refuses: the
+        // cooldown is lifted for it, and put back if the blow is turned aside.
+        int cooldown = invulnerableTime;
+        invulnerableTime = 0;
+        if (!super.hurt(source, 0.0F)) {
+            invulnerableTime = cooldown;
+            return false;
+        }
+        sever();
+        return true;
+    }
+
+    /** Whether this is a blow of a blade in a player's own hand, as Zanjutsu reads one. */
+    private static boolean cuts(DamageSource source) {
+        ItemStack weapon = source.getWeaponItem();
+        return source.is(DamageTypeTags.IS_PLAYER_ATTACK) && source.getEntity() instanceof Player
+                && source.getDirectEntity() == source.getEntity() && weapon != null && SoulEvents.isZanjutsuWeapon(weapon);
+    }
+
+    /** A blade's cut cries out once, as she is cut off, and not as a hurt as well. */
+    @Override
+    protected void playHurtSound(DamageSource source) {
+        if (isSevered() || !cuts(source)) {
+            super.playHurtSound(source);
+        }
+    }
+
     /** Cut off, she lies where she fell. */
     @Override
     protected boolean isImmobile() {
@@ -236,6 +297,14 @@ public class GrandFisherLure extends Mob {
     @Override
     protected SoundEvent getDeathSound() {
         return ModSounds.GRAND_FISHER_LURE_CRY.get();
+    }
+
+    /** Her renderer draws her stalk, so while any of it shows she is drawn while her body is in view. */
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        GrandFisher body = withdrawn(1.0F) < 1.0F ? body() : null;
+        AABB own = super.getBoundingBoxForCulling();
+        return body == null ? own : own.minmax(body.getBoundingBox());
     }
 
     /** A spirit's body: walls and crowds cannot crush it. */

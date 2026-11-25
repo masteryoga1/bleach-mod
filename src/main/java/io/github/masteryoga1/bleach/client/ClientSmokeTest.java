@@ -124,6 +124,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
@@ -1759,11 +1760,10 @@ public final class ClientSmokeTest {
                 command(minecraft, "fill ~-3 ~ ~-12 ~3 ~7 ~-1 air");
                 command(minecraft, "summon bleach:grand_fisher ~ ~ ~-9 " + STILL);
             }
-            // Its body and mask, the girl before it, and its bar at the top of the screen.
+            // Its body and mask, the girl crying before it on her stalk, and its bar at the top of the screen.
             case GRAND_FISHER_AT + 40 -> shot(minecraft, "grand_fisher");
-            // Its body killed, its lure is cut off (see checkGrandFisher); she is killed after.
-            case GRAND_FISHER_AT + 42 -> command(minecraft, "kill @e[type=bleach:grand_fisher]");
-            case GRAND_FISHER_AT + 82 -> command(minecraft, "kill @e[type=bleach:grand_fisher_lure]");
+            // The soul's blade cuts her stalk (see checkGrandFisher), and both are killed once it has withdrawn.
+            case GRAND_FISHER_AT + 42 -> cutLuresOnServer(minecraft);
             case GRAND_FISHER_AT + 115 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
@@ -2568,22 +2568,49 @@ public final class ClientSmokeTest {
 
     /**
      * The checks of Grand Fisher's beat: the body and its lure on her stalk reaching the client unhidden, looked at for
-     * their shot; her seen cut off once her body is killed; then both gone.
+     * their shot; her seen cut off by the soul's blade, her body alive, and her stalk withdrawn, for a second shot; then
+     * both, killed, gone. The last opens a tick after the window whose pass kills them, so it is open when that shows.
      */
     private static void checkGrandFisher(Minecraft minecraft) {
         if (expectWithin(minecraft, GRAND_FISHER_AT + 2, GRAND_FISHER_AT + 35, () -> linkedLure(minecraft) != null,
                 "the summoned Grand Fisher and its lure on her stalk never reached the Arrancar's client unhidden")) {
             GrandFisherLure lure = linkedLure(minecraft);
-            // Between the top of her head and its brow, so the body, its mask and the girl before it are all in the shot.
-            look(minecraft, lure.stalkEnd(1.0F).add(lure.body().brow(1.0F)).scale(0.5));
+            // At her middle: the girl above the chat, and the body, its mask and the stalk from its brow above her.
+            look(minecraft, lure.position().add(0.0, lure.getBbHeight() * 0.5, 0.0));
         }
-        expectWithin(minecraft, GRAND_FISHER_AT + 43, GRAND_FISHER_AT + 80, () -> nearest(minecraft, GrandFisherLure.class,
-                        SUMMONED_RANGE, lure -> lure.isAlive() && lure.isSevered()) != null,
-                "the lure of the Grand Fisher killed by command was never seen cut off on the Arrancar's client");
-        expectWithin(minecraft, GRAND_FISHER_AT + 84, GRAND_FISHER_AT + 110,
-                () -> nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive) == null
+        // Lying limp where she was cut, her stalk drawn back into the brow of her body, which the blade left whole.
+        if (expectWithin(minecraft, GRAND_FISHER_AT + 43, GRAND_FISHER_AT + 80, () -> nearest(minecraft,
+                        GrandFisherLure.class, SUMMONED_RANGE, lure -> lure.isAlive() && lure.isSevered()
+                                && lure.withdrawn(1.0F) == 1.0F && lure.body() != null && lure.body().isAlive()) != null,
+                "the lure the soul's blade struck was never seen cut off, her stalk withdrawn, on the Arrancar's client")) {
+            shot(minecraft, "grand_fisher_cut");
+            command(minecraft, "kill @e[type=bleach:grand_fisher]");
+            command(minecraft, "kill @e[type=bleach:grand_fisher_lure]");
+        }
+        expectWithin(minecraft, GRAND_FISHER_AT + 44, GRAND_FISHER_AT + 110,
+                () -> windowsPassed.contains(GRAND_FISHER_AT + 43)
+                        && nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive) == null
                         && nearest(minecraft, GrandFisherLure.class, SUMMONED_RANGE, GrandFisherLure::isAlive) == null,
-                "Grand Fisher or its lure killed by command still lives");
+                "Grand Fisher or its cut lure killed by command still lives");
+    }
+
+    /**
+     * Has the soul, on the server thread, strike every live lure about it with an iron sword put in its hand: a blow of
+     * a blade from a soul who sees her, which cuts her stalk. A blow by hand would need the lure under the cursor.
+     */
+    private static void cutLuresOnServer(Minecraft minecraft) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server != null) {
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                if (player != null) {
+                    player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_SWORD));
+                    player.level().getEntitiesOfClass(GrandFisherLure.class, player.getBoundingBox().inflate(SUMMONED_RANGE),
+                            GrandFisherLure::isAlive).forEach(player::attack);
+                }
+            });
+        }
     }
 
     /** The live lure about the soul on her stalk, her live body known, both unhidden on its client; null for none. */

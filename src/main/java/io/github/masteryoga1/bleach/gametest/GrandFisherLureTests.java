@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
 import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
@@ -18,18 +19,21 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.world.damagesource.DamageSources;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for Grand Fisher's lure: the one it grows and the one it takes, what reads her as a Hollow (nothing), the stalk
- * that draws her back and tears, and her fading with no death. Bodies stand with no will of their own, so only the
- * lure's own rules move her; each test asks only about its own bodies and lures, by object.
+ * Tests for Grand Fisher's lure: the one it grows and the one it takes, what reads her as a Hollow (nothing), the blade
+ * that cuts her stalk and the blows that only hurt her and never her body, the stalk that draws her back and tears, and
+ * her fading with no death. Bodies stand with no will of their own, so only the lure's own rules move her; each test
+ * asks only about its own bodies and lures, by object.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -40,6 +44,11 @@ public final class GrandFisherLureTests {
     private static final float UNAWARE = 10.0F;
     /** How near its reach the stalk's pull must leave her: a move checked against collisions is not exact. */
     private static final double PULLED = 0.05;
+    /** A blow, and a fist's, neither of which kills a lure of 15. */
+    private static final float BLOW = 6.0F;
+    private static final float FIST = 2.0F;
+    /** A hurt cooldown partway through, which a refused blow must leave as it found it. */
+    private static final int COOLDOWN = 15;
     /** How soon a test's cut lure fades, in place of the config's twenty seconds. */
     private static final int FADE_TICKS = 5;
 
@@ -127,6 +136,65 @@ public final class GrandFisherLureTests {
                     lure.kill();
                     helper.assertTrue(!lure.isRemoved() && body.lure() == null, "the body still holds its slain lure");
                 })
+                .thenSucceed();
+    }
+
+    /**
+     * Blows on a lure: a Getsuga Tenshō across the field strikes her and not her body, which stands off its path, and is
+     * no blade in the hand, so her stalk holds; an unaware soul's blade passes through her; an aware soul's fist hurts
+     * her; an aware soul's blade, swung within the fist's hurt cooldown, cuts her stalk and does her no harm, after which
+     * a fist hurts her again, and the stalk withdraws to the brow. Her body, struck by none of these, still holds her, cut
+     * off.
+     */
+    @GameTest(template = "field", timeoutTicks = 80, batch = "getsuga")
+    public static void aBladeCutsHerStalkAndNoBlowOnHerStrikesHerBody(GameTestHelper helper) {
+        GrandFisher body = helper.spawnWithNoFreeWill(ModEntities.GRAND_FISHER.get(), 8, 2, 2);
+        Player owner = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
+        DamageSources damage = helper.getLevel().damageSources();
+        GetsugaTensho[] crescent = new GetsugaTensho[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, body.lure() != null, "the body grew no lure"))
+                .thenExecute(() -> {
+                    // In the crescent's lane along z 8.5, six blocks from the brow; the body stands off it, at z 2.5.
+                    body.lure().moveTo(helper.absoluteVec(new Vec3(6.5, 2.0, 8.5)));
+                    crescent[0] = ShikaiTests.crescent(helper, owner, BLOW);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(crescent[0].isRemoved(), "the crescent is still flying"))
+                .thenExecute(() -> {
+                    GrandFisherLure lure = body.lure();
+                    float struck = lure.getHealth();
+                    helper.assertTrue(struck < lure.getMaxHealth() && !lure.isSevered(),
+                            "the crescent did not strike the lure, or cut her stalk");
+                    Player unaware = HollowTests.soulPlayer(helper, SoulState.HUMAN, UNAWARE);
+                    HollowTests.arm(unaware, Items.IRON_SWORD);
+                    // A refused cut puts back the hurt cooldown it cleared to try.
+                    lure.invulnerableTime = COOLDOWN;
+                    helper.assertFalse(lure.hurt(damage.playerAttack(unaware), BLOW) || lure.isSevered(),
+                            "an unaware soul's blade struck the lure");
+                    helper.assertTrue(lure.invulnerableTime == COOLDOWN && lure.getHealth() == struck,
+                            "an unaware soul's refused blade left the lure's hurt cooldown at " + lure.invulnerableTime
+                                    + ", or hurt her");
+                    lure.invulnerableTime = 0;
+                    Player fist = HollowTests.soulPlayer(helper, SoulState.HUMAN, AWARE);
+                    helper.assertTrue(lure.hurt(damage.playerAttack(fist), FIST) && !lure.isSevered()
+                            && lure.getHealth() < struck, "an aware soul's fist left the lure whole, or cut her stalk");
+                    // At once, inside the fist's hurt cooldown, which turns aside any blow of no more damage than its own.
+                    float hurt = lure.getHealth();
+                    Player swordsman = HollowTests.soulPlayer(helper, SoulState.HUMAN, AWARE);
+                    HollowTests.arm(swordsman, Items.IRON_SWORD);
+                    helper.assertTrue(lure.hurt(damage.playerAttack(swordsman), BLOW) && lure.isSevered()
+                            && lure.getHealth() == hurt, "an aware soul's blade did not cut the stalk, or harmed her");
+                    lure.invulnerableTime = 0;
+                    helper.assertTrue(lure.hurt(damage.playerAttack(fist), FIST) && lure.getHealth() < hurt,
+                            "a fist did not hurt the lure once she was cut off");
+                    // Off the crescent's lane and struck by no one here, the body could be touched only by a blow passed
+                    // on to it from her, as a part's blow is passed to its body.
+                    helper.assertTrue(body.getHealth() == body.getMaxHealth() && body.getLastDamageSource() == null,
+                            "a blow on the lure struck her body");
+                })
+                .thenIdle(GrandFisherLure.WITHDRAW_TICKS + 1)
+                .thenExecute(() -> helper.assertTrue(body.lure() != null && body.lure().withdrawn(0.0F) == 1.0F,
+                        "the cut lure is gone, or her stalk has not withdrawn"))
                 .thenSucceed();
     }
 

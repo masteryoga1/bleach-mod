@@ -896,12 +896,14 @@ def grand_fisher_mask():
     return c
 
 
-# Grand Fisher's lure: a small girl, on the slim player skin's layout.
+# Grand Fisher's lure: a small girl, on the slim player skin's layout, and the stalk she hangs from.
 LURE_SKIN = rgb(238, 206, 186)
 LURE_HAIR = rgb(58, 40, 34)
 LURE_DRESS = rgb(176, 198, 224)
 LURE_SHOES = rgb(120, 52, 58)
 LURE_TEAR = rgb(150, 196, 236)
+STALK_FLESH = rgb(150, 118, 112)
+STALK_RING = rgb(112, 84, 80)
 
 
 def grand_fisher_lure():
@@ -931,6 +933,16 @@ def grand_fisher_lure():
         for x0, y0, x1, y1 in faces(u, v, 4, 12, 4)[2:]:
             c.rect(x0, y1 - 2, x1, y1, LURE_SHOES)
         c.rect(*faces(u, v, 4, 12, 4)[1], LURE_SHOES)
+    return c
+
+
+def grand_fisher_stalk():
+    """The lure's stalk: dull pink flesh in rings, drawn whole on each face of each segment."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, STALK_FLESH)
+    for y in range(1, 16, 4):
+        c.rect(0, y, 16, y + 1, STALK_RING)
+    mottle(c, 0, 0, 16, 16, STALK_RING, 7)
     return c
 
 
@@ -2306,6 +2318,7 @@ TEXTURES = {
     "entity/hollow/grand_fisher_mask.png": grand_fisher_mask,
     "entity/hollow/grand_fisher_mask_cracked.png": cracked(grand_fisher_mask, [(66, 9), (67, 12), (65, 15), (67, 17)]),
     "entity/grand_fisher_lure.png": grand_fisher_lure,
+    "entity/grand_fisher_stalk.png": grand_fisher_stalk,
     "entity/garganta.png": garganta,
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,
