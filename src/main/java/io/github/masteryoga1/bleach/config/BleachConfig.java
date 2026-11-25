@@ -512,6 +512,7 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.DoubleValue SHRIEKER_HEALTH;
     public static final ModConfigSpec.DoubleValue SHRIEKER_DAMAGE;
+    public static final ModConfigSpec.IntValue SHRIEKER_RETURN_DAYS;
     public static final ModConfigSpec.IntValue SHRIEKER_LEECHES;
     public static final ModConfigSpec.IntValue SHRIEKER_LEECHES_AT_ONCE;
     public static final ModConfigSpec.DoubleValue SHRIEKER_LEECH_DAMAGE;
@@ -2368,6 +2369,10 @@ public final class BleachConfig {
         SHRIEKER_HEAD_DAMAGE = builder
                 .comment("Damage a Shrieker takes when one of its own leeches bursts by its head.")
                 .defineInRange("head_damage", 20.0, 0.0, 1_000.0);
+        SHRIEKER_RETURN_DAYS = builder
+                .comment("Game days, of twenty minutes whether anyone sleeps or not, before a Shrieker may come again"
+                        + " after one dies, killed or purified alike. 0 lets the next come at once.")
+                .defineInRange("return_days", 3, 0, 365);
         builder.pop();
         builder.push("grand_fisher");
         GRAND_FISHER_HEALTH = builder
