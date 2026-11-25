@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
+import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.item.EmptyGintoItem;
 import io.github.masteryoga1.bleach.item.GintoItem;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
@@ -137,7 +138,8 @@ public final class RegistrationTests {
         for (String name : List.of("entity.hollow.ambient", "entity.hollow.hurt", "entity.hollow.death",
                 "entity.hollow.mask_crack", "entity.fishbone_d.roar", "entity.garganta.open", "item.denreishinki.ping",
                 "entity.shrieker.ambient", "entity.shrieker.hurt", "entity.shrieker.death", "entity.shrieker.swoop",
-                "entity.shrieker.flap", "entity.shrieker.loose", "entity.shrieker_leech.cling")) {
+                "entity.shrieker.flap", "entity.shrieker.loose", "entity.shrieker_leech.cling", "entity.shrieker.ring",
+                "entity.shrieker_leech.burst")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");
         }
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("denreishinki")).isPresent(),
@@ -145,6 +147,12 @@ public final class RegistrationTests {
         EntityType<?> leech = ModEntities.SHRIEKER_LEECH.get();
         helper.assertTrue(leech.is(SoulLogic.SPIRITS) && !leech.canSerialize() && !leech.canSummon(),
                 "bleach:shrieker_leech is not a spirit, or is saved or summoned");
+        Optional<Holder.Reference<DamageType>> burst = helper.getLevel().registryAccess()
+                .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(ShriekerLeech.BURST);
+        // Every leech that bursts at once lands, through the hurt cooldown the one before it left.
+        helper.assertTrue(burst.isPresent() && burst.get().is(DamageTypeTags.BYPASSES_COOLDOWN)
+                        && !burst.get().is(DamageTypeTags.IS_EXPLOSION) && !burst.get().is(BleachTags.PURIFIES),
+                "the leech burst's damage type did not load, keeps to the hurt cooldown, or explodes or purifies");
         helper.succeed();
     }
 

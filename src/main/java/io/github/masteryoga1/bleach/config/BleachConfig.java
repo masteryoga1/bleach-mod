@@ -514,6 +514,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SHRIEKER_DAMAGE;
     public static final ModConfigSpec.IntValue SHRIEKER_LEECHES;
     public static final ModConfigSpec.IntValue SHRIEKER_LEECHES_AT_ONCE;
+    public static final ModConfigSpec.DoubleValue SHRIEKER_LEECH_DAMAGE;
+    public static final ModConfigSpec.DoubleValue SHRIEKER_HEAD_DAMAGE;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2354,6 +2356,12 @@ public final class BleachConfig {
         SHRIEKER_LEECHES_AT_ONCE = builder
                 .comment("Leeches a Shrieker looses at once; it looses more only a while after those are spent.")
                 .defineInRange("leeches_at_once", 3, 1, 4);
+        SHRIEKER_LEECH_DAMAGE = builder
+                .comment("Damage of one leech's burst on Normal, before the hollows damage multiplier. Bursts add up.")
+                .defineInRange("leech_damage", 4.0, 0.0, 200.0);
+        SHRIEKER_HEAD_DAMAGE = builder
+                .comment("Damage a Shrieker takes when one of its own leeches bursts by its head.")
+                .defineInRange("head_damage", 20.0, 0.0, 1_000.0);
         builder.pop();
         builder.pop();
 

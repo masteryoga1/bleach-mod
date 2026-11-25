@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.registry.ModSounds;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -39,6 +40,10 @@ import net.minecraft.world.phys.Vec3;
  * prey a few at a time ({@link ShriekerLeech}). Its bar shows to the souls about it who see spirits. It is always a
  * sinner, as it was a killer in life. Its health, the damage of its swoop and its brood are the server's to set. It is
  * never saved, and for now comes only by command.
+ *
+ * <p>Once every leech it loosed clings, none near its head, it hangs still and rings its forked tongue; as the ring ends
+ * each clinging leech bursts. A blow to its mask while it rings breaks the ring off, and one of its own leeches sent back
+ * to burst by its head hurts it badly and cracks its mask.
  */
 public class Shrieker extends Hollow {
     /** How far apart its wingbeats are, in ticks: the model's beat and the sound of it keep this time together. */
@@ -46,10 +51,16 @@ public class Shrieker extends Hollow {
     /** Its flying speed in blocks a tick at a modifier of 1, before what slows it. */
     public static final double FLYING_SPEED = 0.35;
     /**
-     * Its own synced flag: diving at its prey. Bit 16 is each kind's own past Hollow's four (a Menos keeps its Cero's
-     * charge there); 32, 64 and 128 are still free for every Hollow.
+     * Its own synced flags: diving at its prey, and ringing its tongue. Bit 16 is each kind's own past Hollow's four (a
+     * Menos keeps its Cero's charge there); a Shrieker takes 32 too, so 64 and 128 are still free for every Hollow.
      */
     private static final int FLAG_SWOOPING = 16;
+    private static final int FLAG_RINGING = 32;
+    /** How long its ring sounds before its leeches burst (a creeper's fuse, for now), and its wait after a broken one. */
+    public static final int RING_TICKS = 30;
+    public static final int RING_RETRY_TICKS = 40;
+    /** How much further than a burst at its head reaches every clinging leech must be for it to ring. */
+    private static final double RING_MARGIN = 1.0;
     /** How far past its body its wings reach, in blocks, so it is still drawn while only a wing is in view. */
     private static final double WING_REACH = 1.5;
     private static final float FLAP_VOLUME = 0.6F;
@@ -77,6 +88,10 @@ public class Shrieker extends Hollow {
     private final List<ShriekerLeech> leeches = new ArrayList<>();
     private int held = -1;
     private long looseReadyAt;
+    /** When its ring ends, when it may ring again after a broken one, and when a leech last burst by its head. */
+    private long ringUntil;
+    private long ringReadyAt;
+    private long headBurstAt = Long.MIN_VALUE;
 
     /** Its own move control, which reads none of its fields, so it may be made here (see {@link Hollow}). */
     public Shrieker(EntityType<? extends Shrieker> type, Level level) {
@@ -144,7 +159,8 @@ public class Shrieker extends Hollow {
      * Server side, every tick, so it runs with NoAI too: first the air holding it up or letting it fall, before it
      * moves; then the config's strength for one that skipped spawning (a summon with data, a game test), whole if it was
      * whole, though without the difficulty and multipliers spawning adds; its wingbeat while it flies; its spent leeches
-     * let go, the wait for more begun once all are; and its bar, last, so the bar shows the health this tick left.
+     * let go, the wait for more begun once all are; the end of its ring, at which each clinging leech bursts until one by
+     * its head kills it; and its bar, last, so the bar shows the health this tick left.
      */
     @Override
     public void tick() {
@@ -170,8 +186,20 @@ public class Shrieker extends Hollow {
         if (isAlive() && !onGround() && !isSwooping() && (level().getGameTime() + getId() * 3L) % FLAP_TICKS == 0) {
             playSound(ModSounds.SHRIEKER_FLAP.get(), FLAP_VOLUME, 0.9F + random.nextFloat() * 0.2F);
         }
+        long now = level().getGameTime();
         if (!leeches.isEmpty() && leeches.removeIf(leech -> leech.isRemoved()) && leeches.isEmpty()) {
-            looseReadyAt = level().getGameTime() + LOOSE_COOLDOWN_TICKS;
+            looseReadyAt = now + LOOSE_COOLDOWN_TICKS;
+        }
+        if (isRinging() && now >= ringUntil) {
+            setFlag(FLAG_RINGING, false);
+            for (ShriekerLeech leech : List.copyOf(leeches)) {
+                if (!isAlive()) {
+                    break;
+                }
+                if (!leech.isRemoved() && leech.isClinging()) {
+                    leech.burst();
+                }
+            }
         }
         bar.tick();
     }
@@ -196,12 +224,19 @@ public class Shrieker extends Hollow {
         return bar;
     }
 
-    /** A blow to the mask that makes it reel also holds it low while it reels, and ends a swoop. */
+    /**
+     * A blow to the mask that makes it reel also holds it low while it reels, and ends a swoop. Any blow to the mask
+     * breaks off a ring, fresh crack or not, and it waits a while to ring again; its leeches cling on.
+     */
     @Override
     public boolean onMaskStruck(long now) {
         boolean fresh = super.onMaskStruck(now);
         if (lastReelAt == now) {
             stalledUntil = now + REEL_TICKS;
+        }
+        if (isRinging()) {
+            setFlag(FLAG_RINGING, false);
+            ringReadyAt = now + RING_RETRY_TICKS;
         }
         return fresh;
     }
@@ -221,6 +256,11 @@ public class Shrieker extends Hollow {
         setFlag(FLAG_SWOOPING, swooping);
     }
 
+    /** Whether it rings its tongue now, on both sides, for the model. */
+    public boolean isRinging() {
+        return getFlag(FLAG_RINGING);
+    }
+
     /** Its leeches out now, loosed and not yet spent. Server side. */
     public List<ShriekerLeech> leeches() {
         return Collections.unmodifiableList(leeches);
@@ -234,7 +274,7 @@ public class Shrieker extends Hollow {
         return held;
     }
 
-    /** Sets how many leeches it holds back; for the tests, which keep a fight to its claws. */
+    /** Sets how many leeches it holds back; for the tests, which keep a fight to its claws or ring a few. */
     public void setLeechesHeld(int count) {
         held = Math.max(0, count);
     }
@@ -264,6 +304,52 @@ public class Shrieker extends Hollow {
         held -= count;
         playSound(ModSounds.SHRIEKER_LOOSE.get(), 1.0F, 0.9F + random.nextFloat() * 0.2F);
         return leeches.size();
+    }
+
+    /**
+     * Begins to ring, if a broken ring's wait is over and every leech of its own still out clings, none within a margin
+     * of a burst's reach of its head and none with less of its cling left than the ring lasts, so every one is there to
+     * burst. Its fight calls this from its circle; public for the tests and the smoke test.
+     */
+    public boolean startRing() {
+        long now = level().getGameTime();
+        if (level().isClientSide || !isAlive() || isRinging() || now < ringReadyAt) {
+            return false;
+        }
+        Vec3 mask = HollowMask.maskCenter(this);
+        double safe = ShriekerLeech.HEAD_RADIUS + RING_MARGIN;
+        boolean clinging = false;
+        for (ShriekerLeech leech : leeches) {
+            if (leech.isRemoved()) {
+                continue;
+            }
+            if (!leech.isClinging() || leech.clingLeft() < RING_TICKS || leech.distanceToSqr(mask) < safe * safe) {
+                return false;
+            }
+            clinging = true;
+        }
+        if (clinging) {
+            ringUntil = now + RING_TICKS;
+            setFlag(FLAG_RINGING, true);
+            playSound(ModSounds.SHRIEKER_RING.get(), 1.0F, 1.0F);
+        }
+        return clinging;
+    }
+
+    /**
+     * One of its own leeches burst by its head: it is hurt badly, by whoever sent the leech there or bore it, and its mask
+     * cracks as under a blow (which breaks a ring), once a tick at most however many burst there.
+     */
+    void burstAtHead(ShriekerLeech leech, @Nullable LivingEntity cause) {
+        long now = level().getGameTime();
+        if (!(level() instanceof ServerLevel server) || !isAlive() || now == headBurstAt) {
+            return;
+        }
+        headBurstAt = now;
+        if (hurt(CeroBeam.sourceOf(server, cause, leech, ShriekerLeech.KIND),
+                (float) BleachConfig.get(BleachConfig.SHRIEKER_HEAD_DAMAGE)) && isAlive()) {
+            onMaskStruck(now);
+        }
     }
 
     /** Every Shrieker was a sinner in life, whatever its data says. */
@@ -301,7 +387,7 @@ public class Shrieker extends Hollow {
 
     /**
      * Killed or purified by a player's blow: that player has brought a Shrieker down. Its goals stop with its life, so
-     * its fight never ends a dive it died in: the flag goes here, or the model would show it diving in death.
+     * its fight never ends a dive or a ring it died in: the flags go here, or the model would show them in death.
      */
     @Override
     public void die(DamageSource source) {
@@ -310,6 +396,7 @@ public class Shrieker extends Hollow {
         // A cancelled death leaves it alive, and a second call does nothing: only a real first death counts.
         if (!wasDead && dead) {
             setSwooping(false);
+            setFlag(FLAG_RINGING, false);
             if (source.getEntity() instanceof ServerPlayer player) {
                 Milestones.grant(player, Milestones.SHRIEKER);
             }

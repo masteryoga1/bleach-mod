@@ -117,7 +117,7 @@ public final class ShriekerTests {
     }
 
     /** Turns a Hollow, head and body too, to face south (+Z), so its mask is on that side. */
-    private static void faceSouth(Hollow hollow) {
+    static void faceSouth(Hollow hollow) {
         hollow.setYRot(0.0F);
         hollow.setYHeadRot(0.0F);
         hollow.setYBodyRot(0.0F);
@@ -228,7 +228,7 @@ public final class ShriekerTests {
                 "the Shrieker advancement did not load");
         List<DeferredHolder<SoundEvent, SoundEvent>> sounds = List.of(ModSounds.SHRIEKER_AMBIENT, ModSounds.SHRIEKER_HURT,
                 ModSounds.SHRIEKER_DEATH, ModSounds.SHRIEKER_SWOOP, ModSounds.SHRIEKER_FLAP, ModSounds.SHRIEKER_LOOSE,
-                ModSounds.SHRIEKER_LEECH_CLING);
+                ModSounds.SHRIEKER_LEECH_CLING, ModSounds.SHRIEKER_RING, ModSounds.SHRIEKER_LEECH_BURST);
         for (DeferredHolder<SoundEvent, SoundEvent> sound : sounds) {
             helper.assertTrue(sound.isBound(), "the sound " + sound.getId() + " is not registered");
         }

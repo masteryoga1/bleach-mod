@@ -16,8 +16,10 @@ import net.minecraft.world.phys.Vec3;
  * keeps its claws low a while, its mask near the height of the prey's eyes, where a blade swung at it meets the mask
  * before its body; then it climbs back to its circle. A swoop that misses gives up when it comes to the ground, runs
  * into a wall or takes too long. While a blow to its mask holds it, it sinks where it is to that low height, and any
- * swoop it was in is over. From its circle, before any swoop, it looses its leeches at its prey a few at a time
- * ({@link Shrieker#looseLeeches}).
+ * swoop it was in is over. From its circle, before any swoop, it looses its leeches at its prey a few at a time and,
+ * once every one it loosed clings, rings its tongue ({@link Shrieker#looseLeeches}, {@link Shrieker#startRing}); while
+ * it rings it hangs where it is until the ring ends or a blow to its mask breaks it off. Under a roof low enough to keep
+ * its head near the leeches on its prey's back it never rings, and they fall apart in time.
  *
  * <p>With its prey far off or long out of sight it flies to it by a path, round what stands between; near and in sight
  * it steers straight. Held where it is while it steers (by a hill, a tree, a wall), it wishes itself higher, a little
@@ -146,6 +148,11 @@ final class ShriekerFlightGoal extends Goal {
             wish(new Vec3(shrieker.getX(), prey.getY() + CLAWS_LOW_HEIGHT, shrieker.getZ()), HOVER_SPEED);
             return;
         }
+        if (shrieker.isRinging()) {
+            // Ringing its tongue: no path and no wish, so it eases to a hover where it is (ShriekerMoveControl).
+            steerStraight();
+            return;
+        }
         if (swooping) {
             swoop(prey);
         } else {
@@ -179,8 +186,9 @@ final class ShriekerFlightGoal extends Goal {
         if (low || !seen || distance > SWOOP_RANGE) {
             return;
         }
-        // Its next leeches before any swoop, once the last are spent and their wait is over.
-        if (shrieker.looseLeeches() == 0 && phaseTicks >= MIN_HOVER_TICKS && shrieker.attackReady()) {
+        // Its ring once every leech it loosed clings, else its next leeches if their time has come, before any swoop.
+        if (!shrieker.startRing() && shrieker.looseLeeches() == 0 && phaseTicks >= MIN_HOVER_TICKS
+                && shrieker.attackReady()) {
             swooping = true;
             phaseTicks = 0;
             shrieker.setSwooping(true);

@@ -778,6 +778,7 @@ SHRIEKER_BODY = (0, 0, 14, 16, 10)
 SHRIEKER_HEAD = (48, 0, 8, 10, 7)
 SHRIEKER_JAW = (78, 0, 6, 2, 5)
 SHRIEKER_TONGUE_BOX = (100, 0, 2, 1, 8)
+SHRIEKER_FORK = (100, 9, 1, 1, 3)   # the tongue's two tips, one net for both
 SHRIEKER_ARM = (0, 26, 4, 18, 4)
 SHRIEKER_LEG = (16, 26, 4, 9, 4)
 SHRIEKER_SPAR = (60, 26, 22, 2, 2)
@@ -786,7 +787,7 @@ SHRIEKER_MEMBRANE = (0, 48, 22, 0, 16)
 
 def shrieker():
     """Dark fur over a hunched body, long arms and short legs, bone claws, the hole through the chest, wings of dark
-    membrane ribbed with shade on spars of bone, and a red tongue for later."""
+    membrane ribbed with shade on spars of bone, and a red forked tongue."""
     c = Canvas(128, 64)
     for part in (SHRIEKER_BODY, SHRIEKER_HEAD, SHRIEKER_JAW, SHRIEKER_ARM, SHRIEKER_LEG):
         box(c, *part, SHRIEKER_FUR)
@@ -795,6 +796,7 @@ def shrieker():
     box(c, *SHRIEKER_MEMBRANE, SHRIEKER_WING)
     paint_where(c, faces(*SHRIEKER_MEMBRANE), HOLLOW_SHADE, lambda x, y: x % 5 == 0)  # the ribs
     box(c, *SHRIEKER_TONGUE_BOX, SHRIEKER_TONGUE)
+    box(c, *SHRIEKER_FORK, SHRIEKER_TONGUE)
     c.rect(0, 45, 16, 48, BONE_SHADE)   # claws, round the bottom of the arms
     c.rect(15, 14, 19, 18, VOID)        # the hole, through the chest
     return c

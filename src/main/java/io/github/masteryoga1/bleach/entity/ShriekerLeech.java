@@ -1,5 +1,7 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -7,33 +9,49 @@ import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import io.github.masteryoga1.bleach.world.Shakonmaku;
 import javax.annotation.Nullable;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * A Shrieker's leech, loosed at its prey a few at a time from the hole in its chest, the Shrieker hiding how many it still
  * holds (see {@link Shrieker#looseLeeches}). It flies at the creature it was loosed at and clings to its back, set there
- * each tick on both sides and never riding it. It is no creature: one blow from a soul who sees it, or from what such a
- * soul shot or threw, makes it fall apart, in flight or clinging; every other blow is refused, so an unaware soul's arrow
- * glances off it as off any spirit. It falls apart, harmless, when its Shrieker dies or goes, when what it flies at or
+ * each tick on both sides and never riding it, until its Shrieker's ring ends and it bursts, harming what its Shrieker
+ * may strike close by and breaking no block. It is no creature: one blow from a soul who sees it, or from what such a
+ * soul shot or threw, fells it. Clinging, it is pried off and falls apart; in flight it is knocked the way the blow
+ * faced, and if that was near its Shrieker's head it flies there and bursts by it; once knocked it takes no more blows.
+ * Every other blow is refused, so an unaware soul's arrow glances off it as off any spirit, and the mod's arts, which
+ * find only creatures, pass through it. It falls apart, harmless, when its Shrieker dies or goes, when what it flies at or
  * clings to dies, goes, leaves the world or may no longer be struck by its Shrieker, when it flies or clings too long,
  * and at the Shakonmaku. Only those who see spirits see it, hear it or can strike it. Never saved, never summoned.
  */
 public final class ShriekerLeech extends Entity {
+    /** The damage of its burst, which lands however many burst at once (see the type's tags). */
+    public static final ResourceKey<DamageType> BURST =
+            ResourceKey.create(Registries.DAMAGE_TYPE, BleachMod.id("leech_burst"));
+    /** How its burst strikes, for {@link CeroBeam#blastAt}: quiet, as it shows its own burst. */
+    static final CeroBeam.Kind KIND = new CeroBeam.Kind(BURST, true, 1);
+    /** How far from its bearer's back its burst reaches, and how near its Shrieker's mask one must burst to hurt him. */
+    public static final float BURST_RADIUS = 2.5F;
+    public static final double HEAD_RADIUS = 2.0;
     /** Its speed in flight, the share of the gap to that speed it closes each tick, and how near it must come to cling. */
     private static final double FLY_SPEED = 0.4;
     private static final double STEER = 0.25;
@@ -41,6 +59,11 @@ public final class ShriekerLeech extends Entity {
     /** How long it may fly before it falls apart, and cling before it does. */
     public static final int FLIGHT_TICKS = 100;
     public static final int CLING_TICKS = 300;
+    /** Knocked: how fast it flies, for how long, and within what cone (its cosine) and reach of his head it seeks it. */
+    private static final double KNOCKED_SPEED = 0.8;
+    public static final int KNOCKED_TICKS = 20;
+    private static final double SEEK_COS = 0.866;
+    private static final double SEEK_RANGE = 16.0;
     /**
      * Its places on a back, across and up from the middle, one for each leech of its Shrieker there. A fifth would share
      * the last, deliberately: none comes, as a Shrieker looses at most four at once and more only once those are spent.
@@ -61,7 +84,11 @@ public final class ShriekerLeech extends Entity {
     private Shrieker owner;
     @Nullable
     private LivingEntity mark;
-    /** Ticks since it was loosed, or since it began to cling. */
+    /** The soul whose blow knocked it, credited if it bursts by its Shrieker's head, and whether it seeks his head. */
+    @Nullable
+    private Player striker;
+    private boolean seeking;
+    /** Ticks since it was loosed, since it began to cling, or since it was knocked. */
     private int stateTicks;
 
     public ShriekerLeech(EntityType<? extends ShriekerLeech> type, Level level) {
@@ -112,9 +139,20 @@ public final class ShriekerLeech extends Entity {
         }
         entityData.set(DATA_SLOT, (byte) Math.min(Integer.numberOfTrailingZeros(~taken), ACROSS.length - 1));
         entityData.set(DATA_BEARER, creature.getId());
+        mark = creature;
         stateTicks = 0;
         place(creature);
         playSound(ModSounds.SHRIEKER_LEECH_CLING.get(), 0.8F, 0.9F + random.nextFloat() * 0.2F);
+    }
+
+    /** Whether a blow has knocked it away. Server side. */
+    public boolean isKnocked() {
+        return striker != null;
+    }
+
+    /** How long it may still cling. Server side. */
+    int clingLeft() {
+        return CLING_TICKS - stateTicks;
     }
 
     /** Set at its bearer's back each tick on both sides; only the server moves one in flight, or lets it fall apart. */
@@ -136,15 +174,14 @@ public final class ShriekerLeech extends Entity {
         stateTicks++;
         if (isClinging()) {
             cling(shrieker);
+        } else if (striker != null) {
+            knocked(shrieker);
         } else {
             fly(shrieker);
         }
     }
 
-    /**
-     * Steers at its mark's middle against blocks and clings on touching it, while its Shrieker may still strike the mark;
-     * it falls apart crossing the Shakonmaku.
-     */
+    /** Steers at its mark's middle and clings on touching it, while its Shrieker may still strike the mark. */
     private void fly(Shrieker shrieker) {
         LivingEntity target = mark;
         if (target == null || gone(target) || !CeroBeam.mayStrike(shrieker, target) || stateTicks > FLIGHT_TICKS) {
@@ -152,30 +189,59 @@ public final class ShriekerLeech extends Entity {
             return;
         }
         Vec3 wanted = target.getBoundingBox().getCenter().subtract(getBoundingBox().getCenter()).normalize().scale(FLY_SPEED);
-        Vec3 motion = getDeltaMovement().add(wanted.subtract(getDeltaMovement()).scale(STEER));
-        Vec3 from = position();
-        setDeltaMovement(motion);
-        move(MoverType.SELF, motion);
-        if (Shakonmaku.in(level()) && Shakonmaku.bodyCrosses(from, position())) {
-            fallApart();
-            return;
-        }
-        if (motion.horizontalDistanceSqr() > 1.0E-6) {
-            setYRot((float) (Mth.atan2(motion.z, motion.x) * Mth.RAD_TO_DEG) - 90.0F);
-        }
-        if (getBoundingBox().inflate(REACH).intersects(target.getBoundingBox())) {
+        if (!moved(getDeltaMovement().add(wanted.subtract(getDeltaMovement()).scale(STEER)))
+                && getBoundingBox().inflate(REACH).intersects(target.getBoundingBox())) {
             clingTo(target);
         }
     }
 
-    /** Kept at its bearer's back while the bearer lives, stays in its world and may still be struck by its Shrieker. */
+    /**
+     * Kept at its bearer's back while the bearer lives, stays in its world and may still be struck by its Shrieker. The
+     * bearer is the very one it clung to: a player who respawns comes back as another with the same id.
+     */
     private void cling(Shrieker shrieker) {
-        if (!(bearer() instanceof LivingEntity held) || gone(held) || !CeroBeam.mayStrike(shrieker, held)
+        if (!(bearer() instanceof LivingEntity held) || held != mark || gone(held) || !CeroBeam.mayStrike(shrieker, held)
                 || stateTicks > CLING_TICKS) {
             fallApart();
             return;
         }
         place(held);
+    }
+
+    /**
+     * Knocked by a blow: on at its Shrieker's head, aimed afresh each tick, to burst by it, if the blow sent it there;
+     * else on the blow's way until it meets a block or its time is up, and apart.
+     */
+    private void knocked(Shrieker shrieker) {
+        Vec3 head = HollowMask.maskCenter(shrieker);
+        if (seeking) {
+            setDeltaMovement(head.subtract(getBoundingBox().getCenter()).normalize().scale(KNOCKED_SPEED));
+        }
+        if (moved(getDeltaMovement())) {
+            return;
+        }
+        Vec3 centre = getBoundingBox().getCenter();
+        if (seeking && centre.distanceToSqr(head) <= HEAD_RADIUS * HEAD_RADIUS) {
+            shrieker.burstAtHead(this, striker);
+            burstAway(centre);
+        } else if (horizontalCollision || verticalCollision || stateTicks > KNOCKED_TICKS) {
+            fallApart();
+        }
+    }
+
+    /** Moves it this far against blocks, turned its way; true if that took it across the Shakonmaku and it fell apart. */
+    private boolean moved(Vec3 motion) {
+        Vec3 from = position();
+        setDeltaMovement(motion);
+        move(MoverType.SELF, motion);
+        if (Shakonmaku.in(level()) && Shakonmaku.bodyCrosses(from, position())) {
+            fallApart();
+            return true;
+        }
+        if (motion.horizontalDistanceSqr() > 1.0E-6) {
+            setYRot((float) (Mth.atan2(motion.z, motion.x) * Mth.RAD_TO_DEG) - 90.0F);
+        }
+        return false;
     }
 
     /** Whether this creature is dead, gone or in another world: a player who changed worlds is the same object. */
@@ -196,6 +262,42 @@ public final class ShriekerLeech extends Entity {
         setDeltaMovement(Vec3.ZERO);
     }
 
+    /**
+     * Bursts at its bearer's back as its Shrieker's ring ends: what its Shrieker may strike within reach takes the leech's
+     * damage, and he too if it bursts by his head. Measured from within the bearer's body, so a wall at the back shelters
+     * no one. Apart, harmless, if its Shrieker or bearer died or left the world this very tick. Server side.
+     */
+    void burst() {
+        Shrieker shrieker = owner;
+        if (!(level() instanceof ServerLevel server) || shrieker == null || gone(shrieker)
+                || !(bearer() instanceof LivingEntity held) || held != mark || gone(held)) {
+            fallApart();
+            return;
+        }
+        Vec3 centre = getBoundingBox().getCenter();
+        AABB body = held.getBoundingBox();
+        Vec3 at = new Vec3(Mth.clamp(centre.x, body.minX, body.maxX), Mth.clamp(centre.y, body.minY, body.maxY),
+                Mth.clamp(centre.z, body.minZ, body.maxZ));
+        float damage = (float) (BleachConfig.get(BleachConfig.SHRIEKER_LEECH_DAMAGE)
+                * BleachConfig.get(BleachConfig.HOLLOW_DAMAGE_MULTIPLIER));
+        CeroBeam.blastAt(server, shrieker, this, at, BURST_RADIUS, damage, KIND);
+        if (at.distanceToSqr(HollowMask.maskCenter(shrieker)) <= HEAD_RADIUS * HEAD_RADIUS) {
+            shrieker.burstAtHead(this, held);
+        }
+        burstAway(at);
+    }
+
+    /** Gone in a burst here, its flash and bang for those who see spirits. */
+    private void burstAway(Vec3 at) {
+        if (level() instanceof ServerLevel server) {
+            SpiritSenses.particles(server, ParticleTypes.EXPLOSION, at.x, at.y, at.z, 1, 0.0, 0.0, 0.0, 0.0);
+            SpiritSenses.particles(server, ParticleTypes.SQUID_INK, at.x, at.y, at.z, 6, 0.2, 0.2, 0.2, 0.05);
+            SpiritSenses.play(server, at.x, at.y, at.z, ModSounds.SHRIEKER_LEECH_BURST.get(), SoundSource.HOSTILE, 1.0F,
+                    0.9F + random.nextFloat() * 0.2F, false);
+        }
+        discard();
+    }
+
     /** Gone, harmless, in a puff only the aware see. */
     private void fallApart() {
         if (level() instanceof ServerLevel server) {
@@ -205,14 +307,29 @@ public final class ShriekerLeech extends Entity {
         discard();
     }
 
-    /** One blow from a soul who sees it, or from what such a soul shot or threw, makes it fall apart; others are refused. */
+    /**
+     * One blow from a soul who sees it, or from what such a soul shot or threw: clinging, it is pried off and falls apart;
+     * in flight, it is knocked the way the shot flew or the striker looked, and seeks its Shrieker's head if that way
+     * was within a cone of it. Once knocked, and to every other blow, it is refused.
+     */
     @Override
     public boolean hurt(DamageSource source, float amount) {
-        if (level().isClientSide || isRemoved() || amount <= 0.0F || !(source.getEntity() instanceof Player player)
-                || !SoulLogic.seesSpirits(player)) {
+        if (level().isClientSide || isRemoved() || amount <= 0.0F || striker != null
+                || !(source.getEntity() instanceof Player player) || !SoulLogic.seesSpirits(player)) {
             return false;
         }
-        fallApart();
+        Shrieker shrieker = owner;
+        if (isClinging() || shrieker == null) {
+            fallApart();
+            return true;
+        }
+        Vec3 facing = source.getDirectEntity() instanceof Projectile shot ? shot.getDeltaMovement() : player.getLookAngle();
+        Vec3 way = facing.lengthSqr() < 1.0E-6 ? Vec3.directionFromRotation(0.0F, player.getYRot()) : facing.normalize();
+        Vec3 toHead = HollowMask.maskCenter(shrieker).subtract(getBoundingBox().getCenter());
+        striker = player;
+        seeking = toHead.length() <= SEEK_RANGE && way.dot(toHead.normalize()) >= SEEK_COS;
+        stateTicks = 0;
+        setDeltaMovement(way.scale(KNOCKED_SPEED));
         return true;
     }
 

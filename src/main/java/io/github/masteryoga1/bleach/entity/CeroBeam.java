@@ -631,6 +631,19 @@ public class CeroBeam extends Entity {
     }
 
     /**
+     * A blast at {@code at} that no beam brought: what the shooter may strike within {@code radius} of it, in the open
+     * from there and sheltered by no Dankū (which weighs it as a Cero, or as its kind's art), takes all of {@code damage}
+     * of the kind's type from {@code direct}, however far off it stands. It breaks no block and adds no push of its own,
+     * though each blow knocks back as any does, and it is neither seen nor heard: the caller shows its own. A Shrieker's
+     * leech bursts so ({@link ShriekerLeech}).
+     */
+    public static void blastAt(ServerLevel level, LivingEntity shooter, @Nullable Entity direct, Vec3 at, float radius,
+                               float damage, Kind kind) {
+        Spec spec = new Spec(damage, 1.0, 0.05F, radius, 1.0F, 0, 0.0F, 0, 1, 0, false);
+        blast(level, shooter, sourceOf(level, shooter, direct, kind), at, Vec3.ZERO, spec, List.of(), kind);
+    }
+
+    /**
      * A picture of a shot that strikes nothing: a fired beam from {@code shot.from()} to {@code shot.to()},
      * this wide and this colour, seen for {@code life} ticks (1 to {@link #MAX_DISPLAY_LIFE}), all of them
      * fading, and drawn from the owner's eyes as the owner's own (so it starts a little way out for it in
