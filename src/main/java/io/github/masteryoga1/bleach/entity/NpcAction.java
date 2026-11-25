@@ -38,7 +38,12 @@ public enum NpcAction {
     FIELD_TRIAL(DialogueView.STUDENT_TRIAL),
     /** Kisuke Urahara's wares on the merchant screen, in the views of the souls he may sell something to. */
     TRADE(DialogueView.SHOP_AWARE, DialogueView.SHOP_PLUS, DialogueView.SHOP_SOUL, DialogueView.SHOP_STUDENT,
-            DialogueView.SHOP_SHINIGAMI, DialogueView.SHOP_QUINCY, DialogueView.SHOP_VISORED);
+            DialogueView.SHOP_SHINIGAMI, DialogueView.SHOP_QUINCY, DialogueView.SHOP_VISORED),
+    /**
+     * Kisuke Urahara's Senkaimon in the room under his shop, for a soul whose home it leads to or that has a gate of its
+     * own back: a Rukongai soul, a student, a Shinigami or Substitute, a Visored.
+     */
+    SENKAIMON(DialogueView.SHOP_SOUL, DialogueView.SHOP_STUDENT, DialogueView.SHOP_SHINIGAMI, DialogueView.SHOP_VISORED);
 
     private static final IntFunction<NpcAction> BY_ID =
             ByIdMap.continuous(NpcAction::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);

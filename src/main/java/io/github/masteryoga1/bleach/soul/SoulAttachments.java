@@ -72,6 +72,14 @@ public final class SoulAttachments {
             () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
                     .serialize(Codec.LONG, day -> day != ShinigamiProgress.NEVER).copyOnDeath().build());
 
+    /**
+     * The day (the mod's, {@link KidoLogic#lessonDay}) Kisuke Urahara last opened this soul his Senkaimon, which he opens
+     * each soul once a day. Saved once set; kept through death, so dying opens no more; never sent.
+     */
+    public static final Supplier<AttachmentType<Long>> SHOP_SENKAIMON_DAY = ATTACHMENT_TYPES.register(
+            "shop_senkaimon_day", () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
+                    .serialize(Codec.LONG, day -> day != ShinigamiProgress.NEVER).copyOnDeath().build());
+
     /** Client side only: how another player's soul looks, as last sent by the server. Never saved. */
     public static final Supplier<AttachmentType<SoulAppearance>> APPEARANCE = ATTACHMENT_TYPES.register("appearance",
             () -> AttachmentType.builder(() -> SoulAppearance.NONE).build());

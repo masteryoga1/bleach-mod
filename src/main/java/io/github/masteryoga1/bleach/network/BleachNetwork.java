@@ -39,8 +39,9 @@ public final class BleachNetwork {
      * 24: the instructor's STUDENT_TRIAL view and {@code NpcAction.FIELD_TRIAL}, the Academy's field trial.
      * 25: Kisuke Urahara's SHOP_* views.
      * 26: {@code NpcAction.TRADE}, Kisuke Urahara's wares.
+     * 27: {@code NpcAction.SENKAIMON}, Kisuke Urahara's Senkaimon.
      */
-    private static final String VERSION = "26";
+    private static final String VERSION = "27";
 
     private BleachNetwork() {
     }
