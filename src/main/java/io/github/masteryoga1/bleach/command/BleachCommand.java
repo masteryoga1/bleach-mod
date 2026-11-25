@@ -183,9 +183,9 @@ public final class BleachCommand {
     private static final SuggestionProvider<CommandSourceStack> STATES = suggest(SoulState.values());
     private static final SuggestionProvider<CommandSourceStack> STATS = suggest(Stat.values());
     private static final SuggestionProvider<CommandSourceStack> PATHS = suggest(PowerPath.values());
-    /** What a Garganta can bring: the Hollow kinds, and the Arrancar. */
+    /** What a Garganta can bring: the Hollow kinds that come by tear, and the Arrancar. */
     private static final SuggestionProvider<CommandSourceStack> GARGANTA_KINDS = (context, builder) ->
-            SharedSuggestionProvider.suggest(Stream.concat(Arrays.stream(HollowKind.values())
+            SharedSuggestionProvider.suggest(Stream.concat(Arrays.stream(HollowKind.values()).filter(HollowKind::comesByTear)
                     .map(HollowKind::getSerializedName), Stream.of(NUMERO, PRIVARON)), builder);
     private static final SuggestionProvider<CommandSourceStack> TYPES = suggest(ZanpakutoType.values());
     private static final SuggestionProvider<CommandSourceStack> BLOODLINES = suggest(Bloodline.values());
@@ -624,7 +624,8 @@ public final class BleachCommand {
         HollowKind kind = null;
         if (name != null) {
             kind = byName(HollowKind.values(), name);
-            if (kind == null) {
+            // Grand Fisher comes by no tear: it is no kind a Garganta knows.
+            if (kind == null || !kind.comesByTear()) {
                 context.getSource().sendFailure(Component.translatable("commands.bleach.unknown_hollow", name));
                 return 0;
             }

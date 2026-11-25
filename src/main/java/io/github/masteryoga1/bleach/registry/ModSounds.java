@@ -109,6 +109,10 @@ public final class ModSounds {
     /** A Shrieker's tongue ringing, heard well beyond the fight, and a leech bursting as the ring ends. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_RING = fixed("entity.shrieker.ring", 32.0F);
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_LEECH_BURST = variable("entity.shrieker_leech.burst");
+    /** Grand Fisher's low laugh. It hides its reiatsu, so its cries carry no further than a mob's. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_AMBIENT = variable("entity.grand_fisher.ambient");
+    public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_HURT = variable("entity.grand_fisher.hurt");
+    public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_DEATH = variable("entity.grand_fisher.death");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */

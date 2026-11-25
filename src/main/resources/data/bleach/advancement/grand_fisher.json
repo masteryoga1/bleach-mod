@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:shrieker",
+  "display": {
+    "icon": {
+      "id": "minecraft:fishing_rod"
+    },
+    "title": {
+      "translate": "advancements.bleach.grand_fisher.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.grand_fisher.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "grand_fisher": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "grand_fisher"
+      }
+    }
+  }
+}

@@ -840,6 +840,62 @@ def shrieker_leech():
     return c
 
 
+# Grand Fisher's boxes (GrandFisherModel), as (u, v, w, h, d). One net serves both arms with their claws, and one
+# both legs with theirs, the left ones mirrored.
+GRAND_FISHER_FUR = rgb(96, 84, 72)
+GRAND_FISHER_FUR_SHADE = rgb(70, 60, 52)
+GRAND_FISHER_CLAW = rgb(176, 32, 40)
+GRAND_FISHER_SKIN = rgb(158, 124, 118)
+GRAND_FISHER_BODY = (0, 0, 14, 15, 11)
+GRAND_FISHER_HEAD = (52, 0, 12, 10, 9)
+GRAND_FISHER_EAR = (96, 0, 3, 3, 1)
+GRAND_FISHER_STALK_ROOT = (96, 6, 2, 3, 2)
+GRAND_FISHER_ARM = (0, 28, 5, 15, 5)
+GRAND_FISHER_HAND = (22, 28, 5, 4, 2)
+GRAND_FISHER_FOOT = (22, 36, 6, 2, 2)
+GRAND_FISHER_LEG = (40, 28, 6, 8, 6)
+GRAND_FISHER_TAIL = (66, 28, 2, 2, 16)
+
+
+def grand_fisher():
+    """Shaggy grey-brown fur over a hunched body, long arms and thick legs, red bird-like claws on the hands and feet,
+    bare pink skin inside the ears, on the stalk's root and down the long tail, and the hole through the chest."""
+    c = Canvas(128, 64)
+    for part in (GRAND_FISHER_BODY, GRAND_FISHER_HEAD, GRAND_FISHER_ARM, GRAND_FISHER_LEG):
+        box(c, *part, GRAND_FISHER_FUR)
+    mottle(c, 0, 0, 94, 48, GRAND_FISHER_FUR_SHADE, 4)
+    box(c, *GRAND_FISHER_EAR, GRAND_FISHER_FUR)
+    c.rect(*faces(*GRAND_FISHER_EAR)[3], GRAND_FISHER_SKIN)   # the inside of the ear, at its front
+    box(c, *GRAND_FISHER_STALK_ROOT, GRAND_FISHER_SKIN)
+    box(c, *GRAND_FISHER_TAIL, GRAND_FISHER_SKIN)
+    paint_where(c, faces(*GRAND_FISHER_TAIL), GRAND_FISHER_FUR_SHADE, lambda x, y: (x + y) % 4 == 0)  # its rings
+    box(c, *GRAND_FISHER_HAND, GRAND_FISHER_CLAW)
+    box(c, *GRAND_FISHER_FOOT, GRAND_FISHER_CLAW)
+    x0, y0, x1, y1 = faces(*GRAND_FISHER_BODY)[3]   # the front of the chest: the hole, high in its middle
+    c.rect(x0 + 5, y0 + 3, x1 - 5, y0 + 7, VOID)
+    return c
+
+
+def grand_fisher_mask():
+    """A broad bone face over the front of the head: two great round eyes, a short ridge between them, and a wide mouth
+    of long teeth along its foot; the front of the crown is bone too, so the mask shows from above."""
+    c = Canvas(128, 64)
+    x0, y0, x1, y1 = faces(*GRAND_FISHER_HEAD)[3]   # the front: (61, 9) to (73, 19)
+    c.rect(x0, y0, x1, y1, BONE)
+    for left in (x0 + 1, x1 - 5):                   # the eyes, rounded by their corners left as bone
+        c.rect(left, y0 + 1, left + 4, y0 + 5, VOID)
+        for x, y in ((left, y0 + 1), (left + 3, y0 + 1), (left, y0 + 4), (left + 3, y0 + 4)):
+            c.put(x, y, BONE)
+    c.rect(x0 + 5, y0 + 1, x1 - 5, y0 + 6, BONE_SHADE)   # the ridge between them
+    c.rect(x0 + 1, y1 - 4, x1 - 1, y1 - 1, VOID)         # the mouth, and its long teeth from above and below
+    for x in range(x0 + 1, x1 - 1, 2):
+        c.rect(x, y1 - 4, x + 1, y1 - 2, BONE)
+        c.put(x + 1, y1 - 2, BONE)
+    tx0, ty0, tx1, ty1 = faces(*GRAND_FISHER_HEAD)[0]   # the top: its front rows, nearest v + d
+    c.rect(tx0, ty1 - 3, tx1, ty1, BONE)
+    return c
+
+
 def garganta():
     """A tear in the air: black, ragged at the edges and narrow at both ends."""
     c = Canvas(32, 64)
@@ -2208,6 +2264,9 @@ TEXTURES = {
     "entity/hollow/shrieker_mask.png": shrieker_mask,
     "entity/hollow/shrieker_mask_cracked.png": cracked(shrieker_mask, [(57, 7), (58, 10), (57, 13), (59, 15)]),
     "entity/hollow/shrieker_leech.png": shrieker_leech,
+    "entity/hollow/grand_fisher.png": grand_fisher,
+    "entity/hollow/grand_fisher_mask.png": grand_fisher_mask,
+    "entity/hollow/grand_fisher_mask_cracked.png": cracked(grand_fisher_mask, [(66, 9), (67, 12), (65, 15), (67, 17)]),
     "entity/garganta.png": garganta,
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,

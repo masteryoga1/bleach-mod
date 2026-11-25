@@ -13,6 +13,7 @@ import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.GintoCast;
+import io.github.masteryoga1.bleach.entity.GrandFisher;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
@@ -321,6 +322,8 @@ public final class ClientSmokeTest {
     private static final double TEAR_FROM_Z = HUECO_MUNDO_Z - RIFT_AHEAD;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
+    /** The first tick of Grand Fisher's beat; its steps and checks count from here, and the run ends after them. */
+    private static final int GRAND_FISHER_AT = 9180;
     /**
      * A still, bare-chested Privaron Espada facing the player: seat 103, so the 3 of its old seat on its chest (this
      * UUID's spot is CHEST_LEFT), its hole at the sternum, a Halcón blade and the second mask remnant.
@@ -608,6 +611,7 @@ public final class ClientSmokeTest {
         checkHuecoMundoBlocks(minecraft);
         checkHuecoMundo(minecraft, player);
         checkBosses(minecraft);
+        checkGrandFisher(minecraft);
         if (finished) {
             return;
         }
@@ -1747,7 +1751,16 @@ public final class ClientSmokeTest {
             case 9022 -> command(minecraft, "kill @e[type=bleach:shrieker]");
             // A second, standing still in the air nearer the soul, for its leeches and its ring (see checkBosses).
             case 9065 -> command(minecraft, "summon bleach:shrieker ~ ~3 ~-6 " + STILL);
-            case 9175 -> {
+            // Grand Fisher, standing still on the ground before the soul, facing it, in air cleared as for the Shrieker.
+            case GRAND_FISHER_AT -> {
+                command(minecraft, "tp @s ~ ~ ~ 180 -12");
+                command(minecraft, "fill ~-3 ~ ~-12 ~3 ~7 ~-1 air");
+                command(minecraft, "summon bleach:grand_fisher ~ ~ ~-9 " + STILL);
+            }
+            // Its body and mask, and its bar at the top of the screen.
+            case GRAND_FISHER_AT + 40 -> shot(minecraft, "grand_fisher");
+            case GRAND_FISHER_AT + 42 -> command(minecraft, "kill @e[type=bleach:grand_fisher]");
+            case GRAND_FISHER_AT + 85 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2547,6 +2560,21 @@ public final class ClientSmokeTest {
                         && nearest(minecraft, Shrieker.class, SUMMONED_RANGE, Shrieker::isAlive) == null
                         && nearest(minecraft, ShriekerLeech.class, SUMMONED_RANGE, Entity::isAlive) == null,
                 "the second Shrieker killed by command still lives, or its leeches are still about");
+    }
+
+    /** The checks of Grand Fisher's beat: the body reaching the client unhidden, looked at for its shot, then gone. */
+    private static void checkGrandFisher(Minecraft minecraft) {
+        if (expectWithin(minecraft, GRAND_FISHER_AT + 2, GRAND_FISHER_AT + 35, () -> nearest(minecraft, GrandFisher.class,
+                        SUMMONED_RANGE, fisher -> fisher.isAlive() && !ClientSouls.isHiddenFromViewer(fisher)) != null,
+                "the summoned Grand Fisher never reached the Arrancar's client unhidden")) {
+            GrandFisher fisher = nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive);
+            if (fisher != null) {
+                look(minecraft, fisher.position().add(0.0, fisher.getBbHeight() * 0.5, 0.0));
+            }
+        }
+        expectWithin(minecraft, GRAND_FISHER_AT + 44, GRAND_FISHER_AT + 80,
+                () -> nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive) == null,
+                "Grand Fisher killed by command still lives");
     }
 
     /**

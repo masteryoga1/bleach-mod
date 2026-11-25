@@ -21,6 +21,7 @@ public final class BleachModelLayers {
     public static final ModelLayerLocation ADJUCHAS = layer("adjuchas");
     public static final ModelLayerLocation SHRIEKER = layer("shrieker");
     public static final ModelLayerLocation SHRIEKER_LEECH = layer("shrieker_leech");
+    public static final ModelLayerLocation GRAND_FISHER = layer("grand_fisher");
     public static final ModelLayerLocation SANREI_GLOVE = layer("sanrei_glove");
     public static final ModelLayerLocation VOLLSTANDIG = layer("vollstandig");
     /** Blut Vene's veins over armour: the outer armour layer, a little larger, on the skin's layout. */
@@ -45,6 +46,7 @@ public final class BleachModelLayers {
         event.registerLayerDefinition(ADJUCHAS, AdjuchasModel::createBodyLayer);
         event.registerLayerDefinition(SHRIEKER, ShriekerModel::createBodyLayer);
         event.registerLayerDefinition(SHRIEKER_LEECH, ShriekerLeechModel::createLayer);
+        event.registerLayerDefinition(GRAND_FISHER, GrandFisherModel::createBodyLayer);
         event.registerLayerDefinition(SANREI_GLOVE, SanreiGloveModel::createLayer);
         event.registerLayerDefinition(VOLLSTANDIG, VollstandigModel::createLayer);
         event.registerLayerDefinition(VEIN_SHELL,
