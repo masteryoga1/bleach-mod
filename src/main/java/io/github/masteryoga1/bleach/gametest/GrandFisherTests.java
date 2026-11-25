@@ -4,11 +4,14 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.BossBar;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
+import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModSounds;
+import io.github.masteryoga1.bleach.soul.BossLedger;
 import io.github.masteryoga1.bleach.soul.GargantaEvents;
+import io.github.masteryoga1.bleach.soul.GrandFisherComing;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -16,9 +19,12 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.BossEvent;
@@ -46,6 +52,13 @@ public final class GrandFisherTests {
     /** A blow that leaves it standing, and one that ends it. */
     private static final float BLOW = 20.0F;
     private static final float FATAL = 1000.0F;
+    /**
+     * Where a summoned Grand Fisher may land from its player, its centre to theirs: 4 to 8 blocks, give or take the most a
+     * spot's move to its block's centre adds. And how squarely it faces them.
+     */
+    private static final double SUMMON_NEAREST = 3.25;
+    private static final double SUMMON_FURTHEST = 8.75;
+    private static final double FACING = 0.99;
     /** The tag that names this test's Shinigami in a command. */
     private static final String TAG = "bleach_grand_fisher_test";
 
@@ -107,7 +120,8 @@ public final class GrandFisherTests {
     /**
      * A still Grand Fisher: no tear brings one to the Shinigami, not even by command; its red bar shows to the Shinigami
      * by it, full; it falls with a blow on the next tick; the Shinigami's Asauchi purifies it, which brings Grand Fisher
-     * down, and the bar comes down from everyone.
+     * down and marks the server's row away {@code return_days}, beaten by the Shinigami (the row reset before and after,
+     * in that one call); and the bar comes down from everyone.
      */
     @GameTest(template = "field", timeoutTicks = 100)
     public static void grandFishersBarFallsAndItsPurifierBringsItDown(GameTestHelper helper) {
@@ -142,16 +156,80 @@ public final class GrandFisherTests {
                     helper.assertTrue(progress < 1.0F && Math.abs(progress - BossBar.progress(fisher)) < EPSILON,
                             "the bar is at " + progress + " for " + fisher.getHealth() + " of " + fisher.getMaxHealth());
                     fisher.invulnerableTime = 0;
-                    fisher.hurt(helper.getLevel().damageSources().playerAttack(purifier), FATAL);
-                    helper.assertTrue(fisher.isPurifying(), "the Asauchi did not purify Grand Fisher");
-                    helper.assertTrue(SoulLogic.get(purifier).hunt().purified() == 1, "the purifier's count did not grow");
-                    helper.assertTrue(DangaiTests.earned(purifier, "grand_fisher"),
-                            "the purifier has not brought Grand Fisher down");
+                    MinecraftServer server = helper.getLevel().getServer();
+                    BossLedger ledger = BossLedger.get(server);
+                    long now = BossLedger.now(server);
+                    try {
+                        // Another test's Grand Fisher may have died on an earlier tick, marking the row.
+                        ledger.reset(GrandFisherComing.ID);
+                        fisher.hurt(helper.getLevel().damageSources().playerAttack(purifier), FATAL);
+                        helper.assertTrue(fisher.isPurifying(), "the Asauchi did not purify Grand Fisher");
+                        helper.assertTrue(SoulLogic.get(purifier).hunt().purified() == 1,
+                                "the purifier's count did not grow");
+                        helper.assertTrue(DangaiTests.earned(purifier, "grand_fisher"),
+                                "the purifier has not brought Grand Fisher down");
+                        long days = BleachConfig.get(BleachConfig.GRAND_FISHER_RETURN_DAYS) * BossLedger.TICKS_PER_DAY;
+                        List<UUID> beaten = List.copyOf(ledger.beatenBy(GrandFisherComing.ID));
+                        helper.assertTrue(ledger.waitLeft(GrandFisherComing.ID, now) == days
+                                        && beaten.equals(List.of(purifier.getUUID())),
+                                "purified, Grand Fisher's row waits " + ledger.waitLeft(GrandFisherComing.ID, now)
+                                        + " ticks, beaten by " + beaten);
+                    } finally {
+                        ledger.reset(GrandFisherComing.ID);
+                    }
                 })
                 .thenIdle(1)
                 .thenExecute(() -> {
                     helper.assertTrue(bar.players().isEmpty(), "a dead Grand Fisher's bar is still up");
                     fisher.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Grand Fisher in the ledger: listed, and only its body is its. With no player a summon brings nothing; for a
+     * Shinigami it lands on open ground a few blocks off, facing them, as one more about, so a second summon is refused.
+     * On its first tick it grows its lure, who adds none while her body lives; her body gone, she still holds it about,
+     * and with her gone it is about no more. Counted within one call each, so no other test's Grand Fisher comes between.
+     * Under the open sky, as a summon seeks open ground.
+     */
+    @GameTest(template = "field", skyAccess = true, timeoutTicks = 60)
+    public static void aSummonedGrandFisherIsAboutUntilItsLureGoes(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        MinecraftServer server = level.getServer();
+        GrandFisherComing boss = GrandFisherComing.BOSS;
+        helper.assertTrue(BossLedger.boss(GrandFisherComing.ID) == boss, "the ledger does not list Grand Fisher");
+        ServerPlayer near = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(8.5, 2.0, 8.5));
+        near.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, AWARE));
+        List<? extends GrandFisher> already = level.getEntities(ModEntities.GRAND_FISHER.get(), GrandFisher::isAlive);
+        helper.assertTrue(boss.summon(server, null) != null && level.getEntities(ModEntities.GRAND_FISHER.get(),
+                GrandFisher::isAlive).size() == already.size(), "a summon for no player brought Grand Fisher");
+        int before = boss.present(server);
+        Component failed = boss.summon(server, near);
+        helper.assertTrue(failed == null, "the summon failed: " + (failed == null ? "" : failed.getString()));
+        List<? extends GrandFisher> came = level.getEntities(ModEntities.GRAND_FISHER.get(),
+                fisher -> fisher.isAlive() && !already.contains(fisher));
+        helper.assertTrue(came.size() == 1 && boss.present(server) == before + 1 && boss.summonRefusal(server) != null,
+                came.size() + " Grand Fishers came, " + boss.present(server) + " about after " + before
+                        + ", or a second summon is not refused");
+        GrandFisher fisher = came.get(0);
+        Vec3 toward = near.position().subtract(fisher.position()).multiply(1.0, 0.0, 1.0);
+        double off = toward.length();
+        helper.assertTrue(off >= SUMMON_NEAREST && off <= SUMMON_FURTHEST
+                        && Vec3.directionFromRotation(0.0F, fisher.getYRot()).dot(toward.normalize()) > FACING,
+                "the summoned Grand Fisher landed " + off + " blocks off, or does not face the Shinigami");
+        helper.assertTrue(boss.isBody(fisher), "the summoned body is not the boss's");
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, fisher.lure() != null,
+                        "the summoned Grand Fisher grew no lure"))
+                .thenExecute(() -> {
+                    GrandFisherLure lure = fisher.lure();
+                    helper.assertFalse(boss.isBody(lure), "its lure's death would be the boss's");
+                    int with = boss.present(server);
+                    fisher.discard();
+                    helper.assertTrue(boss.present(server) == with, "a lure left alone does not hold Grand Fisher about");
+                    lure.discard();
+                    helper.assertTrue(boss.present(server) == with - 1, "with its lure gone Grand Fisher is still about");
                 })
                 .thenSucceed();
     }

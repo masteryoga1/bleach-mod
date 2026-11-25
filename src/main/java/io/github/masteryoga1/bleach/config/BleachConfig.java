@@ -520,6 +520,7 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_HEALTH;
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_DAMAGE;
+    public static final ModConfigSpec.IntValue GRAND_FISHER_RETURN_DAYS;
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_LURE_REACH;
     public static final ModConfigSpec.IntValue GRAND_FISHER_LURE_FADE_SECONDS;
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_LURE_HEALTH;
@@ -2381,6 +2382,10 @@ public final class BleachConfig {
         GRAND_FISHER_DAMAGE = builder
                 .comment("Damage of Grand Fisher's blow on Normal, before the hollows damage multiplier.")
                 .defineInRange("damage", 8.0, 0.0, 200.0);
+        GRAND_FISHER_RETURN_DAYS = builder
+                .comment("Game days, of twenty minutes whether anyone sleeps or not, before Grand Fisher may come again"
+                        + " after it dies, killed or purified alike. 0 lets it come again at once.")
+                .defineInRange("return_days", 7, 0, 365);
         GRAND_FISHER_LURE_REACH = builder
                 .comment("How far Grand Fisher's lure may stray from its brow, in blocks, before its stalk draws it back."
                         + " Pulled half as far again, the stalk tears. At least 6: her head stands 3 below the brow.")
@@ -2389,7 +2394,8 @@ public final class BleachConfig {
                 .comment("Seconds a lure cut off from its stalk lies before it fades away.")
                 .defineInRange("lure_fade_seconds", 20, 1, 600);
         GRAND_FISHER_LURE_HEALTH = builder
-                .comment("The health of Grand Fisher's lure.")
+                .comment("The health of Grand Fisher's lure. A blade's blow cuts her from her stalk and does her no harm;"
+                        + " every other blow hurts her, as a blade does once she is cut off.")
                 .defineInRange("lure_health", 15.0, 1.0, 1_000.0);
         builder.pop();
         builder.pop();

@@ -75,7 +75,7 @@ public final class ShikaiTests {
      * A crescent of the lowest charge with no blade, swung along +X from relative (0.5, 2.5, 8.5), so it
      * flies from (1.5, 2.5, 8.5).
      */
-    private static GetsugaTensho crescent(GameTestHelper helper, Player owner, float damage) {
+    static GetsugaTensho crescent(GameTestHelper helper, Player owner, float damage) {
         Vec3 root = helper.absoluteVec(new Vec3(0.5, 2.5, 8.5));
         Vec3 along = helper.absoluteVec(new Vec3(1.5, 2.5, 8.5)).subtract(root);
         return GetsugaTensho.launch(helper.getLevel(), owner, root, along, 0.0F, damage, CRESCENT_LIFE, ItemStack.EMPTY,

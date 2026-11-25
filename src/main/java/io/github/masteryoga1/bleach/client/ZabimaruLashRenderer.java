@@ -64,7 +64,7 @@ public final class ZabimaruLashRenderer extends EntityRenderer<ZabimaruLash> {
                 // Local +z along the line, out from the hand.
                 poseStack.mulPose(Axis.YP.rotation(yaw));
                 poseStack.mulPose(Axis.XP.rotation(pitch));
-                segment(consumer, poseStack.last(), packedLight);
+                segment(consumer, poseStack.last(), packedLight, HALF_WIDTH, HALF_HEIGHT, HALF_LENGTH);
                 poseStack.popPose();
             }
         }
@@ -93,14 +93,18 @@ public final class ZabimaruLashRenderer extends EntityRenderer<ZabimaruLash> {
         return owner.getPosition(partialTick).add(dx, owner.getBbHeight() * HAND_HEIGHT, dz);
     }
 
-    /** One blade segment round the pose's origin, its length along local z. */
-    private static void segment(VertexConsumer consumer, PoseStack.Pose pose, int light) {
-        float x0 = -HALF_WIDTH;
-        float x1 = HALF_WIDTH;
-        float y0 = -HALF_HEIGHT;
-        float y1 = HALF_HEIGHT;
-        float z0 = -HALF_LENGTH;
-        float z1 = HALF_LENGTH;
+    /**
+     * One segment round the pose's origin, a box this wide, high and long by halves, its length along local z, with the
+     * whole texture on each face. Grand Fisher's stalk is strung of these too.
+     */
+    static void segment(VertexConsumer consumer, PoseStack.Pose pose, int light, float halfWidth, float halfHeight,
+                        float halfLength) {
+        float x0 = -halfWidth;
+        float x1 = halfWidth;
+        float y0 = -halfHeight;
+        float y1 = halfHeight;
+        float z0 = -halfLength;
+        float z1 = halfLength;
         quad(consumer, pose, light, 0, 0, -1, x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0);
         quad(consumer, pose, light, 0, 0, 1, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1);
         quad(consumer, pose, light, 0, -1, 0, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1);
