@@ -158,7 +158,6 @@ The first playable slice: become a Shinigami, awaken your zanpakutō and hunt Ho
 - [ ] **Shrieker and the Gate of Hell** [Canon]: a mini-boss with exploding minions. Killing a sinful Hollow with a zanpakutō opens the Gate of Hell and drags it in.
 - [ ] **Runuganga** [Canon] *(optional)*: the sand guardian of Las Noches, weak to freezing.
 - [ ] **Sōsuke Aizen and the Hōgyoku** [Canon] *(optional)*: the endgame boss, with Kyōka Suigetsu illusions. The Hōgyoku is his unique drop, not a farmable item.
-- [ ] **Sternritter** [Canon] *(optional)*: Thousand-Year Blood War bosses with a Schrift each and medallions that steal Bankai, recovered with Shin'eiyaku.
 
 ## Later
 
@@ -172,6 +171,7 @@ The first playable slice: become a Shinigami, awaken your zanpakutō and hunt Ho
 - [ ] **Spiritual sensing** [Canon]: briefly outline nearby spiritual beings, coloured by race.
 - [ ] **Advanced Hohō and Hakuda** [Canon]: Utsusemi, Senka and Shunkō.
 - [ ] **Schatten Bereich** [Canon+KD] *(optional)*: the Quincy realm in Seireitei's shadows, around the ice palace Silbern.
+- [ ] **Sternritter** [Canon] *(optional)*: Thousand-Year Blood War bosses with a Schrift each and medallions that steal Bankai, recovered with Shin'eiyaku.
 - [ ] **Soul King Palace** [Canon] *(optional)*: the Royal Guard's floating palaces and their power-ups.
 - [ ] **Hell** [Canon+KD] *(optional)*: Kushanāda and Togabito, reached only through the Gate of Hell.
 - [ ] **Mugetsu** [Canon] *(optional)*: Zangetsu's final Getsuga Tenshō, which seals your powers afterwards.
