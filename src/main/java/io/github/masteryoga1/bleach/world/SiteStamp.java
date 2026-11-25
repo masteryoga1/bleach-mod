@@ -237,7 +237,7 @@ public final class SiteStamp {
             return false;
         }
         if (chunkwiseHome != null) {
-            return layAlone(level, laid, index);
+            return layAlone(level, laid, index, false);
         }
         if (whole(level, laid, index)) {
             // With no chunk bare, the guard learns the site stands whole, as worldgen or a stamp left it.
@@ -282,10 +282,25 @@ public final class SiteStamp {
     }
 
     /**
-     * A chunkwise stamp's site: its one chunk, unless it holds the reference, laid from a start set out afresh and never
-     * kept, then given the reference. Past this tick's share it is left for the next tick's check.
+     * Lays this chunkwise stamp's site for this chunk now, in its own world, if it covers the chunk, the chunk is bare and
+     * its guard agrees: past this tick's share, though counted in it, for a soul that cannot wait. Server thread only.
+     *
+     * @return whether it was laid
      */
-    private boolean layAlone(ServerLevel level, Structure laid, int index) {
+    public boolean layNow(ServerLevel level, ChunkPos pos) {
+        if (level.dimension() != world || chunkwiseHome == null) {
+            return false;
+        }
+        Structure laid = level.registryAccess().registryOrThrow(Registries.STRUCTURE).get(structure);
+        int index = covered.indexOf(List.of(pos));
+        return laid != null && index >= 0 && layAlone(level, laid, index, true);
+    }
+
+    /**
+     * A chunkwise stamp's site: its one chunk, unless it holds the reference, laid from a start set out afresh and never
+     * kept, then given the reference. Past this tick's share it is left for the next tick's check, unless laid now.
+     */
+    private boolean layAlone(ServerLevel level, Structure laid, int index, boolean now) {
         ChunkPos pos = covered.get(index).get(0), home = chunkwiseHome;
         LevelChunk chunk = level.getChunk(pos.x, pos.z);
         if (chunk.getReferencesForStructure(laid).contains(home.toLong())) {
@@ -300,7 +315,7 @@ public final class SiteStamp {
             layTick = tick;
             laidThisTick = 0;
         }
-        if (laidThisTick >= LAYS_PER_TICK) {
+        if (laidThisTick >= LAYS_PER_TICK && !now) {
             triesLeft[index] = Math.max(triesLeft[index], 1);
             return false;
         }

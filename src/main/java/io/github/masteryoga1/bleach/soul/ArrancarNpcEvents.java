@@ -160,20 +160,19 @@ public final class ArrancarNpcEvents {
         return mobs;
     }
 
-    /** The Arrancar NPCs alive in every world of the server, in loaded chunks, leaving out any pledged Fracción. */
+    /** The Arrancar NPCs alive in every world of the server, in loaded chunks, leaving out those that take no room. */
     public static int aliveCount(MinecraftServer server) {
         int count = 0;
         for (ServerLevel level : server.getAllLevels()) {
-            // A pledged Fracción is a player's own, and takes no arrival's room.
-            count += level.getEntities(ANY_ARRANCAR, npc -> npc.isAlive() && !npc.isPledged()).size();
+            count += level.getEntities(ANY_ARRANCAR, ArrancarNpcEvents::takesRoom).size();
         }
         return count;
     }
 
     /**
      * Whether Arrancar may come here by chance: the server has fewer alive than it allows, and none is within the
-     * spacing in this world (a pledged Fracción does not count). It looks through every entity, so it is asked only
-     * after the rare roll has passed.
+     * spacing in this world (a pledged Fracción or a resident does not count). It looks through every entity, so it is
+     * asked only after the rare roll has passed.
      */
     public static boolean mayArrive(ServerLevel level, Vec3 at) {
         if (aliveCount(level.getServer()) >= BleachConfig.get(BleachConfig.ARRANCAR_NPC_MAX_ALIVE)) {
@@ -181,8 +180,12 @@ public final class ArrancarNpcEvents {
         }
         double spacing = BleachConfig.get(BleachConfig.ARRANCAR_NPC_SPACING);
         double spacingSqr = spacing * spacing;
-        return level.getEntities(ANY_ARRANCAR, npc -> npc.isAlive() && !npc.isPledged() && npc.distanceToSqr(at) < spacingSqr)
-                .isEmpty();
+        return level.getEntities(ANY_ARRANCAR, npc -> takesRoom(npc) && npc.distanceToSqr(at) < spacingSqr).isEmpty();
+    }
+
+    /** Whether an NPC takes an arrival's room: alive, and neither a player's Fracción nor a resident of Las Noches. */
+    private static boolean takesRoom(ArrancarNpc npc) {
+        return npc.isAlive() && !npc.isPledged() && !npc.isResident();
     }
 
     // ---- Death ----

@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.world.LasNoches;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import java.util.Set;
 import java.util.UUID;
@@ -23,8 +24,8 @@ import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
 
 /**
  * Where a soul with no spawn of its own wakes when it dies: one that has passed on at its Rukongai home, a student at the
- * Academy, a Shinigami at Soul Society's Senkaimon court, a Menos Grande or an Arrancar in Hueco Mundo, and anyone else
- * where vanilla puts it. A bed or anchor of its own still wins. Only while the server's
+ * Academy, a Shinigami at Soul Society's Senkaimon court, a Menos Grande in Hueco Mundo outside Las Noches, an Arrancar
+ * inside it, and anyone else where vanilla puts it. A bed or anchor of its own still wins. Only while the server's
  * {@code [soul_society] home_world_respawn} is on; a soul that has passed on and lingers in the Human World is sent to
  * the same home by the Shinigami on duty (see {@link #sendHome}).
  */
@@ -39,6 +40,7 @@ public final class HomeWorldRespawn {
         ACADEMY("message.bleach.respawn.academy"),
         COURT("message.bleach.respawn.court"),
         HUECO_MUNDO("message.bleach.respawn.hueco_mundo"),
+        LAS_NOCHES("message.bleach.respawn.las_noches"),
         VANILLA(null);
 
         @Nullable
@@ -60,8 +62,8 @@ public final class HomeWorldRespawn {
      * Where this soul wakes, read as it died: where vanilla puts it if it has a spawn of its own or is being torn apart
      * (which wakes it a living Human); a soul that has passed on at its Rukongai home, or at the Academy as a student or
      * where the server's Konsō takes that shortcut; a Shinigami at the court; a Menos Grande that no purifying blow
-     * frees, or an Arrancar, in Hueco Mundo; anyone else, a Substitute, a Plus, a Human and a basic Hollow among them,
-     * where vanilla puts it.
+     * frees in Hueco Mundo, an Arrancar in Las Noches; anyone else, a Substitute, a Plus, a Human and a basic Hollow
+     * among them, where vanilla puts it.
      */
     public static Home homeOf(SoulData data, boolean ownSpawn) {
         if (ownSpawn || data.isSoulDestroyed()) {
@@ -72,7 +74,7 @@ public final class HomeWorldRespawn {
                     || BleachConfig.get(BleachConfig.KONSO_SENDS_TO) == KonsoTarget.ACADEMY) ? Home.ACADEMY : Home.RUKONGAI;
             case SHINIGAMI -> Home.COURT;
             case HOLLOW -> HollowTier.of(data).isMenos() && !freedByDeath(data) ? Home.HUECO_MUNDO : Home.VANILLA;
-            case ARRANCAR -> Home.HUECO_MUNDO;
+            case ARRANCAR -> Home.LAS_NOCHES;
             default -> Home.VANILLA;
         };
     }
@@ -130,8 +132,9 @@ public final class HomeWorldRespawn {
     /**
      * Read from the soul as it died: death has not changed it yet (see {@link SoulEvents}' Clone, which comes after). Its
      * own spawn is a point set, in a world that still exists, whose bed or anchor is still there. A soul back from the
-     * End's fight is left alone, and so is one that nowhere in its home world will hold. A Menos or an Arrancar wakes in
-     * Hueco Mundo where it died, pushed out past Las Noches as a Garganta sets a soul down.
+     * End's fight is left alone, and so is one that nowhere in its home world will hold. A Menos wakes in Hueco Mundo where
+     * it died, pushed out past Las Noches as a Garganta sets a soul down; an Arrancar inside Las Noches, on its court's
+     * floor, or outside the wall as a Menos where none will hold it.
      */
     private static void onRespawnPosition(PlayerRespawnPositionEvent event) {
         if (event.isFromEndFight() || !(event.getEntity() instanceof ServerPlayer player) || !SoulLogic.hasSoul(player)
@@ -146,17 +149,23 @@ public final class HomeWorldRespawn {
         if (home == Home.VANILLA) {
             return;
         }
-        ServerLevel world = BleachWorlds.level(server,
-                home == Home.HUECO_MUNDO ? BleachWorlds.HUECO_MUNDO : BleachWorlds.SOUL_SOCIETY);
+        boolean hueco = home == Home.HUECO_MUNDO || home == Home.LAS_NOCHES;
+        ServerLevel world = BleachWorlds.level(server, hueco ? BleachWorlds.HUECO_MUNDO : BleachWorlds.SOUL_SOCIETY);
         if (world == null) {
             return;
         }
         Vec3 spot = switch (home) {
             case RUKONGAI -> RukongaiEvents.home(player, world);
             case ACADEMY -> AcademyLocator.landing(player, world);
+            case LAS_NOCHES -> LasNoches.wakeSpot(player, world);
             case HUECO_MUNDO -> TravelEvents.huecoMundoLanding(player, world, player.getX(), player.getZ());
             default -> TravelEvents.landing(player, world, TravelLogic.COURT);
         };
+        // Rarely, no floor inside will hold it: the court built over, flooded or dug out. It wakes outside, and is told so.
+        if (spot == null && home == Home.LAS_NOCHES) {
+            home = Home.HUECO_MUNDO;
+            spot = TravelEvents.huecoMundoLanding(player, world, player.getX(), player.getZ());
+        }
         if (spot == null) {
             return;
         }

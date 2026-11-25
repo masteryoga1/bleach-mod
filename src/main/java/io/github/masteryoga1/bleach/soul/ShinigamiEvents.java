@@ -16,6 +16,7 @@ import io.github.masteryoga1.bleach.world.GateHouses;
 import io.github.masteryoga1.bleach.world.GateState;
 import io.github.masteryoga1.bleach.world.HillWorks;
 import io.github.masteryoga1.bleach.world.LasNoches;
+import io.github.masteryoga1.bleach.world.LasNochesResidents;
 import io.github.masteryoga1.bleach.world.UraharaRoom;
 import io.github.masteryoga1.bleach.world.UraharaShop;
 import java.util.List;
@@ -116,6 +117,8 @@ public final class ShinigamiEvents {
         bus.addListener(LasNoches::onChunkLoad);
         bus.addListener(LasNoches::onServerTick);
         bus.addListener(LasNoches::onEntityJoin);
+        // Números who live in its halls, one at a time, out of sight.
+        bus.addListener(LasNochesResidents::onServerTick);
         // The houses' great gates, laid once each house stands, and moved a row at a time.
         bus.addListener(GateState::onServerTick);
         // The last change to a blow on a gatekeeper: none takes him below a tenth of his health.

@@ -1,20 +1,81 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.ArrancarNpc;
+import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.GargantaRift;
+import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.soul.ArrancarNpcEvents;
+import io.github.masteryoga1.bleach.soul.ArrancarRank;
+import io.github.masteryoga1.bleach.soul.SoulAttachments;
+import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.TravelEvents;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
+import io.github.masteryoga1.bleach.world.LasNoches;
+import io.github.masteryoga1.bleach.world.LasNochesResidents;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
+import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.GameTestInfo;
+import net.minecraft.gametest.framework.GameTestListener;
+import net.minecraft.gametest.framework.GameTestRunner;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** Las Noches lived in: the sky a soul sees under its dome. */
+/** Las Noches lived in: the sky seen under the dome, the Números in its halls, and an Arrancar waking on its floor. */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class LasNochesLifeTests {
+    /** W1's chunk, the centre's, and the 8 the wake lays the shell in. */
+    private static final List<ChunkPos> WAKE_SQUARE = ChunkPos.rangeClosed(LasNoches.HOME, 1).toList();
+    /** R3's chunk, x 16 to 31 and z -48 to -33: open floor of the halls, its 147 cells within r 48 among them. */
+    private static final ChunkPos RESIDENTS = new ChunkPos(1, -3);
+    /** The chunk west of it, where R3 lays the shell alone: its halls wait on the shell in chunks R3 holds but never lays. */
+    private static final ChunkPos SHELL_ONLY = new ChunkPos(0, -3);
+    /** A floor cell in R3's chunk, r 46.5, and an eye 36 under its feet in the Forest of Menos, hidden by the crust. */
+    private static final BlockPos FLOOR = new BlockPos(24, 96, -40);
+    private static final Vec3 BURIED_EYE = new Vec3(24.5, 60.0, -40.5);
+    /** An eye 13 under its feet, hidden by the floor as the buried one is, but within 24 of them. */
+    private static final Vec3 NEAR_EYE = new Vec3(24.5, 83.0, -39.5);
+    /** An eye 27.9 from its feet, across the open floor of chunks whose halls R3 never lays. */
+    private static final Vec3 OPEN_EYE = new Vec3(4.5, 100.0, -20.5);
+    private static final Vec3 SPOT = new Vec3(1.5, 1.0, 0.5);
+    private static final double SAME = 1.0E-6;
+
     private LasNochesLifeTests() {
     }
+
+    // ---- T1. The sky under the dome ----
 
     /**
      * Where a camera sees the dome's sky: under the dome and in the fifth tower's room, and in that tower's column from the
@@ -68,5 +129,306 @@ public final class LasNochesLifeTests {
         helper.assertTrue(steps == 96, "the tower's stair has " + steps + " step cells, not 96");
         helper.assertTrue(added == 432, "the tower's column adds " + added + " cells to the dome's sky, not 432");
         helper.succeed();
+    }
+
+    // ---- R1. Whom a resident hunts ----
+
+    /**
+     * A resident hunts what an arrival hunts but never an Arrancar player, even where the server lets Hollows hunt them;
+     * its Cero follows the same rule; it answers a blow from one; its Cero breaks no block; it is never written, its flag
+     * read back to stay; and a pledge ends its residence.
+     */
+    @GameTest(template = "field")
+    public static void residentsHuntAllButArrancar(GameTestHelper helper) {
+        ArrancarNpc resident = helper.spawnWithNoFreeWill(ModEntities.ARRANCAR.get(), 1, 1, 1);
+        resident.setUp(ArrancarRank.NONE, helper.getLevel().getRandom(), ArrancarNpc.UNTIMED);
+        resident.makeResident();
+        ArrancarNpc arrival = helper.spawnWithNoFreeWill(ModEntities.ARRANCAR.get(), 3, 1, 1);
+        arrival.setUp(ArrancarRank.NONE, helper.getLevel().getRandom(), ArrancarNpc.NEVER);
+        Player shinigami = mock(helper, GameType.SURVIVAL, SoulState.SHINIGAMI);
+        Player numero = arrancar(helper, new ArrancarRank(12, 0));
+        Player espada = arrancar(helper, new ArrancarRank(12, 4));
+        Player plus = mock(helper, GameType.SURVIVAL, SoulState.PLUS);
+        Player creative = mock(helper, GameType.CREATIVE, SoulState.SHINIGAMI);
+        helper.assertTrue(resident.isResident() && resident.isPermanent() && !arrival.isResident(),
+                "the resident is not one, or not set to stay");
+        KidoTests.withConfig(BleachConfig.HUNT_HOLLOW_PLAYERS, true, () -> {
+            helper.assertTrue(resident.hunts(shinigami) && arrival.hunts(shinigami), "a Shinigami is not hunted");
+            helper.assertFalse(resident.hunts(numero), "a resident hunts a Número where the server lets Hollows hunt");
+            helper.assertTrue(arrival.hunts(numero), "an arrival no longer hunts a Número where the server lets it");
+            helper.assertFalse(resident.hunts(espada) || arrival.hunts(espada), "a seated Espada is hunted");
+            helper.assertFalse(resident.hunts(plus) || resident.hunts(creative), "a Plus or a soul in creative is hunted");
+            helper.assertFalse(resident.canAttack(numero), "a resident would attack a Número unprovoked");
+            helper.assertFalse(CeroBeam.mayStrike(resident, numero), "a resident's Cero strikes a Número");
+            helper.assertTrue(CeroBeam.mayStrike(arrival, numero), "an arrival's Cero spares a Número it may hunt");
+            helper.assertTrue(CeroBeam.mayStrike(resident, shinigami), "a resident's Cero spares a Shinigami");
+        });
+        // A blow is answered.
+        resident.setLastHurtByMob(numero);
+        helper.assertTrue(resident.canAttack(numero), "a resident does not answer a Número's blow");
+        helper.assertFalse(resident.ceroSpec().breaksBlocks(), "a resident's Cero breaks blocks");
+        helper.assertTrue(arrival.ceroSpec().breaksBlocks() == (BleachConfig.get(BleachConfig.ARRANCAR_NPC_CERO_BREAKS_BLOCKS)
+                && BleachConfig.get(BleachConfig.CERO_BREAKS_BLOCKS)), "an arrival's Cero no longer follows the config");
+        CompoundTag saved = resident.saveWithoutId(new CompoundTag());
+        helper.assertTrue(saved.getBoolean("Resident") && !resident.saveAsPassenger(new CompoundTag()),
+                "a resident is written as an entity, or its flag is not");
+        // A resident summoned or edited with a time to leave still stays; one without the key is as before.
+        saved.putLong("LeaveAt", 1L);
+        CompoundTag without = saved.copy();
+        without.remove("Resident");
+        ArrancarNpc loaded = ModEntities.ARRANCAR.get().create(helper.getLevel());
+        ArrancarNpc older = ModEntities.ARRANCAR.get().create(helper.getLevel());
+        helper.assertTrue(loaded != null && older != null, "no Arrancar NPC could be made");
+        loaded.load(saved);
+        older.load(without);
+        helper.assertTrue(loaded.isResident() && loaded.isPermanent() && !older.isResident() && !older.isPermanent(),
+                "the flag does not read back to stay, or a missing one reads set");
+        resident.pledgeTo(espada);
+        helper.assertFalse(resident.isResident() || resident.hasRestriction(), "a pledged resident is still one");
+        helper.succeed();
+    }
+
+    // ---- R2. A resident stays ----
+
+    /**
+     * A resident set up to leave stays: its residence makes it stay until killed, while an arrival set up the same way
+     * leaves at its time. It takes no arrival's room, and its bound keeps it under the dome, within 56 of the floor under
+     * the centre.
+     */
+    @GameTest(template = "field", timeoutTicks = 200)
+    public static void aResidentStaysInside(GameTestHelper helper) {
+        List<Entity> spawned = new ArrayList<>();
+        // On every exit, its time-out included: the NPCs and the tear the arrival opened.
+        helper.testInfo.addListener(new Cleanup(() -> {
+            TravelTests.discard(spawned.toArray(new Entity[0]));
+            helper.getLevel().getEntitiesOfClass(GargantaRift.class, helper.getBounds().inflate(2.0, 16.0, 2.0))
+                    .forEach(Entity::discard);
+        }));
+        long soon = helper.getLevel().getGameTime() + 20L;
+        ArrancarNpc resident = npc(helper, spawned, 1, 1, soon);
+        resident.makeResident();
+        ArrancarNpc arrival = npc(helper, spawned, 4, 4, soon);
+        int counted = ArrancarNpcEvents.aliveCount(helper.getLevel().getServer());
+        resident.discard();
+        helper.assertTrue(ArrancarNpcEvents.aliveCount(helper.getLevel().getServer()) == counted,
+                "a resident takes an arrival's room");
+        ArrancarNpc kept = npc(helper, spawned, 1, 1, soon);
+        kept.makeResident();
+        ServerLevel hueco = LasNochesTests.hueco(helper);
+        helper.assertTrue(LasNochesResidents.keeps(hueco, new Vec3(12.5, 96.0, 12.5))
+                        && LasNochesResidents.keeps(hueco, new Vec3(39.5, 96.0, 39.5))
+                        && LasNochesResidents.keeps(hueco, new Vec3(-0.5, 147.0, 5.5))
+                        && !LasNochesResidents.keeps(hueco, new Vec3(0.5, 96.0, 57.5))
+                        && !LasNochesResidents.keeps(hueco, new Vec3(0.5, 97.0, 59.5))
+                        && !LasNochesResidents.keeps(hueco, new Vec3(12.5, 95.0, 12.5))
+                        && LasNochesResidents.keeps(helper.getLevel(), new Vec3(0.5, 96.0, 57.5)),
+                "a resident's bound is not the dome's floor within 56 of the centre, and the throne room");
+        // Off Hueco Mundo it is bound to nothing.
+        helper.assertFalse(kept.hasRestriction(), "a resident in the Overworld is bound");
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(arrival.isDeparting() || arrival.isRemoved(), "it never left"))
+                .thenIdle(40)
+                .thenExecute(() -> helper.assertTrue(kept.isAlive() && !kept.isDeparting() && !kept.isRemoved(),
+                        "the resident left"))
+                .thenSucceed();
+    }
+
+    /** An Arrancar NPC with free will set up to leave at this time, kept for the test's end to discard. */
+    private static ArrancarNpc npc(GameTestHelper helper, List<Entity> spawned, int x, int z, long leaveAt) {
+        ArrancarNpc npc = helper.spawn(ModEntities.ARRANCAR.get(), x, 1, z);
+        spawned.add(npc);
+        npc.setUp(ArrancarRank.NONE, helper.getLevel().getRandom(), leaveAt);
+        return npc;
+    }
+
+    /** Runs this as its test ends, passed or failed, its time-out included. */
+    private record Cleanup(Runnable end) implements GameTestListener {
+        @Override
+        public void testStructureLoaded(GameTestInfo info) {
+        }
+
+        @Override
+        public void testPassed(GameTestInfo info, GameTestRunner runner) {
+            end.run();
+        }
+
+        @Override
+        public void testFailed(GameTestInfo info, GameTestRunner runner) {
+            end.run();
+        }
+
+        @Override
+        public void testAddedForRerun(GameTestInfo info, GameTestInfo rerun, GameTestRunner runner) {
+        }
+    }
+
+    // ---- R3. Where residents come ----
+
+    /**
+     * In the test server's Hueco Mundo, made with structures off as an old world's was, a resident comes only onto the
+     * halls' floor: not where the shell stands alone, not within 24 of a soul or in its sight, not past the cap, not in
+     * Peaceful or with mob spawning off; where it comes it is a Número that stays, bound to the dome's floor.
+     */
+    @GameTest(template = "empty", batch = "las_noches_residents", timeoutTicks = 900)
+    public static void residentsComeOnlyWhereTheHallsStand(GameTestHelper helper) {
+        ServerLevel hueco = LasNochesTests.hueco(helper);
+        MinecraftServer server = hueco.getServer();
+        List<ChunkPos> laid = ChunkPos.rangeClosed(RESIDENTS, 1).toList();
+        for (ChunkPos pos : laid) {
+            helper.assertFalse(LasNochesHallsTests.marked(hueco, LasNoches.STRUCTURE, pos), "the shell stands in " + pos);
+        }
+        // Radius 2, so the chunk's creatures tick (level 31) and every chunk within 2 of it is FULL.
+        LasNochesHallsTests.Hold hold = LasNochesHallsTests.Hold.hold(helper, hueco, List.of(RESIDENTS), 2, laid);
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, ChunkPos.rangeClosed(RESIDENTS, 2)
+                        .allMatch(pos -> hueco.getChunkSource().getChunkNow(pos.x, pos.z) != null)
+                        && hueco.areEntitiesLoaded(RESIDENTS.toLong()) && hueco.isPositionEntityTicking(FLOOR),
+                        "R3's chunks never loaded with their creatures ticking"))
+                .thenExecute(() -> {
+                    laid.forEach(pos -> LasNoches.STAMP.layNow(hueco, pos));
+                    LasNoches.HALLS_STAMP.layNow(hueco, RESIDENTS);
+                    LasNoches.HALLS_STAMP.layNow(hueco, SHELL_ONLY);
+                    boolean shell = laid.stream()
+                            .allMatch(pos -> LasNochesHallsTests.marked(hueco, LasNoches.STRUCTURE, pos));
+                    helper.assertTrue(shell && LasNochesHallsTests.marked(hueco, LasNoches.HALLS, RESIDENTS)
+                                    && !LasNochesHallsTests.marked(hueco, LasNoches.HALLS, SHELL_ONLY),
+                            "the shell or the halls are not laid as R3 needs");
+                    Difficulty difficulty = server.getWorldData().getDifficulty();
+                    GameRules.BooleanValue spawning = hueco.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING);
+                    boolean wasSpawning = spawning.get();
+                    try {
+                        server.setDifficulty(Difficulty.NORMAL, true);
+                        spawning.set(false, server);
+                        helper.assertTrue(refused(hold, LasNochesResidents.spawnAt(hueco, FLOOR, List.of(BURIED_EYE))),
+                                "a resident came with mob spawning off");
+                        spawning.set(true, server);
+                        KidoTests.withConfig(BleachConfig.HUECO_MUNDO_RESIDENTS, 1, () -> {
+                            helper.assertTrue(withoutHalls(hueco, () -> refused(hold,
+                                    LasNochesResidents.spawnAt(hueco, FLOOR, List.of(BURIED_EYE)))),
+                                    "a resident came where the shell stands without the halls");
+                            helper.assertTrue(refused(hold, LasNochesResidents.spawnAt(hueco, FLOOR, List.of(OPEN_EYE))),
+                                    "a resident came in a soul's sight");
+                            helper.assertTrue(refused(hold, LasNochesResidents.spawnAt(hueco, FLOOR, List.of(NEAR_EYE))),
+                                    "a resident came within 24 of a soul");
+                            ArrancarNpc made = LasNochesResidents.look(hueco, hueco.getRandom(), new Vec3(20.5, 96.0, -36.5),
+                                    3.0, List.of(BURIED_EYE));
+                            helper.assertFalse(refused(hold, made), "no resident came onto the halls' floor");
+                            helper.assertTrue(new ChunkPos(made.blockPosition()).equals(RESIDENTS)
+                                            && Math.abs(made.getY() - HuecoMundoPlan.LEVEL_Y) < SAME && made.isResident()
+                                            && made.isPermanent() && made.kind() == ArrancarRank.Kind.NUMERO
+                                            && made.getRestrictCenter().equals(LasNochesResidents.BOUND_CENTRE)
+                                            && made.getRestrictRadius() == LasNochesResidents.BOUND_RADIUS,
+                                    "the resident is no Número on R3's floor, staying and bound: " + made.position());
+                            helper.assertTrue(LasNochesResidents.count(hueco) == 1
+                                    && refused(hold, LasNochesResidents.spawnAt(hueco, FLOOR, List.of(BURIED_EYE))),
+                                    "a second resident came past a cap of 1");
+                        });
+                        KidoTests.withConfig(BleachConfig.HUECO_MUNDO_RESIDENTS, 2, () -> {
+                            server.setDifficulty(Difficulty.PEACEFUL, true);
+                            helper.assertTrue(refused(hold, LasNochesResidents.spawnAt(hueco, FLOOR, List.of(BURIED_EYE))),
+                                    "a resident came in Peaceful");
+                            server.setDifficulty(Difficulty.NORMAL, true);
+                            helper.assertFalse(refused(hold, LasNochesResidents.spawnAt(hueco, FLOOR, List.of(BURIED_EYE))),
+                                    "no second resident came under a cap of 2");
+                        });
+                    } finally {
+                        spawning.set(wasSpawning, server);
+                        server.setDifficulty(difficulty, true);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /** Whether no resident came; one that did is kept for the hold to discard, so a failed check leaves none behind. */
+    private static boolean refused(LasNochesHallsTests.Hold hold, @Nullable ArrancarNpc made) {
+        if (made != null) {
+            hold.placed().add(made);
+        }
+        return made == null;
+    }
+
+    /** Asks this with R3's chunk stripped of its halls' reference, the shell's left, and puts the reference back. */
+    private static boolean withoutHalls(ServerLevel hueco, BooleanSupplier ask) {
+        LevelChunk chunk = hueco.getChunk(RESIDENTS.x, RESIDENTS.z);
+        Map<Structure, LongSet> references = new HashMap<>(chunk.getAllReferences()), shellOnly = new HashMap<>(references);
+        shellOnly.remove(hueco.registryAccess().registryOrThrow(Registries.STRUCTURE).get(LasNoches.HALLS));
+        try {
+            chunk.setAllReferences(shellOnly);
+            return ask.getAsBoolean();
+        } finally {
+            chunk.setAllReferences(references);
+        }
+    }
+
+    // ---- W1. The wake inside ----
+
+    /**
+     * In the test server's Hueco Mundo, made with structures off as an old world's was, an Arrancar with no spawn of its
+     * own wakes on Las Noches' court, the shell laid about the centre's chunk and the halls in it first. With every wake
+     * spot filled it wakes outside the wall instead, told so.
+     */
+    @GameTest(template = "empty", batch = "las_noches_wake", timeoutTicks = 900)
+    public static void anArrancarWakesInsideLasNoches(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel(), hueco = LasNochesTests.hueco(helper);
+        for (ChunkPos pos : WAKE_SQUARE) {
+            helper.assertFalse(LasNochesHallsTests.marked(hueco, LasNoches.STRUCTURE, pos), "the shell stands in " + pos);
+        }
+        helper.assertFalse(LasNochesHallsTests.marked(hueco, LasNoches.HALLS, LasNoches.HOME), "the halls stand already");
+        LasNochesHallsTests.Hold.hold(helper, hueco, List.of(LasNoches.HOME), 1, WAKE_SQUARE);
+        ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, SPOT);
+        player.setData(SoulAttachments.SOUL, GargantaTests.arrancar());
+        DimensionTransition spawn = new DimensionTransition(level, player.position(), Vec3.ZERO, 0.0F, 0.0F,
+                DimensionTransition.DO_NOTHING);
+        Vec3 court = LasNoches.WAKE_SPOTS.get(0);
+        DimensionTransition woken = AcademyTests.respawn(player, spawn, false);
+        helper.assertTrue(woken.newLevel() == hueco && woken.pos().distanceTo(court) < SAME && woken.yRot() == 0.0F,
+                "the Arrancar wakes in " + woken.newLevel().dimension().location() + " at " + woken.pos() + " facing "
+                        + woken.yRot() + ", not on the court at " + court);
+        for (ChunkPos pos : WAKE_SQUARE) {
+            helper.assertTrue(LasNochesHallsTests.marked(hueco, LasNoches.STRUCTURE, pos), "no shell was laid in " + pos);
+            helper.assertTrue(LasNochesHallsTests.marked(hueco, LasNoches.HALLS, pos) == pos.equals(LasNoches.HOME),
+                    "the halls' mark in " + pos + " is not only the centre's");
+        }
+        LasNochesHallsTests.assertLaid(helper, hueco, LasNoches.HOME, true);
+        helper.assertFalse(LasNoches.shutIn(hueco, 12, 96, 12), "the court is still shut in");
+        // With every wake spot's feet filled, no floor inside holds it: it wakes outside the wall.
+        try {
+            LasNoches.WAKE_SPOTS.forEach(each -> hueco.setBlock(BlockPos.containing(each), Blocks.STONE.defaultBlockState(),
+                    Block.UPDATE_CLIENTS));
+            DimensionTransition outside = AcademyTests.respawn(player, spawn, false);
+            Vec3 there = TravelEvents.huecoMundoLanding(player, hueco, player.getX(), player.getZ());
+            helper.assertTrue(there != null && outside.newLevel() == hueco && outside.pos().distanceTo(there) < SAME
+                    && outside.yRot() == 0.0F, "with the court filled the Arrancar wakes at " + outside.pos()
+                    + ", not outside the wall at " + there);
+        } finally {
+            LasNoches.WAKE_SPOTS.forEach(each -> hueco.setBlock(BlockPos.containing(each), Blocks.AIR.defaultBlockState(),
+                    Block.UPDATE_CLIENTS));
+        }
+        // The lines are sent by tasks each waking left, run once this tick is done or four ticks on at the latest.
+        helper.runAfterDelay(5, () -> {
+            helper.assertTrue(told(player, "message.bleach.respawn.las_noches") == 1L
+                    && told(player, "message.bleach.respawn.hueco_mundo") == 1L,
+                    "the Arrancar was not told once each that it woke in Las Noches and outside it");
+            helper.succeed();
+        });
+    }
+
+    // ---- Helpers ----
+
+    private static Player mock(GameTestHelper helper, GameType mode, SoulState state) {
+        return HollowPlayerTests.soulPlayer(helper, mode, state, 100.0F, new Vec3(1.5, 1.0, 1.5));
+    }
+
+    /** A mock Arrancar player holding this rank in its soul's own record, as the roster gives a player. */
+    private static Player arrancar(GameTestHelper helper, ArrancarRank rank) {
+        Player player = mock(helper, GameType.SURVIVAL, SoulState.ARRANCAR);
+        SoulData data = SoulLogic.get(player);
+        data.setHollow(data.hollow().withArrancar(data.hollow().arrancar().withRank(rank)));
+        return player;
+    }
+
+    private static long told(ServerPlayer player, String key) {
+        return TestPlayers.chat(player).stream().filter(line -> line.getContents() instanceof TranslatableContents words
+                && words.getKey().equals(key)).count();
     }
 }

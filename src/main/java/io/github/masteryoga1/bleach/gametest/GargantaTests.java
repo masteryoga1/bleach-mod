@@ -492,10 +492,10 @@ public final class GargantaTests {
     // ---- Waking in Hueco Mundo ----
 
     /**
-     * Where a Menos or an Arrancar wakes on dying with no spawn of its own: in Hueco Mundo, unless a purifying blow frees
-     * it or it is being torn apart. Then the real respawn event for a real Arrancar: in Hueco Mundo where it died, pushed
-     * out past Las Noches, facing south and told so, unless it is back from the End's fight, the server has the rule off,
-     * or it has a spawn of its own. The player is never killed.
+     * Where a Menos or an Arrancar wakes on dying with no spawn of its own: a Menos in Hueco Mundo, an Arrancar in Las
+     * Noches, unless a purifying blow frees it or it is being torn apart. Then the real respawn event for a real Adjuchas:
+     * in Hueco Mundo where it died, pushed out past Las Noches, facing south and told so, unless it is back from the End's
+     * fight, the server has the rule off, or it has a spawn of its own. The player is never killed.
      */
     @GameTest(template = "empty", batch = "konso_move", timeoutTicks = 100)
     public static void aMenosOrAnArrancarWakesInHuecoMundo(GameTestHelper helper) {
@@ -508,7 +508,7 @@ public final class GargantaTests {
         assertHome(helper, "a Gillian", menos(HollowTier.GILLIAN, 400.0F), home);
         assertHome(helper, "an Adjuchas", menos(HollowTier.ADJUCHAS, 400.0F), home);
         assertHome(helper, "a Vasto Lorde", menos(HollowTier.VASTO_LORDE, 400.0F), home);
-        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 400.0F), home);
+        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 400.0F), HomeWorldRespawn.Home.LAS_NOCHES);
         assertHome(helper, "a basic Hollow", ShinigamiTests.soul(SoulState.HOLLOW, 40.0F), vanilla);
         assertHome(helper, "an Adjuchas a purifying blow killed", freed,
                 BleachConfig.get(BleachConfig.PURIFICATION_FREES) ? vanilla : home);
@@ -518,27 +518,27 @@ public final class GargantaTests {
         ServerLevel hueco = level.getServer().getLevel(BleachWorlds.HUECO_MUNDO);
         helper.assertTrue(hueco != null, "the test server has no Hueco Mundo");
         ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, SPOT);
-        player.setData(SoulAttachments.SOUL, arrancar());
+        player.setData(SoulAttachments.SOUL, menos(HollowTier.ADJUCHAS, 400.0F));
         DimensionTransition spawn = new DimensionTransition(level, player.position(), Vec3.ZERO, 0.0F, 0.0F,
                 DimensionTransition.DO_NOTHING);
         DimensionTransition woken = AcademyTests.respawn(player, spawn, false);
         Vec3 there = TravelEvents.huecoMundoLanding(player, hueco, player.getX(), player.getZ());
         helper.assertTrue(there != null && woken.newLevel() == hueco && woken.pos().distanceTo(there) < 0.01
-                        && woken.yRot() == 0.0F, "the Arrancar wakes in " + woken.newLevel().dimension().location()
+                        && woken.yRot() == 0.0F, "the Adjuchas wakes in " + woken.newLevel().dimension().location()
                         + " at " + woken.pos() + " facing " + woken.yRot() + ", not in Hueco Mundo at " + there);
         helper.assertTrue(AcademyTests.respawn(player, spawn, true) == spawn,
-                "an Arrancar back from the End's fight was moved");
+                "an Adjuchas back from the End's fight was moved");
         boolean rule = BleachConfig.get(BleachConfig.HOME_WORLD_RESPAWN);
         try {
             BleachConfig.HOME_WORLD_RESPAWN.set(false);
-            helper.assertTrue(AcademyTests.respawn(player, spawn, false) == spawn, "an Arrancar was moved with the rule off");
+            helper.assertTrue(AcademyTests.respawn(player, spawn, false) == spawn, "an Adjuchas was moved with the rule off");
         } finally {
             BleachConfig.HOME_WORLD_RESPAWN.set(rule);
         }
         try {
             player.setRespawnPosition(Level.OVERWORLD, helper.absolutePos(new BlockPos(1, 1, 3)), 0.0F, true, false);
             helper.assertTrue(AcademyTests.respawn(player, spawn, false) == spawn,
-                    "Hueco Mundo beat the Arrancar's own spawn");
+                    "Hueco Mundo beat the Adjuchas's own spawn");
         } finally {
             player.setRespawnPosition(Level.OVERWORLD, null, 0.0F, false, false);
         }
@@ -549,7 +549,7 @@ public final class GargantaTests {
                     .filter(line -> line.getContents() instanceof TranslatableContents words
                             && words.getKey().equals("message.bleach.respawn.hueco_mundo"))
                     .count();
-            helper.assertTrue(told == 1L, "the Arrancar was told it woke in Hueco Mundo " + told + " times, not once");
+            helper.assertTrue(told == 1L, "the Adjuchas was told it woke in Hueco Mundo " + told + " times, not once");
             helper.succeed();
         });
     }

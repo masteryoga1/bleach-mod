@@ -707,7 +707,7 @@ public final class AcademyTests {
         assertHome(helper, "a Human", ShinigamiTests.soul(SoulState.HUMAN, 400.0F), HomeWorldRespawn.Home.VANILLA);
         assertHome(helper, "a living Substitute", ShinigamiTests.substitute(60.0F), HomeWorldRespawn.Home.VANILLA);
         assertHome(helper, "a Hollow", ShinigamiTests.soul(SoulState.HOLLOW, 40.0F), HomeWorldRespawn.Home.VANILLA);
-        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F), HomeWorldRespawn.Home.HUECO_MUNDO);
+        assertHome(helper, "an Arrancar", ShinigamiTests.soul(SoulState.ARRANCAR, 40.0F), HomeWorldRespawn.Home.LAS_NOCHES);
         KonsoTarget sendsTo = BleachConfig.get(BleachConfig.KONSO_SENDS_TO);
         try {
             BleachConfig.KONSO_SENDS_TO.set(KonsoTarget.ACADEMY);
