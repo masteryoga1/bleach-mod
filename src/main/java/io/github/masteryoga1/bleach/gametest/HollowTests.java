@@ -91,7 +91,8 @@ public final class HollowTests {
             new KindStats(HollowKind.SERPENT, 70.0, 6.0, 3.0, 0.26),
             new KindStats(HollowKind.FISHBONE_D, 80.0, 6.0, 4.0, 0.25),
             new KindStats(HollowKind.GILLIAN, 300.0, 14.0, 8.0, 0.18),
-            new KindStats(HollowKind.ADJUCHAS, 140.0, 9.0, 10.0, 0.34));
+            new KindStats(HollowKind.ADJUCHAS, 140.0, 9.0, 10.0, 0.34),
+            new KindStats(HollowKind.SHRIEKER, 120.0, 7.0, 4.0, 0.25));
 
     private HollowTests() {
     }
@@ -181,6 +182,7 @@ public final class HollowTests {
         helper.assertFalse(ModEntities.FISHBONE_D.get().canSerialize(), "Fishbone D is saved with the world");
         helper.assertFalse(ModEntities.GILLIAN.get().canSerialize(), "a Gillian is saved with the world");
         helper.assertFalse(ModEntities.ADJUCHAS.get().canSerialize(), "an Adjuchas is saved with the world");
+        helper.assertFalse(ModEntities.SHRIEKER.get().canSerialize(), "a Shrieker is saved with the world");
         helper.assertFalse(ModEntities.CERO_BEAM.get().canSerialize(), "a Cero is saved with the world");
         helper.succeed();
     }
@@ -189,13 +191,14 @@ public final class HollowTests {
     public static void hollowsGetASoulOnTheirFirstTick(GameTestHelper helper) {
         List<Hollow> hollows = new ArrayList<>();
         int x = 2;
+        // Two blocks apart, so all six that are no Menos fit the field's row.
         for (HollowKind kind : HollowKind.values()) {
             if (kind.isMenos()) {
                 // Too big for this row; MenosTests checks a Gillian's soul.
                 continue;
             }
             hollows.add(helper.spawnWithNoFreeWill(ModEntities.hollowType(kind), x, 2, 8));
-            x += 3;
+            x += 2;
         }
         helper.runAfterDelay(1, () -> {
             for (Hollow hollow : hollows) {

@@ -8,8 +8,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * The mod's sound events. Their files are vanilla sounds, pitched and spread out in
- * {@code assets/bleach/sounds.json}. A Hollow's howl, Fishbone D's roar, a Menos Grande's cries, a
- * Cero, the tearing sky, a Shikai release, a loosed Getsuga Tenshō, a Quincy's awakening and the great
+ * {@code assets/bleach/sounds.json}. A Hollow's howl, a Shrieker's cry, Fishbone D's roar, a Menos Grande's
+ * cries, a Cero, the tearing sky, a Shikai release, a loosed Getsuga Tenshō, a Quincy's awakening and the great
  * Quincy arts (Letzt Stil, the power's return, Heizen, Sprenger and Vollständig) carry much further than
  * a normal mob's sounds, so they are fixed-range events; the rest reach as far as their volume takes
  * them, as usual.
@@ -95,6 +95,14 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> ADJUCHAS_AMBIENT = fixed("entity.adjuchas.ambient", 48.0F);
     public static final DeferredHolder<SoundEvent, SoundEvent> ADJUCHAS_HURT = variable("entity.adjuchas.hurt");
     public static final DeferredHolder<SoundEvent, SoundEvent> ADJUCHAS_DEATH = variable("entity.adjuchas.death");
+    /** A Shrieker's cry, heard from far off. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_AMBIENT = fixed("entity.shrieker.ambient", 48.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_HURT = variable("entity.shrieker.hurt");
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_DEATH = variable("entity.shrieker.death");
+    /** A Shrieker folding its wings to dive; nothing plays it until the Shrieker flies. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_SWOOP = variable("entity.shrieker.swoop");
+    /** A Shrieker's wingbeat; nothing plays it until the Shrieker flies. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_FLAP = variable("entity.shrieker.flap");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */

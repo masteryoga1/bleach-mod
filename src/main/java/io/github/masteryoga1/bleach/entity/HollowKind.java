@@ -45,7 +45,14 @@ public enum HollowKind implements StringRepresentable {
     /** A Menos Grande that has won its own shape by devouring: a quick beast that hunts in packs. */
     ADJUCHAS("adjuchas", new Stats(140.0, 9.0, 10.0, 0.34, 40.0, 0.6, 0.8, 1.5), 16, 1.15, 900.0F, 50,
             null, 0.9F, 1.15F,
-            new MaskSpot(1.05, 1.8, 0.9), new Look(1.8F, 0.3F, 0.3F, 1.0F), 0, Float.MAX_VALUE);
+            new MaskSpot(1.05, 1.8, 0.9), new Look(1.8F, 0.3F, 0.3F, 1.0F), 0, Float.MAX_VALUE),
+    /**
+     * Shrieker, a great winged Hollow and a boss: it comes alone, by command for now, never by chance. Its health and
+     * attack here are only the config's defaults ([bosses.shrieker]), which set them as it spawns.
+     */
+    SHRIEKER("shrieker", new Stats(120.0, 7.0, 4.0, 0.25, 40.0, 0.3, 0.5, 1.0), 60, 1.0, 150.0F, 40,
+            null, 1.0F, 1.0F,
+            new MaskSpot(0.55, 1.85, 0.6), new Look(1.0F, 0.0F, 0.3F, 1.0F), 0, Float.MAX_VALUE);
 
     public static final Codec<HollowKind> CODEC = StringRepresentable.fromEnum(HollowKind::values);
 

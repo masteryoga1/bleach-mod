@@ -178,8 +178,7 @@ public final class GargantaEvents {
             return false;
         }
         Vec3 at = landing.add(0.0, SpawnSpots.clearAbove(level, type, kind.scaleMax, landing, RIFT_MAX_HEIGHT), 0.0);
-        float size = kind == HollowKind.FISHBONE_D ? FIRST_HOLLOW_SIZE : ARRIVAL_SIZE;
-        GargantaRift rift = GargantaRift.arrival(level, at, now, Collections.nCopies(count, kind), player, size);
+        GargantaRift rift = GargantaRift.arrival(level, at, now, Collections.nCopies(count, kind), player, riftSize(kind));
         if (!level.addFreshEntity(rift)) {
             return false;
         }
@@ -190,6 +189,11 @@ public final class GargantaEvents {
             QuincyNpcEvents.onNaturalArrival(player, data, kind, now);
         }
         return true;
+    }
+
+    /** How wide the tear a Hollow of this kind comes through opens: wider for the first Hollow and for a Shrieker. */
+    public static float riftSize(HollowKind kind) {
+        return kind == HollowKind.FISHBONE_D || kind == HollowKind.SHRIEKER ? FIRST_HOLLOW_SIZE : ARRIVAL_SIZE;
     }
 
     /**

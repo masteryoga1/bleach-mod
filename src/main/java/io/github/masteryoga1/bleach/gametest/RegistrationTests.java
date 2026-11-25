@@ -127,7 +127,7 @@ public final class RegistrationTests {
     @GameTest(template = "empty")
     public static void hollowsAndPlusesAreRegistered(GameTestHelper helper) {
         for (String name : List.of("spider_hollow", "hexapodus", "hound_hollow", "serpent_hollow", "fishbone_d", "plus",
-                "garganta")) {
+                "garganta", "shrieker")) {
             helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.containsKey(BleachMod.id(name)), "bleach:" + name + " is not an entity type");
         }
         for (String name : List.of("spider_hollow_spawn_egg", "hexapodus_spawn_egg", "hound_hollow_spawn_egg",
@@ -135,7 +135,9 @@ public final class RegistrationTests {
             helper.assertTrue(BuiltInRegistries.ITEM.containsKey(BleachMod.id(name)), "bleach:" + name + " is not an item");
         }
         for (String name : List.of("entity.hollow.ambient", "entity.hollow.hurt", "entity.hollow.death",
-                "entity.hollow.mask_crack", "entity.fishbone_d.roar", "entity.garganta.open", "item.denreishinki.ping")) {
+                "entity.hollow.mask_crack", "entity.fishbone_d.roar", "entity.garganta.open", "item.denreishinki.ping",
+                "entity.shrieker.ambient", "entity.shrieker.hurt", "entity.shrieker.death", "entity.shrieker.swoop",
+                "entity.shrieker.flap")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");
         }
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("denreishinki")).isPresent(),
