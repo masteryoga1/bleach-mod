@@ -527,6 +527,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_LURE_HEALTH;
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_FLOOR_SHARE;
     public static final ModConfigSpec.IntValue GRAND_FISHER_ESCAPE_DAYS;
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_AMBUSH_CHANCE;
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_RAIN_WEIGHT;
+    public static final ModConfigSpec.DoubleValue GRAND_FISHER_AMBUSH_MIN_REIRYOKU;
     public static final ModConfigSpec.IntValue GRAND_FISHER_LURE_WAIT_SECONDS;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
@@ -2416,6 +2419,18 @@ public final class BleachConfig {
                 .comment("Game days, of twenty minutes whether anyone sleeps or not, before Grand Fisher may come again"
                         + " after it escapes into its lure. 0 lets it come again once she has faded.")
                 .defineInRange("escape_days", 1, 0, 365);
+        GRAND_FISHER_AMBUSH_CHANCE = builder
+                .comment("The chance each minute that Grand Fisher lays its lure for one of the souls it hunts in the"
+                        + " Overworld, once it may come again and none is about. Never on Peaceful or with mob spawning off."
+                        + " 0 stops it coming by itself.")
+                .defineInRange("ambush_chance", 0.05, 0.0, 1.0);
+        GRAND_FISHER_RAIN_WEIGHT = builder
+                .comment("How many times likelier its ambush is when it rains on the soul it hunts.")
+                .defineInRange("rain_weight", 3.0, 1.0, 20.0);
+        GRAND_FISHER_AMBUSH_MIN_REIRYOKU = builder
+                .comment("The least maximum reiryoku of a soul Grand Fisher hunts: it preys on the spiritually gifted."
+                        + " Only souls who see spirits, playing by survival's rules, and no Arrancar.")
+                .defineInRange("ambush_min_reiryoku", 100.0, 0.0, 10_000.0);
         GRAND_FISHER_LURE_WAIT_SECONDS = builder
                 .comment("Seconds a lure laid alone waits for her prey to come near or strike her before she fades and"
                         + " nothing came.")
