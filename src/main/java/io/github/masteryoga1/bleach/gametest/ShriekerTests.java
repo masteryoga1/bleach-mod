@@ -461,9 +461,10 @@ public final class ShriekerTests {
      * Inside Seireitei over the wall's top at the north-west, a Shrieker set on a Shinigami hanging in the air over the
      * Rukongai flies at it and stays inside on every tick, over the wall's top, and comes within 2 blocks of the
      * membrane, living and hunting still. A pin that the membrane's check of every living mover holds a flyer as it does
-     * a walker; the north-west is no other test's in the batch.
+     * a walker; the north-west is no other test's in the batch. The first wait has room: the server does not wait between
+     * ticks, so Soul Society's chunks can take far more than the 80 ticks a 200-tick timeout left it to start ticking.
      */
-    @GameTest(template = "empty", batch = ShakonmakuTests.BATCH, timeoutTicks = 200)
+    @GameTest(template = "empty", batch = ShakonmakuTests.BATCH, timeoutTicks = 600)
     public static void theShakonmakuHoldsAFlyingShrieker(GameTestHelper helper) {
         ShakonmakuTests.Cleanup held = ShakonmakuTests.hold(helper, -23, -23);
         Vec3 start = new Vec3(-365.5, 120.0, -365.5), out = new Vec3(-376.5, 120.0, -376.5);
