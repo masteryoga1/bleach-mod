@@ -122,7 +122,7 @@ public final class GateKeeperTests {
      * Takes away the Rukongai's beasts about this gate's house and its keeper's ground, which the world's chunks are made
      * with: one that wanders under the gate while it is lifted holds its fall as a soul's body does.
      */
-    private static void clearBeasts(ServerLevel soul, int gate) {
+    static void clearBeasts(ServerLevel soul, int gate) {
         soul.getEntitiesOfClass(Animal.class, GateState.ground(gate).inflate(24.0, 16.0, 24.0)).forEach(Entity::discard);
     }
 
