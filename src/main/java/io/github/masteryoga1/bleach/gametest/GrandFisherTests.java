@@ -46,6 +46,8 @@ public final class GrandFisherTests {
     /** A blow that leaves it standing, and one that ends it. */
     private static final float BLOW = 20.0F;
     private static final float FATAL = 1000.0F;
+    /** The tag that names this test's Shinigami in a command. */
+    private static final String TAG = "bleach_grand_fisher_test";
 
     private GrandFisherTests() {
     }
@@ -112,8 +114,9 @@ public final class GrandFisherTests {
         ServerPlayer purifier = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(8.5, 2.0, 3.5));
         purifier.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, AWARE));
         HollowTests.arm(purifier, ModItems.ASAUCHI.get());
-        List<Component> said = GateTests.run(helper.getLevel(),
-                "bleach garganta " + purifier.getScoreboardName() + " grand_fisher");
+        // Named by a tag: every test player has the same name.
+        purifier.addTag(TAG);
+        List<Component> said = GateTests.run(helper.getLevel(), "bleach garganta @a[tag=" + TAG + ",limit=1] grand_fisher");
         helper.assertTrue(said.stream().anyMatch(line -> GateTests.says(line, "commands.bleach.unknown_hollow", -1)),
                 "/bleach garganta did not refuse grand_fisher: " + said.stream().map(Component::getString).toList());
         helper.assertFalse(GargantaEvents.openArrival(purifier, SoulLogic.get(purifier), HollowKind.GRAND_FISHER,

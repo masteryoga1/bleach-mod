@@ -113,6 +113,11 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_AMBIENT = variable("entity.grand_fisher.ambient");
     public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_HURT = variable("entity.grand_fisher.hurt");
     public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_DEATH = variable("entity.grand_fisher.death");
+    /** Its lure's sobbing, and her cry as she is hurt or cut off. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_LURE_SOB =
+            variable("entity.grand_fisher_lure.sob");
+    public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_LURE_CRY =
+            variable("entity.grand_fisher_lure.cry");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */

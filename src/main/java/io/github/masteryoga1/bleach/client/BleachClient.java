@@ -274,6 +274,7 @@ public final class BleachClient {
                 context -> new HollowRenderer<GrandFisher, GrandFisherModel>(context,
                         new GrandFisherModel(context.bakeLayer(BleachModelLayers.GRAND_FISHER)),
                         HollowKind.GRAND_FISHER, 90.0F));
+        event.registerEntityRenderer(ModEntities.GRAND_FISHER_LURE.get(), GrandFisherLureRenderer::new);
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
         event.registerEntityRenderer(ModEntities.CAJA_NEGACION.get(), CajaNegacionRenderer::new);

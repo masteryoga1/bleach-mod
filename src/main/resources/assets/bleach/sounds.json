@@ -502,6 +502,60 @@
       }
     ]
   },
+  "entity.grand_fisher_lure.sob": {
+    "subtitle": "subtitles.bleach.entity.grand_fisher_lure.sob",
+    "sounds": [
+      {
+        "name": "minecraft:mob/panda/worried/worried1",
+        "pitch": 0.9
+      },
+      {
+        "name": "minecraft:mob/panda/worried/worried2",
+        "pitch": 0.9
+      },
+      {
+        "name": "minecraft:mob/panda/worried/worried3",
+        "pitch": 0.9
+      },
+      {
+        "name": "minecraft:mob/panda/worried/worried4",
+        "pitch": 0.9
+      },
+      {
+        "name": "minecraft:mob/panda/worried/worried5",
+        "pitch": 0.9
+      },
+      {
+        "name": "minecraft:mob/panda/worried/worried6",
+        "pitch": 0.9
+      },
+      {
+        "name": "minecraft:mob/wolf/whine",
+        "pitch": 1.1
+      }
+    ]
+  },
+  "entity.grand_fisher_lure.cry": {
+    "subtitle": "subtitles.bleach.entity.grand_fisher_lure.cry",
+    "sounds": [
+      {
+        "name": "minecraft:mob/fox/screech1",
+        "pitch": 0.85
+      },
+      {
+        "name": "minecraft:mob/fox/screech2",
+        "pitch": 0.85
+      },
+      {
+        "name": "minecraft:mob/fox/screech3",
+        "pitch": 0.85
+      },
+      {
+        "name": "minecraft:mob/fox/screech4",
+        "pitch": 0.85
+      }
+    ]
+  },
   "entity.shrieker_leech.cling": {
     "subtitle": "subtitles.bleach.entity.shrieker_leech.cling",
     "sounds": [

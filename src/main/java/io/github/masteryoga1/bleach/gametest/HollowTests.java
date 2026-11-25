@@ -147,7 +147,7 @@ public final class HollowTests {
     }
 
     /** The translatable contents of a message, which must have this key. */
-    private static TranslatableContents translatable(GameTestHelper helper, Component message, String key) {
+    static TranslatableContents translatable(GameTestHelper helper, Component message, String key) {
         helper.assertTrue(message.getContents() instanceof TranslatableContents contents && contents.getKey().equals(key),
                 "the message was " + message.getContents() + ", not " + key);
         return (TranslatableContents) message.getContents();

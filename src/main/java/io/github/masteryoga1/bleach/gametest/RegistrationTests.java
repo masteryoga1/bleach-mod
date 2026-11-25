@@ -38,6 +38,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffects;
@@ -128,7 +129,7 @@ public final class RegistrationTests {
     @GameTest(template = "empty")
     public static void hollowsAndPlusesAreRegistered(GameTestHelper helper) {
         for (String name : List.of("spider_hollow", "hexapodus", "hound_hollow", "serpent_hollow", "fishbone_d", "plus",
-                "garganta", "shrieker", "shrieker_leech", "grand_fisher")) {
+                "garganta", "shrieker", "shrieker_leech", "grand_fisher", "grand_fisher_lure")) {
             helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.containsKey(BleachMod.id(name)), "bleach:" + name + " is not an entity type");
         }
         for (String name : List.of("spider_hollow_spawn_egg", "hexapodus_spawn_egg", "hound_hollow_spawn_egg",
@@ -140,7 +141,7 @@ public final class RegistrationTests {
                 "entity.shrieker.ambient", "entity.shrieker.hurt", "entity.shrieker.death", "entity.shrieker.swoop",
                 "entity.shrieker.flap", "entity.shrieker.loose", "entity.shrieker_leech.cling", "entity.shrieker.ring",
                 "entity.shrieker_leech.burst", "entity.grand_fisher.ambient", "entity.grand_fisher.hurt",
-                "entity.grand_fisher.death")) {
+                "entity.grand_fisher.death", "entity.grand_fisher_lure.sob", "entity.grand_fisher_lure.cry")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");
         }
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("denreishinki")).isPresent(),
@@ -151,6 +152,10 @@ public final class RegistrationTests {
         EntityType<?> fisher = ModEntities.GRAND_FISHER.get();
         helper.assertTrue(!fisher.canSerialize() && fisher.canSummon(),
                 "bleach:grand_fisher is saved, or cannot be summoned");
+        EntityType<?> lure = ModEntities.GRAND_FISHER_LURE.get();
+        helper.assertTrue(lure.is(SoulLogic.SPIRITS) && !lure.is(BleachTags.HOLLOWS) && !lure.canSerialize()
+                && !lure.canSummon(), "bleach:grand_fisher_lure is no spirit, is a Hollow, or is saved or summoned");
+        helper.assertTrue(lure.is(EntityTypeTags.CAN_BREATHE_UNDER_WATER), "bleach:grand_fisher_lure drowns");
         Optional<Holder.Reference<DamageType>> burst = helper.getLevel().registryAccess()
                 .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(ShriekerLeech.BURST);
         // Every leech that bursts at once lands, through the hurt cooldown the one before it left.

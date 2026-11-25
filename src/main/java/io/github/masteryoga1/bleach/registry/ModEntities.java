@@ -15,6 +15,7 @@ import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
+import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hexapodus;
 import io.github.masteryoga1.bleach.entity.Hollow;
@@ -241,6 +242,21 @@ public final class ModEntities {
                     .noSave()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("grand_fisher").toString()));
+
+    /**
+     * Grand Fisher's lure, a small girl on a stalk from its brow. Never saved and never summoned: it comes only from its
+     * body, and lives no longer than the session that gave it its body.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<GrandFisherLure>> GRAND_FISHER_LURE =
+            ENTITY_TYPES.register("grand_fisher_lure", () -> EntityType.Builder
+                    .<GrandFisherLure>of(GrandFisherLure::new, MobCategory.MISC)
+                    .sized(0.45F, 1.2F)
+                    .eyeHeight(1.0F)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("grand_fisher_lure").toString()));
 
     // ---- Arrancar ----
 
@@ -522,6 +538,7 @@ public final class ModEntities {
         event.put(ADJUCHAS.get(), Adjuchas.createAttributes().build());
         event.put(SHRIEKER.get(), Shrieker.createAttributes().build());
         event.put(GRAND_FISHER.get(), GrandFisher.createAttributes().build());
+        event.put(GRAND_FISHER_LURE.get(), GrandFisherLure.createAttributes().build());
         event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
         event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());

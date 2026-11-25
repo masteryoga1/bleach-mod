@@ -14,6 +14,7 @@ import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.Gillian;
 import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
+import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
@@ -1751,16 +1752,19 @@ public final class ClientSmokeTest {
             case 9022 -> command(minecraft, "kill @e[type=bleach:shrieker]");
             // A second, standing still in the air nearer the soul, for its leeches and its ring (see checkBosses).
             case 9065 -> command(minecraft, "summon bleach:shrieker ~ ~3 ~-6 " + STILL);
-            // Grand Fisher, standing still on the ground before the soul, facing it, in air cleared as for the Shrieker.
+            // Grand Fisher, standing still on the ground before the soul, facing it, in air cleared as for the Shrieker. It
+            // grows its lure on its first tick, between it and the soul.
             case GRAND_FISHER_AT -> {
                 command(minecraft, "tp @s ~ ~ ~ 180 -12");
                 command(minecraft, "fill ~-3 ~ ~-12 ~3 ~7 ~-1 air");
                 command(minecraft, "summon bleach:grand_fisher ~ ~ ~-9 " + STILL);
             }
-            // Its body and mask, and its bar at the top of the screen.
+            // Its body and mask, the girl before it, and its bar at the top of the screen.
             case GRAND_FISHER_AT + 40 -> shot(minecraft, "grand_fisher");
+            // Its body killed, its lure is cut off (see checkGrandFisher); she is killed after.
             case GRAND_FISHER_AT + 42 -> command(minecraft, "kill @e[type=bleach:grand_fisher]");
-            case GRAND_FISHER_AT + 85 -> {
+            case GRAND_FISHER_AT + 82 -> command(minecraft, "kill @e[type=bleach:grand_fisher_lure]");
+            case GRAND_FISHER_AT + 115 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2562,19 +2566,32 @@ public final class ClientSmokeTest {
                 "the second Shrieker killed by command still lives, or its leeches are still about");
     }
 
-    /** The checks of Grand Fisher's beat: the body reaching the client unhidden, looked at for its shot, then gone. */
+    /**
+     * The checks of Grand Fisher's beat: the body and its lure on her stalk reaching the client unhidden, looked at for
+     * their shot; her seen cut off once her body is killed; then both gone.
+     */
     private static void checkGrandFisher(Minecraft minecraft) {
-        if (expectWithin(minecraft, GRAND_FISHER_AT + 2, GRAND_FISHER_AT + 35, () -> nearest(minecraft, GrandFisher.class,
-                        SUMMONED_RANGE, fisher -> fisher.isAlive() && !ClientSouls.isHiddenFromViewer(fisher)) != null,
-                "the summoned Grand Fisher never reached the Arrancar's client unhidden")) {
-            GrandFisher fisher = nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive);
-            if (fisher != null) {
-                look(minecraft, fisher.position().add(0.0, fisher.getBbHeight() * 0.5, 0.0));
-            }
+        if (expectWithin(minecraft, GRAND_FISHER_AT + 2, GRAND_FISHER_AT + 35, () -> linkedLure(minecraft) != null,
+                "the summoned Grand Fisher and its lure on her stalk never reached the Arrancar's client unhidden")) {
+            GrandFisherLure lure = linkedLure(minecraft);
+            // Between the top of her head and its brow, so the body, its mask and the girl before it are all in the shot.
+            look(minecraft, lure.stalkEnd(1.0F).add(lure.body().brow(1.0F)).scale(0.5));
         }
-        expectWithin(minecraft, GRAND_FISHER_AT + 44, GRAND_FISHER_AT + 80,
-                () -> nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive) == null,
-                "Grand Fisher killed by command still lives");
+        expectWithin(minecraft, GRAND_FISHER_AT + 43, GRAND_FISHER_AT + 80, () -> nearest(minecraft, GrandFisherLure.class,
+                        SUMMONED_RANGE, lure -> lure.isAlive() && lure.isSevered()) != null,
+                "the lure of the Grand Fisher killed by command was never seen cut off on the Arrancar's client");
+        expectWithin(minecraft, GRAND_FISHER_AT + 84, GRAND_FISHER_AT + 110,
+                () -> nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive) == null
+                        && nearest(minecraft, GrandFisherLure.class, SUMMONED_RANGE, GrandFisherLure::isAlive) == null,
+                "Grand Fisher or its lure killed by command still lives");
+    }
+
+    /** The live lure about the soul on her stalk, her live body known, both unhidden on its client; null for none. */
+    @Nullable
+    private static GrandFisherLure linkedLure(Minecraft minecraft) {
+        return nearest(minecraft, GrandFisherLure.class, SUMMONED_RANGE, lure -> lure.isAlive() && !lure.isSevered()
+                && lure.body() != null && lure.body().isAlive() && !ClientSouls.isHiddenFromViewer(lure)
+                && !ClientSouls.isHiddenFromViewer(lure.body()));
     }
 
     /**
