@@ -150,9 +150,13 @@ public final class ZanpakutoEvents {
     /**
      * The soul learns its zanpakutō's name. The blade (if it is a nameless Asauchi or already the
      * soul's) is bound to it with the spirit's name, colour and form; the soul grows, the first time,
-     * and is told how to call it out.
+     * and is told how to call it out. A released Bankai ends first, as a seal ends it, with nothing said.
      */
     public static void learnName(Player player, SoulData data, ResourceLocation id, ZanpakutoSpirit spirit, ItemStack stack) {
+        if (data.bankaiActive) {
+            // The blade is bound again sealed or in Shikai, so no release may drain on over it.
+            ShikaiEvents.forceSeal(player, data, null);
+        }
         ZanpakutoBond bond = data.zanpakuto();
         boolean constant = spirit.isConstant();
         if (ZanpakutoLogic.isUnboundAsauchi(stack) || ZanpakutoLogic.isOwnBlade(stack, player)) {

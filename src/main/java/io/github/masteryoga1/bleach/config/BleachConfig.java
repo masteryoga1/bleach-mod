@@ -214,6 +214,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue LASH_RETRACT_TICKS;
 
     public static final ModConfigSpec.DoubleValue BANKAI_RELEASE_COST_RATIO;
+    public static final ModConfigSpec.DoubleValue BANKAI_DRAIN_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BANKAI_MIN_DRAIN;
     public static final ModConfigSpec.DoubleValue BANKAI_DAMAGE_MULTIPLIER;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
@@ -1407,6 +1409,13 @@ public final class BleachConfig {
                 .comment("A Bankai release's cost as a multiple of its Shikai release's, for a spirit whose file gives"
                         + " none. It never costs more than all of a soul's reiryoku.")
                 .defineInRange("release_cost_ratio", 2.4, 0.0, 10.0);
+        BANKAI_DRAIN_MULTIPLIER = builder
+                .comment("Bankai's drain as a multiple of its Shikai's, for a spirit whose file gives none.")
+                .defineInRange("drain_multiplier", 2.5, 0.0, 10.0);
+        BANKAI_MIN_DRAIN = builder
+                .comment("The least share of maximum reiryoku a Bankai drains each second, before Reiatsu Control"
+                        + " lowers it, for a spirit whose file gives none: a constant release's Shikai drains nothing.")
+                .defineInRange("min_drain", 0.01, 0.0, 1.0);
         BANKAI_DAMAGE_MULTIPLIER = builder
                 .comment("Bankai's attack damage as a multiple of its Shikai's, for a spirit whose file gives no form.")
                 .defineInRange("damage_multiplier", 1.5, 1.0, 10.0);

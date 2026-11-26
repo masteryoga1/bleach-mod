@@ -19,6 +19,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -223,23 +224,42 @@ public final class ZanpakutoItem extends SwordItem {
 
     /**
      * A released blade that can seal does so on the ground, however it got there: tossed, dropped on
-     * death or dispensed. The sealed copy replaces the stack so watching clients see the change.
+     * death or dispensed, and a constant release in Bankai falls back to Shikai. The changed copy
+     * replaces the stack so watching clients see the change.
      */
     @Override
     public boolean onEntityItemUpdate(ItemStack stack, ItemEntity entity) {
         if (!entity.level().isClientSide()) {
             ZanpakutoBlade blade = blade(stack);
-            if (blade.released() && !blade.constant()) {
-                ItemStack sealed = stack.copy();
-                ShikaiEvents.sealStack(sealed, entity.level());
-                if (blade(sealed).released()) {
-                    // Never left marked released, or this would run, and resend the stack, every tick.
-                    sealed.set(ModComponents.ZANPAKUTO_BLADE.get(), blade(sealed).withStage(ZanpakutoStage.SEALED));
+            if (ShikaiEvents.lapses(blade)) {
+                ItemStack lapsed = stack.copy();
+                ShikaiEvents.lapseStack(lapsed, entity.level());
+                if (ShikaiEvents.lapses(blade(lapsed))) {
+                    // Never left as it was, or this would run, and resend the stack, every tick.
+                    lapsed.set(ModComponents.ZANPAKUTO_BLADE.get(), blade(lapsed).withStage(
+                            blade.constant() ? ZanpakutoStage.SHIKAI : ZanpakutoStage.SEALED));
                 }
-                entity.setItem(sealed);
+                entity.setItem(lapsed);
             }
         }
         return false;
+    }
+
+    /**
+     * A blade in Bankai carried by anyone but its owner in Bankai falls back at once: to Shikai if it is a constant
+     * release, sealed otherwise. Only a player's own inventory ticks its stacks, so one kept in a chest, a frame or a
+     * mob's hand falls back when a player next carries it; its owner's own Bankai is kept in line by the upkeep.
+     */
+    @Override
+    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
+        ZanpakutoBlade blade = blade(stack);
+        if (level.isClientSide() || blade.stage() != ZanpakutoStage.BANKAI) {
+            return;
+        }
+        if (entity instanceof Player player && blade.isOwnedBy(player.getUUID()) && SoulLogic.get(player).isBankaiActive()) {
+            return;
+        }
+        ShikaiEvents.lapseStack(stack, level);
     }
 
     @Override

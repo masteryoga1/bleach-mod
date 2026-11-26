@@ -297,6 +297,19 @@ public final class ZanpakutoLogic {
     }
 
     /**
+     * Reiryoku a Bankai drains each tick, in place of its Shikai's: its file's share of the soul's maximum each second,
+     * or else its Shikai's made heavier by the server's config and never below its least. Reiatsu Control shrinks it
+     * as it does Shikai's.
+     */
+    public static float bankaiDrainPerTick(SoulData data, ZanpakutoSpirit spirit) {
+        double share = spirit.bankai().flatMap(ZanpakutoSpirit.Bankai::drain).map(Float::doubleValue)
+                .orElse(Math.max(BleachConfig.get(BleachConfig.BANKAI_MIN_DRAIN), spirit.drain()
+                        * BleachConfig.get(BleachConfig.SHIKAI_DRAIN_MULTIPLIER)
+                        * BleachConfig.get(BleachConfig.BANKAI_DRAIN_MULTIPLIER)));
+        return (float) (data.maxReiryoku() * share * drainFraction(data) / 20.0);
+    }
+
+    /**
      * The share of a release's drain this soul pays: Reiatsu Control shrinks it, down to the configured
      * floor. Shikai and an Arrancar's Resurrección both drain by it.
      */
