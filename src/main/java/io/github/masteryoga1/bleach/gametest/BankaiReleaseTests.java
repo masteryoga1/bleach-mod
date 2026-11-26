@@ -2,6 +2,7 @@ package io.github.masteryoga1.bleach.gametest;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
@@ -72,14 +73,14 @@ public final class BankaiReleaseTests {
     }
 
     /** A mock Shinigami (max 510) that has learned this spirit's name for the blade in its hand and reached its Bankai. */
-    private static Player reached(GameTestHelper helper, ResourceKey<ZanpakutoSpirit> key) {
+    static Player reached(GameTestHelper helper, ResourceKey<ZanpakutoSpirit> key) {
         Player player = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
         nameAndReach(helper, player, key);
         return player;
     }
 
     /** A joined Shinigami (max 510) that has learned this spirit's name for the blade in its hand and reached its Bankai. */
-    private static ServerPlayer joined(GameTestHelper helper, ResourceKey<ZanpakutoSpirit> key, Vec3 at) {
+    static ServerPlayer joined(GameTestHelper helper, ResourceKey<ZanpakutoSpirit> key, Vec3 at) {
         ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, at);
         player.setData(SoulAttachments.SOUL, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
         nameAndReach(helper, player, key);
@@ -96,24 +97,24 @@ public final class BankaiReleaseTests {
     }
 
     /** Asserts that a release now comes to this. */
-    private static void released(GameTestHelper helper, Player player, ShikaiEvents.Result expected, String what) {
+    static void released(GameTestHelper helper, Player player, ShikaiEvents.Result expected, String what) {
         ShikaiEvents.Result result = ShikaiEvents.release(player);
         helper.assertTrue(result == expected, what + " came to " + result + ", not " + expected);
     }
 
     /** Releases Shikai, lets it settle and calls Bankai; the test fails if either does not come. */
-    private static void toBankai(GameTestHelper helper, Player player) {
+    static void toBankai(GameTestHelper helper, Player player) {
         released(helper, player, ShikaiEvents.Result.RELEASED, "Shikai");
         player.tickCount += ShikaiEvents.SETTLE_TICKS;
         released(helper, player, ShikaiEvents.Result.BANKAI, "Bankai");
     }
 
-    private static ZanpakutoStage stage(ItemStack stack) {
+    static ZanpakutoStage stage(ItemStack stack) {
         return ZanpakutoItem.blade(stack).stage();
     }
 
     /** What the blade's own main-hand modifier of this kind adds, or NaN without one. */
-    private static double modifier(ItemStack stack, Holder<Attribute> attribute, ResourceLocation id) {
+    static double modifier(ItemStack stack, Holder<Attribute> attribute, ResourceLocation id) {
         ItemAttributeModifiers modifiers =
                 stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
         for (ItemAttributeModifiers.Entry entry : modifiers.modifiers()) {
@@ -124,7 +125,7 @@ public final class BankaiReleaseTests {
         return Double.NaN;
     }
 
-    private static double damageOf(ItemStack stack) {
+    static double damageOf(ItemStack stack) {
         return modifier(stack, Attributes.ATTACK_DAMAGE, Item.BASE_ATTACK_DAMAGE_ID);
     }
 
@@ -133,13 +134,13 @@ public final class BankaiReleaseTests {
     }
 
     /** The keys of these lines, oldest first. */
-    private static List<String> keys(List<Component> lines) {
+    static List<String> keys(List<Component> lines) {
         return lines.stream().<String>map(line -> line.getContents() instanceof TranslatableContents words
                 ? words.getKey() : line.getString()).toList();
     }
 
     /** Whether the last line on this joined player's action bar is this key's. */
-    private static boolean lastSaid(ServerPlayer player, String key) {
+    static boolean lastSaid(ServerPlayer player, String key) {
         List<Component> said = TestPlayers.actionBar(player);
         return !said.isEmpty() && translates(said.get(said.size() - 1), key);
     }
@@ -306,8 +307,8 @@ public final class BankaiReleaseTests {
     /**
      * A spirit file's own Bankai form, cost and drain stand in for the server config's: in Bankai the blade takes that
      * form, model and damage alike, the call costs that share of the soul's maximum, and it drains that share of it a
-     * second. Left to the config, a Shikai that costs the whole bar calls its Bankai for no more than the whole, at the
-     * ratio's most.
+     * second. A model alone keeps the config's numbers, and a file may not give both. Left to the config, a Shikai that
+     * costs the whole bar calls its Bankai for no more than the whole, at the ratio's most.
      */
     @GameTest(template = "empty")
     public static void aSpiritFilesBankaiOverridesTheConfig(GameTestHelper helper) {
@@ -329,6 +330,16 @@ public final class BankaiReleaseTests {
         float drain = ZanpakutoLogic.bankaiDrainPerTick(data, given);
         double share = data.maxReiryoku() * 0.02 * ZanpakutoLogic.drainFraction(data) / 20.0;
         helper.assertTrue(Math.abs(drain - share) < 1.0E-4, "the file's Bankai drains " + drain + " a tick, not " + share);
+        JsonObject modelled = BankaiTests.shippedFile(helper, "zabimaru");
+        modelled.getAsJsonObject("bankai").addProperty("model", 5);
+        ZanpakutoSpirit.Form looks =
+                ZanpakutoLogic.form(BankaiTests.parse(helper, modelled).orElseThrow(), ZanpakutoStage.BANKAI);
+        bankai.addProperty("model", 5);
+        String refused = ZanpakutoSpirit.CODEC.parse(helper.getLevel().registryAccess()
+                .createSerializationContext(JsonOps.INSTANCE), file).error().map(error -> error.message()).orElse("nothing");
+        helper.assertTrue(looks.equals(new ZanpakutoSpirit.Form(5, 12.0F, 1.4F, 3.0F))
+                        && refused.contains("bankai gives a form or a model, not both"),
+                "a file's Bankai model alone gives " + looks + ", and with a form too it was refused for " + refused);
 
         JsonObject dear = BankaiTests.shippedFile(helper, "zabimaru");
         dear.addProperty("release_cost", 1.0);
@@ -376,9 +387,9 @@ public final class BankaiReleaseTests {
 
     /**
      * Zangetsu, released for good, calls its Bankai too, for 2.4 times its Shikai release's cost; it drains 1% of
-     * maximum a second at least, though its Shikai drains nothing, and the soul does not refill; Tensa Zangetsu hits
-     * half again as hard as Zangetsu's Shikai, and no Jinzen is sat in it. The seal key steps it down to Shikai, where
-     * it cannot seal, and the release key calls it again.
+     * maximum a second at least, though its Shikai drains nothing, and the soul does not refill; Tensa Zangetsu, in its
+     * own model, hits half again as hard as Zangetsu's Shikai, and no Jinzen is sat in it. The seal key steps it down
+     * to Shikai, where it cannot seal, and the release key calls it again.
      */
     @GameTest(template = "empty")
     public static void zangetsuCallsBankaiAndStepsDownToShikai(GameTestHelper helper) {
@@ -391,7 +402,7 @@ public final class BankaiReleaseTests {
         released(helper, ichigo, ShikaiEvents.Result.BANKAI, "Tensa Zangetsu");
         float cost = data.maxReiryoku() * 0.05F * 2.4F;
         helper.assertTrue(Math.abs(before - data.reiryoku() - cost) < 0.01F && ZanpakutoItem.blade(blade).constant()
-                        && ZanpakutoTests.model(blade) == 1 && Math.abs(damageOf(blade) - 12.5) < EPSILON,
+                        && ZanpakutoTests.model(blade) == 4 && Math.abs(damageOf(blade) - 12.5) < EPSILON,
                 "Tensa Zangetsu cost " + (before - data.reiryoku()) + " and has damage " + damageOf(blade));
         double floor = data.maxReiryoku() * 0.01 * ZanpakutoLogic.drainFraction(data) / 20.0;
         float drain = ZanpakutoLogic.bankaiDrainPerTick(data, ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU));

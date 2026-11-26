@@ -82,6 +82,7 @@
     "name": {
       "translate": "zanpakuto.bleach.zangetsu.bankai"
     },
+    "model": 4,
     "ability": "speed",
     "test": "swords",
     "entity": "bleach:zangetsu_spirit"

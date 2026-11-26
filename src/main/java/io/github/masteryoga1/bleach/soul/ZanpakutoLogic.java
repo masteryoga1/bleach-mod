@@ -276,14 +276,15 @@ public final class ZanpakutoLogic {
     }
 
     /**
-     * Bankai's form: the one its spirit's file gives, or else Shikai's look, speed and reach with its damage made
-     * stronger by the server's config.
+     * Bankai's form: the one its spirit's file gives, or else the model its file gives (Shikai's if none) at Shikai's
+     * speed and reach, with Shikai's damage made stronger by the server's config.
      */
     private static ZanpakutoSpirit.Form bankaiForm(ZanpakutoSpirit spirit) {
         ZanpakutoSpirit.Form shikai = spirit.shikai();
+        int model = spirit.bankai().flatMap(ZanpakutoSpirit.Bankai::model).orElse(shikai.model());
         float damage = (float) (shikai.damage() * BleachConfig.get(BleachConfig.BANKAI_DAMAGE_MULTIPLIER));
         return spirit.bankai().flatMap(ZanpakutoSpirit.Bankai::form)
-                .orElse(new ZanpakutoSpirit.Form(shikai.model(), damage, shikai.speed(), shikai.reach()));
+                .orElse(new ZanpakutoSpirit.Form(model, damage, shikai.speed(), shikai.reach()));
     }
 
     /**
