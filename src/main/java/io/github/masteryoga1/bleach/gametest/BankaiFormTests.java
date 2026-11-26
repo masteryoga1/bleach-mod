@@ -417,8 +417,8 @@ public final class BankaiFormTests {
 
     /**
      * Tensa Zangetsu's coat is worn by its owner with it in his main hand in Bankai, and by nobody else: not by another
-     * soul with a copy of it in hand, not with it only in the off hand, not in Hihiō Zabimaru, whose Bankai has no look
-     * yet, not by a blade of its model out of Bankai, and not once it is stepped down to Shikai. The coat goes with the
+     * soul with a copy of it in hand, not with it only in the off hand, not in Hihiō Zabimaru, whose look is its pelt,
+     * not by a blade of its model out of Bankai, and not once it is stepped down to Shikai. The coat goes with the
      * model Zangetsu's file gives its Bankai. Every client draws the coat by this same reading of the held stack.
      */
     @GameTest(template = "empty")

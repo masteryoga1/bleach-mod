@@ -106,6 +106,10 @@ HIHIO_BONE = rgb(226, 218, 196)
 HIHIO_BONE_SHADE = rgb(170, 160, 136)
 HIHIO_MANE = rgb(186, 44, 40)
 HIHIO_GUM = rgb(90, 24, 28)
+# Its baboon pelt: shaggy fur, streaked darker, with paler tips.
+PELT_FUR = rgb(148, 116, 84)
+PELT_SHADE = rgb(104, 80, 58)
+PELT_TIP = rgb(196, 168, 128)
 # Tensa Zangetsu: a slim black blade with a pale edge, a black hilt, and the chain broken off its end.
 TENSA = rgb(24, 24, 28)
 TENSA_SHADE = rgb(10, 10, 12)
@@ -550,6 +554,41 @@ def hihio_zabimaru():
             elif 34 <= along < 42 and abs(across) <= 3:
                 eye = along in (36, 37) and across in (-1, 0)
                 c.put(px, py, HIHIO_GUM if eye else HIHIO_BONE_SHADE if abs(across) == 3 else HIHIO_BONE)
+    return c
+
+
+def hihio_zabimaru_segment():
+    """One of Hihiō Zabimaru's bone segments, for the serpent: bone shaded down its middle, cracked, with a red mane along
+    its back and fangs along a dark gum at its front."""
+    c = Canvas(16, 16)
+    c.rect(0, 0, 16, 16, HIHIO_BONE)
+    c.rect(0, 7, 16, 9, HIHIO_BONE_SHADE)
+    c.rect(0, 0, 16, 2, HIHIO_MANE)
+    for x in range(0, 16, 3):
+        c.put(x, 2, HIHIO_MANE)
+    for x in (4, 11):
+        c.rect(x, 3, x + 1, 7, HIHIO_BONE_SHADE)
+    c.rect(0, 12, 16, 13, HIHIO_GUM)
+    for x in range(1, 16, 4):
+        c.rect(x, 13, x + 2, 16, TOOTH)
+    return c
+
+
+def hihio_zabimaru_pelt():
+    """Hihiō Zabimaru's baboon pelt on the pelt model's 64x32 layout: the mane about the neck (a 10x3x6 box at 0, 0), the
+    mantle over the shoulders and chest (8x6x4 at 0, 9), the hide down the back (8x10x1 at 24, 9), torn along its foot,
+    and a pad on each shoulder (4x4x4 at 44, 0), all in shaggy fur, streaked with its shade and tipped paler."""
+    c = Canvas(64, 32)
+    for u, v, w, h, d in ((0, 0, 10, 3, 6), (0, 9, 8, 6, 4), (24, 9, 8, 10, 1), (44, 0, 4, 4, 4)):
+        box(c, u, v, w, h, d, PELT_FUR)
+        for x0, y0, x1, y1 in faces(u, v, w, h, d):
+            for x in range(x0, x1):
+                if x % 3 == 1:
+                    c.rect(x, y0 + (x % 2), x + 1, y1, PELT_SHADE)
+                elif x % 3 == 2:
+                    c.put(x, y0, PELT_TIP)
+    for x in range(24, 42, 3):
+        c.put(x, 19, CLEAR)
     return c
 
 
@@ -2488,6 +2527,7 @@ TEXTURES = {
     "entity/garganta.png": garganta,
     "entity/getsuga_tensho.png": getsuga_tensho,
     "entity/zabimaru_segment.png": zabimaru_segment,
+    "entity/hihio_zabimaru_segment.png": hihio_zabimaru_segment,
     "item/denreishinki.png": denreishinki,
     "item/hell_butterfly.png": hell_butterfly,
     "item/quincy_cross.png": quincy_cross,
@@ -2516,6 +2556,7 @@ TEXTURES = {
     "entity/heilig_pfeil.png": heilig_pfeil,
     "entity/blut_vene.png": blut_vene,
     "entity/tensa_zangetsu_coat.png": tensa_zangetsu_coat,
+    "entity/hihio_zabimaru_pelt.png": hihio_zabimaru_pelt,
     "item/sanrei_glove.png": sanrei_glove_icon,
     "item/seele_schneider.png": seele_schneider_icon,
     "item/seele_schneider_formed.png": seele_schneider_formed_icon,

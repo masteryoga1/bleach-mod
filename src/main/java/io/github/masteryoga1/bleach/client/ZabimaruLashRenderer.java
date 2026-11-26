@@ -6,11 +6,13 @@ import com.mojang.math.Axis;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -22,6 +24,8 @@ import net.minecraft.world.phys.Vec3;
  * Zabimaru lashing out: six blade segments strung along the line from the wielder's sword hand to
  * where the far blow landed (the lash's own position). The line runs out over the first few ticks,
  * holds, and draws back in before the lash ends. Nothing is drawn once the wielder is out of sight.
+ * Hihiō Zabimaru's serpent ({@link ZabimaruLash#isSerpent}) is drawn so too, as great bone segments, one for each
+ * {@link #SERPENT_SPACING} blocks of its length, swaying, small at the hand and largest at its head.
  */
 public final class ZabimaruLashRenderer extends EntityRenderer<ZabimaruLash> {
     private static final ResourceLocation TEXTURE = BleachMod.id("textures/entity/zabimaru_segment.png");
@@ -36,6 +40,27 @@ public final class ZabimaruLashRenderer extends EntityRenderer<ZabimaruLash> {
     /** Where the sword hand is, seen from outside: this share of the wielder's height up, and this far to the side. */
     private static final float HAND_HEIGHT = 0.6F;
     private static final float HAND_SIDE = 0.35F;
+    /** Hihiō Zabimaru's serpent, in bone segments. */
+    private static final ResourceLocation BONE_TEXTURE = BleachMod.id("textures/entity/hihio_zabimaru_segment.png");
+    private static final RenderType BONE = RenderType.entityCutoutNoCull(BONE_TEXTURE);
+    /** Blocks of the serpent's length to each segment, and the most segments drawn however long it is. */
+    private static final double SERPENT_SPACING = 0.8;
+    private static final int SERPENT_MOST = 24;
+    /** Half a bone segment's size, as {@link #HALF_WIDTH} and the rest are a blade segment's. */
+    private static final float BONE_HALF_WIDTH = 0.3F;
+    private static final float BONE_HALF_HEIGHT = 0.24F;
+    private static final float BONE_HALF_LENGTH = 0.34F;
+    /** How much larger the head is than a segment, and the share of a segment's size the one at the hand starts at. */
+    private static final float HEAD_GROWTH = 1.5F;
+    private static final float ROOT_SHARE = 0.35F;
+    /** How far the serpent sways to either side at its middle, in blocks, and how fast, in radians a tick. */
+    private static final float SWAY = 0.35F;
+    private static final float SWAY_SPEED = 0.7F;
+    /** Ticks the serpent takes to reach out fully, and to draw back. */
+    private static final float SERPENT_REACH_TICKS = 4.0F;
+
+    /** Serpents drawn since the game started, one for each in each frame, for the smoke test. */
+    private static int serpentsDrawn;
 
     public ZabimaruLashRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -49,26 +74,66 @@ public final class ZabimaruLashRenderer extends EntityRenderer<ZabimaruLash> {
             return;
         }
         float age = lash.age() + partialTick;
-        float out = Mth.clamp(Math.min(age, lash.lifeTicks() - age) / REACH_TICKS, 0.0F, 1.0F);
+        float reachTicks = lash.isSerpent() ? SERPENT_REACH_TICKS : REACH_TICKS;
+        float out = Mth.clamp(Math.min(age, lash.lifeTicks() - age) / reachTicks, 0.0F, 1.0F);
         // The pose's origin is the lash itself, where the blow landed.
         Vec3 hand = handPosition(owner, partialTick).subtract(lash.getPosition(partialTick));
         Vec3 reach = hand.scale(-out);
         if (out > 0.0F && reach.lengthSqr() > 1.0E-4) {
             float yaw = (float) Mth.atan2(reach.x, reach.z);
             float pitch = (float) -Mth.atan2(reach.y, reach.horizontalDistance());
-            VertexConsumer consumer = buffer.getBuffer(TYPE);
-            for (int i = 0; i < SEGMENTS; i++) {
-                Vec3 at = hand.add(reach.scale((i + 0.5) / SEGMENTS));
-                poseStack.pushPose();
-                poseStack.translate(at.x, at.y, at.z);
-                // Local +z along the line, out from the hand.
-                poseStack.mulPose(Axis.YP.rotation(yaw));
-                poseStack.mulPose(Axis.XP.rotation(pitch));
-                segment(consumer, poseStack.last(), packedLight, HALF_WIDTH, HALF_HEIGHT, HALF_LENGTH);
-                poseStack.popPose();
+            if (lash.isSerpent()) {
+                serpent(lash, partialTick, poseStack, buffer.getBuffer(BONE), hand, reach, yaw, pitch);
+            } else {
+                VertexConsumer consumer = buffer.getBuffer(TYPE);
+                for (int i = 0; i < SEGMENTS; i++) {
+                    Vec3 at = hand.add(reach.scale((i + 0.5) / SEGMENTS));
+                    poseStack.pushPose();
+                    poseStack.translate(at.x, at.y, at.z);
+                    // Local +z along the line, out from the hand.
+                    poseStack.mulPose(Axis.YP.rotation(yaw));
+                    poseStack.mulPose(Axis.XP.rotation(pitch));
+                    segment(consumer, poseStack.last(), packedLight, HALF_WIDTH, HALF_HEIGHT, HALF_LENGTH);
+                    poseStack.popPose();
+                }
             }
         }
         super.render(lash, entityYaw, partialTick, poseStack, buffer, packedLight);
+    }
+
+    /**
+     * Hihiō Zabimaru's serpent along the line from the hand out to {@code reach}, as far as it has come: a segment for
+     * each {@link #SERPENT_SPACING} blocks of the whole line (so they crowd as it comes out and draws in), lit where each
+     * is, as the line may run from shade into light, and swaying across the line, most at its middle.
+     */
+    private static void serpent(ZabimaruLash lash, float partialTick, PoseStack poseStack, VertexConsumer consumer,
+                                Vec3 hand, Vec3 reach, float yaw, float pitch) {
+        serpentsDrawn++;
+        Vec3 origin = lash.getPosition(partialTick);
+        float age = lash.age() + partialTick;
+        int segments = Mth.clamp(Mth.ceil(hand.length() / SERPENT_SPACING), 2, SERPENT_MOST);
+        for (int i = 0; i < segments; i++) {
+            float along = (i + 0.5F) / segments;
+            Vec3 at = hand.add(reach.scale(along));
+            float size = i == segments - 1 ? HEAD_GROWTH : Mth.lerp(along, ROOT_SHARE, 1.0F);
+            int light = LevelRenderer.getLightColor(lash.level(), BlockPos.containing(origin.add(at)));
+            poseStack.pushPose();
+            poseStack.translate(at.x, at.y, at.z);
+            poseStack.mulPose(Axis.YP.rotation(yaw));
+            poseStack.mulPose(Axis.XP.rotation(pitch));
+            poseStack.translate(SWAY * Mth.sin(Mth.PI * along) * Mth.sin(age * SWAY_SPEED + i), 0.0F, 0.0F);
+            segment(consumer, poseStack.last(), light, BONE_HALF_WIDTH * size, BONE_HALF_HEIGHT * size,
+                    BONE_HALF_LENGTH * size);
+            poseStack.popPose();
+        }
+    }
+
+    /**
+     * How many serpents have been drawn since the game started, one for each in each frame: the smoke test reads it to
+     * see the serpent drawn on the real client.
+     */
+    public static int serpentFrames() {
+        return serpentsDrawn;
     }
 
     /**
