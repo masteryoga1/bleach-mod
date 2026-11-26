@@ -9,6 +9,7 @@ import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -446,7 +447,7 @@ public final class ArrancarEvents {
         ArrancarLogic.Blade kind = ArrancarLogic.blade(player.getUUID());
         ItemStack stack = new ItemStack(ModItems.ARRANCAR_BLADE.get());
         stack.set(ModComponents.ZANPAKUTO_BLADE.get(), new ZanpakutoBlade(Optional.of(player.getUUID()),
-                player.getGameProfile().getName(), Optional.empty(), false, false, kind.colour()));
+                player.getGameProfile().getName(), Optional.empty(), ZanpakutoStage.SEALED, false, kind.colour()));
         stack.set(ModComponents.ARRANCAR_FORGING.get(), data.hollow().arrancar().forging());
         stack.set(DataComponents.ITEM_NAME, kind.displayName());
         refreshBlade(stack, ArrancarLogic.originFor(data));
@@ -463,7 +464,7 @@ public final class ArrancarEvents {
         ArrancarLogic.Blade kind = ArrancarLogic.blade(owner.getUUID());
         ItemStack stack = new ItemStack(ModItems.ARRANCAR_BLADE.get());
         stack.set(ModComponents.ZANPAKUTO_BLADE.get(), new ZanpakutoBlade(Optional.of(owner.getUUID()),
-                owner.getName().getString(), Optional.empty(), false, false, kind.colour()));
+                owner.getName().getString(), Optional.empty(), ZanpakutoStage.SEALED, false, kind.colour()));
         stack.set(DataComponents.ITEM_NAME, kind.displayName());
         refreshBlade(stack, origin);
         return stack;

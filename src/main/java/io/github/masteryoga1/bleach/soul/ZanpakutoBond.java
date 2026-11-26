@@ -34,11 +34,13 @@ import net.minecraft.util.Mth;
  * @param getsugaFired     how many Getsuga Tenshō the soul has loosed
  * @param getsugaNamed     whether Zangetsu has named the technique yet
  * @param lastSleepBondAt  when a night's sleep last grew the bond
+ * @param bankai           the road to Bankai and, once it is reached, its name (see {@link BankaiRecord}); this is the
+ *                         record's sixteenth field, the most a record codec takes, so anything more goes in there
  */
 public record ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Optional<ResourceLocation> spirit,
                             boolean named, Component name, boolean constant, boolean firstReleaseDone, int jinzens,
                             long lastJinzenBondAt, long testFailedAt, int testFailures, int whispered,
-                            int getsugaFired, boolean getsugaNamed, long lastSleepBondAt) {
+                            int getsugaFired, boolean getsugaNamed, long lastSleepBondAt, BankaiRecord bankai) {
     /** A full bond: the blade is ready to speak. */
     public static final int FULL = 1000;
     public static final int MAX_AFFINITY = 10000;
@@ -46,13 +48,14 @@ public record ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Opti
     public static final long NEVER = Long.MIN_VALUE / 2;
 
     public static final ZanpakutoBond NONE = new ZanpakutoBond(0, Map.of(), Optional.empty(), false,
-            CommonComponents.EMPTY, false, false, 0, NEVER, NEVER, 0, 0, 0, false, NEVER);
+            CommonComponents.EMPTY, false, false, 0, NEVER, NEVER, 0, 0, 0, false, NEVER, BankaiRecord.NONE);
 
     // Built on first use, so loading this class never starts SoulData's static set-up halfway through its own.
     private static final Codec<Map<ZanpakutoType, Integer>> AFFINITY_CODEC = Codec.lazyInitialized(
             () -> SoulData.enumKeyedMap(ZanpakutoType.class, ZanpakutoType.values()));
 
-    // Every field is read leniently, so one bad value falls back to its default on its own.
+    // Every field is read leniently, so one bad value falls back to its default on its own; a save from before Bankai
+    // has no "bankai" and reads as not having reached it.
     public static final Codec<ZanpakutoBond> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.lenientOptionalFieldOf("bond", 0).forGetter(ZanpakutoBond::bond),
             AFFINITY_CODEC.lenientOptionalFieldOf("affinity", Map.of()).forGetter(ZanpakutoBond::affinity),
@@ -69,7 +72,8 @@ public record ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Opti
             Codec.INT.lenientOptionalFieldOf("whispered", 0).forGetter(ZanpakutoBond::whispered),
             Codec.INT.lenientOptionalFieldOf("getsuga_fired", 0).forGetter(ZanpakutoBond::getsugaFired),
             Codec.BOOL.lenientOptionalFieldOf("getsuga_named", false).forGetter(ZanpakutoBond::getsugaNamed),
-            Codec.LONG.lenientOptionalFieldOf("last_sleep_bond_at", NEVER).forGetter(ZanpakutoBond::lastSleepBondAt)
+            Codec.LONG.lenientOptionalFieldOf("last_sleep_bond_at", NEVER).forGetter(ZanpakutoBond::lastSleepBondAt),
+            BankaiRecord.CODEC.lenientOptionalFieldOf("bankai", BankaiRecord.NONE).forGetter(ZanpakutoBond::bankai)
     ).apply(instance, ZanpakutoBond::new));
 
     /** Keeps every number in range, and drops leanings of nothing so equal bonds compare equal. */
@@ -81,6 +85,7 @@ public record ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Opti
         getsugaFired = Math.max(0, getsugaFired);
         spirit = spirit == null ? Optional.empty() : spirit;
         name = name == null ? CommonComponents.EMPTY : name;
+        bankai = bankai == null ? BankaiRecord.NONE : bankai;
         EnumMap<ZanpakutoType, Integer> clamped = new EnumMap<>(ZanpakutoType.class);
         if (affinity != null) {
             affinity.forEach((type, value) -> {
@@ -90,6 +95,15 @@ public record ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Opti
             });
         }
         affinity = Map.copyOf(clamped);
+    }
+
+    /** The bond as it was before Bankai: no road to it begun. */
+    public ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Optional<ResourceLocation> spirit,
+                         boolean named, Component name, boolean constant, boolean firstReleaseDone, int jinzens,
+                         long lastJinzenBondAt, long testFailedAt, int testFailures, int whispered,
+                         int getsugaFired, boolean getsugaNamed, long lastSleepBondAt) {
+        this(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens, lastJinzenBondAt, testFailedAt,
+                testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt, BankaiRecord.NONE);
     }
 
     /** The raw leaning towards one kind of spirit. */
@@ -103,7 +117,8 @@ public record ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Opti
 
     public ZanpakutoBond withBond(int value) {
         return new ZanpakutoBond(value, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     public ZanpakutoBond withAffinity(ZanpakutoType type, int value) {
@@ -111,64 +126,77 @@ public record ZanpakutoBond(int bond, Map<ZanpakutoType, Integer> affinity, Opti
         changed.putAll(affinity);
         changed.put(type, value);
         return new ZanpakutoBond(bond, changed, spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     /** The bond without the hidden leaning, for the owner's client. */
     public ZanpakutoBond withoutAffinity() {
         return new ZanpakutoBond(bond, Map.of(), spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     public ZanpakutoBond withSpirit(Optional<ResourceLocation> value) {
         return new ZanpakutoBond(bond, affinity, value, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     /** The soul has learned the name: the bond is full and the blade is its own. */
     public ZanpakutoBond asNamed(Component value, boolean constantRelease) {
         return new ZanpakutoBond(FULL, affinity, spirit, true, value, constantRelease, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     public ZanpakutoBond withFirstReleaseDone(boolean value) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, value, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     public ZanpakutoBond withJinzens(int value) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, value,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     public ZanpakutoBond withLastJinzenBondAt(long value) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
-                value, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                value, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt, bankai);
     }
 
     /** The soul failed its spirit's test just now, once more. */
     public ZanpakutoBond failed(long now) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, now, testFailures + 1, whispered, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, now, testFailures + 1, whispered, getsugaFired, getsugaNamed, lastSleepBondAt, bankai);
     }
 
     public ZanpakutoBond withWhispered(int quarter) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, quarter, getsugaFired, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, quarter, getsugaFired, getsugaNamed, lastSleepBondAt,
+                bankai);
     }
 
     public ZanpakutoBond withGetsugaFired(int count) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, count, getsugaNamed, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, count, getsugaNamed, lastSleepBondAt, bankai);
     }
 
     public ZanpakutoBond withGetsugaNamed(boolean value) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, value, lastSleepBondAt);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, value, lastSleepBondAt, bankai);
     }
 
     public ZanpakutoBond withLastSleepBondAt(long value) {
         return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
-                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, value);
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, value, bankai);
+    }
+
+    public ZanpakutoBond withBankai(BankaiRecord value) {
+        return new ZanpakutoBond(bond, affinity, spirit, named, name, constant, firstReleaseDone, jinzens,
+                lastJinzenBondAt, testFailedAt, testFailures, whispered, getsugaFired, getsugaNamed, lastSleepBondAt,
+                value);
     }
 }

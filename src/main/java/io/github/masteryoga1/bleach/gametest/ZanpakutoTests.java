@@ -28,6 +28,7 @@ import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -760,7 +761,7 @@ public final class ZanpakutoTests {
     @GameTest(template = "empty")
     public static void bladeComponentAndBondSurviveSavingAndSync(GameTestHelper helper) {
         ZanpakutoBlade blade = new ZanpakutoBlade(Optional.of(new UUID(11L, 13L)), "Ichigo",
-                Optional.of(ZanpakutoSpirits.ZANGETSU.location()), true, true, 0xBFEFFF);
+                Optional.of(ZanpakutoSpirits.ZANGETSU.location()), ZanpakutoStage.SHIKAI, true, 0xBFEFFF);
         JsonElement json = ZanpakutoBlade.CODEC.encodeStart(JsonOps.INSTANCE, blade).getOrThrow();
         ZanpakutoBlade saved = ZanpakutoBlade.CODEC.parse(JsonOps.INSTANCE, json).getOrThrow();
         helper.assertTrue(saved.equals(blade), "saved " + blade + " but loaded " + saved);
