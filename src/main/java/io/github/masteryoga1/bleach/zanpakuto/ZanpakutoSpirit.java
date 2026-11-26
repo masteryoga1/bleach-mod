@@ -8,6 +8,7 @@ import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
 
 /**
@@ -26,12 +27,13 @@ import net.minecraft.util.StringRepresentable;
  * @param releaseCost the share of maximum reiryoku a release costs, from 0 to 1 (default 0.05)
  * @param drain       the share of maximum reiryoku Shikai drains each second, from 0 to 1 (default 0.004)
  * @param tests       the steps of the test it sets in Jinzen, in order; none means it gives its name freely
- * @param bankaiName  the name of its Bankai, kept for later; nothing reads it yet
+ * @param bankai      its Bankai, if it has one (see {@link Bankai}); a file written before that record may give only
+ *                    {@code "bankai_name"}
  */
 public record ZanpakutoSpirit(ZanpakutoType type, Component name, Optional<Component> command, int colour,
                               Weights weights, Form sealed, Form shikai, Ability ability, float releaseCost,
                               float drain, InnerWorld innerWorld, List<TestStep> tests, JinzenScript script,
-                              Optional<Component> bankaiName) {
+                              Optional<Bankai> bankai) {
     /** A colour written as {@code "#RRGGBB"} (or a chat colour's name), read as its RGB value. */
     public static final Codec<Integer> COLOUR_CODEC = TextColor.CODEC.xmap(TextColor::getValue, TextColor::fromRgb);
 
@@ -49,8 +51,12 @@ public record ZanpakutoSpirit(ZanpakutoType type, Component name, Optional<Compo
             InnerWorld.CODEC.fieldOf("inner_world").forGetter(ZanpakutoSpirit::innerWorld),
             TestStep.CODEC.listOf().optionalFieldOf("tests", List.of()).forGetter(ZanpakutoSpirit::tests),
             JinzenScript.CODEC.fieldOf("script").forGetter(ZanpakutoSpirit::script),
-            ComponentSerialization.CODEC.optionalFieldOf("bankai_name").forGetter(ZanpakutoSpirit::bankaiName)
-    ).apply(instance, ZanpakutoSpirit::new)).validate(ZanpakutoSpirit::validate);
+            Bankai.CODEC.optionalFieldOf("bankai").forGetter(ZanpakutoSpirit::bankai),
+            ComponentSerialization.CODEC.optionalFieldOf("bankai_name").forGetter(spirit -> Optional.<Component>empty())
+    ).apply(instance, (type, name, command, colour, weights, sealed, shikai, ability, releaseCost, drain, innerWorld,
+            tests, script, bankai, bankaiName) -> new ZanpakutoSpirit(type, name, command, colour, weights, sealed, shikai,
+            ability, releaseCost, drain, innerWorld, tests, script, bankai.or(() -> bankaiName.map(Bankai::named)))))
+            .validate(ZanpakutoSpirit::validate);
 
     public ZanpakutoSpirit {
         tests = List.copyOf(tests);
@@ -221,6 +227,96 @@ public record ZanpakutoSpirit(ZanpakutoType type, Component name, Optional<Compo
         private final String name;
 
         Ability(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return name;
+        }
+    }
+
+    /**
+     * The spirit's Bankai, as the file's {@code "bankai"} gives it. Only the name must be given. A file that gives only
+     * the older {@code "bankai_name"} has a Bankai of that name with every other field at its default; one that gives
+     * both reads {@code "bankai"} and passes over the other.
+     *
+     * @param name        what the Bankai is called, which is not the spirit's own name
+     * @param form        its look and how it hits; left out, the Shikai's, made stronger by the server's config
+     * @param releaseCost the share of maximum reiryoku a Bankai release costs, from 0 to 1; left out, the Shikai's cost
+     *                    made dearer by the server's config
+     * @param drain       the share of maximum reiryoku Bankai drains each second, from 0 to 1; left out, the Shikai's
+     *                    drain made heavier by the server's config
+     * @param ability     the art the Bankai brings (default none)
+     * @param test        how the spirit tests the soul that would subjugate it (default none: a plain duel)
+     * @param entity      the entity type the spirit takes when it is drawn out into the world; without one it cannot be
+     */
+    public record Bankai(Component name, Optional<Form> form, Optional<Float> releaseCost, Optional<Float> drain,
+                         BankaiAbility ability, BankaiTest test, Optional<ResourceLocation> entity) {
+        public static final Codec<Bankai> CODEC = RecordCodecBuilder.<Bankai>create(instance -> instance.group(
+                ComponentSerialization.CODEC.fieldOf("name").forGetter(Bankai::name),
+                Form.CODEC.optionalFieldOf("form").forGetter(Bankai::form),
+                Codec.FLOAT.optionalFieldOf("release_cost").forGetter(Bankai::releaseCost),
+                Codec.FLOAT.optionalFieldOf("drain").forGetter(Bankai::drain),
+                BankaiAbility.CODEC.optionalFieldOf("ability", BankaiAbility.NONE).forGetter(Bankai::ability),
+                BankaiTest.CODEC.optionalFieldOf("test", BankaiTest.NONE).forGetter(Bankai::test),
+                ResourceLocation.CODEC.optionalFieldOf("entity").forGetter(Bankai::entity)
+        ).apply(instance, Bankai::new)).validate(Bankai::validate);
+
+        /** A Bankai of this name and nothing more, as a file that gives only {@code "bankai_name"} has. */
+        public static Bankai named(Component name) {
+            return new Bankai(name, Optional.empty(), Optional.empty(), Optional.empty(), BankaiAbility.NONE,
+                    BankaiTest.NONE, Optional.empty());
+        }
+
+        private static DataResult<Bankai> validate(Bankai bankai) {
+            if (bankai.releaseCost().isPresent() && !isFraction(bankai.releaseCost().get())) {
+                return DataResult.error(() -> "bankai.release_cost must be between 0 and 1, not "
+                        + bankai.releaseCost().get());
+            }
+            if (bankai.drain().isPresent() && !isFraction(bankai.drain().get())) {
+                return DataResult.error(() -> "bankai.drain must be between 0 and 1, not " + bankai.drain().get());
+            }
+            return DataResult.success(bankai);
+        }
+    }
+
+    /** The art a Bankai brings with its form. */
+    public enum BankaiAbility implements StringRepresentable {
+        NONE("none"),
+        /** Tensa Zangetsu's: all its power packed into one small blade, for speed. */
+        SPEED("speed"),
+        /** Hihiō Zabimaru's: a vast serpent of bone segments, with a blast from its jaws. */
+        SERPENT("serpent");
+
+        public static final Codec<BankaiAbility> CODEC = StringRepresentable.fromEnum(BankaiAbility::values);
+
+        private final String name;
+
+        BankaiAbility(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return name;
+        }
+    }
+
+    /** How a spirit drawn out into the world tests the soul that would subjugate it. */
+    public enum BankaiTest implements StringRepresentable {
+        /** A plain duel: it yields once it is beaten down. */
+        NONE("none"),
+        /** Zangetsu's: blades rise from the ground, and only the true one can hurt him. */
+        SWORDS("swords"),
+        /** Zabimaru's, the mod's own: the baboon and the snake must be beaten down together. */
+        TWO_HALVES("two_halves");
+
+        public static final Codec<BankaiTest> CODEC = StringRepresentable.fromEnum(BankaiTest::values);
+
+        private final String name;
+
+        BankaiTest(String name) {
             this.name = name;
         }
 

@@ -78,7 +78,12 @@
       }
     ]
   },
-  "bankai_name": {
-    "translate": "zanpakuto.bleach.zabimaru.bankai"
+  "bankai": {
+    "name": {
+      "translate": "zanpakuto.bleach.zabimaru.bankai"
+    },
+    "ability": "serpent",
+    "test": "two_halves",
+    "entity": "bleach:zabimaru_spirit"
   }
 }

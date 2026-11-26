@@ -78,7 +78,12 @@
       }
     ]
   },
-  "bankai_name": {
-    "translate": "zanpakuto.bleach.zangetsu.bankai"
+  "bankai": {
+    "name": {
+      "translate": "zanpakuto.bleach.zangetsu.bankai"
+    },
+    "ability": "speed",
+    "test": "swords",
+    "entity": "bleach:zangetsu_spirit"
   }
 }
