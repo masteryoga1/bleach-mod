@@ -299,12 +299,12 @@ public final class BleachClient {
 
     /**
      * Adds a Hollow's body (the hole, dark forearms and claws, and a Vasto Lorde's bone), the chain and
-     * mask layer, an Arrancar's number tattoo, the sheathed blade, Blut Vene's veins and the Quincy arts (the
-     * Sanrei Glove, Letzt Stil's burning lines, and Vollständig's wings and halo) to both player models (wide
+     * mask layer, an Arrancar's number tattoo, the sheathed blade, a Bankai's coat, Blut Vene's veins and the Quincy
+     * arts (the Sanrei Glove, Letzt Stil's burning lines, and Vollständig's wings and halo) to both player models (wide
      * and slim arms). The body goes under the mask, and the tattoo over a released Arrancar's body. The sheath
-     * takes the look of the blade the player carries, and the arts the look of the Quincy, as their appearance
-     * tells. The bodies a Gillian or Adjuchas player is drawn in instead are built afresh here too, since this
-     * comes again with every resource reload.
+     * takes the look of the blade the player carries, the coat the look of the blade in its hand, and the arts the
+     * look of the Quincy, as their appearance tells. The bodies a Gillian or Adjuchas player is drawn in instead are
+     * built afresh here too, since this comes again with every resource reload.
      */
     private static void addLayers(EntityRenderersEvent.AddLayers event) {
         MenosPlayerRenderer.build(event.getContext());
@@ -317,6 +317,7 @@ public final class BleachClient {
                 playerRenderer.addLayer(new TattooLayer(playerRenderer, skin == PlayerSkin.Model.SLIM));
                 playerRenderer.addLayer(new SayaLayer<>(playerRenderer,
                         player -> SheathLook.forModel(ClientSouls.appearance(player).sheathModel())));
+                playerRenderer.addLayer(new BankaiCoatLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new BlutLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new SanreiGloveLayer(playerRenderer, event.getEntityModels()));
                 playerRenderer.addLayer(new LetztStilLayer(playerRenderer));

@@ -11,7 +11,7 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
  * The mod's own entity model layers. The Spider Hollow and the Hexapodus borrow the vanilla spider's
  * layer and the Plus the villager's, so only the Hollows with models of their own are here, with
  * what the Quincy arts put on a player: the Sanrei Glove, Vollständig's wings and halo, and the
- * shell Blut Vene's veins are drawn on over armour; and a Hollow player's mask.
+ * shell Blut Vene's veins are drawn on over armour; a Hollow player's mask; and a Bankai's coat.
  */
 public final class BleachModelLayers {
     public static final ModelLayerLocation HOUND_HOLLOW = layer("hound_hollow");
@@ -30,6 +30,8 @@ public final class BleachModelLayers {
     private static final CubeDeformation VEIN_SHELL_SIZE = new CubeDeformation(1.25F);
     /** A Hollow player's bone mask, worn on the head (see {@link HollowMaskModel}). */
     public static final ModelLayerLocation HOLLOW_PLAYER_MASK = layer("hollow_player_mask");
+    /** A Bankai's coat, over the garb and armour and under Blut Vene's shell (see {@link BankaiCoatModel}). */
+    public static final ModelLayerLocation BANKAI_COAT = layer("bankai_coat");
 
     private BleachModelLayers() {
     }
@@ -54,5 +56,6 @@ public final class BleachModelLayers {
         event.registerLayerDefinition(VEIN_SHELL,
                 () -> LayerDefinition.create(HumanoidArmorModel.createBodyLayer(VEIN_SHELL_SIZE), 64, 64));
         event.registerLayerDefinition(HOLLOW_PLAYER_MASK, HollowMaskModel::createLayer);
+        event.registerLayerDefinition(BANKAI_COAT, BankaiCoatModel::createLayer);
     }
 }

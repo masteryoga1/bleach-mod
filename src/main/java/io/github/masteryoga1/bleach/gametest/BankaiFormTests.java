@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
+import io.github.masteryoga1.bleach.registry.ModComponents;
 import io.github.masteryoga1.bleach.soul.BankaiForms;
 import io.github.masteryoga1.bleach.soul.FlashStep;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
@@ -15,6 +16,7 @@ import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import io.github.masteryoga1.bleach.zanpakuto.BankaiLook;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
@@ -411,5 +413,56 @@ public final class BankaiFormTests {
     private static String described(GetsugaTensho crescent) {
         return crescent == null ? "nothing" : (crescent.isBlack() ? "a black one" : "a pale one") + " of "
                 + crescent.damage() + " in " + Integer.toHexString(crescent.colour() & 0xFFFFFF);
+    }
+
+    /**
+     * Tensa Zangetsu's coat is worn by its owner with it in his main hand in Bankai, and by nobody else: not by another
+     * soul with a copy of it in hand, not with it only in the off hand, not in Hihiō Zabimaru, whose Bankai has no look
+     * yet, not by a blade of its model out of Bankai, and not once it is stepped down to Shikai. The coat goes with the
+     * model Zangetsu's file gives its Bankai. Every client draws the coat by this same reading of the held stack.
+     */
+    @GameTest(template = "empty")
+    public static void theCoatIsWornOnlyWithOwnBladeInBankai(GameTestHelper helper) {
+        Player ichigo = BankaiReleaseTests.reached(helper, ZanpakutoSpirits.ZANGETSU);
+        ItemStack blade = ichigo.getMainHandItem();
+        BankaiReleaseTests.toBankai(helper, ichigo);
+        helper.assertTrue(BankaiLook.worn(ichigo) == BankaiLook.TENSA_ZANGETSU,
+                "in Tensa Zangetsu its owner wears " + BankaiLook.worn(ichigo));
+
+        Player other = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
+        other.setItemInHand(InteractionHand.MAIN_HAND, blade.copy());
+        helper.assertTrue(BankaiLook.worn(other) == BankaiLook.NONE,
+                "another soul with Tensa Zangetsu in hand wears " + BankaiLook.worn(other));
+
+        ichigo.setItemInHand(InteractionHand.OFF_HAND, blade);
+        ichigo.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        helper.assertTrue(BankaiLook.worn(ichigo) == BankaiLook.NONE,
+                "with Tensa Zangetsu in the off hand its owner wears " + BankaiLook.worn(ichigo));
+        // Tensa Zangetsu's model on a blade that is not in Bankai, as a datapack's Shikai might give it.
+        ItemStack staged = blade.copy();
+        staged.set(ModComponents.ZANPAKUTO_BLADE.get(), ZanpakutoItem.blade(staged).withStage(ZanpakutoStage.SHIKAI));
+        ichigo.setItemInHand(InteractionHand.MAIN_HAND, staged);
+        helper.assertTrue(BankaiLook.worn(ichigo) == BankaiLook.NONE,
+                "a blade of Tensa Zangetsu's model in Shikai gave its owner " + BankaiLook.worn(ichigo));
+        ichigo.setItemInHand(InteractionHand.MAIN_HAND, blade);
+        ichigo.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
+
+        Player renji = BankaiReleaseTests.reached(helper, ZanpakutoSpirits.ZABIMARU);
+        BankaiReleaseTests.toBankai(helper, renji);
+        helper.assertTrue(BankaiLook.worn(renji) != BankaiLook.TENSA_ZANGETSU,
+                "in Hihiō Zabimaru its owner wears Tensa Zangetsu's coat");
+
+        ZanpakutoSpirit zangetsu = ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU);
+        int tensa = ZanpakutoLogic.form(zangetsu, ZanpakutoStage.BANKAI).model();
+        helper.assertTrue(BankaiLook.TENSA_ZANGETSU.model() == tensa && ZanpakutoTests.model(blade) == tensa
+                        && BankaiLook.forModel(tensa) == BankaiLook.TENSA_ZANGETSU
+                        && BankaiLook.forModel(BankaiLook.NONE.model()) == BankaiLook.NONE,
+                "the coat goes with model " + BankaiLook.TENSA_ZANGETSU.model() + ", the blade has "
+                        + ZanpakutoTests.model(blade) + " and Zangetsu's file gives its Bankai " + tensa);
+
+        helper.assertTrue(ShikaiEvents.seal(ichigo) == ShikaiEvents.Result.STEPPED_DOWN
+                        && BankaiLook.worn(ichigo) == BankaiLook.NONE,
+                "stepped down to Shikai, its owner wears " + BankaiLook.worn(ichigo));
+        helper.succeed();
     }
 }
