@@ -80,6 +80,7 @@ public final class SoulEvents {
         HollowEvents.register(bus);
         HollowPlayerEvents.register(bus);
         GargantaEvents.register(bus);
+        bus.addListener(GrandFisherComing::onServerTick);
         PlusEvents.register(bus);
         ZanpakutoEvents.register(bus);
         ShikaiEvents.register(bus);

@@ -8,31 +8,38 @@ import io.github.masteryoga1.bleach.world.LasNochesResidents;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.EventHooks;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * Grand Fisher as a boss of the ledger, and its ambush. One about at a time, counted as its body or, once that is gone, a
  * lure of its that has not yet faded; away {@code [bosses.grand_fisher] return_days} once its body dies, killed or
- * purified alike. No tear brings it, and for now it comes only by a summon: only its lure, laid out of the soul's sight
- * to sob and wait, as its body lies hidden in the ground. When the soul comes near her or strikes her, the body bursts
- * out of the ground beside her.
+ * purified alike. No tear brings it. It comes by itself to the souls it hunts in the Overworld, likelier in rain, or by a
+ * summon: only its lure, laid out of the soul's sight to sob and wait, as its body lies hidden in the ground. When the
+ * soul comes near her or strikes her, the body bursts out of the ground beside her.
  */
 public final class GrandFisherComing implements Boss {
     public static final String ID = "grand_fisher";
     public static final GrandFisherComing BOSS = new GrandFisherComing();
 
+    /** How often the server rolls for an ambush: once a minute. */
+    private static final int CHECK_TICKS = 1200;
     /** Spots tried for a laid lure, the first by water winning. Water within this many blocks across is by water. */
     private static final int LAY_TRIES = 24;
     private static final int BY_WATER = 2;
@@ -77,7 +84,7 @@ public final class GrandFisherComing implements Boss {
         return lure.isAlive() && (body == null || !body.isAlive());
     }
 
-    /** Its lure laid for the player, 12 to 24 blocks off and out of their sight, as it comes for now; no body yet. */
+    /** Its lure laid for the player, 12 to 24 blocks off and out of their sight, as the ambush lays her; no body yet. */
     @Nullable
     @Override
     public Component summon(MinecraftServer server, @Nullable ServerPlayer near) {
@@ -89,6 +96,61 @@ public final class GrandFisherComing implements Boss {
     }
 
     // ---- The ambush ----
+
+    /** Once a minute, never on a game-test server, the server rolls for its ambush ({@link #roll}). */
+    public static void onServerTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        if (server.getTickCount() % CHECK_TICKS == 0 && !(server instanceof GameTestServer)) {
+            roll(server, server.overworld().getRandom(), false);
+        }
+    }
+
+    /**
+     * One roll for its ambush, where the Overworld allows it: if Grand Fisher may come (its wait over and none about), one
+     * of the Overworld's souls it hunts is drawn, and on the chance, likelier if it rains on them, its lure is laid for
+     * them. Forced, the chance is not drawn, and every other rule holds. The lure laid, or null.
+     */
+    @Nullable
+    public static GrandFisherLure roll(MinecraftServer server, RandomSource random, boolean forced) {
+        ServerLevel level = server.overworld();
+        if (!worldAllows(level)) {
+            return null;
+        }
+        List<ServerPlayer> prey = level.players().stream().filter(GrandFisherComing::hunts).toList();
+        if (prey.isEmpty() || !BOSS.mayCome(server, BossLedger.now(server))) {
+            return null;
+        }
+        ServerPlayer soul = prey.get(random.nextInt(prey.size()));
+        if (!forced && random.nextDouble() >= chance(level.isRainingAt(soul.blockPosition()))) {
+            return null;
+        }
+        return lay(soul, GargantaEvents.SPOT_MIN_DISTANCE, GargantaEvents.SPOT_MAX_DISTANCE);
+    }
+
+    /** Whether this world lets it come by itself: the Overworld, not on Peaceful, with mobs spawning. */
+    public static boolean worldAllows(ServerLevel level) {
+        return level.dimension() == Level.OVERWORLD && level.getDifficulty() != Difficulty.PEACEFUL
+                && level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING);
+    }
+
+    /**
+     * Whether it hunts this soul: alive, playing by survival's rules, seeing spirits, no Arrancar, and of at least the
+     * config's maximum reiryoku, as it preys on the spiritually gifted.
+     */
+    public static boolean hunts(Player player) {
+        if (!player.isAlive() || !HollowPlayerLogic.survivalRules(player) || !SoulLogic.hasSoul(player)) {
+            return false;
+        }
+        SoulData data = SoulLogic.get(player);
+        return SoulLogic.isAware(data) && data.state() != SoulState.ARRANCAR
+                && data.maxReiryoku() >= BleachConfig.get(BleachConfig.GRAND_FISHER_AMBUSH_MIN_REIRYOKU);
+    }
+
+    /** The chance its lure is laid on one roll: the config's, times its rain weight when it rains on the soul. */
+    public static double chance(boolean rain) {
+        double chance = BleachConfig.get(BleachConfig.GRAND_FISHER_AMBUSH_CHANCE);
+        return Math.min(1.0, rain ? chance * BleachConfig.get(BleachConfig.GRAND_FISHER_RAIN_WEIGHT) : chance);
+    }
 
     /**
      * Lays its lure for this soul: on open ground between these distances from it, out of its sight, by water if any

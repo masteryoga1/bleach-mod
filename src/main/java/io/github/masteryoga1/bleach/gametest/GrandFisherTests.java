@@ -64,8 +64,8 @@ public final class GrandFisherTests {
      * Where a summoned lure may be laid from her prey, her centre to theirs: 12 to 24 blocks, give or take the most a
      * spot's move to its block's centre adds. And how squarely she faces them.
      */
-    private static final double LAID_NEAREST = 11.25;
-    private static final double LAID_FURTHEST = 24.75;
+    static final double LAID_NEAREST = 11.25;
+    static final double LAID_FURTHEST = 24.75;
     private static final double FACING = 0.99;
     /** The tag that names this test's Shinigami in a command. */
     private static final String TAG = "bleach_grand_fisher_test";
