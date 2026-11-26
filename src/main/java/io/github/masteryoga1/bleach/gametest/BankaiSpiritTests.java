@@ -1,9 +1,12 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
 import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.Materialisation;
 import io.github.masteryoga1.bleach.soul.ReiatsuFleeGoal;
@@ -11,12 +14,17 @@ import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.Stat;
+import io.github.masteryoga1.bleach.soul.VisoredEvents;
+import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
@@ -24,9 +32,20 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageSources;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -37,8 +56,9 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for the materialised spirits: a spirit's body set up from its wielder, drawn out by its call, and gone home at
- * each of its wielder's ends. Each test asks only about its own wielders and spirits.
+ * Tests for the materialised spirits: a spirit's body set up from its wielder, drawn out by its call, gone home at each
+ * of its wielder's ends, fighting its wielder alone down to its floor, and kept out of the inner Hollow's fight. Each
+ * test asks only about its own wielders and spirits.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -107,6 +127,29 @@ public final class BankaiSpiritTests {
     /** Whether a spirit is gone: no longer held for its wielder, and out of the world. */
     private static boolean gone(Player wielder, MaterialisedSpirit spirit) {
         return !Materialisation.holds(wielder.getUUID()) && spirit.isRemoved();
+    }
+
+    /** Whether this joined player was shown a line of this key on its action bar. */
+    private static boolean told(ServerPlayer player, String key) {
+        return TestPlayers.actionBar(player).stream().anyMatch(line -> GateTests.says(line, key, -1));
+    }
+
+    /** A mock host as VisoredTests makes one: a Shinigami who knows Zangetsu's name, 900 reiryoku, full, at the middle. */
+    private static Player host(GameTestHelper helper) {
+        Player player = wielder(helper, MIDDLE);
+        SoulLogic.get(player).setMaxReiryoku(900.0F);
+        SoulLogic.get(player).setReiryoku(900.0F);
+        return player;
+    }
+
+    /** A Hollow rooted in this soul a day ago, ready to be faced now, as VisoredTests readies one. */
+    private static void ready(SoulData data, long now) {
+        VisoredLogic.setRecord(data, VisoredLogic.record(data).withRootedAt(now - 24_000L).withDuelReadyAt(now));
+    }
+
+    /** Ends the host's fight with its inner Hollow, as VisoredTests does, so none is left in the table for another test. */
+    private static void end(long now, Player host) {
+        VisoredEvents.endAll(host, SoulLogic.get(host), now);
     }
 
     /**
@@ -267,5 +310,165 @@ public final class BankaiSpiritTests {
             home.run();
             helper.succeed();
         }));
+    }
+
+    /**
+     * T4. A spirit fights its wielder alone: Zangetsu, with his cleaver, which has nothing of a blade's power, at full
+     * health by the wielder's maximum reiryoku and with a blow by that and its Zanjutsu. No one else's blow reaches it (a
+     * bystander's melee, arrow and Getsuga Tenshō, a zombie's, an explosion's and the fire's), while its wielder's
+     * melee, arrow and Getsuga Tenshō land; it may attack its wielder and no one else, and keeps its wielder, invisible,
+     * for its target; one whose wielder is in creative mode waits with none.
+     */
+    @GameTest(template = "field", timeoutTicks = 40)
+    public static void aSpiritFightsOnlyItsWielder(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Player ichigo = wielder(helper, FLOOR);
+        SoulData soul = SoulLogic.get(ichigo);
+        soul.setLevel(Stat.ZANJUTSU, 10);
+        if (refusedOnPeaceful(helper, ichigo)) {
+            return;
+        }
+        Player creative = helper.makeMockPlayer(GameType.CREATIVE);
+        creative.setData(SoulAttachments.SOUL, soul.copy());
+        stand(helper, creative, MIDDLE);
+        Player bystander = wielder(helper, MIDDLE);
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, 3, 2, 12);
+        Runnable home = () -> {
+            sendSpiritsHome(ichigo, creative);
+            zombie.discard();
+        };
+        HihioZabimaruTests.clearingOnFailure(home, () -> {
+            MaterialisedSpirit spirit = drawOut(helper, ichigo);
+            drawOut(helper, creative);
+            double root = Math.sqrt(soul.maxReiryoku());
+            double health = BleachConfig.get(BleachConfig.BANKAI_SPIRIT_HEALTH_BASE)
+                    + BleachConfig.get(BleachConfig.BANKAI_SPIRIT_HEALTH_PER_ROOT) * root;
+            double blow = (BleachConfig.get(BleachConfig.BANKAI_SPIRIT_BLOW_BASE)
+                    + BleachConfig.get(BleachConfig.BANKAI_SPIRIT_BLOW_PER_ROOT) * root) * SoulLogic.zanjutsuMultiplier(soul);
+            double attack = spirit.getAttributeValue(Attributes.ATTACK_DAMAGE);
+            helper.assertTrue(Math.abs(spirit.getMaxHealth() - health) < 1.0E-3 && spirit.getHealth() == spirit.getMaxHealth()
+                            && Math.abs(attack - blow) < 1.0E-3 && SoulLogic.zanjutsuMultiplier(soul) > 1.0F,
+                    "Zangetsu's health " + spirit.getMaxHealth() + " or blow " + attack + " is not " + health + ", " + blow);
+            ItemStack blade = spirit.getMainHandItem();
+            helper.assertTrue(blade.is(ModItems.ASAUCHI.get()) && ZanpakutoTests.model(blade) == 1
+                            && ItemAttributeModifiers.EMPTY.equals(blade.get(DataComponents.ATTRIBUTE_MODIFIERS)),
+                    "Zangetsu holds " + blade + ", not the cleaver with nothing of its power");
+
+            DamageSources sources = level.damageSources();
+            Arrow arrow = new Arrow(EntityType.ARROW, level);
+            float whole = spirit.getHealth();
+            for (DamageSource source : List.of(sources.playerAttack(bystander), sources.arrow(arrow, bystander),
+                    getsuga(level, arrow, bystander), sources.mobAttack(zombie), sources.explosion(null, null),
+                    sources.inFire())) {
+                helper.assertTrue(!spirit.hurt(source, 5.0F) && spirit.getHealth() == whole,
+                        "a blow of " + source.getMsgId() + " from " + source.getEntity() + " reached the spirit");
+            }
+            for (DamageSource source : List.of(sources.playerAttack(ichigo), sources.arrow(arrow, ichigo),
+                    getsuga(level, arrow, ichigo))) {
+                spirit.invulnerableTime = 0;
+                helper.assertTrue(spirit.hurt(source, 5.0F) && spirit.getHealth() < whole,
+                        "its wielder's blow of " + source.getMsgId() + " did not land");
+                whole = spirit.getHealth();
+            }
+            helper.assertTrue(spirit.canAttack(ichigo) && !spirit.canAttack(bystander) && !spirit.canAttack(zombie),
+                    "the spirit may attack someone besides its wielder");
+            ichigo.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, 200));
+        });
+        helper.runAfterDelay(20, () -> HihioZabimaruTests.clearingOnFailure(home, () -> {
+            MaterialisedSpirit spirit = Materialisation.of(ichigo.getUUID());
+            MaterialisedSpirit waiting = Materialisation.of(creative.getUUID());
+            helper.assertTrue(spirit != null && spirit.getTarget() == ichigo,
+                    "the spirit lost its invisible wielder: " + (spirit == null ? null : spirit.getTarget()));
+            helper.assertTrue(waiting != null && waiting.getTarget() == null, "a creative wielder's spirit went, or took "
+                    + (waiting == null ? null : waiting.getTarget()) + " for its target");
+            home.run();
+            helper.succeed();
+        }));
+    }
+
+    /** A Getsuga Tenshō's blow, its wave (here this projectile) the direct cause and this soul the one who loosed it. */
+    private static DamageSource getsuga(ServerLevel level, Entity wave, Player owner) {
+        return new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                .getHolderOrThrow(GetsugaTensho.DAMAGE_TYPE), wave, owner);
+    }
+
+    /**
+     * T5. A spirit is beaten down to its floor and no further: a blow past it leaves it there, alive, however many more
+     * come, and on its next tick it goes home, its wielder told so as it was told it came out. Its bar, named for it,
+     * shows its wielder alone, with another soul who sees spirits beside it. {@code /kill} passes the floor.
+     */
+    @GameTest(template = "field", timeoutTicks = 30)
+    public static void aSpiritStopsAtItsFloorAndGoesHome(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ServerPlayer ichigo = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F), true);
+        ServerPlayer other = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F), true);
+        stand(helper, ichigo, FLOOR);
+        stand(helper, other, MIDDLE);
+        if (refusedOnPeaceful(helper, ichigo)) {
+            return;
+        }
+        Player killed = wielder(helper, MIDDLE);
+        Runnable home = () -> sendSpiritsHome(ichigo, killed);
+        MaterialisedSpirit spirit = drawOut(helper, ichigo);
+        HihioZabimaruTests.clearingOnFailure(home, () -> {
+            helper.assertTrue(told(ichigo, "message.bleach.spirit.out"), "the wielder was not told its spirit came out");
+            spirit.bar().refresh();
+            helper.assertTrue(spirit.bar().players().size() == 1 && spirit.bar().players().contains(ichigo)
+                            && GateTests.says(spirit.bar().event().getName(), "bossbar.bleach.zangetsu_spirit", -1),
+                    "Zangetsu's bar shows " + spirit.bar().players() + " as " + spirit.bar().event().getName());
+            float floor = spirit.floor();
+            double share = BleachConfig.get(BleachConfig.BANKAI_SPIRIT_FLOOR_SHARE);
+            helper.assertTrue(Math.abs(floor - spirit.getMaxHealth() * share) < 1.0E-3, "the floor is " + floor);
+            spirit.hurt(level.damageSources().playerAttack(ichigo), 10_000.0F);
+            helper.assertTrue(spirit.isAlive() && Math.abs(spirit.getHealth() - floor) < 1.0E-2 && spirit.beaten(),
+                    "a blow past the floor left " + spirit.getHealth() + " of a floor of " + floor);
+            spirit.invulnerableTime = 0;
+            spirit.hurt(level.damageSources().playerAttack(ichigo), 10_000.0F);
+            helper.assertTrue(spirit.isAlive() && Math.abs(spirit.getHealth() - floor) < 1.0E-2,
+                    "a second blow at the floor took it to " + spirit.getHealth());
+            MaterialisedSpirit victim = drawOut(helper, killed);
+            victim.hurt(level.damageSources().genericKill(), Float.MAX_VALUE);
+            helper.assertTrue(victim.isDeadOrDying(), "/kill did not pass the spirit's floor");
+        });
+        helper.runAfterDelay(2, () -> HihioZabimaruTests.clearingOnFailure(home, () -> {
+            helper.assertTrue(gone(ichigo, spirit) && spirit.bar().players().isEmpty() && other.isAlive(),
+                    "a beaten spirit did not go home, or left its bar up, or the soul beside it died");
+            helper.assertTrue(told(ichigo, "message.bleach.spirit.beaten"), "the wielder was not told its spirit was beaten");
+            home.run();
+            helper.succeed();
+        }));
+    }
+
+    /**
+     * T7. No spirit is drawn out while its wielder faces its inner Hollow, and none is out for it then; once that fight
+     * ends, one is, and a fight begun again sends it home on its next tick, run here by hand so that no fight outlives
+     * this tick of the test.
+     */
+    @GameTest(template = "field")
+    public static void aSpiritIsRefusedAndSentHomeInADuel(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player host = host(helper);
+        SoulData data = SoulLogic.get(host);
+        ready(data, now);
+        if (refusedOnPeaceful(helper, host)) {
+            return;
+        }
+        try {
+            VisoredEvents.DuelStart start = VisoredEvents.beginDuel(host, data, now, false);
+            Materialisation.Call call = Materialisation.callOut(host);
+            helper.assertTrue(start == VisoredEvents.DuelStart.STARTED && call == Materialisation.Call.BUSY
+                    && Materialisation.of(host.getUUID()) == null, "the fight " + start + ", and the call in it " + call);
+            end(now, host);
+            MaterialisedSpirit spirit = drawOut(helper, host);
+            ready(data, now);
+            start = VisoredEvents.beginDuel(host, data, now, false);
+            spirit.tick();
+            helper.assertTrue(start == VisoredEvents.DuelStart.STARTED && gone(host, spirit),
+                    "a spirit out stayed as its wielder's fight with its inner Hollow came to " + start);
+        } finally {
+            end(now, host);
+            sendSpiritsHome(host);
+        }
+        helper.succeed();
     }
 }

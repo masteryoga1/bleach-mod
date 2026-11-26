@@ -226,6 +226,11 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_SWEEP_SHARE;
     public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_BLAST_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_BLAST_RANGE;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_HEALTH_BASE;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_HEALTH_PER_ROOT;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_BLOW_BASE;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_BLOW_PER_ROOT;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_FLOOR_SHARE;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1466,6 +1471,27 @@ public final class BleachConfig {
         BANKAI_SERPENT_BLAST_RANGE = builder
                 .comment("How far Hikotsu Taihō reaches, in blocks, from the serpent's jaws.")
                 .defineInRange("blast_range", 32.0, 4.0, 128.0);
+        builder.pop();
+        builder.push("spirit");
+        BANKAI_SPIRIT_HEALTH_BASE = builder
+                .comment("A zanpakutō spirit's health, drawn out, before it is scaled to its wielder (2 is a heart): half"
+                        + " again the inner Hollow's, as Bankai is half again Shikai's blow.")
+                .defineInRange("health_base", 45.0, 1.0, 1024.0);
+        BANKAI_SPIRIT_HEALTH_PER_ROOT = builder
+                .comment("Health it gains per square root of its wielder's maximum reiryoku: 90 more at 900, and never"
+                        + " more than 1,024 in all.")
+                .defineInRange("health_per_root", 3.0, 0.0, 64.0);
+        BANKAI_SPIRIT_BLOW_BASE = builder
+                .comment("Its blow before it is scaled to its wielder.")
+                .defineInRange("blow_base", 2.0, 0.0, 100.0);
+        BANKAI_SPIRIT_BLOW_PER_ROOT = builder
+                .comment("Blow it gains per square root of its wielder's maximum reiryoku: 3 more at 900. The whole is"
+                        + " then multiplied by its wielder's Zanjutsu, as a blade's is, and is never more than 30.")
+                .defineInRange("blow_per_root", 0.1, 0.0, 10.0);
+        BANKAI_SPIRIT_FLOOR_SHARE = builder
+                .comment("The share of its full health that no blow takes a spirit below but /kill: beaten there, it goes"
+                        + " home.")
+                .defineInRange("floor_share", 0.1, 0.01, 0.5);
         builder.pop();
         builder.pop();
 

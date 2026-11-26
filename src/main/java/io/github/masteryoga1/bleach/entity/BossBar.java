@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
@@ -44,11 +45,19 @@ public final class BossBar {
     private boolean hidden;
     /** Ticks until who sees the bar is looked at again; the first tick looks at once. */
     private int untilRefresh;
+    /** Who of those who may see it is shown it: all, unless its boss's fight is one soul's ({@link #onlyFor}). */
+    private Predicate<ServerPlayer> shownTo = viewer -> true;
 
     /** A bar for this boss, named by its lang key, shown from its first tick unless hidden first. */
     public BossBar(LivingEntity owner, String key, BossEvent.BossBarColor color, BossEvent.BossBarOverlay overlay) {
         this.owner = owner;
         this.event = new ServerBossEvent(Component.translatable(key), color, overlay);
+    }
+
+    /** Shows the bar only to those of its viewers this lets through, for a fight that is one soul's; this bar. */
+    public BossBar onlyFor(Predicate<ServerPlayer> shownTo) {
+        this.shownTo = shownTo;
+        return this;
     }
 
     public static void register(IEventBus bus) {
@@ -77,6 +86,7 @@ public final class BossBar {
         }
         event.setProgress(progress(owner));
         List<ServerPlayer> viewers = viewers(level, owner.position());
+        viewers.removeIf(shownTo.negate());
         // Those who left go first, by object: a respawned soul's new player has its old self's entity id, so equals would
         // keep the old one and never show the new one the bar (mc PlayerList.java:437, Entity.java:341-348).
         for (ServerPlayer shown : List.copyOf(event.getPlayers())) {
