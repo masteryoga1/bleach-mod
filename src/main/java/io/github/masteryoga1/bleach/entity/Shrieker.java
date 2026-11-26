@@ -35,7 +35,8 @@ import net.minecraft.world.phys.Vec3;
  * blocks as any mob does, so walls, Sekkiseki and the Shakonmaku hold it. From its circle it looses its leeches at its
  * prey a few at a time ({@link ShriekerLeech}). Its bar shows to the souls about it who see spirits. It is always a
  * sinner, as it was a killer in life. Its health, the damage of its swoop and its brood are the server's to set. It is
- * never saved, and for now comes only by command.
+ * never saved, and comes one at a time, at night for a strong soul (see {@link
+ * io.github.masteryoga1.bleach.soul.ShriekerComing}).
  *
  * <p>Once every leech it loosed clings, none near its head, it hangs still and rings its forked tongue; as the ring ends
  * each clinging leech bursts. A blow to its mask while it rings breaks the ring off, and one of its own leeches sent back
@@ -115,8 +116,7 @@ public class Shrieker extends Hollow {
 
     /**
      * Its own goals in place of a Hollow's: the fight in the air for the bite on foot and the leap, a flyer's wander for
-     * the walk, and no gathering to a bait, which never holds a Hollow that comes only by command. Its prey is sought as
-     * far up and down as across.
+     * the walk, and no gathering to a bait, whose waves never bring one. Its prey is sought as far up and down as across.
      */
     @Override
     protected void registerGoals() {

@@ -111,6 +111,10 @@ public final class GargantaEvents {
             if (ArrancarNpcEvents.tryNaturalArrival(player, data, now)) {
                 return;
             }
+            // Now and then, at night, a strong soul draws the Shrieker, while none is about and its days away are over.
+            if (ShriekerComing.tryComing(player, data, now, level.isNight(), player.getRandom().nextDouble())) {
+                return;
+            }
             // A strong soul now and then draws a Menos Grande instead, while the server has room for one here,
             // and a Menos Hollow player more often, so the Menos it must devour to rise do come.
             HollowKind menos = Menos.arrivalKind(data.maxReiryoku(), HollowTier.of(data).isMenos(),
@@ -120,16 +124,23 @@ public final class GargantaEvents {
     }
 
     /**
-     * Whether a Garganta may open near this soul now: the world allows it (not in a game test), and
-     * the soul is alive, in survival or adventure mode, aware and not an Arrancar, past its grace after
-     * joining, not on a field trial, and not under an Academy instructor's protection. A Hollow player
-     * draws them too, and they come as its rivals (see {@link HollowLogic#isRival}).
+     * Whether a Garganta may open near this soul now: not on the game-test server, whose tests bring their own, and as
+     * {@link #mayArriveInPlay} says.
      */
     public static boolean mayArriveNear(ServerPlayer player, SoulData data, long now) {
+        return !(player.server instanceof GameTestServer) && mayArriveInPlay(player, data, now);
+    }
+
+    /**
+     * Whether the world and this soul allow a Garganta near it now, the game-test server's refusal aside (for tests): the
+     * world allows it, and the soul is alive, in survival or adventure mode, aware and not an Arrancar, past its grace
+     * after joining, not on a field trial, and not under an Academy instructor's protection. A Hollow player draws them
+     * too, and they come as its rivals (see {@link HollowLogic#isRival}).
+     */
+    public static boolean mayArriveInPlay(ServerPlayer player, SoulData data, long now) {
         ServerLevel level = player.serverLevel();
-        if (player.server instanceof GameTestServer
-                || !HollowLogic.worldAllowsArrivals(level.getDifficulty(),
-                        level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING), level.dimension() == Level.OVERWORLD)) {
+        if (!HollowLogic.worldAllowsArrivals(level.getDifficulty(),
+                level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING), level.dimension() == Level.OVERWORLD)) {
             return false;
         }
         if (!player.isAlive() || !player.gameMode.isSurvival() || !SoulLogic.hasSoul(player)

@@ -77,7 +77,7 @@ public final class BossLedgerTests {
     }
 
     /** The tears drawn by this player, in every world. */
-    private static List<GargantaRift> riftsFor(MinecraftServer server, ServerPlayer player) {
+    static List<GargantaRift> riftsFor(MinecraftServer server, ServerPlayer player) {
         List<GargantaRift> rifts = new ArrayList<>();
         server.getAllLevels().forEach(level -> rifts.addAll(level.getEntities(ModEntities.GARGANTA.get(),
                 rift -> player.getUUID().equals(rift.drawer()))));
@@ -85,7 +85,7 @@ public final class BossLedgerTests {
     }
 
     /** The Shriekers this player drew, about it. */
-    private static List<Shrieker> drawnBy(ServerLevel level, ServerPlayer player) {
+    static List<Shrieker> drawnBy(ServerLevel level, ServerPlayer player) {
         return level.getEntitiesOfClass(Shrieker.class, player.getBoundingBox().inflate(48.0),
                 shrieker -> player.getUUID().equals(shrieker.drawer()));
     }
