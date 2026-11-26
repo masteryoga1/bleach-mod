@@ -93,13 +93,39 @@ public final class Materialisation {
      * happens: {@link Call#NO_SPIRIT}.
      */
     public static Call callOut(Player wielder) {
+        return callOut(wielder, false);
+    }
+
+    /**
+     * Draws the wielder's spirit out as {@link #callOut(Player)} does, but when {@code replacing} a spirit out already is
+     * no refusal: it stays out until the new one has room, then goes home quietly just before the new one comes.
+     */
+    public static Call callOut(Player wielder, boolean replacing) {
+        return draw(wielder, replacing, true);
+    }
+
+    /**
+     * The first of the call's refusals from the wielder dead to Peaceful, or null when none holds; when
+     * {@code replacing}, a spirit out already is none. Nothing joins the world: the body made to learn its type is dropped.
+     */
+    @Nullable
+    public static Call refusal(Player wielder, boolean replacing) {
+        Call call = draw(wielder, replacing, false);
+        return call == Call.CALLED ? null : call;
+    }
+
+    /**
+     * The call, its refusals written once: when {@code adding}, the spirit drawn out or no room for it; otherwise
+     * CALLED once nothing from the wielder dead to Peaceful refuses, before its spot is sought.
+     */
+    private static Call draw(Player wielder, boolean replacing, boolean adding) {
         if (!(wielder.level() instanceof ServerLevel level)) {
             return Call.NO_SPIRIT;
         }
         if (!wielder.isAlive()) {
             return Call.DEAD;
         }
-        if (of(wielder.getUUID()) != null) {
+        if (!replacing && of(wielder.getUUID()) != null) {
             return Call.ALREADY;
         }
         SoulData data = SoulLogic.get(wielder);
@@ -124,6 +150,9 @@ public final class Materialisation {
         if (level.getDifficulty() == Difficulty.PEACEFUL) {
             return Call.PEACEFUL;
         }
+        if (!adding) {
+            return Call.CALLED;
+        }
         Vec3 spot = spot(level, wielder, body.getType());
         if (spot == null) {
             return Call.NO_ROOM;
@@ -134,6 +163,12 @@ public final class Materialisation {
         body.moveTo(spot.x, spot.y, spot.z, yaw, 0.0F);
         body.setYHeadRot(yaw);
         body.setYBodyRot(yaw);
+        MaterialisedSpirit out = of(wielder.getUUID());
+        if (out != null) {
+            // Replaced, it goes with no line of its own: the new one's says what came.
+            burst(level, out);
+            out.discard();
+        }
         // Held before it joins the world, so its first tick finds itself its wielder's.
         CALLED.put(wielder.getUUID(), body);
         if (!level.addFreshEntity(body)) {

@@ -64,4 +64,9 @@ public record BankaiRecord(long achievedAt, Component name, long windowEndsAt, O
     public BankaiRecord reached(long now, Component value) {
         return new BankaiRecord(now, value, ZanpakutoBond.NEVER, Optional.empty(), 1.0F, tries, lastTryAt, shikaiTicks);
     }
+
+    /** A bout against the spirit begins now: one more try, and the last of them now. */
+    public BankaiRecord tried(long now) {
+        return new BankaiRecord(achievedAt, name, windowEndsAt, doll, spiritHealth, tries + 1, now, shikaiTicks);
+    }
 }

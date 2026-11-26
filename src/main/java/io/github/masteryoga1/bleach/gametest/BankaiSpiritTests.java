@@ -77,20 +77,20 @@ public final class BankaiSpiritTests {
     }
 
     /** A mock Shinigami who knows Zangetsu's name, standing at this spot of the test and facing south. */
-    private static Player wielder(GameTestHelper helper, Vec3 relative) {
+    static Player wielder(GameTestHelper helper, Vec3 relative) {
         Player player = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZANGETSU);
         stand(helper, player, relative);
         return player;
     }
 
     /** Moves this player to a spot of the test, keeping its facing; a joined one is told, so it stays there. */
-    private static void stand(GameTestHelper helper, Player player, Vec3 relative) {
+    static void stand(GameTestHelper helper, Player player, Vec3 relative) {
         Vec3 at = helper.absoluteVec(relative);
         player.teleportTo(at.x, at.y, at.z);
     }
 
     /** The wielder's spirit drawn out by its call, or the test fails saying why not. */
-    private static MaterialisedSpirit drawOut(GameTestHelper helper, Player wielder) {
+    static MaterialisedSpirit drawOut(GameTestHelper helper, Player wielder) {
         Materialisation.Call call = Materialisation.callOut(wielder);
         MaterialisedSpirit spirit = Materialisation.of(wielder.getUUID());
         helper.assertTrue(call == Materialisation.Call.CALLED && spirit != null, "the spirit was not drawn out: " + call);
@@ -130,12 +130,12 @@ public final class BankaiSpiritTests {
     }
 
     /** Whether a spirit is gone: no longer held for its wielder, and out of the world. */
-    private static boolean gone(Player wielder, MaterialisedSpirit spirit) {
+    static boolean gone(Player wielder, MaterialisedSpirit spirit) {
         return !Materialisation.holds(wielder.getUUID()) && spirit.isRemoved();
     }
 
     /** Whether this joined player was shown a line of this key on its action bar. */
-    private static boolean told(ServerPlayer player, String key) {
+    static boolean told(ServerPlayer player, String key) {
         return TestPlayers.actionBar(player).stream().anyMatch(line -> GateTests.says(line, key, -1));
     }
 
