@@ -235,6 +235,7 @@ public final class BleachClient {
                         return INNER_HOLLOW_TEXTURE;
                     }
                 });
+        event.registerEntityRenderer(ModEntities.ZANGETSU_SPIRIT.get(), ZangetsuSpiritRenderer::new);
         // Spiders end on their backs when they die; the rest fall on their sides, all but the Gillian.
         event.registerEntityRenderer(ModEntities.SPIDER_HOLLOW.get(),
                 context -> new HollowRenderer<SpiderHollow, SpiderModel<SpiderHollow>>(context,

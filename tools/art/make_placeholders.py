@@ -201,6 +201,10 @@ GLOVE_CUFF = QUINCY_BLUE
 INNER_SKIN = rgb(232, 234, 238)
 INNER_ROBE = rgb(208, 210, 216)
 HOLLOW_IRIS = rgb(236, 200, 40)
+# Zangetsu drawn out: a weathered old man's skin, grey at the jaw, and his shirt, which is the mod's own.
+ZANGETSU_SKIN = rgb(206, 172, 140)
+ZANGETSU_STUBBLE = rgb(126, 116, 106)
+ZANGETSU_SHIRT = rgb(84, 80, 88)
 # Sekkiseki, the Seireiheki's stone: pale grey, faintly flecked, with darker joints.
 SEKKISEKI = rgb(222, 222, 214)
 SEKKISEKI_FLECK = rgb(204, 204, 197)
@@ -2062,6 +2066,56 @@ def inner_hollow():
     return c
 
 
+def zangetsu_spirit():
+    """Zangetsu drawn out, in the player skin layout with wide arms: a weathered face under long, dark, wavy hair that
+    falls past the jaw at the sides and down the back of the neck, dark glasses across the eyes and grey stubble on the
+    jaw; a dark shirt, hands bare, and black boots. His long ragged coat is drawn on the overlays in Tensa Zangetsu's
+    colours: the jacket closed to the chest and open below, its back under the hair, sleeves to the wrist with torn
+    cuffs, and its skirt on the trouser layers down past the knee, torn along the hem and open at the front."""
+    c = Canvas(64, 64)
+    box(c, 0, 0, 8, 8, 8, ZANGETSU_SKIN)    # the head
+    c.rect(8, 0, 16, 8, BLACK)              # the top of the head
+    c.rect(0, 8, 8, 16, BLACK)              # the right side, hair to the jaw
+    c.rect(16, 8, 32, 16, BLACK)            # the left side and the back
+    c.rect(8, 8, 16, 10, BLACK)             # hair over the brow
+    for x in range(8, 16, 3):               # its waves along the brow
+        c.put(x, 10, BLACK)
+    c.rect(9, 11, 15, 13, VOID)             # the glasses, the bridge between them
+    c.put(12, 11, ZANGETSU_SKIN)
+    mottle(c, 9, 14, 15, 16, ZANGETSU_STUBBLE, 2)
+    box(c, 16, 16, 8, 12, 4, ZANGETSU_SHIRT)
+    box(c, 40, 16, 4, 12, 4, ZANGETSU_SHIRT)
+    c.rect(40, 30, 56, 32, ZANGETSU_SKIN)   # the hands
+    c.rect(48, 16, 52, 20, ZANGETSU_SKIN)
+    box(c, 32, 48, 4, 12, 4, ZANGETSU_SHIRT)
+    c.rect(32, 62, 48, 64, ZANGETSU_SKIN)
+    c.rect(40, 48, 44, 52, ZANGETSU_SKIN)
+    for u, v in ((0, 16), (16, 48)):        # the legs, dark, in black boots from the shin
+        box(c, u, v, 4, 12, 4, ZANGETSU_SHIRT)
+        c.rect(u, v + 10, u + 16, v + 16, BLACK)
+        c.rect(u + 8, v, u + 12, v + 4, BLACK)
+    # The coat: the jacket layer, closed at the chest and open from the waist, the hair down its back's top rows.
+    box(c, 16, 32, 8, 12, 4, COAT)
+    c.rect(23, 42, 25, 48, CLEAR)
+    for x in (17, 34, 38):
+        c.rect(x, 37, x + 1, 48, COAT_FOLD)
+    c.rect(32, 36, 40, 39, BLACK)
+    # The sleeves, torn at the cuff.
+    for u, v in ((40, 32), (48, 48)):
+        box(c, u, v, 4, 12, 4, COAT)
+        c.rect(u, v + 4, u + 1, v + 14, COAT_FOLD)
+        ragged(c, u, u + 16, v + 14, COAT)
+        c.rect(u, v + 15, u + 16, v + 16, CLEAR)
+    # The skirt on the trouser layers, past the knee, torn at the hem and open at the front of each leg.
+    for u, v in ((0, 32), (0, 48)):
+        box(c, u, v, 4, 12, 4, COAT)
+        c.rect(u + 5, v + 4, u + 7, v + 16, CLEAR)
+        ragged(c, u, u + 16, v + 12, COAT)
+        c.rect(u, v + 13, u + 16, v + 16, CLEAR)
+        c.rect(u + 4, v, u + 12, v + 4, CLEAR)
+    return c
+
+
 def hollow_player_mask():
     """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
     between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
@@ -2586,6 +2640,7 @@ TEXTURES = {
     "entity/training_dummy.png": training_dummy,
     **{"entity/gate_keeper/%s.png" % name: gate_keeper(gate) for gate, name in enumerate(GATE_NAMES)},
     "entity/inner_hollow.png": inner_hollow,
+    "entity/zangetsu_spirit.png": zangetsu_spirit,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,

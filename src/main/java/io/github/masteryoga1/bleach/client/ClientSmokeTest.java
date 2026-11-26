@@ -33,6 +33,7 @@ import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
+import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
@@ -386,11 +387,19 @@ public final class ClientSmokeTest {
     /**
      * The first tick of Hihiō Zabimaru's beat, 30 ticks after Tensa Zangetsu's ends, so that its first release falls well
      * past the 40-tick settle that Tensa Zangetsu's seal at {@code BANKAI_AT + 100} began. Its steps and checks count
-     * from here, and the run ends after.
+     * from here.
      */
     private static final int HIHIO_AT = BANKAI_AT + 150;
     /** Hihiō Zabimaru's model number, as Zabimaru's file gives its Bankai, and sealed Zabimaru's. */
     private static final int HIHIO_MODEL = 5, ZABIMARU_SEALED_MODEL = 2;
+    /**
+     * The first tick of the materialised spirits' beat, as Hihiō Zabimaru's ends, 15 ticks after its seal; no step
+     * here releases Bankai, so the settle does not apply.
+     * Its steps and checks count from here, and the run ends after.
+     */
+    private static final int SPIRITS_AT = HIHIO_AT + 120;
+    /** How many times a spirit's body had been drawn as it came out. */
+    private static int spiritsDrawn;
     /** How far before the soul's eyes the golem its serpent lashes at is hung, and the tag it is killed by. */
     private static final double LASHED_AHEAD = 8.0;
     private static final String LASHED_TAG = "bleach_smoke_lashed";
@@ -665,6 +674,7 @@ public final class ClientSmokeTest {
         checkGrandFisher(minecraft);
         checkBankai(minecraft, player, soul);
         checkHihioZabimaru(minecraft, player);
+        checkSpirits(minecraft);
         if (finished) {
             return;
         }
@@ -1921,7 +1931,19 @@ public final class ClientSmokeTest {
                 command(minecraft, "kill @e[type=minecraft:iron_golem,tag=" + LASHED_TAG + "]");
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }
-            case HIHIO_AT + 120 -> {
+            // Zangetsu summoned four blocks before the soul, facing it; the soul looks at him a little down, from its eyes.
+            case SPIRITS_AT -> {
+                spiritsDrawn = ZangetsuSpiritRenderer.drawnFrames();
+                command(minecraft, "tp @s ~ ~ ~ 180 10");
+                command(minecraft, "summon bleach:zangetsu_spirit ~ ~ ~-4 {Rotation:[0.0f,0.0f]}");
+            }
+            case SPIRITS_AT + 45 -> command(minecraft, "kill @e[type=bleach:zangetsu_spirit,distance=..16]");
+            // After the last window, nothing of the beat is left for one after it: the soul's eyes level, its own view.
+            case SPIRITS_AT + 59 -> {
+                command(minecraft, "tp @s ~ ~ ~ ~ 0");
+                minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            }
+            case SPIRITS_AT + 60 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2935,6 +2957,28 @@ public final class ClientSmokeTest {
                 && nearest(minecraft, ZabimaruLash.class, 32.0, lash -> true) == null;
     }
 
+    /** The checks of the spirits' beat: Zangetsu out, drawn in his own skin, then gone. */
+    private static void checkSpirits(Minecraft minecraft) {
+        if (expectWithin(minecraft, SPIRITS_AT + 2, SPIRITS_AT + 40, () -> zangetsuOut(minecraft),
+                "Zangetsu never came out on the client, drawn in his own skin")) {
+            shot(minecraft, "zangetsu_spirit");
+        }
+        expectWithin(minecraft, SPIRITS_AT + 46, SPIRITS_AT + 58, () -> zangetsuGone(minecraft),
+                "Zangetsu still stood on the client after he had gone");
+    }
+
+    /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has. */
+    private static boolean zangetsuOut(Minecraft minecraft) {
+        ZangetsuSpirit zangetsu = nearest(minecraft, ZangetsuSpirit.class, 16.0, spirit -> true);
+        return zangetsu != null && ZangetsuSpiritRenderer.drawnFrames() > spiritsDrawn
+                && minecraft.getResourceManager().getResource(ZangetsuSpiritRenderer.TEXTURE).isPresent();
+    }
+
+    /** Whether no living Zangetsu is near: one killed lies dying for a second before he is gone. */
+    private static boolean zangetsuGone(Minecraft minecraft) {
+        return nearest(minecraft, ZangetsuSpirit.class, 16.0, spirit -> spirit.isAlive()) == null;
+    }
+
     /**
      * Has the soul, on the server thread, strike with its blade in hand a still iron golem hung in the air
      * {@link #LASHED_AHEAD} blocks along its look: a blow from beyond arm's length, which brings out its serpent by the
@@ -3163,9 +3207,10 @@ public final class ClientSmokeTest {
      * for what a server stalled by the crossing or behind sends late, before the gate home's press, for the first
      * gate's wait that such a server has not yet run, or before the step into the Garganta, for the tear's first tick;
      * and before the last tick of each of the Gate of Hell's last three windows, so a stalled server's Gate and the
-     * windows move together; and before the last tick of Tensa Zangetsu's and Hihiō Zabimaru's first windows, for a
-     * Bankai a slow server has not yet let settle. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as
-     * before.
+     * windows move together; before the last tick of Tensa Zangetsu's and Hihiō Zabimaru's first windows, for a
+     * Bankai a slow server has not yet let settle; and before the last tick of each of the spirits' windows, for a
+     * spirit a slow server has not yet brought out or taken away. Past {@link #SERVER_WAIT_TICKS} it goes on, and the
+     * check fails as before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
@@ -3178,7 +3223,9 @@ public final class ClientSmokeTest {
                 || ticksInWorld == BANKAI_AT + 74 && !windowsPassed.contains(BANKAI_AT + 51)
                 && !inTensaZangetsu(minecraft, player)
                 || ticksInWorld == HIHIO_AT + 74 && !windowsPassed.contains(HIHIO_AT + 51)
-                && !inHihioZabimaru(minecraft, player);
+                && !inHihioZabimaru(minecraft, player)
+                || ticksInWorld == SPIRITS_AT + 39 && !windowsPassed.contains(SPIRITS_AT + 2) && !zangetsuOut(minecraft)
+                || ticksInWorld == SPIRITS_AT + 57 && !windowsPassed.contains(SPIRITS_AT + 46) && !zangetsuGone(minecraft);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 
