@@ -334,13 +334,26 @@ public final class ZanpakutoLogic {
      * Bankai {@code [bankai] black_getsuga_multiplier} times that again, after the cap: behind a mask, both multiply.
      */
     public static float getsugaDamage(SoulData data, float charge, boolean bankai) {
-        double base = Math.min(BleachConfig.get(BleachConfig.GETSUGA_MAX_DAMAGE),
-                BleachConfig.get(BleachConfig.GETSUGA_BASE_DAMAGE)
-                        + BleachConfig.get(BleachConfig.GETSUGA_DAMAGE_PER_ROOT_REIRYOKU) * Math.sqrt(data.maxReiryoku()));
         double named = data.zanpakuto().getsugaNamed() ? 1.0 : BleachConfig.get(BleachConfig.GETSUGA_UNNAMED_MULTIPLIER);
         double inBankai = bankai ? BleachConfig.get(BleachConfig.BANKAI_BLACK_GETSUGA_MULTIPLIER) : 1.0;
-        return (float) (base * (0.6 + 0.6 * Mth.clamp(charge, 0.0F, 1.0F)) * named * VisoredLogic.getsugaFactor(data)
-                * inBankai);
+        return (float) (getsugaBase(data) * (0.6 + 0.6 * Mth.clamp(charge, 0.0F, 1.0F)) * named
+                * VisoredLogic.getsugaFactor(data) * inBankai);
+    }
+
+    /**
+     * Hikotsu Taihō's damage at this charge (0 to 1): a named Getsuga Tenshō's, as Zabimaru names none, made
+     * {@code [bankai.serpent] blast_multiplier} times as strong after the cap, and from behind a Visored's mask the mask's
+     * multiplier too.
+     */
+    public static float hikotsuTaihoDamage(SoulData data, float charge) {
+        return (float) (getsugaBase(data) * (0.6 + 0.6 * Mth.clamp(charge, 0.0F, 1.0F))
+                * BleachConfig.get(BleachConfig.BANKAI_SERPENT_BLAST_MULTIPLIER) * VisoredLogic.getsugaFactor(data));
+    }
+
+    /** A full-strength Getsuga Tenshō's base: it grows with the root of maximum reiryoku, up to the cap. */
+    private static double getsugaBase(SoulData data) {
+        return Math.min(BleachConfig.get(BleachConfig.GETSUGA_MAX_DAMAGE), BleachConfig.get(BleachConfig.GETSUGA_BASE_DAMAGE)
+                + BleachConfig.get(BleachConfig.GETSUGA_DAMAGE_PER_ROOT_REIRYOKU) * Math.sqrt(data.maxReiryoku()));
     }
 
     /** What a Getsuga Tenshō of this charge costs: a share of maximum reiryoku from a tap to a full swing, never below the minimum. */

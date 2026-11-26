@@ -1,17 +1,23 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.BankaiForms;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import javax.annotation.Nullable;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Marker;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.PushReaction;
@@ -24,13 +30,21 @@ import net.minecraft.world.phys.Vec3;
  * which the wielder's longer reach has already struck (see {@code ShikaiEvents.lash}); it touches
  * nothing itself. Never saved. In Hihiō Zabimaru it is the serpent ({@link #isSerpent}), out for
  * {@link #SERPENT_LIFE_TICKS}, and gone the tick its wielder no longer holds the serpent
- * ({@link BankaiForms#serpentine}), whatever ended it.
+ * ({@link BankaiForms#serpentine}), whatever ended it. A serpent lashed at a far blow strikes, once, on its first
+ * tick, all it passes on its way there ({@link #sweepFrom}), as a Cero would.
  */
 public class ZabimaruLash extends Entity {
     /** Ticks from the blade leaving the hand to it being back. */
     public static final int LIFE_TICKS = 8;
     /** Ticks from the serpent leaving the hand to it being back: longer, as it is longer. */
     public static final int SERPENT_LIFE_TICKS = 12;
+    /** How far either side of its line the serpent's passage strikes, in blocks. */
+    public static final float SWEEP_RADIUS = 0.8F;
+    /** What the serpent's passage strikes with. It purifies a Hollow it kills, as a zanpakutō's blow does. */
+    public static final ResourceKey<DamageType> SERPENT_DAMAGE =
+            ResourceKey.create(Registries.DAMAGE_TYPE, BleachMod.id("hihio_zabimaru"));
+    /** The passage strikes all it passes, quietly, and is weighed as a Cero by a shield, a ward or a Dankū. */
+    private static final CeroBeam.Kind SWEEP = new CeroBeam.Kind(SERPENT_DAMAGE, true, Integer.MAX_VALUE);
 
     /** The wielder's entity id, so every client draws the line from the right hand. */
     private static final EntityDataAccessor<Integer> DATA_OWNER =
@@ -48,6 +62,10 @@ public class ZabimaruLash extends Entity {
     @Nullable
     private Entity spawnedFor;
     private int age;
+    /** Where the serpent's passage starts, or null for one that strikes nothing: server side only. */
+    @Nullable
+    private Vec3 sweepFrom;
+    private float sweepDamage;
 
     public ZabimaruLash(EntityType<? extends ZabimaruLash> type, Level level) {
         super(type, level);
@@ -77,6 +95,18 @@ public class ZabimaruLash extends Entity {
         lash.entityData.set(DATA_OWNER, owner.getId());
         lash.spawnedFor = owner;
         return lash;
+    }
+
+    /**
+     * Makes this serpent's passage, from {@code from} to where it is, strike all in its way on its first tick for this
+     * much, once: after the blow it came with, never inside it. No damage, as a share of 0 gives, strikes nothing.
+     */
+    public ZabimaruLash sweepFrom(Vec3 from, float damage) {
+        if (damage > 0.0F) {
+            sweepFrom = from;
+            sweepDamage = damage;
+        }
+        return this;
     }
 
     /** Whether this is Hihiō Zabimaru's serpent rather than its Shikai's blade. */
@@ -121,7 +151,23 @@ public class ZabimaruLash extends Entity {
         if (age >= lifeTicks() || isSerpent() && !(owner() instanceof Player wielder && wielder.level() == level()
                 && BankaiForms.serpentine(wielder, SoulLogic.get(wielder)))) {
             discard();
+        } else if (age == 1 && sweepFrom != null && owner() instanceof Player player
+                && level() instanceof ServerLevel level) {
+            sweep(level, player, sweepFrom);
         }
+    }
+
+    /**
+     * The serpent's passage: one beam from where it left the wielder to where it is, as wide as {@link #SWEEP_RADIUS}
+     * either side, striking every creature it may on the way, a giant by any of its parts, and stopped by a wall, a
+     * shield or a ward as a Cero is. A marker, never added to the world, stands in for the serpent at a shield.
+     */
+    private void sweep(ServerLevel level, Player wielder, Vec3 from) {
+        Vec3 along = position().subtract(from);
+        Marker body = new Marker(EntityType.MARKER, level);
+        body.setPos(from);
+        CeroBeam.fire(level, wielder, body, from, along, new CeroBeam.Spec(sweepDamage, along.length(), SWEEP_RADIUS,
+                0.0F, 0.0F, 0, 0.0F, 0, 1, 0, false), SWEEP);
     }
 
     /** The drawn line reaches back to the wielder, so it is culled by the box around both, and the serpent's sway. */
