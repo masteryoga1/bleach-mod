@@ -159,7 +159,7 @@ public final class BankaiReleaseTests {
      * is refused and told so. Paid for, it costs 2.4 times a Shikai release; the soul says "Bankai" and the Bankai's
      * name aloud, heard by itself and a soul nearby that sees spirits, it is heard lower than a Shikai and seen in twice
      * the motes, and the action bar names it, as a release and not a refusal; the blade is in Bankai, tooltip and all,
-     * in Shikai's look and reach with half again its damage, which the blades kept in line do not undo and which
+     * in its own look, at Shikai's reach with half again its damage, which the blades kept in line do not undo and which
      * reaches the player's own attack on the next tick; the soul does not refill while it lasts; and the release earns
      * the Bankai advancement, which the soul nearby does not. Its title is not read here: no test player keeps titles.
      */
@@ -200,7 +200,7 @@ public final class BankaiReleaseTests {
         blade.remove(DataComponents.ATTRIBUTE_MODIFIERS);
         ZanpakutoEvents.reconcile(renji, data);
         double reach = modifier(blade, Attributes.ENTITY_INTERACTION_RANGE, ZanpakutoItem.REACH_ID);
-        helper.assertTrue(ZanpakutoTests.model(blade) == 3 && Math.abs(damageOf(blade) - 11.0) < EPSILON
+        helper.assertTrue(ZanpakutoTests.model(blade) == 5 && Math.abs(damageOf(blade) - 11.0) < EPSILON
                         && Math.abs(reach - 3.0) < EPSILON,
                 "Hihiō Zabimaru has model " + ZanpakutoTests.model(blade) + ", damage " + damageOf(blade) + ", reach "
                         + reach);
@@ -314,6 +314,8 @@ public final class BankaiReleaseTests {
     public static void aSpiritFilesBankaiOverridesTheConfig(GameTestHelper helper) {
         JsonObject file = BankaiTests.shippedFile(helper, "zabimaru");
         JsonObject bankai = file.getAsJsonObject("bankai");
+        // The shipped file gives a model, and a file gives a model or a form, not both.
+        bankai.remove("model");
         bankai.add("form", JsonParser.parseString("{\"model\": 5, \"damage\": 20.0, \"speed\": 1.0}"));
         bankai.addProperty("release_cost", 0.5);
         bankai.addProperty("drain", 0.02);

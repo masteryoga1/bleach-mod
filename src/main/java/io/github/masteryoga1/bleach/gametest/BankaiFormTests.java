@@ -90,7 +90,7 @@ public final class BankaiFormTests {
     }
 
     /** This asset of the mod's, read from its own resources, as a server loads no assets; the test fails without it. */
-    private static byte[] asset(GameTestHelper helper, String path) {
+    static byte[] asset(GameTestHelper helper, String path) {
         try (InputStream in = BleachMod.class.getResourceAsStream("/assets/bleach/" + path)) {
             helper.assertTrue(in != null, "the mod's resources hold no assets/bleach/" + path);
             return in.readAllBytes();

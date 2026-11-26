@@ -594,7 +594,9 @@ public final class ShikaiEvents {
 
     /**
      * A blow from beyond arm's length with Zabimaru released: the blade lashes out in segments to the
-     * target, then draws back, shortening the wielder's reach for a moment.
+     * target, then draws back, shortening the wielder's reach for a moment. In Hihiō Zabimaru the serpent lashes out
+     * in its place, heard lower, and its own longer reach is withheld until it is back ({@link BankaiForms#keep});
+     * until then no second serpent is drawn, so the far reach is never free every swing.
      *
      * @return true if it lashed
      */
@@ -605,20 +607,31 @@ public final class ShikaiEvents {
         SoulData data = SoulLogic.get(player);
         ZanpakutoBlade held = ZanpakutoItem.blade(blade);
         Optional<ZanpakutoSpirit> spirit = spiritOf(player, data, held);
-        if (!held.released() || spirit.isEmpty() || spirit.get().ability() != ZanpakutoSpirit.Ability.SEGMENT_LASH) {
+        boolean serpent = BankaiForms.serpentine(player, data);
+        if (!held.released() || spirit.isEmpty()
+                || !serpent && spirit.get().ability() != ZanpakutoSpirit.Ability.SEGMENT_LASH) {
             return false;
         }
-        if (Math.sqrt(target.getBoundingBox().distanceToSqr(player.getEyePosition())) <= LASH_DISTANCE) {
+        if (Math.sqrt(target.getBoundingBox().distanceToSqr(player.getEyePosition())) <= LASH_DISTANCE
+                || serpent && data.lashRetractUntil != ZanpakutoBond.NEVER) {
             return false;
         }
-        ZabimaruLash.spawn(player.level(), player, target.getBoundingBox().getCenter());
-        SpiritSenses.play(player, ModSounds.ZABIMARU_LASH.get(), SoundSource.PLAYERS, 1.0F, 1.0F, false);
+        Vec3 at = target.getBoundingBox().getCenter();
+        if (serpent) {
+            ZabimaruLash.serpent(player.level(), player, at);
+        } else {
+            ZabimaruLash.spawn(player.level(), player, at);
+        }
+        SpiritSenses.play(player, ModSounds.ZABIMARU_LASH.get(), SoundSource.PLAYERS, 1.0F, serpent ? BANKAI_PITCH : 1.0F,
+                false);
         AttributeInstance reach = player.getAttribute(Attributes.ENTITY_INTERACTION_RANGE);
         if (reach != null) {
             reach.addOrUpdateTransientModifier(new AttributeModifier(RETRACT_ID, -spirit.get().shikai().reach(),
                     AttributeModifier.Operation.ADD_VALUE));
         }
         data.lashRetractUntil = player.level().getGameTime() + BleachConfig.get(BleachConfig.LASH_RETRACT_TICKS);
+        // The serpent's reach comes off at once, not on the next tick; each tick puts it back once the retract is over.
+        BankaiForms.keep(player, data);
         return true;
     }
 
