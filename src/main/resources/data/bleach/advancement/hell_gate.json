@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:purified",
+  "display": {
+    "icon": {
+      "id": "minecraft:skeleton_skull"
+    },
+    "title": {
+      "translate": "advancements.bleach.hell_gate.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.hell_gate.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "hell_gate": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "hell_gate"
+      }
+    }
+  }
+}

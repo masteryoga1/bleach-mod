@@ -8,11 +8,11 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * The mod's sound events. Their files are vanilla sounds, pitched and spread out in
- * {@code assets/bleach/sounds.json}. A Hollow's howl, a Shrieker's cry and its ringing tongue, Fishbone D's roar,
- * a Menos Grande's cries, a Cero, the tearing sky, a Shikai release, a loosed Getsuga Tenshō, a Quincy's
- * awakening and the great Quincy arts (Letzt Stil, the power's return, Heizen, Sprenger and Vollständig) carry
- * much further than a normal mob's sounds, so they are fixed-range events; the rest reach as far as their volume
- * takes them, as usual.
+ * {@code assets/bleach/sounds.json}. A Hollow's howl, a Shrieker's cry and its ringing tongue, the Gate of Hell,
+ * Fishbone D's roar, a Menos Grande's cries, a Cero, the tearing sky, a Shikai release, a loosed Getsuga Tenshō, a
+ * Quincy's awakening and the great Quincy arts (Letzt Stil, the power's return, Heizen, Sprenger and Vollständig)
+ * carry much further than a normal mob's sounds, so they are fixed-range events; the rest reach as far as their
+ * volume takes them, as usual.
  */
 public final class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
@@ -99,6 +99,14 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_AMBIENT = fixed("entity.shrieker.ambient", 48.0F);
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_HURT = variable("entity.shrieker.hurt");
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_DEATH = variable("entity.shrieker.death");
+    /** The Gate of Hell rising out of the ground, its doors swinging open, the blade from the dark and what laughs there. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HELL_GATE_RISE = fixed("entity.hell_gate.rise", 48.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> HELL_GATE_OPEN = fixed("entity.hell_gate.open", 48.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> HELL_GATE_BLADE = fixed("entity.hell_gate.blade", 48.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> HELL_GATE_LAUGH = fixed("entity.hell_gate.laugh", 48.0F);
+    /** Its doors slamming on what it took, and the Gate crumbling away. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> HELL_GATE_SLAM = fixed("entity.hell_gate.slam", 48.0F);
+    public static final DeferredHolder<SoundEvent, SoundEvent> HELL_GATE_CRUMBLE = fixed("entity.hell_gate.crumble", 48.0F);
     /** A Shrieker folding its wings to dive. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SHRIEKER_SWOOP = variable("entity.shrieker.swoop");
     /** A Shrieker's wingbeat, every Shrieker.FLAP_TICKS while it flies. */

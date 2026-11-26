@@ -16,6 +16,7 @@ import io.github.masteryoga1.bleach.entity.GintoCast;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
 import io.github.masteryoga1.bleach.entity.GrandFisherLure;
 import io.github.masteryoga1.bleach.entity.HeiligPfeil;
+import io.github.masteryoga1.bleach.entity.HellGate;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.HollowMask;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
@@ -116,6 +117,7 @@ import net.minecraft.util.FastColor;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -271,7 +273,10 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * must reach the client unhidden, the soul looks at it for a shot that shows its bar as well, and it must be gone once
  * killed by command. A second, set on the soul from the server, must loose its leeches, which must cling at the soul's
  * back on its client, and then ring its tongue there, the soul looking at it for a shot of the tongue; killed before the
- * ring is out, it and its leeches must be gone before the run quits.
+ * ring is out, it and its leeches must be gone. A Shinigami again by command, the soul cuts down a third with its own
+ * Getsuga Tenshō on the server: the Gate of Hell must rise unhidden behind it, its body held whole and upright, the soul
+ * looks at the Gate for a shot as the body is drawn in along its blade, credited once with no soul rising, and the body
+ * must be gone before the run quits.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -326,10 +331,6 @@ public final class ClientSmokeTest {
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
     /** The first tick of Grand Fisher's beat; its steps and checks count from here. */
     private static final int GRAND_FISHER_AT = 9180;
-    /** The first tick of its ambush's beat, after its own; its steps and checks count from here, and the run ends after. */
-    private static final int GRAND_FISHER_AMBUSH_AT = GRAND_FISHER_AT + 120;
-    /** How far before the soul its lure is laid for the ambush's beat. */
-    private static final double LAID_AHEAD = 8.0;
     /**
      * A still, bare-chested Privaron Espada facing the player: seat 103, so the 3 of its old seat on its chest (this
      * UUID's spot is CHEST_LEFT), its hole at the sternum, a Halcón blade and the second mask remnant.
@@ -352,7 +353,7 @@ public final class ClientSmokeTest {
     private static final int GATE_HOME_PRESS_TICK = 7320;
     /** The step into the Garganta in Seireitei, which waits for the server's tear to have seen who stood in it. */
     private static final int GARGANTA_STEP_IN_TICK = 8475;
-    /** How long the clock may wait in all before those four ticks for the server to catch up, before the checks fail. */
+    /** How long the clock may wait in all, over every tick {@link #waitsForServer} holds, before the checks fail. */
     private static final int SERVER_WAIT_TICKS = 400;
     /** How many of the server's last chat lines are kept for the checks that read them. */
     private static final int CHAT_LINES_KEPT = 16;
@@ -360,6 +361,15 @@ public final class ClientSmokeTest {
     private static final int ACTION_BAR_LINES_KEPT = 6;
     /** How long after a Shrieker is first seen to ring its shot is taken, so a frame drawn since shows the tongue. */
     private static final int RING_SHOT_TICKS = 5;
+    /** The first tick of the Gate of Hell's beat, after Grand Fisher's; its steps and checks count from here. */
+    private static final int HELL_GATE_AT = GRAND_FISHER_AT + 115;
+    /**
+     * The first tick of Grand Fisher's ambush's beat, after the Gate of Hell's; its steps and checks count from here, and
+     * the run ends after.
+     */
+    private static final int GRAND_FISHER_AMBUSH_AT = HELL_GATE_AT + 120;
+    /** How far before the soul its lure is laid for the ambush's beat. */
+    private static final double LAID_AHEAD = 8.0;
 
     private static boolean worldRequested;
     private static int ticksWaiting;
@@ -391,6 +401,8 @@ public final class ClientSmokeTest {
     private static int skyFrom = -1;
     /** The tick the second Shrieker was first seen to ring, or -1 before then. */
     private static int rangFrom = -1;
+    /** The soul's purified count as the Gate's Shrieker is cut down, so the Gate's credit can be checked. */
+    private static int purifiedBefore = -1;
     /** The player as the death beat killed it, to tell it from the one that wakes in its place, or null before then. */
     @Nullable
     private static LocalPlayer killed;
@@ -616,6 +628,7 @@ public final class ClientSmokeTest {
         checkWaking(minecraft, player);
         checkHuecoMundoBlocks(minecraft);
         checkHuecoMundo(minecraft, player);
+        checkHellGate(minecraft, soul);
         checkBosses(minecraft);
         checkGrandFisher(minecraft);
         if (finished) {
@@ -1768,6 +1781,15 @@ public final class ClientSmokeTest {
             case GRAND_FISHER_AT + 40 -> shot(minecraft, "grand_fisher");
             // The soul's blade cuts her stalk (see checkGrandFisher), and both are killed once it has withdrawn.
             case GRAND_FISHER_AT + 42 -> strikeLuresOnServer(minecraft);
+            // The Gate of Hell, still at home: a Shinigami again, before a third Shrieker standing still in the air, which
+            // its own Getsuga Tenshō cuts down on the server once it shows (see checkHellGate), in air cleared again.
+            case HELL_GATE_AT -> {
+                command(minecraft, "tp @s ~ ~ ~ 180 -12");
+                command(minecraft, "fill ~-3 ~ ~-12 ~3 ~7 ~-1 air");
+                command(minecraft, "bleach soul @s shinigami");
+                command(minecraft, "bleach reiryoku @s 800 800");
+            }
+            case HELL_GATE_AT + 1 -> command(minecraft, "summon bleach:shrieker ~ ~3 ~-6 " + STILL);
             // Its lure laid alone on the ground before the soul, facing it, as its ambush lays her, in air cleared as
             // before: its body lies hidden in the ground.
             case GRAND_FISHER_AMBUSH_AT -> {
@@ -2537,6 +2559,61 @@ public final class ClientSmokeTest {
     }
 
     /**
+     * The checks of the Gate of Hell, each window a tick after the last, so it is open when its server step can first
+     * show: the third Shrieker reaching the client, then cut down by the soul's own Getsuga Tenshō on the server; the Gate
+     * risen behind it, the body held for it; the shot as the body is drawn in along the blade, with the soul credited once
+     * and no soul rising; and the body gone. The last three hold the clock before their last tick for a late server.
+     */
+    private static void checkHellGate(Minecraft minecraft, SoulData soul) {
+        if (expectWithin(minecraft, HELL_GATE_AT + 2, HELL_GATE_AT + 35, () -> nearest(minecraft, Shrieker.class,
+                        SUMMONED_RANGE, shrieker -> shrieker.isAlive() && !ClientSouls.isHiddenFromViewer(shrieker)) != null,
+                "the third Shrieker never reached the Shinigami's client unhidden")) {
+            purifiedBefore = soul.hunt().purified();
+            // Set on the soul, so its target is the soul whose Getsuga Tenshō cuts it down.
+            onServerShrieker(minecraft, shrieker -> shrieker.hurt(new DamageSource(shrieker.level().registryAccess()
+                    .registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(GetsugaTensho.DAMAGE_TYPE),
+                    shrieker.getTarget()), 1000.0F));
+        }
+        if (expectWithin(minecraft, HELL_GATE_AT + 3, HELL_GATE_AT + 65, () -> gateRose(minecraft),
+                "no Gate of Hell rose unhidden on the Shinigami's client, or its Shrieker was not held for it")) {
+            HellGate gate = nearest(minecraft, HellGate.class, SUMMONED_RANGE, seen -> true);
+            // Its middle, so the whole of it, doorway, blade and body, is in the shot.
+            look(minecraft, gate.position().add(0.0, HellGate.HEIGHT * gate.scale() * 0.5, 0.0));
+        }
+        if (expectWithin(minecraft, HELL_GATE_AT + 4, HELL_GATE_AT + 110, () -> gateDraws(minecraft),
+                "the Gate of Hell never drew its body in on the Shinigami's client")) {
+            minecraft.getToasts().clear();
+            shot(minecraft, "hell_gate");
+            expect(minecraft, soul.hunt().purified() == purifiedBefore + 1,
+                    "the Gate's Shrieker counted " + (soul.hunt().purified() - purifiedBefore) + " purified, not 1");
+            expect(minecraft, nearest(minecraft, PlusSpirit.class, SUMMONED_RANGE, PlusSpirit::isDeparting) == null,
+                    "a soul rose from the Shrieker the Gate of Hell took");
+        }
+        expectWithin(minecraft, HELL_GATE_AT + 5, HELL_GATE_AT + 118, () -> gateTook(minecraft),
+                "the Gate of Hell never took its Shrieker on the Shinigami's client");
+    }
+
+    /** Whether the cut Shrieker is seen and a Gate of Hell has risen unhidden, the body held for it, whole and upright. */
+    private static boolean gateRose(Minecraft minecraft) {
+        return windowsPassed.contains(HELL_GATE_AT + 2)
+                && nearest(minecraft, HellGate.class, SUMMONED_RANGE, gate -> !ClientSouls.isHiddenFromViewer(gate)) != null
+                && nearest(minecraft, Shrieker.class, SUMMONED_RANGE, shrieker -> shrieker.isHellbound()
+                        && !shrieker.isPurifying() && shrieker.deathTime == 0) != null;
+    }
+
+    /** Whether the risen Gate of Hell is drawing its body in along the blade, before the doors slam. */
+    private static boolean gateDraws(Minecraft minecraft) {
+        return windowsPassed.contains(HELL_GATE_AT + 3) && nearest(minecraft, HellGate.class, SUMMONED_RANGE,
+                gate -> gate.age() >= HellGate.DRAW_AT + 5 && gate.body() != null) != null;
+    }
+
+    /** Whether the Gate of Hell, seen drawing its body in, has taken it. */
+    private static boolean gateTook(Minecraft minecraft) {
+        return windowsPassed.contains(HELL_GATE_AT + 4)
+                && nearest(minecraft, Shrieker.class, SUMMONED_RANGE, shrieker -> true) == null;
+    }
+
+    /**
      * The checks of the bosses, each window from the step it follows: the Shrieker reaching the client, then gone; then a
      * second, set on the soul on the server, its leeches clinging at the soul's back, its ring, the shot of it a few ticks
      * on, and the two gone once it is killed. Each of these last opens a tick after the window whose pass sets it going,
@@ -2617,13 +2694,13 @@ public final class ClientSmokeTest {
                         && nearest(minecraft, GrandFisherLure.class, SUMMONED_RANGE, GrandFisherLure::isAlive) == null,
                 "Grand Fisher or its cut lure killed by command still lives");
         if (expectWithin(minecraft, GRAND_FISHER_AMBUSH_AT + 2, GRAND_FISHER_AMBUSH_AT + 35,
-                () -> waitingLure(minecraft) != null, "the lure laid alone never reached the Arrancar's client unhidden")) {
+                () -> waitingLure(minecraft) != null, "the lure laid alone never reached the Shinigami's client unhidden")) {
             GrandFisherLure lure = waitingLure(minecraft);
             look(minecraft, lure.position().add(0.0, lure.getBbHeight() * 0.5, 0.0));
         }
         if (expectWithin(minecraft, GRAND_FISHER_AMBUSH_AT + 43, GRAND_FISHER_AMBUSH_AT + 80,
                 () -> linkedLure(minecraft) != null,
-                "the body the soul's blow on the lure brought out was never seen beside her on the Arrancar's client")) {
+                "the body the soul's blow on the lure brought out was never seen beside her on the Shinigami's client")) {
             GrandFisherLure lure = linkedLure(minecraft);
             look(minecraft, lure.position().add(lure.body().position()).scale(0.5).add(0.0, lure.getBbHeight(), 0.0));
         }
@@ -2829,14 +2906,18 @@ public final class ClientSmokeTest {
     /**
      * Whether the clock waits a tick before the last tick of the Senkaimon's arrival check or of the lawn's wall check,
      * for what a server stalled by the crossing or behind sends late, before the gate home's press, for the first
-     * gate's wait that such a server has not yet run, or before the step into the Garganta, for the tear's first tick.
-     * Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
+     * gate's wait that such a server has not yet run, or before the step into the Garganta, for the tear's first tick;
+     * and before the last tick of each of the Gate of Hell's last three windows, so a stalled server's Gate and the
+     * windows move together. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
                 || ticksInWorld == WALL_BY_TICK - 1 && !wallStands(minecraft.level)
                 || ticksInWorld == GATE_HOME_PRESS_TICK - 1 && !serverGateReady(minecraft)
-                || ticksInWorld == GARGANTA_STEP_IN_TICK - 1 && !serverRiftTicked(minecraft);
+                || ticksInWorld == GARGANTA_STEP_IN_TICK - 1 && !serverRiftTicked(minecraft)
+                || ticksInWorld == HELL_GATE_AT + 64 && !windowsPassed.contains(HELL_GATE_AT + 3) && !gateRose(minecraft)
+                || ticksInWorld == HELL_GATE_AT + 109 && !windowsPassed.contains(HELL_GATE_AT + 4) && !gateDraws(minecraft)
+                || ticksInWorld == HELL_GATE_AT + 117 && !windowsPassed.contains(HELL_GATE_AT + 5) && !gateTook(minecraft);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

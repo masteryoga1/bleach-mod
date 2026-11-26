@@ -342,6 +342,171 @@
       }
     ]
   },
+  "entity.hell_gate.rise": {
+    "subtitle": "subtitles.bleach.entity.hell_gate.rise",
+    "sounds": [
+      {
+        "name": "minecraft:mob/warden/sonic_charge1",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_charge2",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_charge3",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/warden/sonic_charge4",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.hell_gate.open": {
+    "subtitle": "subtitles.bleach.entity.hell_gate.open",
+    "sounds": [
+      {
+        "name": "minecraft:block/chain/break1",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:block/chain/break2",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:block/chain/break3",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:block/chain/break4",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.hell_gate.blade": {
+    "subtitle": "subtitles.bleach.entity.hell_gate.blade",
+    "sounds": [
+      {
+        "name": "minecraft:enchant/thorns/hit1",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:enchant/thorns/hit2",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:enchant/thorns/hit3",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:enchant/thorns/hit4",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.hell_gate.laugh": {
+    "subtitle": "subtitles.bleach.entity.hell_gate.laugh",
+    "sounds": [
+      {
+        "name": "minecraft:mob/zoglin/idle1",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle2",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle3",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle4",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle5",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:mob/zoglin/idle6",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.hell_gate.slam": {
+    "subtitle": "subtitles.bleach.entity.hell_gate.slam",
+    "sounds": [
+      {
+        "name": "minecraft:random/explode1",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:random/explode2",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:random/explode3",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:random/explode4",
+        "pitch": 0.5,
+        "attenuation_distance": 48
+      }
+    ]
+  },
+  "entity.hell_gate.crumble": {
+    "subtitle": "subtitles.bleach.entity.hell_gate.crumble",
+    "sounds": [
+      {
+        "name": "minecraft:block/bone_block/break1",
+        "pitch": 0.6,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:block/bone_block/break2",
+        "pitch": 0.6,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:block/bone_block/break3",
+        "pitch": 0.6,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:block/bone_block/break4",
+        "pitch": 0.6,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "minecraft:block/bone_block/break5",
+        "pitch": 0.6,
+        "attenuation_distance": 48
+      }
+    ]
+  },
   "entity.shrieker.swoop": {
     "subtitle": "subtitles.bleach.entity.shrieker.swoop",
     "sounds": [

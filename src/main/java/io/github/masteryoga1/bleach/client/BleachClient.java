@@ -37,7 +37,6 @@ import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
-import net.minecraft.client.renderer.entity.NoopRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.renderer.item.ClampedItemPropertyFunction;
 import net.minecraft.client.renderer.item.ItemProperties;
@@ -276,7 +275,7 @@ public final class BleachClient {
                         new GrandFisherModel(context.bakeLayer(BleachModelLayers.GRAND_FISHER)),
                         HollowKind.GRAND_FISHER, 90.0F));
         event.registerEntityRenderer(ModEntities.GRAND_FISHER_LURE.get(), GrandFisherLureRenderer::new);
-        event.registerEntityRenderer(ModEntities.HELL_GATE.get(), NoopRenderer::new);
+        event.registerEntityRenderer(ModEntities.HELL_GATE.get(), HellGateRenderer::new);
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
         event.registerEntityRenderer(ModEntities.CAJA_NEGACION.get(), CajaNegacionRenderer::new);

@@ -139,6 +139,8 @@ public final class RegistrationTests {
         for (String name : List.of("entity.hollow.ambient", "entity.hollow.hurt", "entity.hollow.death",
                 "entity.hollow.mask_crack", "entity.fishbone_d.roar", "entity.garganta.open", "item.denreishinki.ping",
                 "entity.shrieker.ambient", "entity.shrieker.hurt", "entity.shrieker.death", "entity.shrieker.swoop",
+                "entity.hell_gate.rise", "entity.hell_gate.open", "entity.hell_gate.blade", "entity.hell_gate.laugh",
+                "entity.hell_gate.slam", "entity.hell_gate.crumble",
                 "entity.shrieker.flap", "entity.shrieker.loose", "entity.shrieker_leech.cling", "entity.shrieker.ring",
                 "entity.shrieker_leech.burst", "entity.grand_fisher.ambient", "entity.grand_fisher.hurt",
                 "entity.grand_fisher.death", "entity.grand_fisher_lure.sob", "entity.grand_fisher_lure.cry")) {

@@ -218,6 +218,7 @@ public abstract class Hollow extends Monster {
                                         MobSpawnType spawnType, @Nullable SpawnGroupData groupData) {
         SpawnGroupData data = super.finalizeSpawn(level, difficulty, spawnType, groupData);
         applySpawnStats(level.getDifficulty(), kind().rollScale(level.getRandom()));
+        sinner = rollsSinner(kind(), level.getRandom().nextDouble());
         return data;
     }
 
@@ -500,6 +501,8 @@ public abstract class Hollow extends Monster {
         trialStart = start;
         fragmentRolled = true;
         deathScore = -1;
+        // A practice Hollow answers to its trial alone, never to the Gate of Hell.
+        sinner = false;
     }
 
     /** The student whose field trial this practice Hollow belongs to; null for a real Hollow. */
@@ -705,13 +708,24 @@ public abstract class Hollow extends Monster {
         fromPlus = value;
     }
 
-    /** Whether this Hollow was a sinner in life, whom the Gate of Hell takes. None is yet but the Shrieker, always one. */
+    /** Whether this Hollow was a sinner in life, whom the Gate of Hell takes: every Shrieker, and a share of arrivals. */
     public boolean isSinner() {
         return sinner;
     }
 
     public void setSinner(boolean value) {
         sinner = value;
+    }
+
+    /**
+     * Whether a Hollow of this kind arriving with this roll was a sinner in life: {@code [bosses] sinner_share} of them.
+     * Never a Menos, a heap of souls with no one life to answer for, nor Fishbone D, whose purifying shows a new Shinigami
+     * what the blade does for a soul, nor Grand Fisher, no sinner ({@link GrandFisher}). A Shrieker always is
+     * ({@link Shrieker#isSinner}).
+     */
+    public static boolean rollsSinner(HollowKind kind, double roll) {
+        return !kind.isMenos() && kind != HollowKind.FISHBONE_D && kind != HollowKind.GRAND_FISHER
+                && roll < BleachConfig.get(BleachConfig.SINNER_SHARE);
     }
 
     protected boolean getFlag(int flag) {
