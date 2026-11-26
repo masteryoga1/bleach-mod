@@ -32,6 +32,8 @@ public final class BleachModelLayers {
     public static final ModelLayerLocation HOLLOW_PLAYER_MASK = layer("hollow_player_mask");
     /** A Bankai's coat, over the garb and armour and under Blut Vene's shell (see {@link BankaiCoatModel}). */
     public static final ModelLayerLocation BANKAI_COAT = layer("bankai_coat");
+    /** Hihiō Zabimaru's pelt, worn as the coat is (see {@link BankaiPeltModel}). */
+    public static final ModelLayerLocation BANKAI_PELT = layer("bankai_pelt");
 
     private BleachModelLayers() {
     }
@@ -57,5 +59,6 @@ public final class BleachModelLayers {
                 () -> LayerDefinition.create(HumanoidArmorModel.createBodyLayer(VEIN_SHELL_SIZE), 64, 64));
         event.registerLayerDefinition(HOLLOW_PLAYER_MASK, HollowMaskModel::createLayer);
         event.registerLayerDefinition(BANKAI_COAT, BankaiCoatModel::createLayer);
+        event.registerLayerDefinition(BANKAI_PELT, BankaiPeltModel::createLayer);
     }
 }

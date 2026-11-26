@@ -32,6 +32,7 @@ import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
@@ -128,6 +129,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -280,10 +282,14 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * ring is out, it and its leeches must be gone. A Shinigami again by command, the soul cuts down a third with its own
  * Getsuga Tenshō on the server: the Gate of Hell must rise unhidden behind it, its body held whole and upright, the soul
  * looks at the Gate for a shot as the body is drawn in along its blade, credited once with no soul rising, and the body
- * must be gone before the run quits. Last, bound to Zangetsu again with its Bankai granted, the soul calls Tensa
+ * must be gone before the run quits. Then, bound to Zangetsu again with its Bankai granted, the soul calls Tensa
  * Zangetsu, seen from the front: the blade in hand must reach the client in Bankai in its own model, with the soul
  * quickened and its coat drawn on it; its Getsuga Tenshō must be the black one with no mask on; and the seal key must
  * step it all back down to Shikai, the coat no longer drawn, after which the Bankai is revoked and the blade put away.
+ * Last, bound to Zabimaru with its Bankai granted, the soul calls Hihiō Zabimaru, seen from behind: the blade must reach
+ * the client in Bankai in its own model, with the serpent's reach on the soul and its pelt drawn on it; a far blow at an
+ * iron golem hung before it must bring out the serpent, drawn in bone; and the seal key must seal it all, the pelt no
+ * longer drawn, after which the Bankai is revoked, the blade put away and the golem killed.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -372,13 +378,21 @@ public final class ClientSmokeTest {
     private static final int HELL_GATE_AT = GRAND_FISHER_AT + 115;
     /** The first tick of Grand Fisher's ambush's beat, after the Gate of Hell's; its steps and checks count from here. */
     private static final int GRAND_FISHER_AMBUSH_AT = HELL_GATE_AT + 120;
-    /**
-     * The first tick of Tensa Zangetsu's beat, after Grand Fisher's ambush's; its steps and checks count from here, and
-     * the run ends after.
-     */
+    /** The first tick of Tensa Zangetsu's beat, after Grand Fisher's ambush's; its steps and checks count from here. */
     private static final int BANKAI_AT = GRAND_FISHER_AMBUSH_AT + 115;
     /** Tensa Zangetsu's model number, as Zangetsu's file gives its Bankai, and Zangetsu's in Shikai. */
     private static final int TENSA_MODEL = 4, SHIKAI_MODEL = 1;
+    /**
+     * The first tick of Hihiō Zabimaru's beat, 30 ticks after Tensa Zangetsu's ends, so that its first release falls well
+     * past the 40-tick settle that Tensa Zangetsu's seal at {@code BANKAI_AT + 100} began. Its steps and checks count
+     * from here, and the run ends after.
+     */
+    private static final int HIHIO_AT = BANKAI_AT + 150;
+    /** Hihiō Zabimaru's model number, as Zabimaru's file gives its Bankai, and sealed Zabimaru's. */
+    private static final int HIHIO_MODEL = 5, ZABIMARU_SEALED_MODEL = 2;
+    /** How far before the soul's eyes the golem its serpent lashes at is hung, and the tag it is killed by. */
+    private static final double LASHED_AHEAD = 8.0;
+    private static final String LASHED_TAG = "bleach_smoke_lashed";
     /** How far before the soul its lure is laid for the ambush's beat. */
     private static final double LAID_AHEAD = 8.0;
 
@@ -414,8 +428,10 @@ public final class ClientSmokeTest {
     private static int rangFrom = -1;
     /** The soul's purified count as the Gate's Shrieker is cut down, so the Gate's credit can be checked. */
     private static int purifiedBefore = -1;
-    /** How many Bankai coats had been drawn as Tensa Zangetsu's first window opened, then as its last window last looked. */
+    /** How many coats and pelts had been drawn as a Bankai's first window opened, then as its last window last looked. */
     private static int coatsDrawn;
+    /** How many serpents had been drawn as Hihiō Zabimaru's lash went out. */
+    private static int serpentsDrawn;
     /** The player as the death beat killed it, to tell it from the one that wakes in its place, or null before then. */
     @Nullable
     private static LocalPlayer killed;
@@ -645,6 +661,7 @@ public final class ClientSmokeTest {
         checkBosses(minecraft);
         checkGrandFisher(minecraft);
         checkBankai(minecraft, player, soul);
+        checkHihioZabimaru(minecraft, player);
         if (finished) {
             return;
         }
@@ -1857,7 +1874,47 @@ public final class ClientSmokeTest {
                 command(minecraft, "clear @s bleach:asauchi");
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }
-            case BANKAI_AT + 120 -> {
+            // Still where Tensa Zangetsu's beat stood: a fresh Asauchi in hand bound to Zabimaru and named, its Bankai
+            // granted, looking north and a little up, in air cleared as before, seen from behind, where its pelt is drawn
+            // and its serpent runs out ahead of it.
+            case HIHIO_AT -> {
+                command(minecraft, "clear @s bleach:asauchi");
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:asauchi");
+                command(minecraft, "bleach zanpakuto @s reset");
+                command(minecraft, "bleach zanpakuto @s spirit bleach:zabimaru");
+                command(minecraft, "bleach zanpakuto @s bond 1000");
+                command(minecraft, "bleach zanpakuto @s name");
+                command(minecraft, "bleach zanpakuto @s bankai grant");
+                command(minecraft, "bleach reiryoku @s 800 800");
+                command(minecraft, "tp @s ~ ~ ~ 180 -20");
+                command(minecraft, "fill ~-3 ~ ~-12 ~3 ~7 ~-1 air");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            }
+            // Shikai; then, once it has settled, Bankai, and once more if a slow server had not let it settle.
+            case HIHIO_AT + 5 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+            case HIHIO_AT + 50 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+            case HIHIO_AT + 65 -> {
+                if (ZanpakutoItem.blade(player.getMainHandItem()).stage() != ZanpakutoStage.BANKAI) {
+                    BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+                }
+            }
+            // The pelt, the great blade of bone, and its name as the title.
+            case HIHIO_AT + 80 -> shot(minecraft, "hihio_zabimaru");
+            // A blow at a golem hung eight blocks off brings out the serpent (see checkHihioZabimaru).
+            case HIHIO_AT + 81 -> {
+                serpentsDrawn = ZabimaruLashRenderer.serpentFrames();
+                lashOnServer(minecraft);
+            }
+            case HIHIO_AT + 105 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.SEAL);
+            // After the last window, nothing of the beat is left: no Bankai, no blade, no golem, the camera back.
+            case HIHIO_AT + 119 -> {
+                command(minecraft, "bleach zanpakuto @s bankai revoke");
+                command(minecraft, "bleach zanpakuto @s reset");
+                command(minecraft, "clear @s bleach:asauchi");
+                command(minecraft, "kill @e[type=minecraft:iron_golem,tag=" + LASHED_TAG + "]");
+                minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            }
+            case HIHIO_AT + 120 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2813,6 +2870,88 @@ public final class ClientSmokeTest {
     }
 
     /**
+     * The checks of Hihiō Zabimaru, each window from the step it follows: called, then its serpent lashed out, then
+     * sealed.
+     */
+    private static void checkHihioZabimaru(Minecraft minecraft, LocalPlayer player) {
+        if (ticksInWorld == HIHIO_AT + 51) {
+            coatsDrawn = BankaiCoatLayer.drawnFrames();
+        }
+        expectWithin(minecraft, HIHIO_AT + 51, HIHIO_AT + 75, () -> inHihioZabimaru(minecraft, player),
+                "Hihiō Zabimaru never reached the client: the blade in hand in Bankai in its own model, its owner's"
+                        + " reach lengthened and its pelt drawn on him");
+        // Shot once it is all the way out, four ticks after it leaves the hand.
+        if (expectWithin(minecraft, HIHIO_AT + 82, HIHIO_AT + 95, () -> ZabimaruLashRenderer.serpentFrames() > serpentsDrawn
+                        && nearest(minecraft, ZabimaruLash.class, 24.0, lash -> lash.isSerpent() && lash.age() >= 4) != null,
+                "Hihiō Zabimaru's serpent never lashed out on the client in bone at a blow eight blocks off")) {
+            shot(minecraft, "hihio_zabimaru_serpent");
+        }
+        expectWithin(minecraft, HIHIO_AT + 106, HIHIO_AT + 118, () -> windowsPassed.contains(HIHIO_AT + 51)
+                        && sealedZabimaru(minecraft, player),
+                "the seal key never sealed Hihiō Zabimaru on the client, its reach and its serpent gone");
+    }
+
+    /**
+     * Whether the soul holds Hihiō Zabimaru as its client sees it: its own blade in Bankai in its own model, which the
+     * item model's override draws in Hihiō Zabimaru's texture, the reach its server put on it, and its pelt: worn, in a
+     * texture the client has, and drawn since the window opened.
+     */
+    private static boolean inHihioZabimaru(Minecraft minecraft, LocalPlayer player) {
+        ItemStack held = player.getMainHandItem();
+        return ZanpakutoItem.blade(held).stage() == ZanpakutoStage.BANKAI && modelOf(held) == HIHIO_MODEL
+                && BankaiLook.worn(player) == BankaiLook.HIHIO_ZABIMARU && BankaiCoatLayer.drawnFrames() > coatsDrawn
+                && minecraft.getResourceManager().getResource(BankaiCoatLayer.HIHIO_ZABIMARU_PELT).isPresent()
+                && player.getAttribute(Attributes.ENTITY_INTERACTION_RANGE).getModifier(BankaiForms.SERPENT_REACH_ID) != null
+                && minecraft.getItemRenderer().getModel(held, minecraft.level, player, 0).getParticleIcon().contents()
+                        .name().equals(BleachMod.id("item/hihio_zabimaru"));
+    }
+
+    /**
+     * Whether the soul's blade in hand is sealed Zabimaru again, with no reach of the serpent's, no serpent out and no
+     * pelt drawn since this was last asked.
+     */
+    private static boolean sealedZabimaru(Minecraft minecraft, LocalPlayer player) {
+        ItemStack held = player.getMainHandItem();
+        int drawn = BankaiCoatLayer.drawnFrames();
+        boolean bare = drawn == coatsDrawn;
+        coatsDrawn = drawn;
+        return bare && ZanpakutoItem.blade(held).stage() == ZanpakutoStage.SEALED && modelOf(held) == ZABIMARU_SEALED_MODEL
+                && player.getAttribute(Attributes.ENTITY_INTERACTION_RANGE).getModifier(BankaiForms.SERPENT_REACH_ID) == null
+                && nearest(minecraft, ZabimaruLash.class, 32.0, lash -> true) == null;
+    }
+
+    /**
+     * Has the soul, on the server thread, strike with its blade in hand a still iron golem hung in the air
+     * {@link #LASHED_AHEAD} blocks along its look: a blow from beyond arm's length, which brings out its serpent by the
+     * game's own way, the blow's damage event. The golem hangs in the air the beat cleared, 2.7 blocks above the soul's
+     * eyes and 7.5 north; if anything stands there the run fails, saying where, as a golem in a wall would be hurt.
+     */
+    private static void lashOnServer(Minecraft minecraft) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server != null) {
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                IronGolem golem = player == null ? null : EntityType.IRON_GOLEM.create(player.serverLevel());
+                if (golem != null) {
+                    Vec3 at = player.getEyePosition().add(player.getLookAngle().scale(LASHED_AHEAD));
+                    golem.moveTo(at.x, at.y - golem.getBbHeight() / 2.0, at.z, 0.0F, 0.0F);
+                    if (!player.serverLevel().noCollision(golem)) {
+                        String problem = "the golem Hihiō Zabimaru lashes at would hang in a block at " + golem.position();
+                        minecraft.execute(() -> fail(minecraft, problem));
+                        return;
+                    }
+                    golem.setNoAi(true);
+                    golem.setNoGravity(true);
+                    golem.addTag(LASHED_TAG);
+                    player.serverLevel().addFreshEntity(golem);
+                    player.attack(golem);
+                }
+            });
+        }
+    }
+
+    /**
      * Has the soul, on the server thread, strike every live lure about it with an iron sword put in its hand: a blow of
      * a blade from a soul who sees her, which cuts her stalk, or brings out the body of one laid alone. Every body about
      * is then stilled, as a summon's {@link #STILL} would be. A blow by hand would need the lure under the cursor.
@@ -3009,8 +3148,9 @@ public final class ClientSmokeTest {
      * for what a server stalled by the crossing or behind sends late, before the gate home's press, for the first
      * gate's wait that such a server has not yet run, or before the step into the Garganta, for the tear's first tick;
      * and before the last tick of each of the Gate of Hell's last three windows, so a stalled server's Gate and the
-     * windows move together; and before the last tick of Tensa Zangetsu's first window, for a Bankai a slow server has
-     * not yet let settle. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
+     * windows move together; and before the last tick of Tensa Zangetsu's and Hihiō Zabimaru's first windows, for a
+     * Bankai a slow server has not yet let settle. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as
+     * before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
@@ -3021,7 +3161,9 @@ public final class ClientSmokeTest {
                 || ticksInWorld == HELL_GATE_AT + 109 && !windowsPassed.contains(HELL_GATE_AT + 4) && !gateDraws(minecraft)
                 || ticksInWorld == HELL_GATE_AT + 117 && !windowsPassed.contains(HELL_GATE_AT + 5) && !gateTook(minecraft)
                 || ticksInWorld == BANKAI_AT + 74 && !windowsPassed.contains(BANKAI_AT + 51)
-                && !inTensaZangetsu(minecraft, player);
+                && !inTensaZangetsu(minecraft, player)
+                || ticksInWorld == HIHIO_AT + 74 && !windowsPassed.contains(HIHIO_AT + 51)
+                && !inHihioZabimaru(minecraft, player);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

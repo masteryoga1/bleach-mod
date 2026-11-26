@@ -41,6 +41,8 @@ public class ZabimaruLash extends Entity {
     private static final int NO_OWNER = -1;
     /** Drawn as far out as a lash can be seen. */
     private static final double RENDER_DISTANCE = 64.0;
+    /** How much further than the line the serpent's sway and its head can reach, for culling. */
+    private static final double SERPENT_CULL_MARGIN = 1.0;
 
     /** The wielder it was spawned for, on the server; clients look the wielder up by id. */
     @Nullable
@@ -122,11 +124,12 @@ public class ZabimaruLash extends Entity {
         }
     }
 
-    /** The drawn line reaches back to the wielder, so it is culled by the box around both. */
+    /** The drawn line reaches back to the wielder, so it is culled by the box around both, and the serpent's sway. */
     @Override
     public AABB getBoundingBoxForCulling() {
         Entity owner = owner();
-        return owner != null ? getBoundingBox().minmax(owner.getBoundingBox()) : getBoundingBox();
+        AABB both = owner != null ? getBoundingBox().minmax(owner.getBoundingBox()) : getBoundingBox();
+        return isSerpent() ? both.inflate(SERPENT_CULL_MARGIN) : both;
     }
 
     @Override

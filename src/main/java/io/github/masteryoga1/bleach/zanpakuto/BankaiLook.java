@@ -10,13 +10,15 @@ import net.minecraft.world.item.component.CustomModelData;
  * What a soul wears for its Bankai, as everyone who sees it draws it: read from the blade in its main hand alone (its
  * owner, its stage and its model number, which every client is sent with the held stack), never from a payload or the
  * spirit's file, which no client is sent. A look belongs to a Bankai's model number, as a sheath does to a sealed or
- * Shikai blade's. Tensa Zangetsu's coat is the first; Hihiō Zabimaru's pelt is to come, by its own model number.
+ * Shikai blade's: Tensa Zangetsu's coat, and Hihiō Zabimaru's pelt.
  */
 public enum BankaiLook {
     /** Nothing: no blade of one's own in Bankai in hand, or a Bankai with no look of its own. */
     NONE(-1),
     /** Tensa Zangetsu's long black coat, its hem in tatters, by the model Zangetsu's file gives its Bankai. */
-    TENSA_ZANGETSU(4);
+    TENSA_ZANGETSU(4),
+    /** Hihiō Zabimaru's baboon pelt over the shoulders, mane and back, by the model Zabimaru's file gives its Bankai. */
+    HIHIO_ZABIMARU(5);
 
     private final int model;
 

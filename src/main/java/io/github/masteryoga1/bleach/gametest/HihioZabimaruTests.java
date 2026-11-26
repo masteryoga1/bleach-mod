@@ -9,7 +9,9 @@ import io.github.masteryoga1.bleach.soul.BankaiForms;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import io.github.masteryoga1.bleach.zanpakuto.BankaiLook;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
@@ -238,5 +240,34 @@ public final class HihioZabimaruTests {
                 yield "the blade out of hand";
             }
         };
+    }
+
+    /**
+     * Hihiō Zabimaru's pelt is worn by its owner with it in his main hand in Bankai, and by nobody else: not by another
+     * soul with a copy of it in hand, and not once it is sealed. The pelt goes with the model Zabimaru's file gives its
+     * Bankai, and its texture and the serpent's bone segment are shipped. Every client draws the pelt by this same
+     * reading of the held stack.
+     */
+    @GameTest(template = "empty")
+    public static void thePeltIsWornOnlyWithOwnBladeInBankai(GameTestHelper helper) {
+        Player renji = BankaiReleaseTests.reached(helper, ZanpakutoSpirits.ZABIMARU);
+        ItemStack blade = renji.getMainHandItem();
+        BankaiReleaseTests.toBankai(helper, renji);
+        helper.assertTrue(BankaiLook.worn(renji) == BankaiLook.HIHIO_ZABIMARU,
+                "in Hihiō Zabimaru its owner wears " + BankaiLook.worn(renji));
+        Player other = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
+        other.setItemInHand(InteractionHand.MAIN_HAND, blade.copy());
+        helper.assertTrue(BankaiLook.worn(other) == BankaiLook.NONE,
+                "another soul with Hihiō Zabimaru in hand wears " + BankaiLook.worn(other));
+        ZanpakutoSpirit zabimaru = ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZABIMARU);
+        int hihio = ZanpakutoLogic.form(zabimaru, ZanpakutoStage.BANKAI).model();
+        helper.assertTrue(BankaiLook.HIHIO_ZABIMARU.model() == hihio && ZanpakutoTests.model(blade) == hihio
+                        && BankaiLook.forModel(hihio) == BankaiLook.HIHIO_ZABIMARU,
+                "the pelt goes with model " + BankaiLook.HIHIO_ZABIMARU.model() + " and Zabimaru's file gives " + hihio);
+        BankaiFormTests.asset(helper, "textures/entity/hihio_zabimaru_pelt.png");
+        BankaiFormTests.asset(helper, "textures/entity/hihio_zabimaru_segment.png");
+        helper.assertTrue(ShikaiEvents.seal(renji) == ShikaiEvents.Result.SEALED && BankaiLook.worn(renji) == BankaiLook.NONE,
+                "sealed, its owner wears " + BankaiLook.worn(renji));
+        helper.succeed();
     }
 }
