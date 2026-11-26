@@ -68,6 +68,8 @@ public final class Milestones {
     public static final String SHIKAI = "shikai";
     /** Loosed enough Getsuga Tenshō that Zangetsu named the technique. */
     public static final String GETSUGA_TENSHO = "getsuga_tensho";
+    /** Released a Bankai. Granted when it happens, with no catch-up, as nothing saved says it ever was. */
+    public static final String BANKAI = "bankai";
     /** Awakened the Quincy power: Quincy tier 1. */
     public static final String QUINCY = "quincy";
     /** Struck a spirit with a Heilig Pfeil. Granted when it happens, as are the four below. */

@@ -64,6 +64,10 @@ public final class ShikaiEvents {
     private static final long RELEASE_XP_COOLDOWN_TICKS = 1200L;
     private static final int RELEASE_PARTICLES = 24;
     private static final float RELEASE_PARTICLE_SIZE = 1.2F;
+    private static final int BANKAI_PARTICLES = 48;
+    private static final float BANKAI_PARTICLE_SIZE = 1.8F;
+    /** A Bankai is called out deeper than a Shikai is released. */
+    private static final float BANKAI_PITCH = 0.7F;
     private static final double SPEECH_RANGE = 24.0;
     /** A lash only comes out for a blow struck farther away than an ordinary blade could reach. */
     private static final double LASH_DISTANCE = 3.5;
@@ -74,10 +78,13 @@ public final class ShikaiEvents {
     /** The black Getsuga Tenshō is heard a little lower than the pale one. */
     private static final float BLACK_FIRE_PITCH = 0.85F;
 
-    /** What came of asking to release or seal. Every one but {@link #RELEASED} is told to the player. */
+    /**
+     * What came of asking to release or seal. Every one but {@link #RELEASED}, {@link #SEALED} and
+     * {@link #BANKAI}, which are shown their own way, is told to the player.
+     */
     public enum Result {
         RELEASED, SEALED, NO_BLADE, NAMELESS, NOT_YOURS, LENT, SILENT, SETTLING, CONSTANT, ALREADY,
-        TOO_WEAK, NOT_RELEASED, CANNOT_SEAL;
+        TOO_WEAK, NOT_RELEASED, CANNOT_SEAL, BANKAI;
 
         public String messageKey() {
             return "message.bleach.shikai." + name().toLowerCase(Locale.ROOT);
@@ -133,7 +140,7 @@ public final class ShikaiEvents {
         switch (key) {
             case RELEASE -> {
                 Result result = release(player);
-                if (result != Result.RELEASED) {
+                if (result != Result.RELEASED && result != Result.BANKAI) {
                     tell(player, result.messageKey());
                 }
             }
@@ -162,7 +169,8 @@ public final class ShikaiEvents {
     /**
      * Calls out the held zanpakutō's name. The first check that fails wins; on success the soul pays
      * the release cost and the blade takes its Shikai form. A constant release, like Zangetsu's, is
-     * for good: it never drains and never seals.
+     * for good: it never drains and never seals. A blade that can seal, in Shikai, whose soul has
+     * reached the Bankai its spirit names is called on into Bankai instead (see {@link #bankai}).
      */
     public static Result release(Player player) {
         SoulData data = SoulLogic.get(player);
@@ -189,13 +197,21 @@ public final class ShikaiEvents {
         if (player.tickCount - data.lastShikaiChangeTick < SETTLE_TICKS) {
             return Result.SETTLING;
         }
+        if (blade.stage() == ZanpakutoStage.BANKAI) {
+            return Result.ALREADY;
+        }
+        Optional<ZanpakutoSpirit> found = spiritOf(player, data, blade);
+        Optional<Component> bankaiName = found.flatMap(BankaiLogic::nameOf);
+        if (blade.stage() == ZanpakutoStage.SHIKAI && !blade.constant() && bond.bankai().achieved()
+                && bankaiName.isPresent()) {
+            return bankai(player, data, stack, blade, found.get(), bankaiName.get());
+        }
         if (blade.constant() && blade.released()) {
             return Result.CONSTANT;
         }
         if (blade.released()) {
             return Result.ALREADY;
         }
-        Optional<ZanpakutoSpirit> found = spiritOf(player, data, blade);
         if (found.isEmpty()) {
             return Result.SILENT;
         }
@@ -244,6 +260,41 @@ public final class ShikaiEvents {
         }
         player.displayClientMessage(Component.translatable("message.bleach.shikai.released", name), true);
         return Result.RELEASED;
+    }
+
+    /**
+     * Calls out the Bankai of the blade in Shikai in hand: "Bankai", then its name, heard nearby. After the checks a
+     * release makes first, a soul that cannot pay is too weak. On success the soul pays the Bankai's cost, the blade
+     * takes its form, its name is shown as a title, the Bankai advancement is earned, and it drains while it lasts, as
+     * its Shikai does (see {@link #upkeep}). It trains nothing of its own.
+     */
+    private static Result bankai(Player player, SoulData data, ItemStack stack, ZanpakutoBlade blade,
+                                 ZanpakutoSpirit spirit, Component name) {
+        float cost = ZanpakutoLogic.bankaiReleaseCost(data, spirit);
+        if (data.reiryoku() - cost < ZanpakutoLogic.RESERVE) {
+            return Result.TOO_WEAK;
+        }
+
+        SoulLogic.trySpend(player, data, cost);
+        ZanpakutoItem.setStage(stack, spirit, ZanpakutoStage.BANKAI);
+        data.shikaiActive = true;
+        data.shikaiAwayTicks = 0;
+        data.lastShikaiChangeTick = player.tickCount;
+        speak(player, Component.translatable("speech.bleach.bankai", name));
+        if (player instanceof ServerPlayer serverPlayer) {
+            serverPlayer.connection.send(new ClientboundSetTitlesAnimationPacket(TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT));
+            serverPlayer.connection.send(new ClientboundSetSubtitleTextPacket(
+                    Component.translatable("message.bleach.bankai.subtitle")));
+            serverPlayer.connection.send(new ClientboundSetTitleTextPacket(name));
+            Milestones.grant(serverPlayer, Milestones.BANKAI);
+        }
+        if (player.level() instanceof ServerLevel level) {
+            SpiritSenses.particles(level, dust(blade.colour(), BANKAI_PARTICLE_SIZE), player.getX(), player.getY(0.5),
+                    player.getZ(), BANKAI_PARTICLES, 0.8, 1.2, 0.8, 0.08);
+        }
+        SpiritSenses.play(player, ModSounds.ZANPAKUTO_RELEASE.get(), SoundSource.PLAYERS, 1.0F, BANKAI_PITCH, false);
+        player.displayClientMessage(Component.translatable("message.bleach.shikai.released", name), true);
+        return Result.BANKAI;
     }
 
     /** Seals the released zanpakutō in hand. A constant release has no sealed form any more. */

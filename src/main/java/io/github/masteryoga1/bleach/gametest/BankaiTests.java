@@ -157,9 +157,9 @@ public final class BankaiTests {
 
     /**
      * Shikai's own writers make Shikai, never Bankai: Zabimaru's release puts it in Shikai and its seal back to sealed,
-     * and Zangetsu's release is Shikai for good. A blade in Bankai, which only a test or a later build makes, is released
-     * to every reader that asks: set released again it stays in Bankai, release says it is already released, and the
-     * seal and the ground seal put it back to sealed in its sealed form.
+     * and Zangetsu's release is Shikai for good. A blade in Bankai, which the release key makes from Shikai and this test
+     * sets by hand, is released to every reader that asks: set released again it stays in Bankai, release says it is
+     * already released, and the seal and the ground seal put it back to sealed in its sealed form.
      */
     @GameTest(template = "empty")
     public static void shikaiIsShikaiAndABankaiBladeStillAnswersReleased(GameTestHelper helper) {
@@ -255,7 +255,7 @@ public final class BankaiTests {
     }
 
     /** The shipped spirit file of this name, as it lies in the mod's data. */
-    private static JsonObject shippedFile(GameTestHelper helper, String spirit) {
+    static JsonObject shippedFile(GameTestHelper helper, String spirit) {
         MinecraftServer server = helper.getLevel().getServer();
         ResourceLocation file = BleachMod.id("bleach/zanpakuto_spirit/" + spirit + ".json");
         try (Reader reader = server.getResourceManager().getResourceOrThrow(file).openAsReader()) {
@@ -266,7 +266,7 @@ public final class BankaiTests {
     }
 
     /** A spirit file read as the world reads them, or nothing if it fails to load. */
-    private static Optional<ZanpakutoSpirit> parse(GameTestHelper helper, JsonObject file) {
+    static Optional<ZanpakutoSpirit> parse(GameTestHelper helper, JsonObject file) {
         return ZanpakutoSpirit.CODEC.parse(helper.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE),
                 file).result();
     }

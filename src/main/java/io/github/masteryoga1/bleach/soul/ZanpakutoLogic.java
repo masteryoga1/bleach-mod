@@ -3,6 +3,7 @@ package io.github.masteryoga1.bleach.soul;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -263,6 +264,36 @@ public final class ZanpakutoLogic {
     public static float shikaiDrainPerTick(SoulData data, ZanpakutoSpirit spirit) {
         return (float) (data.maxReiryoku() * (double) spirit.drain()
                 * BleachConfig.get(BleachConfig.SHIKAI_DRAIN_MULTIPLIER) * drainFraction(data) / 20.0);
+    }
+
+    /** The form a blade takes at this stage: its spirit's sealed or Shikai form, or its Bankai's. */
+    public static ZanpakutoSpirit.Form form(ZanpakutoSpirit spirit, ZanpakutoStage stage) {
+        return switch (stage) {
+            case SEALED -> spirit.sealed();
+            case SHIKAI -> spirit.shikai();
+            case BANKAI -> bankaiForm(spirit);
+        };
+    }
+
+    /**
+     * Bankai's form: the one its spirit's file gives, or else Shikai's look, speed and reach with its damage made
+     * stronger by the server's config.
+     */
+    private static ZanpakutoSpirit.Form bankaiForm(ZanpakutoSpirit spirit) {
+        ZanpakutoSpirit.Form shikai = spirit.shikai();
+        float damage = (float) (shikai.damage() * BleachConfig.get(BleachConfig.BANKAI_DAMAGE_MULTIPLIER));
+        return spirit.bankai().flatMap(ZanpakutoSpirit.Bankai::form)
+                .orElse(new ZanpakutoSpirit.Form(shikai.model(), damage, shikai.speed(), shikai.reach()));
+    }
+
+    /**
+     * Reiryoku a Bankai release costs up front: its file's share of the soul's maximum, or else its Shikai release's
+     * share made dearer by the server's config, and never more than the whole.
+     */
+    public static float bankaiReleaseCost(SoulData data, ZanpakutoSpirit spirit) {
+        double share = spirit.bankai().flatMap(ZanpakutoSpirit.Bankai::releaseCost).map(Float::doubleValue)
+                .orElse(spirit.releaseCost() * BleachConfig.get(BleachConfig.BANKAI_RELEASE_COST_RATIO));
+        return (float) (data.maxReiryoku() * Math.min(1.0, share));
     }
 
     /**

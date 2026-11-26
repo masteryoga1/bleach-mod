@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
@@ -116,16 +117,21 @@ public final class ZanpakutoItem extends SwordItem {
 
     /**
      * Releases or seals the blade: the spirit's Shikai or sealed form, and the blade marked to match. A blade released
-     * already keeps its stage, so no release steps a Bankai down to Shikai.
+     * already keeps its stage and that stage's form, so no release steps a Bankai down to Shikai.
      */
     public static void setReleased(ItemStack stack, ZanpakutoSpirit spirit, boolean released) {
+        ZanpakutoBlade blade = blade(stack);
+        ZanpakutoStage kept = blade.released() ? blade.stage() : ZanpakutoStage.SHIKAI;
+        setStage(stack, spirit, released ? kept : ZanpakutoStage.SEALED);
+    }
+
+    /** Puts the blade at this stage, in its spirit's form for it (see {@link ZanpakutoLogic#form}). */
+    public static void setStage(ItemStack stack, ZanpakutoSpirit spirit, ZanpakutoStage stage) {
         if (stack.isEmpty()) {
             return;
         }
-        applyForm(stack, released ? spirit.shikai() : spirit.sealed());
-        ZanpakutoBlade blade = blade(stack);
-        ZanpakutoStage stage = blade.released() ? blade.stage() : ZanpakutoStage.SHIKAI;
-        stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withStage(released ? stage : ZanpakutoStage.SEALED));
+        applyForm(stack, ZanpakutoLogic.form(spirit, stage));
+        stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade(stack).withStage(stage));
     }
 
     /**
@@ -245,7 +251,8 @@ public final class ZanpakutoItem extends SwordItem {
         }
         lines.add(Component.translatable("item.bleach.zanpakuto.bound", blade.ownerName()).withStyle(ChatFormatting.GRAY));
         if (blade.released()) {
-            String state = blade.constant() ? "item.bleach.zanpakuto.constant" : "item.bleach.zanpakuto.released";
+            String state = blade.stage() == ZanpakutoStage.BANKAI ? "item.bleach.zanpakuto.bankai"
+                    : blade.constant() ? "item.bleach.zanpakuto.constant" : "item.bleach.zanpakuto.released";
             lines.add(Component.translatable(state).withColor(blade.colour()));
         }
     }

@@ -1,0 +1,26 @@
+{
+  "parent": "bleach:shikai",
+  "display": {
+    "icon": {
+      "id": "bleach:asauchi",
+      "components": {
+        "minecraft:custom_model_data": 1
+      }
+    },
+    "title": {
+      "translate": "advancements.bleach.bankai.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.bankai.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "bankai": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "bankai"
+      }
+    }
+  }
+}
