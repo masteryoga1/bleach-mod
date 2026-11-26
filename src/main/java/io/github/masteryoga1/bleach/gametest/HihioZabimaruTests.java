@@ -512,7 +512,7 @@ public final class HihioZabimaruTests {
     }
 
     /** Runs a test's step, and if it fails, runs {@code clear} before the failure goes on. */
-    private static void clearingOnFailure(Runnable clear, Runnable step) {
+    static void clearingOnFailure(Runnable clear, Runnable step) {
         try {
             step.run();
         } catch (RuntimeException failure) {

@@ -1931,13 +1931,19 @@ public final class ClientSmokeTest {
                 command(minecraft, "kill @e[type=minecraft:iron_golem,tag=" + LASHED_TAG + "]");
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }
-            // Zangetsu summoned four blocks before the soul, facing it; the soul looks at him a little down, from its eyes.
+            // Bound to Zangetsu again and knowing his name, the soul turns north and draws him out by command, four blocks
+            // before it and facing it, and looks at him a little down, from its eyes. Its reset sends him home, and the
+            // Asauchi its naming handed it goes after.
             case SPIRITS_AT -> {
                 spiritsDrawn = ZangetsuSpiritRenderer.drawnFrames();
+                command(minecraft, "bleach zanpakuto @s spirit bleach:zangetsu");
+                command(minecraft, "bleach zanpakuto @s bond 1000");
+                command(minecraft, "bleach zanpakuto @s name");
                 command(minecraft, "tp @s ~ ~ ~ 180 10");
-                command(minecraft, "summon bleach:zangetsu_spirit ~ ~ ~-4 {Rotation:[0.0f,0.0f]}");
+                command(minecraft, "bleach zanpakuto @s bankai spirit");
             }
-            case SPIRITS_AT + 45 -> command(minecraft, "kill @e[type=bleach:zangetsu_spirit,distance=..16]");
+            case SPIRITS_AT + 45 -> command(minecraft, "bleach zanpakuto @s reset");
+            case SPIRITS_AT + 46 -> command(minecraft, "clear @s bleach:asauchi");
             // After the last window, nothing of the beat is left for one after it: the soul's eyes level, its own view.
             case SPIRITS_AT + 59 -> {
                 command(minecraft, "tp @s ~ ~ ~ ~ 0");

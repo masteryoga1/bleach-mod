@@ -328,7 +328,7 @@ public final class BankaiTests {
     }
 
     /** Whether a line, or one it holds, refuses one player for this reason. */
-    private static boolean refused(Component line, String reason) {
+    static boolean refused(Component line, String reason) {
         if (line.getContents() instanceof TranslatableContents words
                 && words.getKey().equals("commands.bleach.quincy.arts_refused") && words.getArgs().length == 2
                 && words.getArgs()[1] instanceof Component why && translates(why, reason)) {
@@ -338,7 +338,7 @@ public final class BankaiTests {
     }
 
     /** A joined player with this soul and these tags, to name it by; a named one knows Zangetsu's name for its Asauchi. */
-    private static ServerPlayer join(GameTestHelper helper, SoulData soul, boolean named, String... tags) {
+    static ServerPlayer join(GameTestHelper helper, SoulData soul, boolean named, String... tags) {
         ServerPlayer player = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
         player.setData(SoulAttachments.SOUL, soul);
         for (String tag : tags) {
