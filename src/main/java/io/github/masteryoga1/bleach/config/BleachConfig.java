@@ -217,8 +217,11 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_DRAIN_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue BANKAI_MIN_DRAIN;
     public static final ModConfigSpec.DoubleValue BANKAI_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BANKAI_BLACK_GETSUGA_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue BANKAI_SPEED_MOVEMENT_BONUS;
     public static final ModConfigSpec.DoubleValue BANKAI_SPEED_ATTACK_SPEED_BONUS;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPEED_SHUNPO_DISTANCE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPEED_SHUNPO_COST_MULTIPLIER;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1421,6 +1424,10 @@ public final class BleachConfig {
         BANKAI_DAMAGE_MULTIPLIER = builder
                 .comment("Bankai's attack damage as a multiple of its Shikai's, for a spirit whose file gives no form.")
                 .defineInRange("damage_multiplier", 1.5, 1.0, 10.0);
+        BANKAI_BLACK_GETSUGA_MULTIPLIER = builder
+                .comment("A Getsuga Tenshō loosed in Bankai is the black one, this many times as strong, after its cap."
+                        + " From behind a Visored's mask as well, this and the mask's multiply.")
+                .defineInRange("black_getsuga_multiplier", 1.5, 1.0, 10.0);
         builder.push("speed");
         BANKAI_SPEED_MOVEMENT_BONUS = builder
                 .comment("Movement speed a Bankai whose art is speed, as Tensa Zangetsu's is, adds while it is held, as a"
@@ -1429,6 +1436,13 @@ public final class BleachConfig {
         BANKAI_SPEED_ATTACK_SPEED_BONUS = builder
                 .comment("Attack speed it adds while it is held, as a share of the attack speed the blade in hand gives.")
                 .defineInRange("attack_speed_bonus", 0.5, 0.0, 4.0);
+        BANKAI_SPEED_SHUNPO_DISTANCE_MULTIPLIER = builder
+                .comment("How much further a flash step goes while it is held, after the longest Hohō gives.")
+                .defineInRange("shunpo_distance_multiplier", 1.5, 1.0, 4.0);
+        BANKAI_SPEED_SHUNPO_COST_MULTIPLIER = builder
+                .comment("How much of its reiryoku cost a flash step keeps while it is held. A flash step never costs less"
+                        + " than 1.")
+                .defineInRange("shunpo_cost_multiplier", 0.5, 0.0, 1.0);
         builder.pop();
         builder.pop();
 

@@ -10,6 +10,8 @@ import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
+import io.github.masteryoga1.bleach.soul.BankaiForms;
+import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.HollowBody;
 import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
@@ -33,6 +35,8 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -543,6 +547,69 @@ public final class VisoredArtsTests {
         } finally {
             discard(black, pale, unmasked);
             end(now, host, bare, strongest, late);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A masked Visored may call its Bankai, and has both at once: it moves at its mask's and Tensa Zangetsu's speed
+     * together, and its Getsuga Tenshō is the black one, as hard as the mask and the Bankai make it between them (2.25
+     * times a Shinigami's, and 162 a named full swing at the cap). Taken off, the mask leaves the Bankai and its speed.
+     */
+    @GameTest(template = "empty")
+    public static void aMaskedBankaiStacksMaskAndBankai(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player host = masked(helper, 800.0F, 0L);
+        SoulData data = SoulLogic.get(host);
+        Player strongest = masked(helper, 1.0E6F, 0L);
+        SoulData strongestData = SoulLogic.get(strongest);
+        strongestData.setZanpakuto(strongestData.zanpakuto().withGetsugaNamed(true));
+        GetsugaTensho black = null;
+        try {
+            AttributeInstance movement = host.getAttribute(Attributes.MOVEMENT_SPEED);
+            double base = movement.getBaseValue();
+            BankaiLogic.reach(data, BankaiLogic.nameOf(ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU))
+                    .orElseThrow(), now);
+            ShikaiEvents.Result release = ShikaiEvents.release(host);
+            helper.assertTrue(release == ShikaiEvents.Result.RELEASED, "the masked Visored's release gave " + release);
+            double maskedSpeed = movement.getValue();
+            host.tickCount += ShikaiEvents.SETTLE_TICKS;
+            release = ShikaiEvents.release(host);
+            helper.assertTrue(release == ShikaiEvents.Result.BANKAI && VisoredLogic.isMasked(data)
+                            && BankaiForms.inBankai(host, data),
+                    "the masked Visored's Bankai gave " + release + (VisoredLogic.isMasked(data) ? "" : ", unmasked"));
+            double both = movement.getValue();
+            helper.assertTrue(movement.getModifier(VisoredLogic.MASK_SPEED_ID) != null
+                            && movement.getModifier(BankaiForms.SPEED_ID) != null,
+                    "masked in Bankai the soul wears the mask's speed " + movement.getModifier(VisoredLogic.MASK_SPEED_ID)
+                            + " and the Bankai's " + movement.getModifier(BankaiForms.SPEED_ID));
+            HollowPlayerTests.assertClose(helper, both - maskedSpeed, 0.3 * base, "the Bankai's speed over the mask's");
+
+            SoulData plain = ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F);
+            plain.setZanpakuto(plain.zanpakuto().withGetsugaNamed(data.zanpakuto().getsugaNamed()));
+            HollowPlayerTests.assertClose(helper, ZanpakutoLogic.getsugaDamage(data, 1.0F, true),
+                    2.25 * ZanpakutoLogic.getsugaDamage(plain, 1.0F), "a masked Bankai's full swing at 800");
+            HollowPlayerTests.assertClose(helper, ZanpakutoLogic.getsugaDamage(strongestData, 1.0F, true), 162.0,
+                    "a masked Bankai's named full swing at the cap");
+            // Full again after the two releases, so the gathering is never too weak.
+            data.setReiryoku(data.maxReiryoku());
+            ShikaiEvents.GatherResult gather = ShikaiEvents.gather(host);
+            helper.assertTrue(gather == ShikaiEvents.GatherResult.GATHERING, "the gathering gave " + gather);
+            black = ShikaiEvents.fire(host);
+            helper.assertTrue(black != null && black.isBlack(), "a masked Bankai's Getsuga Tenshō is not the black one");
+            HollowPlayerTests.assertClose(helper, black.damage(), 2.25 * ZanpakutoLogic.getsugaDamage(plain, 0.0F),
+                    "a masked Bankai's Getsuga Tenshō loosed at once");
+
+            VisoredEvents.onMaskKey(host, data, now);
+            helper.assertTrue(!VisoredLogic.isMasked(data) && data.isBankaiActive()
+                            && movement.getModifier(VisoredLogic.MASK_SPEED_ID) == null
+                            && movement.getModifier(BankaiForms.SPEED_ID) != null,
+                    "with the mask off the soul is " + (data.isBankaiActive() ? "" : "not ") + "in Bankai, and wears "
+                            + movement.getModifiers());
+            HollowPlayerTests.assertClose(helper, both - movement.getValue(), 0.25 * base, "the mask's speed, gone");
+        } finally {
+            discard(black);
+            end(now, host, strongest);
         }
         helper.succeed();
     }

@@ -226,12 +226,17 @@ public class GetsugaTensho extends Projectile {
         return entityData.get(DATA_CHARGE);
     }
 
+    /** The damage it does each creature it cuts, as it was loosed. A client is never sent it, and reads 0. */
+    public float damage() {
+        return damage;
+    }
+
     /** The blade's colour, which tints the crescent: its low 24 bits; the {@link #BLACK} bit above them. */
     public int colour() {
         return entityData.get(DATA_COLOUR);
     }
 
-    /** Whether this is the black crescent with a red edge: a masked Visored's. */
+    /** Whether this is the black crescent with a red edge: a masked Visored's, or one loosed in Bankai. */
     public boolean isBlack() {
         return (colour() & BLACK) != 0;
     }

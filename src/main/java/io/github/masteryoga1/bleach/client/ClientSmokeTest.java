@@ -48,6 +48,7 @@ import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
+import io.github.masteryoga1.bleach.soul.BankaiForms;
 import io.github.masteryoga1.bleach.soul.DangaiLogic;
 import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
@@ -75,6 +76,7 @@ import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Deque;
@@ -124,6 +126,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -276,7 +279,10 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * ring is out, it and its leeches must be gone. A Shinigami again by command, the soul cuts down a third with its own
  * Getsuga Tenshō on the server: the Gate of Hell must rise unhidden behind it, its body held whole and upright, the soul
  * looks at the Gate for a shot as the body is drawn in along its blade, credited once with no soul rising, and the body
- * must be gone before the run quits.
+ * must be gone before the run quits. Last, bound to Zangetsu again with its Bankai granted, the soul calls Tensa
+ * Zangetsu, seen from the front: the blade in hand must reach the client in Bankai in its own model, with the soul
+ * quickened; its Getsuga Tenshō must be the black one with no mask on; and the seal key must step it all back down to
+ * Shikai, after which the Bankai is revoked and the blade put away.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -363,11 +369,15 @@ public final class ClientSmokeTest {
     private static final int RING_SHOT_TICKS = 5;
     /** The first tick of the Gate of Hell's beat, after Grand Fisher's; its steps and checks count from here. */
     private static final int HELL_GATE_AT = GRAND_FISHER_AT + 115;
+    /** The first tick of Grand Fisher's ambush's beat, after the Gate of Hell's; its steps and checks count from here. */
+    private static final int GRAND_FISHER_AMBUSH_AT = HELL_GATE_AT + 120;
     /**
-     * The first tick of Grand Fisher's ambush's beat, after the Gate of Hell's; its steps and checks count from here, and
+     * The first tick of Tensa Zangetsu's beat, after Grand Fisher's ambush's; its steps and checks count from here, and
      * the run ends after.
      */
-    private static final int GRAND_FISHER_AMBUSH_AT = HELL_GATE_AT + 120;
+    private static final int BANKAI_AT = GRAND_FISHER_AMBUSH_AT + 115;
+    /** Tensa Zangetsu's model number, as Zangetsu's file gives its Bankai, and Zangetsu's in Shikai. */
+    private static final int TENSA_MODEL = 4, SHIKAI_MODEL = 1;
     /** How far before the soul its lure is laid for the ambush's beat. */
     private static final double LAID_AHEAD = 8.0;
 
@@ -631,6 +641,7 @@ public final class ClientSmokeTest {
         checkHellGate(minecraft, soul);
         checkBosses(minecraft);
         checkGrandFisher(minecraft);
+        checkBankai(minecraft, player, soul);
         if (finished) {
             return;
         }
@@ -1807,7 +1818,43 @@ public final class ClientSmokeTest {
                 command(minecraft, "kill @e[type=bleach:grand_fisher]");
                 command(minecraft, "kill @e[type=bleach:grand_fisher_lure]");
             }
-            case GRAND_FISHER_AMBUSH_AT + 115 -> {
+            // A fresh Asauchi in hand bound to Zangetsu and named, its Bankai granted by command and reiryoku to spare,
+            // looking up and away so the Getsuga Tenshō carves nothing, seen from the front.
+            case BANKAI_AT -> {
+                command(minecraft, "clear @s bleach:asauchi");
+                command(minecraft, "item replace entity @s weapon.mainhand with bleach:asauchi");
+                command(minecraft, "bleach zanpakuto @s reset");
+                command(minecraft, "bleach zanpakuto @s spirit bleach:zangetsu");
+                command(minecraft, "bleach zanpakuto @s bond 1000");
+                command(minecraft, "bleach zanpakuto @s name");
+                command(minecraft, "bleach zanpakuto @s bankai grant");
+                command(minecraft, "bleach reiryoku @s 800 800");
+                command(minecraft, "tp @s ~ ~ ~ 180 -30");
+                minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+            }
+            // Shikai, for good; then, once it has settled, Bankai.
+            case BANKAI_AT + 5 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+            case BANKAI_AT + 50 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+            // Once more, if a slow server had not let the Shikai settle by the first call.
+            case BANKAI_AT + 65 -> {
+                if (ZanpakutoItem.blade(player.getMainHandItem()).stage() != ZanpakutoStage.BANKAI) {
+                    BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
+                }
+            }
+            // The slim black blade, and its name as the title.
+            case BANKAI_AT + 80 -> shot(minecraft, "tensa_zangetsu");
+            // Held for half a second, then let go: a black Getsuga Tenshō of a third of its charge.
+            case BANKAI_AT + 81 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_PRESS);
+            case BANKAI_AT + 91 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_RELEASE);
+            case BANKAI_AT + 100 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.SEAL);
+            // After the last window, nothing of the beat is left for one after it: no Bankai, no blade, the camera back.
+            case BANKAI_AT + 119 -> {
+                command(minecraft, "bleach zanpakuto @s bankai revoke");
+                command(minecraft, "bleach zanpakuto @s reset");
+                command(minecraft, "clear @s bleach:asauchi");
+                minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            }
+            case BANKAI_AT + 120 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2712,6 +2759,45 @@ public final class ClientSmokeTest {
     }
 
     /**
+     * The checks of Tensa Zangetsu, each window from the step it follows: called, then its Getsuga Tenshō, then stepped
+     * down by the seal key.
+     */
+    private static void checkBankai(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        expectWithin(minecraft, BANKAI_AT + 51, BANKAI_AT + 75, () -> inTensaZangetsu(minecraft, player),
+                "Tensa Zangetsu never reached the client: the blade in hand in Bankai in its own model, its owner"
+                        + " quickened");
+        if (expectWithin(minecraft, BANKAI_AT + 92, BANKAI_AT + 110, () -> !VisoredLogic.isMasked(soul) && nearest(minecraft,
+                        GetsugaTensho.class, 48.0, crescent -> crescent.isBlack() && crescent.age() >= 2) != null,
+                "Tensa Zangetsu's Getsuga Tenshō never reached the client as the black one with no mask on")) {
+            shot(minecraft, "tensa_zangetsu_getsuga");
+        }
+        expectWithin(minecraft, BANKAI_AT + 101, BANKAI_AT + 118,
+                () -> windowsPassed.contains(BANKAI_AT + 51) && steppedDown(player),
+                "the seal key never stepped Tensa Zangetsu down to Shikai on the client, its speed gone");
+    }
+
+    /**
+     * Whether the soul holds Tensa Zangetsu as its client sees it: its own blade in Bankai in its own model, which the
+     * item model's override draws in Tensa Zangetsu's texture, and the speed its server put on it.
+     */
+    private static boolean inTensaZangetsu(Minecraft minecraft, LocalPlayer player) {
+        ItemStack held = player.getMainHandItem();
+        return ZanpakutoItem.blade(held).stage() == ZanpakutoStage.BANKAI && modelOf(held) == TENSA_MODEL
+                && player.getAttribute(Attributes.MOVEMENT_SPEED).getModifier(BankaiForms.SPEED_ID) != null
+                && player.getAttribute(Attributes.ATTACK_SPEED).getModifier(BankaiForms.ATTACK_SPEED_ID) != null
+                && minecraft.getItemRenderer().getModel(held, minecraft.level, player, 0).getParticleIcon().contents()
+                        .name().equals(BleachMod.id("item/tensa_zangetsu"));
+    }
+
+    /** Whether the soul's blade in hand is back in Shikai in Zangetsu's model, with no speed of Bankai's. */
+    private static boolean steppedDown(LocalPlayer player) {
+        ItemStack held = player.getMainHandItem();
+        return ZanpakutoItem.blade(held).stage() == ZanpakutoStage.SHIKAI && modelOf(held) == SHIKAI_MODEL
+                && player.getAttribute(Attributes.MOVEMENT_SPEED).getModifier(BankaiForms.SPEED_ID) == null
+                && player.getAttribute(Attributes.ATTACK_SPEED).getModifier(BankaiForms.ATTACK_SPEED_ID) == null;
+    }
+
+    /**
      * Has the soul, on the server thread, strike every live lure about it with an iron sword put in its hand: a blow of
      * a blade from a soul who sees her, which cuts her stalk, or brings out the body of one laid alone. Every body about
      * is then stilled, as a summon's {@link #STILL} would be. A blow by hand would need the lure under the cursor.
@@ -2908,7 +2994,8 @@ public final class ClientSmokeTest {
      * for what a server stalled by the crossing or behind sends late, before the gate home's press, for the first
      * gate's wait that such a server has not yet run, or before the step into the Garganta, for the tear's first tick;
      * and before the last tick of each of the Gate of Hell's last three windows, so a stalled server's Gate and the
-     * windows move together. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
+     * windows move together; and before the last tick of Tensa Zangetsu's first window, for a Bankai a slow server has
+     * not yet let settle. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
@@ -2917,7 +3004,9 @@ public final class ClientSmokeTest {
                 || ticksInWorld == GARGANTA_STEP_IN_TICK - 1 && !serverRiftTicked(minecraft)
                 || ticksInWorld == HELL_GATE_AT + 64 && !windowsPassed.contains(HELL_GATE_AT + 3) && !gateRose(minecraft)
                 || ticksInWorld == HELL_GATE_AT + 109 && !windowsPassed.contains(HELL_GATE_AT + 4) && !gateDraws(minecraft)
-                || ticksInWorld == HELL_GATE_AT + 117 && !windowsPassed.contains(HELL_GATE_AT + 5) && !gateTook(minecraft);
+                || ticksInWorld == HELL_GATE_AT + 117 && !windowsPassed.contains(HELL_GATE_AT + 5) && !gateTook(minecraft)
+                || ticksInWorld == BANKAI_AT + 74 && !windowsPassed.contains(BANKAI_AT + 51)
+                && !inTensaZangetsu(minecraft, player);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

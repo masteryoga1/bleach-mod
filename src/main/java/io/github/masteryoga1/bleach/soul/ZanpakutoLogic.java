@@ -323,14 +323,24 @@ public final class ZanpakutoLogic {
     /**
      * A Getsuga Tenshō's damage at this charge (0 to 1): it grows with the root of maximum reiryoku up
      * to a cap, and is weaker until Zangetsu has named it; and, from behind a Visored's mask,
-     * {@code black_getsuga_multiplier} times that, after the cap ({@link VisoredLogic#getsugaFactor}).
+     * {@code black_getsuga_multiplier} times that, after the cap ({@link VisoredLogic#getsugaFactor}). Out of Bankai.
      */
     public static float getsugaDamage(SoulData data, float charge) {
+        return getsugaDamage(data, charge, false);
+    }
+
+    /**
+     * A Getsuga Tenshō's damage at this charge, as {@link #getsugaDamage(SoulData, float)} gives it, and loosed in
+     * Bankai {@code [bankai] black_getsuga_multiplier} times that again, after the cap: behind a mask, both multiply.
+     */
+    public static float getsugaDamage(SoulData data, float charge, boolean bankai) {
         double base = Math.min(BleachConfig.get(BleachConfig.GETSUGA_MAX_DAMAGE),
                 BleachConfig.get(BleachConfig.GETSUGA_BASE_DAMAGE)
                         + BleachConfig.get(BleachConfig.GETSUGA_DAMAGE_PER_ROOT_REIRYOKU) * Math.sqrt(data.maxReiryoku()));
         double named = data.zanpakuto().getsugaNamed() ? 1.0 : BleachConfig.get(BleachConfig.GETSUGA_UNNAMED_MULTIPLIER);
-        return (float) (base * (0.6 + 0.6 * Mth.clamp(charge, 0.0F, 1.0F)) * named * VisoredLogic.getsugaFactor(data));
+        double inBankai = bankai ? BleachConfig.get(BleachConfig.BANKAI_BLACK_GETSUGA_MULTIPLIER) : 1.0;
+        return (float) (base * (0.6 + 0.6 * Mth.clamp(charge, 0.0F, 1.0F)) * named * VisoredLogic.getsugaFactor(data)
+                * inBankai);
     }
 
     /** What a Getsuga Tenshō of this charge costs: a share of maximum reiryoku from a tap to a full swing, never below the minimum. */

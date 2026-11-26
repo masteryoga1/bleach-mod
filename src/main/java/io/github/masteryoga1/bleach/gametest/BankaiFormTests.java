@@ -4,11 +4,16 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.soul.BankaiForms;
+import io.github.masteryoga1.bleach.soul.FlashStep;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
+import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.Stat;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
@@ -253,5 +258,158 @@ public final class BankaiFormTests {
                                 + (unsped(ichigo) ? "unsped" : "sped") + ", and shown "
                                 + BankaiReleaseTests.keys(TestPlayers.actionBar(ichigo))))
                 .thenSucceed();
+    }
+
+    /** Asserts the flash step this soul would take now: how far, and what it costs against what Hohō alone makes it. */
+    private static void assertShunpo(GameTestHelper helper, Player player, double distance, double share, String when) {
+        SoulData data = SoulLogic.get(player);
+        double plainCost = Math.max(1.0, ShinigamiLogic.flashStepCost(data) * share);
+        helper.assertTrue(near(FlashStep.distanceFor(player, data), distance)
+                        && near(FlashStep.costFor(player, data), plainCost),
+                when + " a flash step goes " + FlashStep.distanceFor(player, data) + ", not " + distance + ", and costs "
+                        + FlashStep.costFor(player, data) + ", not " + plainCost);
+    }
+
+    /**
+     * In Tensa Zangetsu its owner flash steps half again as far, after Hohō's cap, so past Hohō's longest, for half
+     * what Hohō alone makes it cost, never under 1: 12 blocks at Hohō 10 where Shikai's is 8, and 24 at Hohō 50 where
+     * Hohō's longest is 16. Stepped down, and in Hihiō Zabimaru, whose art is another, a flash step is Hohō's alone.
+     */
+    @GameTest(template = "empty")
+    public static void tensaZangetsuFlashStepsFurtherForLess(GameTestHelper helper) {
+        Player ichigo = BankaiReleaseTests.reached(helper, ZanpakutoSpirits.ZANGETSU);
+        SoulData data = SoulLogic.get(ichigo);
+        data.setLevel(Stat.HOHO, 10);
+        BankaiReleaseTests.released(helper, ichigo, ShikaiEvents.Result.RELEASED, "Shikai");
+        assertShunpo(helper, ichigo, 8.0, 1.0, "in Shikai at Hohō 10");
+        ichigo.tickCount += ShikaiEvents.SETTLE_TICKS;
+        BankaiReleaseTests.released(helper, ichigo, ShikaiEvents.Result.BANKAI, "Tensa Zangetsu");
+        assertShunpo(helper, ichigo, 12.0, 0.5, "in Tensa Zangetsu at Hohō 10");
+        data.setLevel(Stat.HOHO, 50);
+        assertShunpo(helper, ichigo, 24.0, 0.5, "in Tensa Zangetsu at Hohō 50");
+        // A small soul's step, which half would put under 1, costs 1.
+        float most = data.maxReiryoku();
+        data.setMaxReiryoku(40.0F);
+        helper.assertTrue(ShinigamiLogic.flashStepCost(data) * 0.5F < 1.0F && FlashStep.costFor(ichigo, data) == 1.0F,
+                "a small soul's flash step in Tensa Zangetsu costs " + FlashStep.costFor(ichigo, data) + ", not 1");
+        data.setMaxReiryoku(most);
+        helper.assertTrue(ShikaiEvents.seal(ichigo) == ShikaiEvents.Result.STEPPED_DOWN, "the seal key did not step down");
+        assertShunpo(helper, ichigo, 16.0, 1.0, "stepped down at Hohō 50");
+
+        Player renji = BankaiReleaseTests.reached(helper, ZanpakutoSpirits.ZABIMARU);
+        SoulLogic.get(renji).setLevel(Stat.HOHO, 10);
+        BankaiReleaseTests.toBankai(helper, renji);
+        assertShunpo(helper, renji, 8.0, 1.0, "in Hihiō Zabimaru at Hohō 10");
+        helper.succeed();
+    }
+
+    /**
+     * Has this joined soul flash step on the ground at full reiryoku, steering this way, and asserts the step went more
+     * than {@code over} and at most {@code most} blocks along the ground for {@code cost}. A refused step spends nothing,
+     * so fails.
+     */
+    private static void assertStepped(GameTestHelper helper, ServerPlayer player, float forward, double over,
+            double most, double cost, String when) {
+        SoulData data = SoulLogic.get(player);
+        data.setReiryoku(data.maxReiryoku());
+        Vec3 start = player.position();
+        player.setOnGround(true);
+        FlashStep.perform(player, forward, 0.0F);
+        double moved = Math.hypot(player.getX() - start.x, player.getZ() - start.z);
+        double spent = data.maxReiryoku() - data.reiryoku();
+        helper.assertTrue(moved > over && moved <= most && Math.abs(spent - cost) < 0.01,
+                when + " a flash step went " + moved + " for " + spent + ", not over " + over + " and at most " + most
+                        + " for " + cost);
+    }
+
+    /**
+     * A flash step taken in Tensa Zangetsu goes well past Hohō's 8 at Hohō 10, at most 12, for half Hohō's cost, as
+     * {@link FlashStep#perform} takes it; stepped down to Shikai and the cooldown waited out, the next goes no further
+     * than 8, at the full cost. On the field's open floor, facing along it, so neither step is cut short or refused.
+     */
+    @GameTest(template = "field", timeoutTicks = 400)
+    public static void aBankaiFlashStepGoesFurtherForLess(GameTestHelper helper) {
+        ServerPlayer ichigo = BankaiReleaseTests.joined(helper, ZanpakutoSpirits.ZANGETSU, new Vec3(1.5, 2.0, 1.5));
+        SoulData data = SoulLogic.get(ichigo);
+        data.setLevel(Stat.HOHO, 10);
+        BankaiReleaseTests.toBankai(helper, ichigo);
+        int from = ichigo.tickCount;
+        long[] stepped = new long[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, ichigo.tickCount >= from + 2 && sped(ichigo),
+                        "the joined Ichigo has not been watched in Tensa Zangetsu yet"))
+                .thenExecute(() -> {
+                    double half = Math.max(1.0, ShinigamiLogic.flashStepCost(data) * 0.5);
+                    // Well past Hohō's 8, so a step that went Hohō's way cannot pass.
+                    assertStepped(helper, ichigo, 1.0F, 11.0, 12.5, half, "in Tensa Zangetsu");
+                    helper.assertTrue(ShikaiEvents.seal(ichigo) == ShikaiEvents.Result.STEPPED_DOWN,
+                            "the seal key did not step down");
+                    stepped[0] = helper.getLevel().getGameTime();
+                })
+                .thenWaitUntil(() -> helper.assertTrue(helper.getLevel().getGameTime() - stepped[0]
+                                >= ShinigamiLogic.flashStepCooldownTicks(data), "the flash step is still cooling down"))
+                // The field's floor runs 16 blocks, so back the way it came; a step of a block is the least that goes.
+                .thenExecute(() -> assertStepped(helper, ichigo, -1.0F, 1.0, 8.0 + EPSILON,
+                        ShinigamiLogic.flashStepCost(data), "stepped down to Shikai"))
+                .thenSucceed();
+    }
+
+    /**
+     * A Getsuga Tenshō loosed in Bankai is the black one with a red edge, in its blade's colour bits, and half again as
+     * hard as the same soul's in Shikai, after the cap: at the cap of 60, 72 a named full swing out of Bankai, and 108
+     * in it. It costs what it would in Shikai.
+     */
+    @GameTest(template = "empty")
+    public static void aBankaiGetsugaTenshoIsBlackAndHarder(GameTestHelper helper) {
+        Player shikai = BankaiReleaseTests.reached(helper, ZanpakutoSpirits.ZANGETSU);
+        Player bankai = BankaiReleaseTests.reached(helper, ZanpakutoSpirits.ZANGETSU);
+        BankaiReleaseTests.released(helper, shikai, ShikaiEvents.Result.RELEASED, "Shikai");
+        BankaiReleaseTests.toBankai(helper, bankai);
+        GetsugaTensho pale = null;
+        GetsugaTensho black = null;
+        try {
+            float[] paid = new float[2];
+            Player[] both = {shikai, bankai};
+            for (int i = 0; i < both.length; i++) {
+                SoulData data = SoulLogic.get(both[i]);
+                data.setReiryoku(data.maxReiryoku());
+                ShikaiEvents.GatherResult gather = ShikaiEvents.gather(both[i]);
+                helper.assertTrue(gather == ShikaiEvents.GatherResult.GATHERING, "the gathering gave " + gather);
+                paid[i] = data.reiryoku();
+            }
+            pale = ShikaiEvents.fire(shikai);
+            black = ShikaiEvents.fire(bankai);
+            paid[0] -= SoulLogic.get(shikai).reiryoku();
+            paid[1] -= SoulLogic.get(bankai).reiryoku();
+            // Mocks never tick, so the game time is the same at the gather and the fire: both are at no charge. Both
+            // souls are the same.
+            float plain = ZanpakutoLogic.getsugaDamage(SoulLogic.get(bankai), 0.0F);
+            int colour = ZanpakutoItem.blade(bankai.getMainHandItem()).colour() & 0xFFFFFF;
+            helper.assertTrue(pale != null && !pale.isBlack() && near(pale.damage(), plain),
+                    "Zangetsu's Shikai loosed " + described(pale) + ", not a pale one of " + plain);
+            helper.assertTrue(black != null && black.isBlack() && (black.colour() & 0xFFFFFF) == colour
+                            && near(black.damage(), 1.5 * plain) && near(paid[1], paid[0]),
+                    "Tensa Zangetsu loosed " + described(black) + ", not a black one of " + 1.5 * plain + " in "
+                            + Integer.toHexString(colour) + ", for " + paid[1] + " against Shikai's " + paid[0]);
+        } finally {
+            for (GetsugaTensho crescent : new GetsugaTensho[] {pale, black}) {
+                if (crescent != null) {
+                    crescent.discard();
+                }
+            }
+        }
+        SoulData strongest = ZanpakutoTests.soul(SoulState.SHINIGAMI, 1.0E6F);
+        strongest.setZanpakuto(strongest.zanpakuto().withGetsugaNamed(true));
+        HollowPlayerTests.assertClose(helper, ZanpakutoLogic.getsugaDamage(strongest, 1.0F, false), 72.0,
+                "a named full swing at the cap, out of Bankai");
+        HollowPlayerTests.assertClose(helper, ZanpakutoLogic.getsugaDamage(strongest, 1.0F, true), 108.0,
+                "a named full swing at the cap, in Bankai");
+        helper.succeed();
+    }
+
+    /** What a Getsuga Tenshō is, for a failure: black or pale, how hard and in what colour, or nothing. */
+    private static String described(GetsugaTensho crescent) {
+        return crescent == null ? "nothing" : (crescent.isBlack() ? "a black one" : "a pale one") + " of "
+                + crescent.damage() + " in " + Integer.toHexString(crescent.colour() & 0xFFFFFF);
     }
 }
