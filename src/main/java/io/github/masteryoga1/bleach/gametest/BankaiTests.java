@@ -277,7 +277,7 @@ public final class BankaiTests {
     }
 
     /**
-     * The shipped spirits give their Bankai's name, art, test and spirit, Zangetsu's its model too, and leave its form,
+     * The shipped spirits give their Bankai's name, art, test, spirit and model, and leave its form,
      * cost and drain to the server's config. A file that gives only {@code "bankai_name"}, as both did before, still
      * loads, with a Bankai of that name and nothing more; given both, {@code "bankai"} wins; given neither, there is no
      * Bankai. A Bankai with no name, an unknown test or a drain past 1 fails to load.
@@ -296,7 +296,8 @@ public final class BankaiTests {
         helper.assertTrue(translates(zabimaru.name(), "zanpakuto.bleach.zabimaru.bankai")
                         && zabimaru.ability() == ZanpakutoSpirit.BankaiAbility.SERPENT
                         && zabimaru.test() == ZanpakutoSpirit.BankaiTest.TWO_HALVES
-                        && zabimaru.entity().equals(Optional.of(BleachMod.id("zabimaru_spirit"))),
+                        && zabimaru.entity().equals(Optional.of(BleachMod.id("zabimaru_spirit")))
+                        && zabimaru.form().isEmpty() && zabimaru.model().equals(Optional.of(5)),
                 "Zabimaru's Bankai is " + zabimaru);
 
         // Zangetsu's file with another Bankai's name in the older key, so the key read shows in the name.

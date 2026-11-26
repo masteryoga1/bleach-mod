@@ -222,6 +222,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_SPEED_ATTACK_SPEED_BONUS;
     public static final ModConfigSpec.DoubleValue BANKAI_SPEED_SHUNPO_DISTANCE_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue BANKAI_SPEED_SHUNPO_COST_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_REACH_BONUS;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1443,6 +1444,12 @@ public final class BleachConfig {
                 .comment("How much of its reiryoku cost a flash step keeps while it is held. A flash step never costs less"
                         + " than 1.")
                 .defineInRange("shunpo_cost_multiplier", 0.5, 0.0, 1.0);
+        builder.pop();
+        builder.push("serpent");
+        BANKAI_SERPENT_REACH_BONUS = builder
+                .comment("Blocks a Bankai whose art is the serpent, as Hihiō Zabimaru's is, adds to its wielder's reach"
+                        + " while it is held, on top of its Shikai's, except while the serpent draws back after a lash.")
+                .defineInRange("reach_bonus", 9.0, 0.0, 48.0);
         builder.pop();
         builder.pop();
 

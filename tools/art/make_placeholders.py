@@ -101,6 +101,11 @@ ZABI_WRAP = rgb(150, 36, 36)
 ZABI_WRAP_DARK = rgb(96, 20, 24)
 BRONZE = rgb(170, 120, 60)
 TOOTH = rgb(240, 236, 226)
+# Hihiō Zabimaru: great bone segments, shaded along their backs, red mane at each joint, a dark gum under the fangs.
+HIHIO_BONE = rgb(226, 218, 196)
+HIHIO_BONE_SHADE = rgb(170, 160, 136)
+HIHIO_MANE = rgb(186, 44, 40)
+HIHIO_GUM = rgb(90, 24, 28)
 # Tensa Zangetsu: a slim black blade with a pale edge, a black hilt, and the chain broken off its end.
 TENSA = rgb(24, 24, 28)
 TENSA_SHADE = rgb(10, 10, 12)
@@ -516,6 +521,35 @@ def zabimaru_segment():
     c.rect(0, 14, 16, 16, SHADE)
     for x in range(2, 16, 5):
         c.rect(x, 2, x + 2, 5, TOOTH)
+    return c
+
+
+def hihio_zabimaru():
+    """Hihiō Zabimaru: a great blade of bone on the diagonal, five pixels across, in segments with a tuft of red mane at
+    each joint and a fang below each, a broader skull at its tip with a dark eye, and Zabimaru's red-wrapped hilt and
+    bronze guard at its root."""
+    c = Canvas(32, 32)
+    for py in range(32):
+        for px in range(32):
+            along = (px - 8) - (py - 23)  # twice the steps up the blade from its guard
+            across = (px - 8) + (py - 23)  # 0 down its middle, its back above, its edge below
+            if -10 <= along < 0 and abs(across) <= 1:
+                c.put(px, py, ZABI_WRAP if (along // 2) % 2 else ZABI_WRAP_DARK)
+            elif 0 <= along < 2 and abs(across) <= 4:
+                c.put(px, py, BRONZE)
+            elif 2 <= along < 34 and abs(across) <= 2:
+                if along % 9 >= 8:
+                    if across <= 0:
+                        c.put(px, py, HIHIO_MANE)
+                else:
+                    c.put(px, py, HIHIO_BONE_SHADE if across == -2 else HIHIO_BONE)
+            elif 2 <= along < 34 and across == 3 and along % 9 in (1, 2):
+                c.put(px, py, TOOTH)
+            elif 2 <= along < 34 and across == -3 and along % 9 >= 7:
+                c.put(px, py, HIHIO_MANE)
+            elif 34 <= along < 42 and abs(across) <= 3:
+                eye = along in (36, 37) and across in (-1, 0)
+                c.put(px, py, HIHIO_GUM if eye else HIHIO_BONE_SHADE if abs(across) == 3 else HIHIO_BONE)
     return c
 
 
@@ -2404,6 +2438,7 @@ TEXTURES = {
     "item/zabimaru.png": zabimaru,
     "item/zabimaru_shikai.png": zabimaru_shikai,
     "item/tensa_zangetsu.png": tensa_zangetsu,
+    "item/hihio_zabimaru.png": hihio_zabimaru,
     "item/shihakusho_kosode.png": kosode_icon,
     "item/shihakusho_hakama.png": hakama_icon,
     "item/waraji.png": waraji_icon,

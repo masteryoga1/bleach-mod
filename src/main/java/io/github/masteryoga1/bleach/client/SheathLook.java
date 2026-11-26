@@ -23,7 +23,7 @@ public record SheathLook(boolean onBack, int saya, int fitting, int tsuka, float
     /** Zangetsu in Shikai: the broad cleaver across the back, wrapped in white cloth with the hilt over the shoulder. */
     public static final SheathLook ZANGETSU = new SheathLook(true, 0xECE8DC, 0xBEB8AA, 0xECE8DC, 1.25F, 0.30F);
 
-    /** The look for a sheathed blade of this model number, or null for -1 (no blade sheathed) and Tensa Zangetsu. */
+    /** The look for a sheathed blade of this model number, or null for -1 (no blade sheathed) and a Bankai's. */
     @Nullable
     public static SheathLook forModel(int model) {
         if (model < 0) {
@@ -33,7 +33,7 @@ public record SheathLook(boolean onBack, int saya, int fitting, int tsuka, float
             case 1 -> ZANGETSU;
             case 2, 3 -> ZABIMARU;
             // Out of hand it is back in Shikai within a second, and has no sheath until then.
-            case 4 -> null;
+            case 4, 5 -> null;
             default -> ASAUCHI;
         };
     }

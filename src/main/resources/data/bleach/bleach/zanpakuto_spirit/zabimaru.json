@@ -82,6 +82,7 @@
     "name": {
       "translate": "zanpakuto.bleach.zabimaru.bankai"
     },
+    "model": 5,
     "ability": "serpent",
     "test": "two_halves",
     "entity": "bleach:zabimaru_spirit"

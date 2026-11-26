@@ -49,7 +49,7 @@ public final class ZabimaruLashRenderer extends EntityRenderer<ZabimaruLash> {
             return;
         }
         float age = lash.age() + partialTick;
-        float out = Mth.clamp(Math.min(age, ZabimaruLash.LIFE_TICKS - age) / REACH_TICKS, 0.0F, 1.0F);
+        float out = Mth.clamp(Math.min(age, lash.lifeTicks() - age) / REACH_TICKS, 0.0F, 1.0F);
         // The pose's origin is the lash itself, where the blow landed.
         Vec3 hand = handPosition(owner, partialTick).subtract(lash.getPosition(partialTick));
         Vec3 reach = hand.scale(-out);
