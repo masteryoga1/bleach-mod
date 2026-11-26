@@ -163,6 +163,10 @@ public final class RegistrationTests {
         EntityType<?> gate = ModEntities.HELL_GATE.get();
         helper.assertTrue(gate.is(SoulLogic.SPIRITS) && !gate.canSerialize() && !gate.canSummon(),
                 "bleach:hell_gate is not a spirit, or is saved or summoned");
+        EntityType<?> zangetsu = ModEntities.ZANGETSU_SPIRIT.get();
+        helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id("zangetsu_spirit")) == zangetsu
+                        && zangetsu.is(SoulLogic.SPIRITS) && !zangetsu.is(BleachTags.HOLLOWS) && !zangetsu.canSerialize(),
+                "bleach:zangetsu_spirit is not registered, is no spirit, is a Hollow, or is saved");
         Optional<Holder.Reference<DamageType>> burst = helper.getLevel().registryAccess()
                 .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(ShriekerLeech.BURST);
         // Every leech that bursts at once lands, through the hurt cooldown the one before it left.

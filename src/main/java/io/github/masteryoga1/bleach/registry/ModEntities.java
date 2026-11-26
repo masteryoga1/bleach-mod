@@ -26,6 +26,7 @@ import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.KisukeUrahara;
 import io.github.masteryoga1.bleach.entity.Kototsu;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
+import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
 import io.github.masteryoga1.bleach.entity.NegacionLight;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
@@ -41,6 +42,7 @@ import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
+import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -320,6 +322,19 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .build(BleachMod.id("inner_hollow").toString()));
 
+    /**
+     * Zangetsu drawn out of his wielder's inner world (see MaterialisedSpirit), as the inner Hollow is drawn from its
+     * host's: never saved, and never spawned by himself.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<ZangetsuSpirit>> ZANGETSU_SPIRIT =
+            ENTITY_TYPES.register("zangetsu_spirit", () -> EntityType.Builder
+                    .<ZangetsuSpirit>of(ZangetsuSpirit::new, MobCategory.MONSTER)
+                    .sized(0.6F, 1.8F)
+                    .eyeHeight(1.62F)
+                    .noSave()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("zangetsu_spirit").toString()));
+
     // ---- Pluses and the Garganta ----
 
     public static final DeferredHolder<EntityType<?>, EntityType<PlusSpirit>> PLUS =
@@ -559,6 +574,7 @@ public final class ModEntities {
         event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
         event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());
+        event.put(ZANGETSU_SPIRIT.get(), MaterialisedSpirit.createAttributes().build());
         event.put(PLUS.get(), PlusSpirit.createAttributes().build());
         event.put(KISUKE_URAHARA.get(), KisukeUrahara.createAttributes().build());
     }
