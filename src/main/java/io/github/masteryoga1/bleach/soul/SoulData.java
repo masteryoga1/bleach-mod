@@ -142,6 +142,11 @@ public final class SoulData {
      * sets this. Not saved: a release does not outlast the session, and a stale released blade seals.
      */
     boolean shikaiActive;
+    /**
+     * Whether a Bankai is released, draining reiryoku. One that can seal is a Shikai underneath, so
+     * {@link #shikaiActive} is set with it; a constant release's is not. Not saved, as Shikai's is not.
+     */
+    boolean bankaiActive;
     /** Ticks in a row the released blade has been out of the soul's hand. */
     int shikaiAwayTicks;
     /** Game time a release last trained Reiatsu Control. */
@@ -650,6 +655,11 @@ public final class SoulData {
     /** Whether a zanpakutō that can seal is released. Server side only: the client reads the blade itself. */
     public boolean isShikaiActive() {
         return shikaiActive;
+    }
+
+    /** Whether a Bankai is released. Server side only: the client reads the blade's stage. */
+    public boolean isBankaiActive() {
+        return bankaiActive;
     }
 
     /**

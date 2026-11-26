@@ -14,6 +14,7 @@ import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,6 +95,9 @@ public final class JinzenLogic {
         ZanpakutoBlade blade = ZanpakutoItem.blade(stack);
         if (blade.isBound() && !blade.isOwnedBy(player.getUUID())) {
             return "not_yours";
+        }
+        if (blade.isBound() && blade.stage() == ZanpakutoStage.BANKAI) {
+            return "bankai";
         }
         if (blade.isBound() && blade.released() && !blade.constant()) {
             return "released";

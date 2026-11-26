@@ -1472,7 +1472,8 @@ public final class BleachCommand {
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "players");
         for (ServerPlayer player : players) {
             SoulData data = SoulLogic.get(player);
-            ShikaiEvents.forceSeal(player, data, "message.bleach.shikai.sealed");
+            // A constant release is sealed below, so its Bankai is not told it falls back to Shikai.
+            ShikaiEvents.forceSeal(player, data, data.zanpakuto().constant() ? null : "message.bleach.shikai.sealed");
             if (data.zanpakuto().constant()) {
                 data.setZanpakuto(data.zanpakuto().withFirstReleaseDone(false));
                 Inventory inventory = player.getInventory();
@@ -1506,7 +1507,8 @@ public final class BleachCommand {
      * Grants Bankai as if the spirit had been subjugated, by the name its spirit gives it, or takes it away and starts
      * the road to it over. Grant says why it passes over a soul without a Shinigami's power, one that does not know its
      * zanpakutō's name, one that has Bankai already and one whose spirit has none in this world, and counts the rest;
-     * revoke never refuses and counts every soul named, as seal and reset do. Neither changes a blade.
+     * revoke never refuses and counts every soul named, as seal and reset do. Grant changes no blade; revoke ends a
+     * Bankai that is released, back to the Shikai under it.
      */
     private static int bankai(CommandContext<CommandSourceStack> context, boolean grant) throws CommandSyntaxException {
         int changed = 0;
@@ -1519,6 +1521,7 @@ public final class BleachCommand {
                     continue;
                 }
             } else {
+                ShikaiEvents.endBankai(player, data, ShikaiEvents.BANKAI_ENDED);
                 BankaiLogic.forget(data);
             }
             BleachNetwork.syncSoul(player, data);

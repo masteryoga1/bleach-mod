@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.soul.BankaiLogic;
+import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.ShikaiEvents;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
@@ -17,6 +18,7 @@ import io.github.masteryoga1.bleach.soul.VisoredEvents;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
@@ -37,10 +39,12 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -273,13 +277,13 @@ public final class BankaiReleaseTests {
     }
 
     /**
-     * Death and logging out end a Bankai as they end a Shikai: the blade seals all the way and the soul is released no
-     * more, read from whichever soul the player has by then.
+     * Death and logging out end a Bankai as they end a Shikai: a blade that can seal seals all the way and Zangetsu falls
+     * back to its Shikai, and the soul is in neither any more, read from whichever soul the player has by then.
      */
     @GameTest(template = "empty")
     public static void deathAndLogoutEndABankai(GameTestHelper helper) {
         for (boolean death : new boolean[] {true, false}) {
-            for (ResourceKey<ZanpakutoSpirit> key : List.of(ZanpakutoSpirits.ZABIMARU)) {
+            for (ResourceKey<ZanpakutoSpirit> key : List.of(ZanpakutoSpirits.ZABIMARU, ZanpakutoSpirits.ZANGETSU)) {
                 Player player = reached(helper, key);
                 ItemStack blade = player.getMainHandItem();
                 toBankai(helper, player);
@@ -291,7 +295,8 @@ public final class BankaiReleaseTests {
                     NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(player));
                 }
                 SoulData data = SoulLogic.get(player);
-                helper.assertTrue(stage(blade) == ZanpakutoStage.SEALED && !data.isShikaiActive(),
+                ZanpakutoStage after = key == ZanpakutoSpirits.ZANGETSU ? ZanpakutoStage.SHIKAI : ZanpakutoStage.SEALED;
+                helper.assertTrue(stage(blade) == after && !data.isShikaiActive() && !data.isBankaiActive(),
                         (death ? "death" : "logging out") + " left " + key.location() + "'s Bankai " + stage(blade));
             }
         }
@@ -299,9 +304,10 @@ public final class BankaiReleaseTests {
     }
 
     /**
-     * A spirit file's own Bankai form and cost stand in for the server config's: in Bankai the blade takes that form,
-     * model and damage alike, and the call costs that share of the soul's maximum. Left to the config, a Shikai that
-     * costs the whole bar calls its Bankai for no more than the whole, at the ratio's most.
+     * A spirit file's own Bankai form, cost and drain stand in for the server config's: in Bankai the blade takes that
+     * form, model and damage alike, the call costs that share of the soul's maximum, and it drains that share of it a
+     * second. Left to the config, a Shikai that costs the whole bar calls its Bankai for no more than the whole, at the
+     * ratio's most.
      */
     @GameTest(template = "empty")
     public static void aSpiritFilesBankaiOverridesTheConfig(GameTestHelper helper) {
@@ -320,6 +326,9 @@ public final class BankaiReleaseTests {
                         && ZanpakutoTests.model(blade) == 5 && Math.abs(damageOf(blade) - 19.0) < EPSILON,
                 "the file's Bankai is " + form + " for " + cost + ", on a blade of model " + ZanpakutoTests.model(blade)
                         + " and damage " + damageOf(blade));
+        float drain = ZanpakutoLogic.bankaiDrainPerTick(data, given);
+        double share = data.maxReiryoku() * 0.02 * ZanpakutoLogic.drainFraction(data) / 20.0;
+        helper.assertTrue(Math.abs(drain - share) < 1.0E-4, "the file's Bankai drains " + drain + " a tick, not " + share);
 
         JsonObject dear = BankaiTests.shippedFile(helper, "zabimaru");
         dear.addProperty("release_cost", 1.0);
@@ -335,6 +344,249 @@ public final class BankaiReleaseTests {
         }
         helper.assertTrue(Math.abs(capped - data.maxReiryoku()) < 0.01F,
                 "a Shikai of the whole bar called its Bankai for " + capped + " at ten times the cost");
+        helper.succeed();
+    }
+
+    /**
+     * A Bankai drains 2.5 times its Shikai's share while it lasts. Run dry, the soul is exhausted and a Bankai that can
+     * seal seals all the way at once, told as a Shikai run dry is, with no fall to Shikai told between.
+     */
+    @GameTest(template = "empty", timeoutTicks = 300)
+    public static void aBankaiRunsDryAndSeals(GameTestHelper helper) {
+        ServerPlayer renji = joined(helper, ZanpakutoSpirits.ZABIMARU, new Vec3(1.5, 1.0, 1.5));
+        SoulData data = SoulLogic.get(renji);
+        ItemStack blade = renji.getMainHandItem();
+        toBankai(helper, renji);
+        float perTick = ZanpakutoLogic.bankaiDrainPerTick(data, ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZABIMARU));
+        double expected = data.maxReiryoku() * 0.006 * BleachConfig.get(BleachConfig.SHIKAI_DRAIN_MULTIPLIER) * 2.5
+                * ZanpakutoLogic.drainFraction(data) / 20.0;
+        helper.assertTrue(Math.abs(perTick - expected) < 1.0E-4, "Hihiō Zabimaru drains " + perTick + ", not " + expected);
+        // Three ticks paid, and the fourth cannot be.
+        data.setReiryoku(0.5F + 3.5F * perTick);
+        helper.succeedWhen(() -> {
+            List<String> said = keys(TestPlayers.actionBar(renji));
+            GateTests.patiently(helper, lastSaid(renji, "message.bleach.shikai.exhausted"), "running dry was shown " + said);
+            helper.assertTrue(!said.contains("message.bleach.bankai.exhausted") && stage(blade) == ZanpakutoStage.SEALED
+                            && ZanpakutoTests.model(blade) == 2 && renji.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)
+                            && !data.isShikaiActive() && !data.isBankaiActive(),
+                    "run dry, the blade is " + stage(blade) + " and the soul was shown " + said
+                            + (renji.hasEffect(MobEffects.MOVEMENT_SLOWDOWN) ? "" : ", not exhausted"));
+        });
+    }
+
+    /**
+     * Zangetsu, released for good, calls its Bankai too, for 2.4 times its Shikai release's cost; it drains 1% of
+     * maximum a second at least, though its Shikai drains nothing, and the soul does not refill; Tensa Zangetsu hits
+     * half again as hard as Zangetsu's Shikai, and no Jinzen is sat in it. The seal key steps it down to Shikai, where
+     * it cannot seal, and the release key calls it again.
+     */
+    @GameTest(template = "empty")
+    public static void zangetsuCallsBankaiAndStepsDownToShikai(GameTestHelper helper) {
+        Player ichigo = reached(helper, ZanpakutoSpirits.ZANGETSU);
+        SoulData data = SoulLogic.get(ichigo);
+        ItemStack blade = ichigo.getMainHandItem();
+        released(helper, ichigo, ShikaiEvents.Result.RELEASED, "Shikai");
+        ichigo.tickCount += ShikaiEvents.SETTLE_TICKS;
+        float before = data.reiryoku();
+        released(helper, ichigo, ShikaiEvents.Result.BANKAI, "Tensa Zangetsu");
+        float cost = data.maxReiryoku() * 0.05F * 2.4F;
+        helper.assertTrue(Math.abs(before - data.reiryoku() - cost) < 0.01F && ZanpakutoItem.blade(blade).constant()
+                        && ZanpakutoTests.model(blade) == 1 && Math.abs(damageOf(blade) - 12.5) < EPSILON,
+                "Tensa Zangetsu cost " + (before - data.reiryoku()) + " and has damage " + damageOf(blade));
+        double floor = data.maxReiryoku() * 0.01 * ZanpakutoLogic.drainFraction(data) / 20.0;
+        float drain = ZanpakutoLogic.bankaiDrainPerTick(data, ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU));
+        helper.assertTrue(data.isBankaiActive() && !data.isShikaiActive() && !SoulEvents.mayRegenerate(ichigo, data)
+                        && Math.abs(drain - floor) < 1.0E-4,
+                "Tensa Zangetsu drains " + drain + ", not " + floor + ", and the soul "
+                        + (SoulEvents.mayRegenerate(ichigo, data) ? "refills" : "is in Bankai: " + data.isBankaiActive()));
+        String sitting = JinzenLogic.refusal(ichigo, data, blade, helper.getLevel().getGameTime());
+        helper.assertTrue("bankai".equals(sitting), "Jinzen in Tensa Zangetsu was refused as " + sitting);
+
+        helper.assertTrue(ShikaiEvents.seal(ichigo) == ShikaiEvents.Result.STEPPED_DOWN
+                        && stage(blade) == ZanpakutoStage.SHIKAI && Math.abs(damageOf(blade) - 8.0) < EPSILON
+                        && !data.isBankaiActive(),
+                "the seal key left Tensa Zangetsu " + stage(blade) + " with damage " + damageOf(blade));
+        ichigo.tickCount += ShikaiEvents.SETTLE_TICKS;
+        helper.assertTrue(ShikaiEvents.seal(ichigo) == ShikaiEvents.Result.CANNOT_SEAL
+                && stage(blade) == ZanpakutoStage.SHIKAI, "Zangetsu's Shikai sealed, or would not say it cannot");
+        released(helper, ichigo, ShikaiEvents.Result.BANKAI, "Tensa Zangetsu again");
+        helper.succeed();
+    }
+
+    /**
+     * On the ground a blade in Bankai falls back at once: Zabimaru seals and Zangetsu is in Shikai, in Shikai's form,
+     * and it is changed once, not again on every tick after.
+     */
+    @GameTest(template = "empty")
+    public static void aBankaiBladeOnTheGroundFallsBack(GameTestHelper helper) {
+        Vec3 at = helper.absoluteVec(new Vec3(1.5, 2.0, 1.5));
+        for (ResourceKey<ZanpakutoSpirit> key : List.of(ZanpakutoSpirits.ZABIMARU, ZanpakutoSpirits.ZANGETSU)) {
+            Player player = reached(helper, key);
+            toBankai(helper, player);
+            ItemStack lying = player.getMainHandItem().copy();
+            ItemEntity dropped = new ItemEntity(helper.getLevel(), at.x, at.y, at.z, lying);
+            lying.getItem().onEntityItemUpdate(lying, dropped);
+            ItemStack fallen = dropped.getItem();
+            helper.assertTrue(key == ZanpakutoSpirits.ZANGETSU
+                            ? stage(fallen) == ZanpakutoStage.SHIKAI && Math.abs(damageOf(fallen) - 8.0) < EPSILON
+                            : stage(fallen) == ZanpakutoStage.SEALED && ZanpakutoTests.model(fallen) == 2,
+                    key.location() + "'s Bankai lay on the ground " + stage(fallen) + " with damage " + damageOf(fallen));
+            fallen.getItem().onEntityItemUpdate(fallen, dropped);
+            helper.assertTrue(dropped.getItem() == fallen, key.location() + "'s fallen blade was changed again");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A blade in Bankai carried by anyone but its owner in Bankai falls back on that player's first tick with it:
+     * another's Zangetsu to Shikai, which nothing else would do, and another's Zabimaru sealed; and its owner's own
+     * spare once the Bankai has ended, as after a login or the way out of the End, which keep no Bankai. The owner's
+     * Bankai in hand holds, tick after tick.
+     */
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void aBankaiBladeFallsBackInAnyHandsButItsOwners(GameTestHelper helper) {
+        Player renji = reached(helper, ZanpakutoSpirits.ZABIMARU);
+        toBankai(helper, renji);
+        Player other = reached(helper, ZanpakutoSpirits.ZANGETSU);
+        toBankai(helper, other);
+        ItemStack spare = other.getMainHandItem().copy();
+        ItemStack zangetsu = other.getMainHandItem().copy();
+        spare.inventoryTick(helper.getLevel(), other, 3, false);
+        helper.assertTrue(stage(spare) == ZanpakutoStage.BANKAI, "a spare blade fell back while its owner is in Bankai");
+        ShikaiEvents.endBankai(other, SoulLogic.get(other), null);
+        spare.inventoryTick(helper.getLevel(), other, 3, false);
+        helper.assertTrue(stage(spare) == ZanpakutoStage.SHIKAI, "a spare stayed " + stage(spare) + " after its Bankai");
+
+        ServerPlayer holder = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
+        holder.setData(SoulAttachments.SOUL, ZanpakutoTests.soul(SoulState.SHINIGAMI, 300.0F));
+        holder.getInventory().setItem(5, zangetsu);
+        holder.getInventory().setItem(6, renji.getMainHandItem().copy());
+        int start = holder.tickCount;
+        ServerPlayer ichigo = joined(helper, ZanpakutoSpirits.ZANGETSU, new Vec3(3.5, 1.0, 1.5));
+        toBankai(helper, ichigo);
+        ItemStack own = ichigo.getMainHandItem();
+        int from = ichigo.tickCount;
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, holder.tickCount > start, "the holder has not ticked yet"))
+                .thenExecute(() -> {
+                    ZanpakutoBlade kept = ZanpakutoItem.blade(holder.getInventory().getItem(5));
+                    ZanpakutoStage sealed = stage(holder.getInventory().getItem(6));
+                    helper.assertTrue(kept.stage() == ZanpakutoStage.SHIKAI && kept.constant()
+                                    && sealed == ZanpakutoStage.SEALED,
+                            "on the holder's first tick, Zangetsu is " + kept.stage() + " and Zabimaru " + sealed);
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, ichigo.tickCount >= from + 5,
+                        "the owner has not held his Bankai five ticks yet"))
+                .thenExecute(() -> helper.assertTrue(stage(own) == ZanpakutoStage.BANKAI
+                        && SoulLogic.get(ichigo).isBankaiActive(), "the owner's own Bankai fell back to " + stage(own)))
+                .thenSucceed();
+    }
+
+    /**
+     * A Bankai is held only by its own blade in Bankai: with a Shikai copy of it in hand and the Bankai blade put away,
+     * the Bankai ends as a release left out of hand ends, all the way, and is told so.
+     */
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void aShikaiCopyInHandDoesNotHoldABankai(GameTestHelper helper) {
+        ServerPlayer renji = joined(helper, ZanpakutoSpirits.ZABIMARU, new Vec3(1.5, 1.0, 1.5));
+        SoulData data = SoulLogic.get(renji);
+        ItemStack bankai = renji.getMainHandItem();
+        toBankai(helper, renji);
+        ItemStack copy = bankai.copy();
+        ShikaiEvents.toShikai(copy, helper.getLevel());
+        renji.setItemInHand(InteractionHand.MAIN_HAND, copy);
+        renji.getInventory().setItem(3, bankai);
+        int from = renji.tickCount;
+        helper.succeedWhen(() -> {
+            GateTests.patiently(helper, renji.tickCount >= from + 25, "Renji has not been watched 25 ticks yet");
+            helper.assertTrue(!data.isBankaiActive() && stage(bankai) == ZanpakutoStage.SEALED
+                            && lastSaid(renji, "message.bleach.shikai.away"),
+                    "with a Shikai copy in hand the soul is " + (data.isBankaiActive() ? "still" : "no longer")
+                            + " in Bankai, its blade " + stage(bankai) + ", shown " + keys(TestPlayers.actionBar(renji)));
+        });
+    }
+
+    /**
+     * Zangetsu's seal key steps its Bankai down to Shikai and says so in words of its own. Called again and run dry, it
+     * falls back to Shikai, exhausted and told so, and stays there, told nothing as a Shikai is: it never seals.
+     */
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void zangetsuRunsDryBackToShikaiAndStays(GameTestHelper helper) {
+        ServerPlayer ichigo = joined(helper, ZanpakutoSpirits.ZANGETSU, new Vec3(1.5, 1.0, 1.5));
+        SoulData data = SoulLogic.get(ichigo);
+        ItemStack blade = ichigo.getMainHandItem();
+        toBankai(helper, ichigo);
+        ShikaiEvents.onKey(ichigo, ZanpakutoKey.SEAL);
+        helper.assertTrue(lastSaid(ichigo, "message.bleach.bankai.ended") && stage(blade) == ZanpakutoStage.SHIKAI,
+                "the seal key left Tensa Zangetsu " + stage(blade) + " and showed " + keys(TestPlayers.actionBar(ichigo)));
+        ichigo.tickCount += ShikaiEvents.SETTLE_TICKS;
+        released(helper, ichigo, ShikaiEvents.Result.BANKAI, "Tensa Zangetsu again");
+        float perTick = ZanpakutoLogic.bankaiDrainPerTick(data, ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU));
+        // One tick paid, and the second cannot be.
+        data.setReiryoku(0.5F + 1.5F * perTick);
+        int[] from = new int[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, lastSaid(ichigo, "message.bleach.bankai.exhausted"),
+                        "Tensa Zangetsu has not run dry: " + keys(TestPlayers.actionBar(ichigo))))
+                .thenExecute(() -> {
+                    helper.assertTrue(stage(blade) == ZanpakutoStage.SHIKAI && ZanpakutoItem.blade(blade).constant()
+                                    && !data.isBankaiActive() && ichigo.hasEffect(MobEffects.MOVEMENT_SLOWDOWN),
+                            "run dry, Zangetsu is " + stage(blade) + (data.isBankaiActive() ? " in Bankai" : ""));
+                    from[0] = ichigo.tickCount;
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, ichigo.tickCount >= from[0] + 20,
+                        "Zangetsu's Shikai has not been watched twenty ticks yet"))
+                .thenExecute(() -> helper.assertTrue(stage(blade) == ZanpakutoStage.SHIKAI
+                                && lastSaid(ichigo, "message.bleach.bankai.exhausted")
+                                && !keys(TestPlayers.actionBar(ichigo)).contains("message.bleach.shikai.exhausted"),
+                        "after running dry Zangetsu is " + stage(blade) + ", shown " + keys(TestPlayers.actionBar(ichigo))))
+                .thenExecute(() -> {
+                    // The operator's seal puts Tensa Zangetsu back to waiting for its first release, told nothing on
+                    // the way, as a constant Shikai is.
+                    data.setReiryoku(data.maxReiryoku());
+                    ichigo.tickCount += ShikaiEvents.SETTLE_TICKS;
+                    released(helper, ichigo, ShikaiEvents.Result.BANKAI, "Tensa Zangetsu before the seal command");
+                    int shown = TestPlayers.actionBar(ichigo).size();
+                    ichigo.addTag("bleach_bankai_sealed");
+                    GateTests.run(helper.getLevel(), "bleach zanpakuto @a[tag=bleach_bankai_sealed,limit=1] seal");
+                    helper.assertTrue(stage(blade) == ZanpakutoStage.SEALED && !data.isBankaiActive()
+                                    && TestPlayers.actionBar(ichigo).size() == shown,
+                            "the seal command left Zangetsu " + stage(blade) + " and showed "
+                                    + keys(TestPlayers.actionBar(ichigo)));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Learning the name again ends a Bankai as a seal does, before the blade is bound anew, so no release drains on over
+     * it. {@code /bleach zanpakuto … bankai revoke} ends a Bankai that is released, back to the Shikai under it, which
+     * still drains, and tells its soul so; the release key then finds the blade released already.
+     */
+    @GameTest(template = "empty")
+    public static void revokeAndLearningTheNameAgainEndABankai(GameTestHelper helper) {
+        ServerPlayer renji = joined(helper, ZanpakutoSpirits.ZABIMARU, new Vec3(1.5, 1.0, 1.5));
+        renji.addTag("bleach_bankai_revoked");
+        SoulData data = SoulLogic.get(renji);
+        ItemStack blade = renji.getMainHandItem();
+        toBankai(helper, renji);
+        ZanpakutoEvents.learnName(renji, data, ZanpakutoSpirits.ZABIMARU.location(),
+                ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZABIMARU), blade);
+        helper.assertTrue(!data.isBankaiActive() && !data.isShikaiActive() && stage(blade) == ZanpakutoStage.SEALED,
+                "learning the name again left the blade " + stage(blade) + " and the soul released");
+
+        renji.tickCount += ShikaiEvents.SETTLE_TICKS;
+        toBankai(helper, renji);
+        List<Component> said = GateTests.run(helper.getLevel(),
+                "bleach zanpakuto @a[tag=bleach_bankai_revoked,limit=1] bankai revoke");
+        helper.assertTrue(said.size() == 1 && GateTests.says(said.get(0), "commands.bleach.zanpakuto.bankai.revoke", -1),
+                "revoke said " + keys(said));
+        helper.assertTrue(stage(blade) == ZanpakutoStage.SHIKAI && Math.abs(damageOf(blade) - 7.0) < EPSILON
+                        && data.isShikaiActive() && !data.isBankaiActive() && !data.zanpakuto().bankai().achieved()
+                        && lastSaid(renji, "message.bleach.bankai.ended"),
+                "revoked, the blade is " + stage(blade) + " with damage " + damageOf(blade) + " and the soul was shown "
+                        + keys(TestPlayers.actionBar(renji)));
+        renji.tickCount += ShikaiEvents.SETTLE_TICKS;
+        released(helper, renji, ShikaiEvents.Result.ALREADY, "the key after revoke");
         helper.succeed();
     }
 }

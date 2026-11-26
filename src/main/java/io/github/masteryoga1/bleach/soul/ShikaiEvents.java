@@ -66,8 +66,10 @@ public final class ShikaiEvents {
     private static final float RELEASE_PARTICLE_SIZE = 1.2F;
     private static final int BANKAI_PARTICLES = 48;
     private static final float BANKAI_PARTICLE_SIZE = 1.8F;
-    /** A Bankai is called out deeper than a Shikai is released. */
+    /** A Bankai is heard deeper than a Shikai, called out and falling back alike. */
     private static final float BANKAI_PITCH = 0.7F;
+    /** What a soul is told when its Bankai falls back to the Shikai under it. */
+    public static final String BANKAI_ENDED = "message.bleach.bankai.ended";
     private static final double SPEECH_RANGE = 24.0;
     /** A lash only comes out for a blow struck farther away than an ordinary blade could reach. */
     private static final double LASH_DISTANCE = 3.5;
@@ -79,12 +81,12 @@ public final class ShikaiEvents {
     private static final float BLACK_FIRE_PITCH = 0.85F;
 
     /**
-     * What came of asking to release or seal. Every one but {@link #RELEASED}, {@link #SEALED} and
-     * {@link #BANKAI}, which are shown their own way, is told to the player.
+     * What came of asking to release or seal. Every one but {@link #RELEASED}, {@link #SEALED},
+     * {@link #BANKAI} and {@link #STEPPED_DOWN}, which are shown their own way, is told to the player.
      */
     public enum Result {
         RELEASED, SEALED, NO_BLADE, NAMELESS, NOT_YOURS, LENT, SILENT, SETTLING, CONSTANT, ALREADY,
-        TOO_WEAK, NOT_RELEASED, CANNOT_SEAL, BANKAI;
+        TOO_WEAK, NOT_RELEASED, CANNOT_SEAL, BANKAI, STEPPED_DOWN;
 
         public String messageKey() {
             return "message.bleach.shikai." + name().toLowerCase(Locale.ROOT);
@@ -146,7 +148,7 @@ public final class ShikaiEvents {
             }
             case SEAL -> {
                 Result result = seal(player);
-                if (result != Result.SEALED) {
+                if (result != Result.SEALED && result != Result.STEPPED_DOWN) {
                     tell(player, result.messageKey());
                 }
             }
@@ -169,8 +171,8 @@ public final class ShikaiEvents {
     /**
      * Calls out the held zanpakutō's name. The first check that fails wins; on success the soul pays
      * the release cost and the blade takes its Shikai form. A constant release, like Zangetsu's, is
-     * for good: it never drains and never seals. A blade that can seal, in Shikai, whose soul has
-     * reached the Bankai its spirit names is called on into Bankai instead (see {@link #bankai}).
+     * for good: its Shikai never drains and never seals. A blade in Shikai, constant or not, whose
+     * soul has reached the Bankai its spirit names is called on into Bankai instead (see {@link #bankai}).
      */
     public static Result release(Player player) {
         SoulData data = SoulLogic.get(player);
@@ -202,8 +204,7 @@ public final class ShikaiEvents {
         }
         Optional<ZanpakutoSpirit> found = spiritOf(player, data, blade);
         Optional<Component> bankaiName = found.flatMap(BankaiLogic::nameOf);
-        if (blade.stage() == ZanpakutoStage.SHIKAI && !blade.constant() && bond.bankai().achieved()
-                && bankaiName.isPresent()) {
+        if (blade.stage() == ZanpakutoStage.SHIKAI && bond.bankai().achieved() && bankaiName.isPresent()) {
             return bankai(player, data, stack, blade, found.get(), bankaiName.get());
         }
         if (blade.constant() && blade.released()) {
@@ -265,8 +266,8 @@ public final class ShikaiEvents {
     /**
      * Calls out the Bankai of the blade in Shikai in hand: "Bankai", then its name, heard nearby. After the checks a
      * release makes first, a soul that cannot pay is too weak. On success the soul pays the Bankai's cost, the blade
-     * takes its form, its name is shown as a title, the Bankai advancement is earned, and it drains while it lasts, as
-     * its Shikai does (see {@link #upkeep}). It trains nothing of its own.
+     * takes its form, its name is shown as a title, the Bankai advancement is earned, and it drains its own share while
+     * it lasts (see {@link #upkeep}). It trains nothing of its own.
      */
     private static Result bankai(Player player, SoulData data, ItemStack stack, ZanpakutoBlade blade,
                                  ZanpakutoSpirit spirit, Component name) {
@@ -277,7 +278,10 @@ public final class ShikaiEvents {
 
         SoulLogic.trySpend(player, data, cost);
         ZanpakutoItem.setStage(stack, spirit, ZanpakutoStage.BANKAI);
-        data.shikaiActive = true;
+        data.bankaiActive = true;
+        if (!blade.constant()) {
+            data.shikaiActive = true;
+        }
         data.shikaiAwayTicks = 0;
         data.lastShikaiChangeTick = player.tickCount;
         speak(player, Component.translatable("speech.bleach.bankai", name));
@@ -297,7 +301,10 @@ public final class ShikaiEvents {
         return Result.BANKAI;
     }
 
-    /** Seals the released zanpakutō in hand. A constant release has no sealed form any more. */
+    /**
+     * Seals the released zanpakutō in hand. A constant release has no sealed form any more: in Bankai it falls back to
+     * Shikai, and in Shikai it cannot seal.
+     */
     public static Result seal(Player player) {
         SoulData data = SoulLogic.get(player);
         ItemStack stack = player.getMainHandItem();
@@ -306,6 +313,10 @@ public final class ShikaiEvents {
         }
         ZanpakutoBlade blade = ZanpakutoItem.blade(stack);
         boolean ownReleased = blade.isOwnedBy(player.getUUID()) && blade.released();
+        if (ownReleased && blade.constant() && blade.stage() == ZanpakutoStage.BANKAI) {
+            endBankai(player, data, BANKAI_ENDED);
+            return Result.STEPPED_DOWN;
+        }
         if (ownReleased && blade.constant()) {
             return Result.CANNOT_SEAL;
         }
@@ -317,31 +328,96 @@ public final class ShikaiEvents {
     }
 
     /**
-     * Seals every one of the soul's own released blades that can seal, wherever they are carried, and
-     * ends what a release brought with it: the drain, a gathering Getsuga Tenshō and Zabimaru's
-     * drawn-back reach. The seal is heard, and the message shown, only if something was released.
+     * Seals every one of the soul's own released blades that can seal, wherever they are carried, steps
+     * a constant release's Bankai down to Shikai, and ends what a release brought with it: the drain, a
+     * Bankai, a gathering Getsuga Tenshō and Zabimaru's drawn-back reach. The change is heard, and the
+     * message shown, only if something was released; a Bankai that only fell back to Shikai says so.
      */
     public static void forceSeal(Player player, SoulData data, @Nullable String messageKey) {
         boolean sealed = data.shikaiActive;
+        boolean ended = data.bankaiActive;
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
             ItemStack stack = inventory.getItem(slot);
             ZanpakutoBlade blade = ZanpakutoItem.blade(stack);
-            if (ZanpakutoLogic.isOwnBlade(stack, player) && blade.released() && !blade.constant()) {
-                sealStack(stack, player.level());
-                sealed = true;
+            if (ZanpakutoLogic.isOwnBlade(stack, player) && lapses(blade)) {
+                lapseStack(stack, player.level());
+                sealed |= !blade.constant();
+                ended = true;
             }
         }
         data.shikaiActive = false;
+        data.bankaiActive = false;
         data.shikaiAwayTicks = 0;
         cancelGather(player, data);
         removeRetract(player, data);
-        if (sealed) {
+        if (sealed || ended) {
             data.lastShikaiChangeTick = player.tickCount;
-            SpiritSenses.play(player, ModSounds.ZANPAKUTO_SEAL.get(), SoundSource.PLAYERS, 1.0F, 1.0F, false);
+            float pitch = sealed ? 1.0F : BANKAI_PITCH;
+            SpiritSenses.play(player, ModSounds.ZANPAKUTO_SEAL.get(), SoundSource.PLAYERS, 1.0F, pitch, false);
+            if (messageKey != null) {
+                tell(player, sealed ? messageKey : BANKAI_ENDED);
+            }
+        }
+    }
+
+    /**
+     * Whether this blade's release ends when its soul's does: any release that can seal, and a constant release in
+     * Bankai, which falls back to Shikai.
+     */
+    public static boolean lapses(ZanpakutoBlade blade) {
+        return blade.released() && (!blade.constant() || blade.stage() == ZanpakutoStage.BANKAI);
+    }
+
+    /**
+     * Ends one blade's release: a constant release falls back from Bankai to Shikai, and any other seals. Call this
+     * rather than {@link #sealStack}, which leaves a constant release's Bankai as it is.
+     */
+    public static void lapseStack(ItemStack stack, Level level) {
+        if (ZanpakutoItem.blade(stack).constant()) {
+            toShikai(stack, level);
+        } else {
+            sealStack(stack, level);
+        }
+    }
+
+    /**
+     * Ends the soul's Bankai and leaves its Shikai: each of its own blades in Bankai, wherever it is carried, falls back
+     * to Shikai. The fall is heard, and the message shown, only if a Bankai was released.
+     */
+    public static void endBankai(Player player, SoulData data, @Nullable String messageKey) {
+        boolean ended = data.bankaiActive;
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (ZanpakutoLogic.isOwnBlade(stack, player) && ZanpakutoItem.blade(stack).stage() == ZanpakutoStage.BANKAI) {
+                toShikai(stack, player.level());
+                ended = true;
+            }
+        }
+        data.bankaiActive = false;
+        data.shikaiAwayTicks = 0;
+        if (ended) {
+            data.lastShikaiChangeTick = player.tickCount;
+            SpiritSenses.play(player, ModSounds.ZANPAKUTO_SEAL.get(), SoundSource.PLAYERS, 1.0F, BANKAI_PITCH, false);
             if (messageKey != null) {
                 tell(player, messageKey);
             }
+        }
+    }
+
+    /** One blade in Bankai back in Shikai: its spirit's Shikai form, or sealed as a plain Asauchi if the spirit is gone. */
+    public static void toShikai(ItemStack stack, Level level) {
+        ZanpakutoBlade blade = ZanpakutoItem.blade(stack);
+        if (blade.stage() != ZanpakutoStage.BANKAI) {
+            return;
+        }
+        Optional<ZanpakutoSpirit> spirit = ZanpakutoSpirits.get(level, blade.spirit());
+        if (spirit.isPresent()) {
+            ZanpakutoItem.setStage(stack, spirit.get(), ZanpakutoStage.SHIKAI);
+        } else {
+            ZanpakutoItem.applyForm(stack, ZanpakutoSpirit.Form.ASAUCHI);
+            stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withStage(ZanpakutoStage.SEALED));
         }
     }
 
@@ -573,7 +649,7 @@ public final class ShikaiEvents {
         if (data.lashRetractUntil != ZanpakutoBond.NEVER && now >= data.lashRetractUntil) {
             removeRetract(player, data);
         }
-        if (data.shikaiActive) {
+        if (data.shikaiActive || data.bankaiActive) {
             upkeep(player, data, now);
         }
         if (data.isGathering()) {
@@ -586,7 +662,11 @@ public final class ShikaiEvents {
         }
     }
 
-    /** One tick of a release that can seal: it seals when it must, and otherwise drains reiryoku. */
+    /**
+     * One tick of a release that can seal, or of a Bankai: it ends when it must, and otherwise drains reiryoku. A
+     * Bankai must be its own blade in hand in Bankai, and drains its own heavier share in place of its Shikai's; run
+     * dry, it seals, unless it is a constant release's, which falls back to Shikai.
+     */
     private static void upkeep(Player player, SoulData data, long now) {
         if (!player.isAlive() || player.isSpectator() || player.isSleeping()) {
             forceSeal(player, data, null);
@@ -597,7 +677,10 @@ public final class ShikaiEvents {
             return;
         }
         ItemStack held = player.getMainHandItem();
-        if (!ZanpakutoLogic.isOwnBlade(held, player) || !ZanpakutoItem.blade(held).released()) {
+        ZanpakutoBlade blade = ZanpakutoItem.blade(held);
+        boolean holding = ZanpakutoLogic.isOwnBlade(held, player)
+                && (data.bankaiActive ? blade.stage() == ZanpakutoStage.BANKAI : blade.released());
+        if (!holding) {
             if (++data.shikaiAwayTicks >= AWAY_TICKS) {
                 forceSeal(player, data, "message.bleach.shikai.away");
                 return;
@@ -606,6 +689,18 @@ public final class ShikaiEvents {
             data.shikaiAwayTicks = 0;
         }
         Optional<ZanpakutoSpirit> spirit = ZanpakutoSpirits.get(player.level(), data.zanpakuto().spirit());
+        if (data.bankaiActive) {
+            float drain = spirit.map(found -> ZanpakutoLogic.bankaiDrainPerTick(data, found)).orElse(0.0F);
+            if (drain > 0.0F && !SoulLogic.drain(player, data, drain)) {
+                // At no reiryoku a draining Shikai seals on the next tick, so a blade that can seal seals now.
+                if (data.shikaiActive) {
+                    forceSeal(player, data, "message.bleach.shikai.exhausted");
+                } else {
+                    endBankai(player, data, "message.bleach.bankai.exhausted");
+                }
+            }
+            return;
+        }
         float drain = spirit.map(found -> ZanpakutoLogic.shikaiDrainPerTick(data, found)).orElse(0.0F);
         if (drain > 0.0F && !SoulLogic.drain(player, data, drain)) {
             forceSeal(player, data, "message.bleach.shikai.exhausted");
