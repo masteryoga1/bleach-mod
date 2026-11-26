@@ -78,6 +78,7 @@ import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoType;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1487,7 +1488,7 @@ public final class BleachCommand {
             ZanpakutoItem.setReleased(stack, spirit.get(), false);
         } else {
             ZanpakutoItem.applyForm(stack, ZanpakutoSpirit.Form.ASAUCHI);
-            stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withReleased(false));
+            stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withStage(ZanpakutoStage.SEALED));
         }
     }
 

@@ -41,8 +41,9 @@ public final class BleachNetwork {
      * 26: {@code NpcAction.TRADE}, Kisuke Urahara's wares.
      * 27: {@code NpcAction.SENKAIMON}, Kisuke Urahara's Senkaimon.
      * 28: {@code NpcAction.GARGANTA}, Kisuke Urahara's Garganta.
+     * 29: the zanpakutō blade's stage in place of its released flag, and the Bankai record in the zanpakutō bond.
      */
-    private static final String VERSION = "28";
+    private static final String VERSION = "29";
 
     private BleachNetwork() {
     }

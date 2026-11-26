@@ -13,6 +13,7 @@ import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoKey;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import java.util.Locale;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -211,7 +212,7 @@ public final class ShikaiEvents {
         if (constant && !marked.constant()) {
             // A constant release is marked as one for good, even on a blade bound before its spirit changed kind.
             stack.set(ModComponents.ZANPAKUTO_BLADE.get(), new ZanpakutoBlade(marked.owner(), marked.ownerName(),
-                    marked.spirit(), true, true, marked.colour()));
+                    marked.spirit(), marked.stage(), true, marked.colour()));
         }
         if (!constant) {
             data.shikaiActive = true;
@@ -304,7 +305,7 @@ public final class ShikaiEvents {
             ZanpakutoItem.setReleased(stack, spirit.get(), false);
         } else {
             ZanpakutoItem.applyForm(stack, ZanpakutoSpirit.Form.ASAUCHI);
-            stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withReleased(false));
+            stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withStage(ZanpakutoStage.SEALED));
         }
     }
 

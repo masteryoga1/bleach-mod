@@ -25,6 +25,7 @@ import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -135,7 +136,7 @@ public final class ShikaiTests {
         ItemStack blade = lost.getMainHandItem();
         ZanpakutoBlade bound = ZanpakutoItem.blade(blade);
         blade.set(ModComponents.ZANPAKUTO_BLADE.get(), new ZanpakutoBlade(bound.owner(), bound.ownerName(), Optional.of(missing),
-                false, false, bound.colour()));
+                ZanpakutoStage.SEALED, false, bound.colour()));
         helper.assertTrue(ShikaiEvents.release(lost) == ShikaiEvents.Result.SILENT, "a spirit missing from the world answered");
         helper.succeed();
     }

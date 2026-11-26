@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,7 +76,8 @@ public final class ZanpakutoItem extends SwordItem {
             return;
         }
         stack.set(ModComponents.ZANPAKUTO_BLADE.get(), new ZanpakutoBlade(Optional.of(owner.getUUID()),
-                owner.getGameProfile().getName(), Optional.of(id), released, spirit.isConstant(), spirit.colour()));
+                owner.getGameProfile().getName(), Optional.of(id), released ? ZanpakutoStage.SHIKAI : ZanpakutoStage.SEALED,
+                spirit.isConstant(), spirit.colour()));
         stack.set(DataComponents.ITEM_NAME, spirit.name().copy().withColor(spirit.colour()));
         stack.remove(DataComponents.CUSTOM_NAME);
         applyForm(stack, released ? spirit.shikai() : spirit.sealed());
@@ -112,13 +114,18 @@ public final class ZanpakutoItem extends SwordItem {
         }
     }
 
-    /** Releases or seals the blade: the spirit's Shikai or sealed form, and the blade marked to match. */
+    /**
+     * Releases or seals the blade: the spirit's Shikai or sealed form, and the blade marked to match. A blade released
+     * already keeps its stage, so no release steps a Bankai down to Shikai.
+     */
     public static void setReleased(ItemStack stack, ZanpakutoSpirit spirit, boolean released) {
         if (stack.isEmpty()) {
             return;
         }
         applyForm(stack, released ? spirit.shikai() : spirit.sealed());
-        stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade(stack).withReleased(released));
+        ZanpakutoBlade blade = blade(stack);
+        ZanpakutoStage stage = blade.released() ? blade.stage() : ZanpakutoStage.SHIKAI;
+        stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withStage(released ? stage : ZanpakutoStage.SEALED));
     }
 
     /**
@@ -221,7 +228,7 @@ public final class ZanpakutoItem extends SwordItem {
                 ShikaiEvents.sealStack(sealed, entity.level());
                 if (blade(sealed).released()) {
                     // Never left marked released, or this would run, and resend the stack, every tick.
-                    sealed.set(ModComponents.ZANPAKUTO_BLADE.get(), blade(sealed).withReleased(false));
+                    sealed.set(ModComponents.ZANPAKUTO_BLADE.get(), blade(sealed).withStage(ZanpakutoStage.SEALED));
                 }
                 entity.setItem(sealed);
             }
