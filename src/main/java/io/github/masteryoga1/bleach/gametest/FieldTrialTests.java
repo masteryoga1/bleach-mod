@@ -80,6 +80,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 public final class FieldTrialTests {
     private static final String KEY = "bleach:field_trial";
     private static final String TAG = "field_trial_command";
+    /** How far about the middle of the practice Hollows' test its ground must tick entities before any is placed. */
+    private static final double PRACTICE_GROUND = 6.0;
     /** How far about the student the ground must tick for practice Hollows 10 to 20 blocks off. */
     private static final double REACH = 24.0;
     /** The same for a Garganta 12 to 24 blocks off. */
@@ -216,8 +218,21 @@ public final class FieldTrialTests {
      * trains; it hunts and answers its own student alone, takes no portal, never despawns and is never saved. Two
      * students hold two trials, each its own count and bar, and the rest fade, discarded, as each ends.
      */
-    @GameTest(template = "empty", batch = "field_trial")
+    @GameTest(template = "empty", batch = "field_trial", timeoutTicks = 400)
     public static void practiceHollowsGiveNothingAndFade(GameTestHelper helper) {
+        // A Hollow placed before its chunk is shown sits in a hidden section (mc PersistentEntitySectionManager.java:48),
+        // which getEntitiesOfClass skips (mc EntitySectionStorage.java:57), so the trial's end could not find it.
+        ServerLevel level = helper.getLevel();
+        Vec3 middle = helper.absoluteVec(new Vec3(4.5, 2.0, 3.5));
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, HollowBaitTests.allTicking(level, middle, PRACTICE_GROUND),
+                        "the trial's ground does not tick entities"))
+                .thenExecute(() -> practiceFades(helper))
+                .thenSucceed();
+    }
+
+    /** The body of {@link #practiceHollowsGiveNothingAndFade}, once its ground ticks entities. */
+    private static void practiceFades(GameTestHelper helper) {
         ServerPlayer student = student(helper, new Vec3(2.5, 1.0, 1.5));
         ServerPlayer other = student(helper, new Vec3(6.5, 1.0, 1.5));
         SpiderHollow first = begun(helper, student);
@@ -270,7 +285,6 @@ public final class FieldTrialTests {
         TravelTests.discard(second);
         helper.assertTrue(faded == Entity.RemovalReason.DISCARDED && FieldTrialEvents.bar(student) == null,
                 "the practice Hollow was " + faded + " as its trial ended, not discarded");
-        helper.succeed();
     }
 
     // ---- The hunt and the pass ----
