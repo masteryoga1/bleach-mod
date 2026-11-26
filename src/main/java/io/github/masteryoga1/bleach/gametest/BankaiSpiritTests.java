@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.GetsugaTensho;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
+import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
@@ -19,8 +20,10 @@ import io.github.masteryoga1.bleach.soul.VisoredEvents;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -50,15 +53,17 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the materialised spirits: a spirit's body set up from its wielder, drawn out by its call, gone home at each
- * of its wielder's ends, fighting its wielder alone down to its floor, and kept out of the inner Hollow's fight. Each
- * test asks only about its own wielders and spirits.
+ * of its wielder's ends, fighting its wielder alone down to its floor, kept out of the inner Hollow's fight, and
+ * Zabimaru's snake, a part that marks the half struck. Each test asks only about its own wielders and spirits.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -468,6 +473,76 @@ public final class BankaiSpiritTests {
         } finally {
             end(now, host);
             sendSpiritsHome(host);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * T6. Every shipped spirit file names a body. Zabimaru's, drawn out for a Shinigami who knows its name, is the
+     * baboon, set up from its wielder with empty hands, and its snake is a part of it from before its first tick, its id
+     * the next after the body's, at the baboon's back, where the world finds it. A bystander's blow on the snake is
+     * refused and marks nothing; the wielder's lowers the body's health and is the snake's while the blow's events run,
+     * and one on the body after is the baboon's.
+     */
+    @GameTest(template = "field", timeoutTicks = 30)
+    public static void zabimarusSnakeIsAPartThatMarksTheHalfStruck(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (ZanpakutoSpirit shipped : ZanpakutoTests.spirits(helper)) {
+            helper.assertTrue(Materialisation.create(level, shipped) != null, shipped.name().getString() + " has no body");
+        }
+        Player renji = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZABIMARU);
+        stand(helper, renji, FLOOR);
+        if (refusedOnPeaceful(helper, renji)) {
+            return;
+        }
+        Player bystander = wielder(helper, MIDDLE);
+        MaterialisedSpirit drawn = drawOut(helper, renji);
+        // The half Zabimaru is marked as while each blow's events run, in the order the blows come.
+        List<ZabimaruSpirit.Half> marked = new ArrayList<>();
+        Consumer<LivingIncomingDamageEvent> record = event -> {
+            if (event.getEntity() instanceof ZabimaruSpirit struck && struck == drawn) {
+                marked.add(struck.lastStruck());
+            }
+        };
+        NeoForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, LivingIncomingDamageEvent.class, record);
+        try {
+            SoulData its = SoulLogic.get(drawn);
+            float reiryoku = SoulLogic.get(renji).maxReiryoku();
+            helper.assertTrue(drawn instanceof ZabimaruSpirit && drawn.wielder() == renji
+                            && renji.getUUID().equals(drawn.wielderId())
+                            && ZanpakutoSpirits.ZABIMARU.location().equals(drawn.spiritId())
+                            && its.state() == SoulState.SHINIGAMI && drawn.getMainHandItem().isEmpty()
+                            && Math.abs(drawn.getMaxHealth() - MaterialisedSpirit.health(reiryoku)) < 1.0E-3,
+                    "Zabimaru came out as " + drawn + " of " + drawn.wielder() + ", " + its.state() + ", holding "
+                            + drawn.getMainHandItem() + " with " + drawn.getMaxHealth() + " health");
+            ZabimaruSpirit zabimaru = (ZabimaruSpirit) drawn;
+            ZabimaruSpirit.Snake snake = zabimaru.snake();
+            helper.assertTrue(zabimaru.getParts().length == 1 && zabimaru.getParts()[0] == snake
+                    && snake.getId() == zabimaru.getId() + 1, "the snake is not the baboon's one part, next by id");
+            Vec3 at = ZabimaruSpirit.snakeAt(zabimaru.getX(), zabimaru.getY(), zabimaru.getZ(), zabimaru.yBodyRot);
+            // It came out facing its wielder to the north, so its back is to the south.
+            helper.assertTrue(snake.position().distanceTo(at) < 1.0E-3 && at.z > zabimaru.getZ()
+                            && level.getEntities(zabimaru, snake.getBoundingBox()).contains(snake),
+                    "the snake stands at " + snake.position() + ", not at the back, or the world does not find it");
+
+            float whole = zabimaru.getHealth();
+            helper.assertTrue(!snake.hurt(level.damageSources().playerAttack(bystander), 5.0F)
+                            && zabimaru.getHealth() == whole && zabimaru.lastStruck() == null && marked.isEmpty(),
+                    "a bystander's blow on the snake reached Zabimaru, or marked " + zabimaru.lastStruck());
+            helper.assertTrue(snake.hurt(level.damageSources().playerAttack(renji), 5.0F) && zabimaru.getHealth() < whole
+                            && marked.equals(List.of(ZabimaruSpirit.Half.SNAKE))
+                            && zabimaru.lastStruck() == ZabimaruSpirit.Half.SNAKE,
+                    "a blow on the snake left " + zabimaru.getHealth() + " of " + whole + ", marked " + marked);
+            zabimaru.invulnerableTime = 0;
+            float before = zabimaru.getHealth();
+            helper.assertTrue(zabimaru.hurt(level.damageSources().playerAttack(renji), 5.0F)
+                            && zabimaru.getHealth() < before
+                            && marked.equals(List.of(ZabimaruSpirit.Half.SNAKE, ZabimaruSpirit.Half.BABOON))
+                            && zabimaru.lastStruck() == ZabimaruSpirit.Half.BABOON,
+                    "a blow on the baboon was marked " + marked);
+        } finally {
+            NeoForge.EVENT_BUS.unregister(record);
+            Materialisation.sendHome(drawn);
         }
         helper.succeed();
     }

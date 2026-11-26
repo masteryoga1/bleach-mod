@@ -236,6 +236,7 @@ public final class BleachClient {
                     }
                 });
         event.registerEntityRenderer(ModEntities.ZANGETSU_SPIRIT.get(), ZangetsuSpiritRenderer::new);
+        event.registerEntityRenderer(ModEntities.ZABIMARU_SPIRIT.get(), ZabimaruSpiritRenderer::new);
         // Spiders end on their backs when they die; the rest fall on their sides, all but the Gillian.
         event.registerEntityRenderer(ModEntities.SPIDER_HOLLOW.get(),
                 context -> new HollowRenderer<SpiderHollow, SpiderModel<SpiderHollow>>(context,

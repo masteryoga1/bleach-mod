@@ -205,6 +205,9 @@ HOLLOW_IRIS = rgb(236, 200, 40)
 ZANGETSU_SKIN = rgb(206, 172, 140)
 ZANGETSU_STUBBLE = rgb(126, 116, 106)
 ZANGETSU_SHIRT = rgb(84, 80, 88)
+# Zabimaru drawn out: the baboon's bare face, and its dark hands and feet; its fur is Hihiō Zabimaru's mane.
+ZABIMARU_FACE = rgb(196, 110, 100)
+ZABIMARU_PAW = rgb(70, 30, 30)
 # Sekkiseki, the Seireiheki's stone: pale grey, faintly flecked, with darker joints.
 SEKKISEKI = rgb(222, 222, 214)
 SEKKISEKI_FLECK = rgb(204, 204, 197)
@@ -2116,6 +2119,37 @@ def zangetsu_spirit():
     return c
 
 
+def zabimaru_spirit():
+    """Zabimaru drawn out, on its model's 128x64 layout: red fur, in Hihiō Zabimaru's mane colour streaked with its gum,
+    over the legs (a 5x12x5 box at 0, 0) and the long arms (5x25x5 at 0, 17), with dark palms and soles, the body
+    (14x16x10 at 20, 0) and the shaggy mane over its shoulders (16x7x12 at 20, 26); the head (8x8x7 at 68, 0) with a
+    bare face and the muzzle (5x4x4 at 98, 0); and the snake in Hihiō Zabimaru's segment, scaled down to each face of a
+    tail segment (4x4x5 at 76, 15) and of its head (5x4x7 at 94, 15), with the segment's gum and teeth on its jaw (4x1x6
+    at 98, 26)."""
+    c = Canvas(128, 64)
+    fur = ((0, 0, 5, 12, 5), (0, 17, 5, 25, 5), (20, 0, 14, 16, 10), (20, 26, 16, 7, 12), (68, 0, 8, 8, 7))
+    for u, v, w, h, d in fur:
+        box(c, u, v, w, h, d, HIHIO_MANE)
+        mottle(c, u, v, u + 2 * (w + d), v + d + h, HIHIO_GUM, 5, u)
+    c.rect(10, 0, 15, 5, ZABIMARU_PAW)      # a sole, and a palm
+    c.rect(10, 17, 15, 22, ZABIMARU_PAW)
+    c.rect(76, 8, 82, 13, ZABIMARU_FACE)    # the face under the brow, about the eyes
+    c.rect(77, 9, 78, 10, VOID)
+    c.rect(80, 9, 81, 10, VOID)
+    box(c, 98, 0, 5, 4, 4, ZABIMARU_FACE)
+    c.rect(102, 7, 107, 8, HIHIO_GUM)       # the mouth along the muzzle's foot
+    segment = hihio_zabimaru_segment()
+    for u, v, w, h, d in ((76, 15, 4, 4, 5), (94, 15, 5, 4, 7)):
+        for x0, y0, x1, y1 in faces(u, v, w, h, d):
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    c.put(x, y, segment.get((x - x0) * 16 // (x1 - x0), (y - y0) * 16 // (y1 - y0)))
+    box(c, 98, 26, 4, 1, 6, HIHIO_GUM)
+    for x in range(104, 108, 2):            # teeth along the jaw's top, the snake's mouth
+        c.put(x, 26, TOOTH)
+    return c
+
+
 def hollow_player_mask():
     """A Hollow player's mask (HollowMaskModel): a bone plate with dark eye holes, a ridge down the brow and gaps
     between the teeth along its lower edge; a jaw with teeth along its top; fangs, horns and a beak for the
@@ -2641,6 +2675,7 @@ TEXTURES = {
     **{"entity/gate_keeper/%s.png" % name: gate_keeper(gate) for gate, name in enumerate(GATE_NAMES)},
     "entity/inner_hollow.png": inner_hollow,
     "entity/zangetsu_spirit.png": zangetsu_spirit,
+    "entity/zabimaru_spirit.png": zabimaru_spirit,
     "entity/hollow_player_mask.png": hollow_player_mask,
     "entity/hollow_player_mask_cracked.png": cracked(hollow_player_mask, [(8, 1), (6, 2), (6, 5), (5, 6)]),
     "entity/hollow_player_mask_eyes.png": hollow_player_mask_eyes,

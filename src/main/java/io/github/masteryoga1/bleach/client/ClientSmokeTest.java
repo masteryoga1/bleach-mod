@@ -33,6 +33,7 @@ import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
+import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
 import io.github.masteryoga1.bleach.item.ArrancarUniformItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
@@ -400,6 +401,8 @@ public final class ClientSmokeTest {
     private static final int SPIRITS_AT = HIHIO_AT + 120;
     /** How many times a spirit's body had been drawn as it came out. */
     private static int spiritsDrawn;
+    /** How far Zabimaru's snake may trail its place at a turning baboon's back on the client, in blocks. */
+    private static final double SNAKE_TRAIL = 0.75;
     /** How far before the soul's eyes the golem its serpent lashes at is hung, and the tag it is killed by. */
     private static final double LASHED_AHEAD = 8.0;
     private static final String LASHED_TAG = "bleach_smoke_lashed";
@@ -1945,14 +1948,25 @@ public final class ClientSmokeTest {
             }
             case SPIRITS_AT + 45 -> command(minecraft, "bleach zanpakuto @s reset");
             case SPIRITS_AT + 46 -> command(minecraft, "clear @s bleach:asauchi");
+            // Then bound to Zabimaru and drawing it out the same way: the baboon four blocks off, the snake at its back.
+            case SPIRITS_AT + 60 -> {
+                spiritsDrawn = ZabimaruSpiritRenderer.drawnFrames();
+                command(minecraft, "bleach zanpakuto @s spirit bleach:zabimaru");
+                command(minecraft, "bleach zanpakuto @s bond 1000");
+                command(minecraft, "bleach zanpakuto @s name");
+                command(minecraft, "tp @s ~ ~ ~ 180 10");
+                command(minecraft, "bleach zanpakuto @s bankai spirit");
+            }
+            case SPIRITS_AT + 105 -> command(minecraft, "bleach zanpakuto @s reset");
+            case SPIRITS_AT + 106 -> command(minecraft, "clear @s bleach:asauchi");
             // After the last window, nothing of the beat is left for one after it: no resistance, the soul's eyes level,
             // its own view.
-            case SPIRITS_AT + 59 -> {
+            case SPIRITS_AT + 119 -> {
                 command(minecraft, "effect clear @s minecraft:resistance");
                 command(minecraft, "tp @s ~ ~ ~ ~ 0");
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }
-            case SPIRITS_AT + 60 -> {
+            case SPIRITS_AT + 120 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2966,14 +2980,23 @@ public final class ClientSmokeTest {
                 && nearest(minecraft, ZabimaruLash.class, 32.0, lash -> true) == null;
     }
 
-    /** The checks of the spirits' beat: Zangetsu out, drawn in his own skin with his cleaver, then gone. */
+    /**
+     * The checks of the spirits' beat: Zangetsu out, drawn in his own skin with his cleaver, then gone; then Zabimaru out,
+     * drawn with its snake at its back, then gone.
+     */
     private static void checkSpirits(Minecraft minecraft) {
         if (expectWithin(minecraft, SPIRITS_AT + 2, SPIRITS_AT + 40, () -> zangetsuOut(minecraft),
                 "Zangetsu never came out on the client, drawn in his own skin with his cleaver")) {
             shot(minecraft, "zangetsu_spirit");
         }
-        expectWithin(minecraft, SPIRITS_AT + 46, SPIRITS_AT + 58, () -> zangetsuGone(minecraft),
+        expectWithin(minecraft, SPIRITS_AT + 46, SPIRITS_AT + 58, () -> spiritGone(minecraft, ZangetsuSpirit.class),
                 "Zangetsu still stood on the client after he had gone");
+        if (expectWithin(minecraft, SPIRITS_AT + 62, SPIRITS_AT + 100, () -> zabimaruOut(minecraft),
+                "Zabimaru never came out on the client as the baboon, its snake at its back with the id after its own")) {
+            shot(minecraft, "zabimaru_spirit");
+        }
+        expectWithin(minecraft, SPIRITS_AT + 106, SPIRITS_AT + 118, () -> spiritGone(minecraft, ZabimaruSpirit.class),
+                "Zabimaru still stood on the client after it had gone");
     }
 
     /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has, with his cleaver in hand. */
@@ -2984,9 +3007,24 @@ public final class ClientSmokeTest {
                 && minecraft.getResourceManager().getResource(ZangetsuSpiritRenderer.TEXTURE).isPresent();
     }
 
-    /** Whether no living Zangetsu is near: one killed lies dying for a second before he is gone. */
-    private static boolean zangetsuGone(Minecraft minecraft) {
-        return nearest(minecraft, ZangetsuSpirit.class, 16.0, spirit -> spirit.isAlive()) == null;
+    /**
+     * Whether Zabimaru stands near, drawn since it came out, in a texture the client has, its snake made on the client
+     * with the id after the baboon's and placed at its back there, as the server places it. The snake is placed as the
+     * baboon moves, before its body turns that tick, so a turning baboon's snake lags its place by a little.
+     */
+    private static boolean zabimaruOut(Minecraft minecraft) {
+        ZabimaruSpirit zabimaru = nearest(minecraft, ZabimaruSpirit.class, 16.0, spirit -> true);
+        if (zabimaru == null || ZabimaruSpiritRenderer.drawnFrames() <= spiritsDrawn
+                || minecraft.getResourceManager().getResource(ZabimaruSpiritRenderer.TEXTURE).isEmpty()) {
+            return false;
+        }
+        Vec3 back = ZabimaruSpirit.snakeAt(zabimaru.getX(), zabimaru.getY(), zabimaru.getZ(), zabimaru.yBodyRot);
+        return zabimaru.snake().getId() == zabimaru.getId() + 1 && zabimaru.snake().position().distanceTo(back) < SNAKE_TRAIL;
+    }
+
+    /** Whether no living spirit of this kind is near: one killed lies dying for a second before it is gone. */
+    private static <T extends Entity> boolean spiritGone(Minecraft minecraft, Class<T> kind) {
+        return nearest(minecraft, kind, 16.0, Entity::isAlive) == null;
     }
 
     /**
@@ -3235,7 +3273,11 @@ public final class ClientSmokeTest {
                 || ticksInWorld == HIHIO_AT + 74 && !windowsPassed.contains(HIHIO_AT + 51)
                 && !inHihioZabimaru(minecraft, player)
                 || ticksInWorld == SPIRITS_AT + 39 && !windowsPassed.contains(SPIRITS_AT + 2) && !zangetsuOut(minecraft)
-                || ticksInWorld == SPIRITS_AT + 57 && !windowsPassed.contains(SPIRITS_AT + 46) && !zangetsuGone(minecraft);
+                || ticksInWorld == SPIRITS_AT + 57 && !windowsPassed.contains(SPIRITS_AT + 46)
+                && !spiritGone(minecraft, ZangetsuSpirit.class)
+                || ticksInWorld == SPIRITS_AT + 99 && !windowsPassed.contains(SPIRITS_AT + 62) && !zabimaruOut(minecraft)
+                || ticksInWorld == SPIRITS_AT + 117 && !windowsPassed.contains(SPIRITS_AT + 106)
+                && !spiritGone(minecraft, ZabimaruSpirit.class);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

@@ -140,6 +140,7 @@
   "entity.bleach.kototsu": "Kōtotsu",
   "entity.bleach.inner_hollow": "Inner Hollow",
   "entity.bleach.zangetsu_spirit": "Zangetsu",
+  "entity.bleach.zabimaru_spirit": "Zabimaru",
   "entity.bleach.plus": "Plus",
   "entity.bleach.garganta": "Garganta",
   "entity.bleach.getsuga_tensho": "Getsuga Tenshō",
@@ -1296,6 +1297,7 @@
   "bossbar.bleach.shrieker": "Shrieker",
   "bossbar.bleach.grand_fisher": "Grand Fisher",
   "bossbar.bleach.zangetsu_spirit": "Zangetsu",
+  "bossbar.bleach.zabimaru_spirit": "Zabimaru",
   "bossbar.bleach.inner_hollow": "Your Hollow: %s s",
   "bossbar.bleach.field_trial": "Field trial: %s of %s practice Hollows slain",
 
