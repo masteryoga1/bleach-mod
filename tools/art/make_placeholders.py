@@ -110,6 +110,10 @@ TENSA_WRAP = rgb(32, 30, 36)
 TENSA_WRAP_LIGHT = rgb(66, 62, 72)
 CHAIN = rgb(92, 92, 100)
 CHAIN_LIGHT = rgb(132, 132, 142)
+# Its coat: blacker than the garb under it, with a dark grey lining and folds.
+COAT = rgb(12, 12, 14)
+COAT_FOLD = rgb(36, 34, 40)
+COAT_LINING = rgb(58, 54, 62)
 
 # The Quincy: a silver cross, white cloth with blue trim, and pale blue reishi.
 SILVER = rgb(206, 212, 222)
@@ -440,6 +444,56 @@ def tensa_zangetsu():
         c.put(x + 1, y, TENSA_WRAP)
     for k, (x, y) in enumerate([(2, 30), (1, 30), (1, 31), (0, 31)]):
         c.put(x, y, CHAIN if k % 2 == 0 else CHAIN_LIGHT)
+    return c
+
+
+def ragged(c, x0, x1, y, colour, every=3):
+    """A torn hem along row y from x0 to x1 (end exclusive): every few pixels one hangs a row lower, and the one after
+    is torn away."""
+    for x in range(x0, x1):
+        step = (x - x0) % every
+        if step == 0:
+            c.put(x, y, colour)
+            c.put(x, y + 1, colour)
+        elif step == 1:
+            c.put(x, y, CLEAR)
+        else:
+            c.put(x, y, colour)
+
+
+def tensa_zangetsu_coat():
+    """Tensa Zangetsu's long black coat on the armour layout of the coat model (HumanoidModel's mesh, 64x64): the
+    body closed at the chest and open down the front below it, sleeves to the wrist with torn cuffs, a skirt round
+    the thighs open at the front with a torn hem above the knee, and the tails below (a 10x11x1 box at 0, 32), lined
+    dark grey on the face against the back and torn along the bottom. The head, the hat and the shins stay clear."""
+    c = Canvas(64, 64)
+    # Body: shoulders, then the sides, the front and the back.
+    c.rect(20, 16, 28, 20, COAT)
+    c.rect(16, 20, 40, 32, COAT)
+    c.rect(23, 26, 25, 32, CLEAR)  # open down the front from the waist
+    for y in range(20, 26):        # the collar's V, in the fold colour
+        c.put(20 + (y - 20) // 2, y, COAT_FOLD)
+        c.put(27 - (y - 20) // 2, y, COAT_FOLD)
+    for x in (17, 34, 38):         # folds down the sides and back
+        c.rect(x, 21, x + 1, 32, COAT_FOLD)
+    # Arms: the whole sleeve, torn at the cuff.
+    c.rect(44, 16, 48, 20, COAT)
+    c.rect(40, 20, 56, 30, COAT)
+    c.rect(40, 23, 41, 30, COAT_FOLD)
+    ragged(c, 40, 56, 30, COAT)
+    # Legs: the skirt round the thigh, open at the front, torn above the knee.
+    c.rect(0, 20, 4, 25, COAT)
+    c.rect(8, 20, 16, 25, COAT)
+    ragged(c, 0, 4, 25, COAT)
+    ragged(c, 8, 16, 25, COAT)
+    # Tails: lined on the face against the back, black outside, its last row torn to the hem's few hanging ends.
+    box(c, 0, 32, 10, 11, 1, COAT)
+    c.rect(1, 33, 11, 44, COAT_LINING)
+    for x in (14, 17, 20):
+        c.rect(x, 33, x + 1, 42, COAT_FOLD)
+    c.rect(0, 43, 22, 44, CLEAR)
+    ragged(c, 12, 22, 42, COAT, every=4)
+    ragged(c, 1, 11, 42, COAT_LINING, every=4)
     return c
 
 
@@ -2426,6 +2480,7 @@ TEXTURES = {
     "item/hollow_bait.png": hollow_bait_icon,
     "entity/heilig_pfeil.png": heilig_pfeil,
     "entity/blut_vene.png": blut_vene,
+    "entity/tensa_zangetsu_coat.png": tensa_zangetsu_coat,
     "item/sanrei_glove.png": sanrei_glove_icon,
     "item/seele_schneider.png": seele_schneider_icon,
     "item/seele_schneider_formed.png": seele_schneider_formed_icon,

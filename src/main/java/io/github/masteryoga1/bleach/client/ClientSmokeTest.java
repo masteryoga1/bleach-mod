@@ -72,6 +72,7 @@ import io.github.masteryoga1.bleach.world.LasNoches;
 import io.github.masteryoga1.bleach.world.MoonPhases;
 import io.github.masteryoga1.bleach.world.Rukongai;
 import io.github.masteryoga1.bleach.world.SeireiteiPlan;
+import io.github.masteryoga1.bleach.zanpakuto.BankaiLook;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenScene;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStep;
 import io.github.masteryoga1.bleach.zanpakuto.JinzenStepKind;
@@ -281,8 +282,8 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * looks at the Gate for a shot as the body is drawn in along its blade, credited once with no soul rising, and the body
  * must be gone before the run quits. Last, bound to Zangetsu again with its Bankai granted, the soul calls Tensa
  * Zangetsu, seen from the front: the blade in hand must reach the client in Bankai in its own model, with the soul
- * quickened; its Getsuga Tenshō must be the black one with no mask on; and the seal key must step it all back down to
- * Shikai, after which the Bankai is revoked and the blade put away.
+ * quickened and its coat drawn on it; its Getsuga Tenshō must be the black one with no mask on; and the seal key must
+ * step it all back down to Shikai, the coat no longer drawn, after which the Bankai is revoked and the blade put away.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -413,6 +414,8 @@ public final class ClientSmokeTest {
     private static int rangFrom = -1;
     /** The soul's purified count as the Gate's Shrieker is cut down, so the Gate's credit can be checked. */
     private static int purifiedBefore = -1;
+    /** How many Bankai coats had been drawn as Tensa Zangetsu's first window opened, then as its last window last looked. */
+    private static int coatsDrawn;
     /** The player as the death beat killed it, to tell it from the one that wakes in its place, or null before then. */
     @Nullable
     private static LocalPlayer killed;
@@ -1819,7 +1822,7 @@ public final class ClientSmokeTest {
                 command(minecraft, "kill @e[type=bleach:grand_fisher_lure]");
             }
             // A fresh Asauchi in hand bound to Zangetsu and named, its Bankai granted by command and reiryoku to spare,
-            // looking up and away so the Getsuga Tenshō carves nothing, seen from the front.
+            // looking up and away so the Getsuga Tenshō carves nothing, seen from the front, where its coat is drawn.
             case BANKAI_AT -> {
                 command(minecraft, "clear @s bleach:asauchi");
                 command(minecraft, "item replace entity @s weapon.mainhand with bleach:asauchi");
@@ -1841,7 +1844,7 @@ public final class ClientSmokeTest {
                     BleachNetwork.requestZanpakutoKey(ZanpakutoKey.RELEASE);
                 }
             }
-            // The slim black blade, and its name as the title.
+            // The coat, the slim black blade, and its name as the title.
             case BANKAI_AT + 80 -> shot(minecraft, "tensa_zangetsu");
             // Held for half a second, then let go: a black Getsuga Tenshō of a third of its charge.
             case BANKAI_AT + 81 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_PRESS);
@@ -2763,9 +2766,12 @@ public final class ClientSmokeTest {
      * down by the seal key.
      */
     private static void checkBankai(Minecraft minecraft, LocalPlayer player, SoulData soul) {
+        if (ticksInWorld == BANKAI_AT + 51) {
+            coatsDrawn = BankaiCoatLayer.drawnFrames();
+        }
         expectWithin(minecraft, BANKAI_AT + 51, BANKAI_AT + 75, () -> inTensaZangetsu(minecraft, player),
                 "Tensa Zangetsu never reached the client: the blade in hand in Bankai in its own model, its owner"
-                        + " quickened");
+                        + " quickened and its coat drawn on him");
         if (expectWithin(minecraft, BANKAI_AT + 92, BANKAI_AT + 110, () -> !VisoredLogic.isMasked(soul) && nearest(minecraft,
                         GetsugaTensho.class, 48.0, crescent -> crescent.isBlack() && crescent.age() >= 2) != null,
                 "Tensa Zangetsu's Getsuga Tenshō never reached the client as the black one with no mask on")) {
@@ -2773,26 +2779,35 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, BANKAI_AT + 101, BANKAI_AT + 118,
                 () -> windowsPassed.contains(BANKAI_AT + 51) && steppedDown(player),
-                "the seal key never stepped Tensa Zangetsu down to Shikai on the client, its speed gone");
+                "the seal key never stepped Tensa Zangetsu down to Shikai on the client, its coat and speed gone");
     }
 
     /**
      * Whether the soul holds Tensa Zangetsu as its client sees it: its own blade in Bankai in its own model, which the
-     * item model's override draws in Tensa Zangetsu's texture, and the speed its server put on it.
+     * item model's override draws in Tensa Zangetsu's texture, the speed its server put on it, and its coat: worn, in a
+     * texture the client has, and drawn since the window opened, which only the camera in front lets it be.
      */
     private static boolean inTensaZangetsu(Minecraft minecraft, LocalPlayer player) {
         ItemStack held = player.getMainHandItem();
         return ZanpakutoItem.blade(held).stage() == ZanpakutoStage.BANKAI && modelOf(held) == TENSA_MODEL
+                && BankaiLook.worn(player) == BankaiLook.TENSA_ZANGETSU && BankaiCoatLayer.drawnFrames() > coatsDrawn
+                && minecraft.getResourceManager().getResource(BankaiCoatLayer.TENSA_ZANGETSU_COAT).isPresent()
                 && player.getAttribute(Attributes.MOVEMENT_SPEED).getModifier(BankaiForms.SPEED_ID) != null
                 && player.getAttribute(Attributes.ATTACK_SPEED).getModifier(BankaiForms.ATTACK_SPEED_ID) != null
                 && minecraft.getItemRenderer().getModel(held, minecraft.level, player, 0).getParticleIcon().contents()
                         .name().equals(BleachMod.id("item/tensa_zangetsu"));
     }
 
-    /** Whether the soul's blade in hand is back in Shikai in Zangetsu's model, with no speed of Bankai's. */
+    /**
+     * Whether the soul's blade in hand is back in Shikai in Zangetsu's model, with no speed of Bankai's and no coat drawn
+     * since this was last asked, which the coat's last frames before the hand changed can put off by a tick.
+     */
     private static boolean steppedDown(LocalPlayer player) {
         ItemStack held = player.getMainHandItem();
-        return ZanpakutoItem.blade(held).stage() == ZanpakutoStage.SHIKAI && modelOf(held) == SHIKAI_MODEL
+        int drawn = BankaiCoatLayer.drawnFrames();
+        boolean bare = drawn == coatsDrawn;
+        coatsDrawn = drawn;
+        return bare && ZanpakutoItem.blade(held).stage() == ZanpakutoStage.SHIKAI && modelOf(held) == SHIKAI_MODEL
                 && player.getAttribute(Attributes.MOVEMENT_SPEED).getModifier(BankaiForms.SPEED_ID) == null
                 && player.getAttribute(Attributes.ATTACK_SPEED).getModifier(BankaiForms.ATTACK_SPEED_ID) == null;
     }
