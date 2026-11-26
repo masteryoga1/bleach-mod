@@ -203,9 +203,9 @@ public final class QuincyNpcLogic {
                 BleachConfig.get(BleachConfig.HUNTER_COOLDOWN_MINUTES) * TICKS_PER_MINUTE);
     }
 
-    /** Whether this arrival could bring the Hunter: a natural one, and not the first Hollow. */
+    /** Whether this arrival could bring the Hunter: a natural one, not the first Hollow, and not the Shrieker's. */
     public static boolean hunterMayCome(HollowKind kind, boolean byCommand) {
-        return !byCommand && kind != HollowKind.FISHBONE_D;
+        return !byCommand && kind != HollowKind.FISHBONE_D && kind != HollowKind.SHRIEKER;
     }
 
     /** Ticks the Hunter waits between shots after the draw: quicker the harder the world. Peaceful counts as Easy. */

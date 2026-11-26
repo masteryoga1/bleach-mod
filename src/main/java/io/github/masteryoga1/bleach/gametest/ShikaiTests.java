@@ -368,6 +368,27 @@ public final class ShikaiTests {
         });
     }
 
+    /**
+     * A launched crescent that reaches a sinner opens the Gate of Hell for it in place of purifying it, and flies on past
+     * the Gate's square to purify the plain Hollow behind; its owner is credited as for a purification for both, once each.
+     * HellGateTests takes the Getsuga by its damage type; this is the real crescent in flight.
+     */
+    @GameTest(template = "field", timeoutTicks = 60, batch = "getsuga")
+    public static void getsugaSendsASinnerToTheGate(GameTestHelper helper) {
+        SpiderHollow sinner = still(helper.spawnWithNoFreeWill(ModEntities.SPIDER_HOLLOW.get(), 4, 2, 8));
+        sinner.setSinner(true);
+        SpiderHollow plain = still(helper.spawnWithNoFreeWill(ModEntities.SPIDER_HOLLOW.get(), 10, 2, 8));
+        plain.setSinner(false);
+        Player owner = ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F));
+        crescent(helper, owner, 1000.0F);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(sinner.isHellbound() && !sinner.isPurifying(), "the crescent purified the sinner");
+            helper.assertTrue(plain.isPurifying() && !plain.isHellbound(), "the crescent sent the plain Hollow to the Gate");
+            int purified = SoulLogic.get(owner).hunt().purified();
+            helper.assertTrue(purified == 2, "the owner was credited " + purified + " times, not 2");
+        });
+    }
+
     @GameTest(template = "field", timeoutTicks = 40, batch = "getsuga")
     public static void getsugaCutsPointBlankButNothingBehind(GameTestHelper helper) {
         // Three swings start at x 3.5 with the wielder facing +X: level along z 6.5, aimed 45 degrees

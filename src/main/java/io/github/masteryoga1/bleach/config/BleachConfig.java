@@ -513,6 +513,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue SHRIEKER_HEALTH;
     public static final ModConfigSpec.DoubleValue SHRIEKER_DAMAGE;
     public static final ModConfigSpec.IntValue SHRIEKER_RETURN_DAYS;
+    public static final ModConfigSpec.DoubleValue SHRIEKER_MIN_MAX_REIRYOKU;
+    public static final ModConfigSpec.DoubleValue SHRIEKER_ARRIVAL_SHARE;
     public static final ModConfigSpec.IntValue SHRIEKER_LEECHES;
     public static final ModConfigSpec.IntValue SHRIEKER_LEECHES_AT_ONCE;
     public static final ModConfigSpec.DoubleValue SHRIEKER_LEECH_DAMAGE;
@@ -2386,6 +2388,14 @@ public final class BleachConfig {
                 .comment("Game days, of twenty minutes whether anyone sleeps or not, before a Shrieker may come again"
                         + " after one dies, killed or purified alike. 0 lets the next come at once.")
                 .defineInRange("return_days", 3, 0, 365);
+        SHRIEKER_MIN_MAX_REIRYOKU = builder
+                .comment("Maximum reiryoku a soul needs before a Shrieker may come for it by itself, at night, in place of"
+                        + " a Garganta's Hollows.")
+                .defineInRange("min_max_reiryoku", 200.0, 0.0, 10_000.0);
+        SHRIEKER_ARRIVAL_SHARE = builder
+                .comment("Share of the Garganta arrivals at night, for a soul strong enough that is no Hollow, that bring a"
+                        + " Shrieker instead, while none is about and its days away are over. 0 brings none by itself.")
+                .defineInRange("arrival_share", 0.1, 0.0, 1.0);
         builder.pop();
         builder.push("grand_fisher");
         GRAND_FISHER_HEALTH = builder

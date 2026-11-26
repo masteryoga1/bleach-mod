@@ -679,6 +679,7 @@ public final class QuincyNpcTests {
                 "the Hunter came back a hundred ticks after his last visit");
         helper.assertFalse(QuincyNpcLogic.hunterMayCome(HollowKind.FISHBONE_D, false), "the Hunter may follow the first Hollow");
         helper.assertFalse(QuincyNpcLogic.hunterMayCome(HollowKind.SPIDER, true), "the Hunter may follow a summoned Garganta");
+        helper.assertFalse(QuincyNpcLogic.hunterMayCome(HollowKind.SHRIEKER, false), "the Hunter may follow the Shrieker");
         helper.succeed();
     }
 
