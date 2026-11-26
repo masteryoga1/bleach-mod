@@ -9,6 +9,8 @@ import io.github.masteryoga1.bleach.soul.GrandFisherComing;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import java.util.List;
 import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -27,8 +29,9 @@ import net.minecraft.world.phys.Vec3;
  * Grand Fisher: a great Hollow, fur-covered and rodent-like, with red, bird-like claws on its hands and feet, and a boss.
  * It walks, hunts and bites as any Hollow does, its health and the damage of its blow the server's to set; its bar shows
  * to the souls about it who see spirits. It hides its reiatsu: its own cries never reach the shimmer band, and none
- * carries further than a mob's sounds do. It is no sinner. It is never saved, and for now comes only by command, as no
- * Garganta brings it ({@link HollowKind#comesByTear}).
+ * carries further than a mob's sounds do. It is no sinner. It is never saved, and no Garganta brings it
+ * ({@link HollowKind#comesByTear}): it bursts out of the ground beside its lure, laid first to wait for its prey
+ * ({@code GrandFisherComing}), or comes by {@code /summon}, and leaves for lack of prey back into the ground.
  *
  * <p>On its first tick it grows its lure ({@link GrandFisherLure}) on a stalk from its brow, unless one was linked to it
  * first, and it never grows a second: a lure cut off, faded or slain leaves it with that lure or none.
@@ -158,6 +161,28 @@ public class GrandFisher extends Hollow implements BossFloor.Floored {
         super.restoreFrom(entity);
         if (entity instanceof GrandFisher old) {
             lureTaken = old.lureTaken;
+        }
+    }
+
+    /** The ground breaks about its feet, as it bursts out or sinks back, and it laughs: seen and heard by the aware. */
+    public void breakGround(ServerLevel server) {
+        BlockParticleOption ground = new BlockParticleOption(ParticleTypes.BLOCK,
+                server.getBlockState(BlockPos.containing(getX(), getY() - 0.5, getZ())));
+        SpiritSenses.particles(server, ground, getX(), getY() + 0.25, getZ(), 60, getBbWidth() * 0.5, 0.25,
+                getBbWidth() * 0.5, 0.15);
+        playSound(ModSounds.GRAND_FISHER_AMBIENT.get(), 2.0F, 1.0F);
+    }
+
+    /** It leaves for lack of prey as it came, back into the ground, never by a tear; its lure fades with it. */
+    @Override
+    protected void leave() {
+        if (level() instanceof ServerLevel server) {
+            GrandFisherLure own = lure();
+            if (own != null) {
+                own.fadeNow();
+            }
+            breakGround(server);
+            discard();
         }
     }
 

@@ -329,7 +329,7 @@ public final class ClientSmokeTest {
     private static final double TEAR_FROM_Z = HUECO_MUNDO_Z - RIFT_AHEAD;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
-    /** The first tick of Grand Fisher's beat; its steps and checks count from here, and the run ends after them. */
+    /** The first tick of Grand Fisher's beat; its steps and checks count from here. */
     private static final int GRAND_FISHER_AT = 9180;
     /**
      * A still, bare-chested Privaron Espada facing the player: seat 103, so the 3 of its old seat on its chest (this
@@ -363,6 +363,13 @@ public final class ClientSmokeTest {
     private static final int RING_SHOT_TICKS = 5;
     /** The first tick of the Gate of Hell's beat, after Grand Fisher's; its steps and checks count from here. */
     private static final int HELL_GATE_AT = GRAND_FISHER_AT + 115;
+    /**
+     * The first tick of Grand Fisher's ambush's beat, after the Gate of Hell's; its steps and checks count from here, and
+     * the run ends after.
+     */
+    private static final int GRAND_FISHER_AMBUSH_AT = HELL_GATE_AT + 120;
+    /** How far before the soul its lure is laid for the ambush's beat. */
+    private static final double LAID_AHEAD = 8.0;
 
     private static boolean worldRequested;
     private static int ticksWaiting;
@@ -1773,7 +1780,7 @@ public final class ClientSmokeTest {
             // Its body and mask, the girl crying before it on her stalk, and its bar at the top of the screen.
             case GRAND_FISHER_AT + 40 -> shot(minecraft, "grand_fisher");
             // The soul's blade cuts her stalk (see checkGrandFisher), and both are killed once it has withdrawn.
-            case GRAND_FISHER_AT + 42 -> cutLuresOnServer(minecraft);
+            case GRAND_FISHER_AT + 42 -> strikeLuresOnServer(minecraft);
             // The Gate of Hell, still at home: a Shinigami again, before a third Shrieker standing still in the air, which
             // its own Getsuga Tenshō cuts down on the server once it shows (see checkHellGate), in air cleared again.
             case HELL_GATE_AT -> {
@@ -1783,7 +1790,24 @@ public final class ClientSmokeTest {
                 command(minecraft, "bleach reiryoku @s 800 800");
             }
             case HELL_GATE_AT + 1 -> command(minecraft, "summon bleach:shrieker ~ ~3 ~-6 " + STILL);
-            case HELL_GATE_AT + 120 -> {
+            // Its lure laid alone on the ground before the soul, facing it, as its ambush lays her, in air cleared as
+            // before: its body lies hidden in the ground.
+            case GRAND_FISHER_AMBUSH_AT -> {
+                command(minecraft, "tp @s ~ ~ ~ 180 -12");
+                command(minecraft, "fill ~-3 ~ ~-12 ~3 ~7 ~-1 air");
+                layLureOnServer(minecraft);
+            }
+            // The girl crying alone, with no stalk and no body.
+            case GRAND_FISHER_AMBUSH_AT + 40 -> shot(minecraft, "grand_fisher_waiting");
+            // The soul's blade on her brings her body bursting out of the ground beside her (see checkGrandFisher).
+            case GRAND_FISHER_AMBUSH_AT + 42 -> strikeLuresOnServer(minecraft);
+            // The body out of the ground, its bar at the top, and the girl on her stalk again; then both are killed.
+            case GRAND_FISHER_AMBUSH_AT + 82 -> {
+                shot(minecraft, "grand_fisher_burst");
+                command(minecraft, "kill @e[type=bleach:grand_fisher]");
+                command(minecraft, "kill @e[type=bleach:grand_fisher_lure]");
+            }
+            case GRAND_FISHER_AMBUSH_AT + 115 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -2644,6 +2668,9 @@ public final class ClientSmokeTest {
      * The checks of Grand Fisher's beat: the body and its lure on her stalk reaching the client unhidden, looked at for
      * their shot; her seen cut off by the soul's blade, her body alive, and her stalk withdrawn, for a second shot; then
      * both, killed, gone. The last opens a tick after the window whose pass kills them, so it is open when that shows.
+     * Then its ambush's: a lure laid alone reaching the client unhidden with no body, looked at for her shot; struck, her
+     * body seen burst out beside her, her on her stalk, looked at between the two for theirs; then both, killed, gone,
+     * from the tick after the kill.
      */
     private static void checkGrandFisher(Minecraft minecraft) {
         if (expectWithin(minecraft, GRAND_FISHER_AT + 2, GRAND_FISHER_AT + 35, () -> linkedLure(minecraft) != null,
@@ -2666,13 +2693,30 @@ public final class ClientSmokeTest {
                         && nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive) == null
                         && nearest(minecraft, GrandFisherLure.class, SUMMONED_RANGE, GrandFisherLure::isAlive) == null,
                 "Grand Fisher or its cut lure killed by command still lives");
+        if (expectWithin(minecraft, GRAND_FISHER_AMBUSH_AT + 2, GRAND_FISHER_AMBUSH_AT + 35,
+                () -> waitingLure(minecraft) != null, "the lure laid alone never reached the Shinigami's client unhidden")) {
+            GrandFisherLure lure = waitingLure(minecraft);
+            look(minecraft, lure.position().add(0.0, lure.getBbHeight() * 0.5, 0.0));
+        }
+        if (expectWithin(minecraft, GRAND_FISHER_AMBUSH_AT + 43, GRAND_FISHER_AMBUSH_AT + 80,
+                () -> linkedLure(minecraft) != null,
+                "the body the soul's blow on the lure brought out was never seen beside her on the Shinigami's client")) {
+            GrandFisherLure lure = linkedLure(minecraft);
+            look(minecraft, lure.position().add(lure.body().position()).scale(0.5).add(0.0, lure.getBbHeight(), 0.0));
+        }
+        expectWithin(minecraft, GRAND_FISHER_AMBUSH_AT + 83, GRAND_FISHER_AMBUSH_AT + 110,
+                () -> windowsPassed.contains(GRAND_FISHER_AMBUSH_AT + 43)
+                        && nearest(minecraft, GrandFisher.class, SUMMONED_RANGE, GrandFisher::isAlive) == null
+                        && nearest(minecraft, GrandFisherLure.class, SUMMONED_RANGE, GrandFisherLure::isAlive) == null,
+                "Grand Fisher or its lure out of the ambush killed by command still lives");
     }
 
     /**
      * Has the soul, on the server thread, strike every live lure about it with an iron sword put in its hand: a blow of
-     * a blade from a soul who sees her, which cuts her stalk. A blow by hand would need the lure under the cursor.
+     * a blade from a soul who sees her, which cuts her stalk, or brings out the body of one laid alone. Every body about
+     * is then stilled, as a summon's {@link #STILL} would be. A blow by hand would need the lure under the cursor.
      */
-    private static void cutLuresOnServer(Minecraft minecraft) {
+    private static void strikeLuresOnServer(Minecraft minecraft) {
         MinecraftServer server = minecraft.getSingleplayerServer();
         LocalPlayer local = minecraft.player;
         if (server != null) {
@@ -2680,11 +2724,35 @@ public final class ClientSmokeTest {
                 ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
                 if (player != null) {
                     player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_SWORD));
-                    player.level().getEntitiesOfClass(GrandFisherLure.class, player.getBoundingBox().inflate(SUMMONED_RANGE),
-                            GrandFisherLure::isAlive).forEach(player::attack);
+                    AABB about = player.getBoundingBox().inflate(SUMMONED_RANGE);
+                    player.level().getEntitiesOfClass(GrandFisherLure.class, about, GrandFisherLure::isAlive)
+                            .forEach(player::attack);
+                    player.level().getEntitiesOfClass(GrandFisher.class, about, GrandFisher::isAlive)
+                            .forEach(body -> body.setNoAi(true));
                 }
             });
         }
+    }
+
+    /** Lays a lure alone on the server, {@link #LAID_AHEAD} blocks north of the soul and facing it, as the ambush does. */
+    private static void layLureOnServer(Minecraft minecraft) {
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        LocalPlayer local = minecraft.player;
+        if (server != null) {
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(local.getUUID());
+                if (player != null) {
+                    GrandFisherLure.grow(player.serverLevel(), player.position().add(0.0, 0.0, -LAID_AHEAD), 0.0F);
+                }
+            });
+        }
+    }
+
+    /** The live lure about the soul laid alone, with no body yet, unhidden on its client; null for none. */
+    @Nullable
+    private static GrandFisherLure waitingLure(Minecraft minecraft) {
+        return nearest(minecraft, GrandFisherLure.class, SUMMONED_RANGE,
+                lure -> lure.isAlive() && lure.isWaiting() && !ClientSouls.isHiddenFromViewer(lure));
     }
 
     /** The live lure about the soul on her stalk, her live body known, both unhidden on its client; null for none. */
