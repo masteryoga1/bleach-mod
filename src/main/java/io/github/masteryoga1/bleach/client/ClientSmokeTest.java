@@ -1932,20 +1932,23 @@ public final class ClientSmokeTest {
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }
             // Bound to Zangetsu again and knowing his name, the soul turns north and draws him out by command, four blocks
-            // before it and facing it, and looks at him a little down, from its eyes. Its reset sends him home, and the
-            // Asauchi its naming handed it goes after.
+            // before it and facing it, and looks at him a little down, from its eyes; he fights it, and resistance keeps
+            // his blows off. Its reset sends him home, and the Asauchi its naming handed it goes after.
             case SPIRITS_AT -> {
                 spiritsDrawn = ZangetsuSpiritRenderer.drawnFrames();
                 command(minecraft, "bleach zanpakuto @s spirit bleach:zangetsu");
                 command(minecraft, "bleach zanpakuto @s bond 1000");
                 command(minecraft, "bleach zanpakuto @s name");
+                command(minecraft, "effect give @s minecraft:resistance 30 4 true");
                 command(minecraft, "tp @s ~ ~ ~ 180 10");
                 command(minecraft, "bleach zanpakuto @s bankai spirit");
             }
             case SPIRITS_AT + 45 -> command(minecraft, "bleach zanpakuto @s reset");
             case SPIRITS_AT + 46 -> command(minecraft, "clear @s bleach:asauchi");
-            // After the last window, nothing of the beat is left for one after it: the soul's eyes level, its own view.
+            // After the last window, nothing of the beat is left for one after it: no resistance, the soul's eyes level,
+            // its own view.
             case SPIRITS_AT + 59 -> {
+                command(minecraft, "effect clear @s minecraft:resistance");
                 command(minecraft, "tp @s ~ ~ ~ ~ 0");
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }
@@ -2963,20 +2966,21 @@ public final class ClientSmokeTest {
                 && nearest(minecraft, ZabimaruLash.class, 32.0, lash -> true) == null;
     }
 
-    /** The checks of the spirits' beat: Zangetsu out, drawn in his own skin, then gone. */
+    /** The checks of the spirits' beat: Zangetsu out, drawn in his own skin with his cleaver, then gone. */
     private static void checkSpirits(Minecraft minecraft) {
         if (expectWithin(minecraft, SPIRITS_AT + 2, SPIRITS_AT + 40, () -> zangetsuOut(minecraft),
-                "Zangetsu never came out on the client, drawn in his own skin")) {
+                "Zangetsu never came out on the client, drawn in his own skin with his cleaver")) {
             shot(minecraft, "zangetsu_spirit");
         }
         expectWithin(minecraft, SPIRITS_AT + 46, SPIRITS_AT + 58, () -> zangetsuGone(minecraft),
                 "Zangetsu still stood on the client after he had gone");
     }
 
-    /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has. */
+    /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has, with his cleaver in hand. */
     private static boolean zangetsuOut(Minecraft minecraft) {
         ZangetsuSpirit zangetsu = nearest(minecraft, ZangetsuSpirit.class, 16.0, spirit -> true);
         return zangetsu != null && ZangetsuSpiritRenderer.drawnFrames() > spiritsDrawn
+                && modelOf(zangetsu.getMainHandItem()) == SHIKAI_MODEL
                 && minecraft.getResourceManager().getResource(ZangetsuSpiritRenderer.TEXTURE).isPresent();
     }
 

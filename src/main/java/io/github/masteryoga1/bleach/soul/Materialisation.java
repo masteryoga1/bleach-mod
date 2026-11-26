@@ -9,9 +9,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -33,19 +36,22 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
  *
  * <p>Every end sends the spirit home with nothing kept ({@link #sendHome}), seen on the spirit's tick, which goes on as
  * long as its wielder is near: its wielder dies, is removed (logged out), is in another world (at once, on the event),
- * strays past {@link #LEAVE_DISTANCE}, loses the power or the name, or binds another spirit. Reaching Bankai or having
- * it revoked ends nothing. A spirit that leaves its world any other way (its chunk unloaded, Peaceful, a death) is
- * forgotten as it leaves, so its wielder may call again at once. The spirits out are held only in memory, by their
- * wielders' UUIDs, on the server thread, and none is ever saved.
+ * strays past {@link #LEAVE_DISTANCE}, loses the power or the name, binds another spirit or faces its inner Hollow; a
+ * spirit beaten to its floor goes home too. It comes and goes in its colour's dust, with a line to its wielder.
+ * Reaching Bankai or having it revoked ends nothing. A spirit that leaves its world any other way (its chunk unloaded,
+ * Peaceful, a death) is forgotten as it leaves, so its wielder may call again at once. The spirits out are held only in
+ * memory, by their wielders' UUIDs, on the server thread, and none is ever saved.
  */
 public final class Materialisation {
     /** How far before its wielder a spirit steps out, in blocks, as the inner Hollow does. */
     public static final int CALL_DISTANCE = VisoredLogic.SPAWN_DISTANCE;
     /** How far its wielder may go from a spirit before it goes home, in blocks: its follow range, 16 past a mob's 16. */
     public static final double LEAVE_DISTANCE = 32.0;
-    private static final int SPOT_TRIES = 8, SPOT_DROP_BLOCKS = 2;
+    private static final int SPOT_TRIES = 8, SPOT_DROP_BLOCKS = 2, BURST = 30;
     private static final float SPOT_TURN_DEGREES = 45.0F;
+    private static final double BURST_SPREAD = 0.4, BURST_SPREAD_UP = 1.0;
     private static final String KEY = "commands.bleach.zanpakuto.bankai.spirit";
+    private static final String HOME = "message.bleach.spirit.home", BEATEN = "message.bleach.spirit.beaten";
 
     /** Every spirit out, by its wielder's UUID, each only while it is in its world. Server thread only. */
     private static final Map<UUID, MaterialisedSpirit> CALLED = new HashMap<>();
@@ -55,7 +61,7 @@ public final class Materialisation {
 
     /** What came of a call, each but {@link #CALLED} with the reason a command says. */
     public enum Call {
-        CALLED, DEAD, ALREADY, NO_POWER, NAMELESS, NO_SPIRIT, NO_TYPE, PEACEFUL, NO_ROOM;
+        CALLED, DEAD, ALREADY, NO_POWER, NAMELESS, NO_SPIRIT, NO_TYPE, BUSY, PEACEFUL, NO_ROOM;
 
         public String key() {
             return KEY + "." + name().toLowerCase(Locale.ROOT);
@@ -80,10 +86,11 @@ public final class Materialisation {
     }
 
     /**
-     * Draws the wielder's spirit out, or says why not, in this order: the wielder dead or gone, one out already, no power
-     * to (none, lent or seized), the name not known, a spirit this world lacks or one with no Bankai, a type that is none
-     * or no spirit's, Peaceful, and no room. The power and the name are what {@link #mayCall} asks, so a spirit drawn out
-     * is not sent home on its first tick for them. On the client nothing happens: {@link Call#NO_SPIRIT}.
+     * Draws the wielder's spirit out, or says why not, in this order: the wielder dead or gone, one out already, no
+     * power to (none, lent or seized), the name not known, a spirit this world lacks or one with no Bankai, a type that
+     * is none or no spirit's, the inner Hollow faced now, Peaceful, and no room. The power and the name are what
+     * {@link #mayCall} asks, so a spirit drawn out is not sent home on its first tick for them. On the client nothing
+     * happens: {@link Call#NO_SPIRIT}.
      */
     public static Call callOut(Player wielder) {
         if (!(wielder.level() instanceof ServerLevel level)) {
@@ -111,6 +118,9 @@ public final class Materialisation {
         if (body == null) {
             return Call.NO_TYPE;
         }
+        if (VisoredEvents.isDuelling(wielder)) {
+            return Call.BUSY;
+        }
         if (level.getDifficulty() == Difficulty.PEACEFUL) {
             return Call.PEACEFUL;
         }
@@ -130,6 +140,9 @@ public final class Materialisation {
             CALLED.remove(wielder.getUUID());
             return Call.NO_ROOM;
         }
+        burst(level, body);
+        wielder.displayClientMessage(Component.translatable("message.bleach.spirit.out",
+                spirit.get().name().copy().withColor(spirit.get().colour())).withStyle(ChatFormatting.GRAY), true);
         return Call.CALLED;
     }
 
@@ -161,23 +174,25 @@ public final class Materialisation {
     }
 
     /**
-     * Each tick of a spirit: a spirit that is not its wielder's own (never set up, summoned, or dying) goes at once, and
-     * one whose wielder has met any end goes home.
+     * Each tick of a spirit: a spirit that is not its wielder's own (never set up, summoned, or dying) goes at once, one
+     * whose wielder has met any end goes home, and so does one beaten to its floor.
      */
     public static void upkeep(MaterialisedSpirit spirit) {
         if (of(spirit.wielderId()) != spirit || endCame(spirit)) {
             sendHome(spirit);
+        } else if (spirit.beaten()) {
+            sendHome(spirit, BEATEN);
         }
     }
 
     /**
-     * Whether its wielder has met an end the spirit's tick sees: gone, dead, in another world, too far, no longer able to
-     * call it, or bound to another spirit.
+     * Whether its wielder has met an end the spirit's tick sees: gone, dead, in another world, too far, facing its inner
+     * Hollow, no longer able to call it, or bound to another spirit.
      */
     private static boolean endCame(MaterialisedSpirit spirit) {
         Player wielder = spirit.wielder();
         if (wielder == null || wielder.isRemoved() || !wielder.isAlive() || wielder.level() != spirit.level()
-                || wielder.distanceToSqr(spirit) > LEAVE_DISTANCE * LEAVE_DISTANCE) {
+                || wielder.distanceToSqr(spirit) > LEAVE_DISTANCE * LEAVE_DISTANCE || VisoredEvents.isDuelling(wielder)) {
             return true;
         }
         SoulData data = SoulLogic.get(wielder);
@@ -185,10 +200,25 @@ public final class Materialisation {
                 || !data.zanpakuto().spirit().equals(Optional.ofNullable(spirit.spiritId()));
     }
 
-    /** The spirit goes back into its wielder's inner world: forgotten, and out of this one. */
+    /** The spirit goes home, its wielder told so: the line for every end but a beating. */
     public static void sendHome(MaterialisedSpirit spirit) {
+        sendHome(spirit, HOME);
+    }
+
+    /**
+     * The spirit goes back into its wielder's inner world: forgotten, gone from this one in its colour's dust, and this
+     * line to its wielder, should the wielder still be here to hear it.
+     */
+    public static void sendHome(MaterialisedSpirit spirit, String line) {
         CALLED.remove(spirit.wielderId(), spirit);
+        if (spirit.level() instanceof ServerLevel level) {
+            burst(level, spirit);
+        }
         spirit.discard();
+        Player wielder = spirit.wielder();
+        if (wielder != null && wielder.isAlive() && !wielder.isRemoved()) {
+            wielder.displayClientMessage(Component.translatable(line).withStyle(ChatFormatting.GRAY), true);
+        }
     }
 
     /**
@@ -196,7 +226,7 @@ public final class Materialisation {
      * straight ahead and turning by 45°, with room for its body and footing within two blocks below; null with none.
      */
     @Nullable
-    private static Vec3 spot(ServerLevel level, Player wielder, EntityType<?> type) {
+    static Vec3 spot(ServerLevel level, Player wielder, EntityType<?> type) {
         for (int i = 0; i < SPOT_TRIES; i++) {
             Vec3 ahead = Vec3.directionFromRotation(0.0F, wielder.getYRot() + i * SPOT_TURN_DEGREES);
             Vec3 spot = wielder.position().add(ahead.x * CALL_DISTANCE, 0.0, ahead.z * CALL_DISTANCE);
@@ -216,6 +246,12 @@ public final class Materialisation {
             }
         }
         return false;
+    }
+
+    private static void burst(ServerLevel level, MaterialisedSpirit spirit) {
+        DustParticleOptions dust = new DustParticleOptions(Vec3.fromRGB24(spirit.colour()).toVector3f(), 1.2F);
+        SpiritSenses.particles(level, dust, spirit.getX(), spirit.getY() + spirit.getBbHeight() * 0.5, spirit.getZ(),
+                BURST, BURST_SPREAD, BURST_SPREAD_UP, BURST_SPREAD, 0.0);
     }
 
     // ---- Ends from outside ----

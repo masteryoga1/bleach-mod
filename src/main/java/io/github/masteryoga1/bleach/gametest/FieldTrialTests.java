@@ -80,7 +80,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 public final class FieldTrialTests {
     private static final String KEY = "bleach:field_trial";
     private static final String TAG = "field_trial_command";
-    /** How far about the middle of the practice Hollows' test its ground must tick entities before any is placed. */
+    /** How far about the middle of the practice Hollows' test its ground is forced, and ticks, before any is placed. */
     private static final double PRACTICE_GROUND = 6.0;
     /** How far about the student the ground must tick for practice Hollows 10 to 20 blocks off. */
     private static final double REACH = 24.0;
@@ -221,13 +221,30 @@ public final class FieldTrialTests {
     @GameTest(template = "empty", batch = "field_trial", timeoutTicks = 400)
     public static void practiceHollowsGiveNothingAndFade(GameTestHelper helper) {
         // A Hollow placed before its chunk is shown sits in a hidden section (mc PersistentEntitySectionManager.java:48),
-        // which getEntitiesOfClass skips (mc EntitySectionStorage.java:57), so the trial's end could not find it.
+        // which getEntitiesOfClass skips (mc EntitySectionStorage.java:57), so the trial's end could not find it. The
+        // test forces only the chunks under its three blocks (mc StructureUtils.java:126, :167-168), and its spots reach
+        // past them, so their ground is forced here and waited on.
         ServerLevel level = helper.getLevel();
         Vec3 middle = helper.absoluteVec(new Vec3(4.5, 2.0, 3.5));
+        List<ChunkPos> forced = HollowBaitTests.forceAround(level, middle, PRACTICE_GROUND);
+        Runnable unforce = () -> {
+            forced.forEach(chunk -> level.setChunkForced(chunk.x, chunk.z, false));
+            forced.clear();
+        };
+        helper.runAtTickTime(390, () -> {
+            unforce.run();
+            helper.fail("the trial's ground did not tick entities in time");
+        });
         helper.startSequence()
                 .thenWaitUntil(() -> GateTests.patiently(helper, HollowBaitTests.allTicking(level, middle, PRACTICE_GROUND),
                         "the trial's ground does not tick entities"))
-                .thenExecute(() -> practiceFades(helper))
+                .thenExecute(() -> {
+                    try {
+                        practiceFades(helper);
+                    } finally {
+                        unforce.run();
+                    }
+                })
                 .thenSucceed();
     }
 
