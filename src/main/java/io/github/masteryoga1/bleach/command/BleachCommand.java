@@ -44,6 +44,7 @@ import io.github.masteryoga1.bleach.soul.HollowProgress;
 import io.github.masteryoga1.bleach.soul.HuntRecord;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.KidoEvents;
+import io.github.masteryoga1.bleach.soul.Materialisation;
 import io.github.masteryoga1.bleach.soul.MenosEvolution;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.QuincyArts;
@@ -157,6 +158,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach zanpakuto &lt;players&gt; seal    (a constant release can be released for the first time again)
  * /bleach zanpakuto &lt;players&gt; bankai &lt;grant|revoke&gt;   (as if the spirit was subjugated; revoke starts the
  *                                    road over)
+ * /bleach zanpakuto &lt;players&gt; bankai spirit   (draws the spirit out before its wielder)
  * /bleach zanpakuto &lt;players&gt; reset
  * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|mask|unmask|takeover|reset&gt;
  *                                    (duel fights here, rooting as needed)
@@ -360,7 +362,9 @@ public final class BleachCommand {
                                         .then(Commands.literal("grant")
                                                 .executes(context -> bankai(context, true)))
                                         .then(Commands.literal("revoke")
-                                                .executes(context -> bankai(context, false))))
+                                                .executes(context -> bankai(context, false)))
+                                        .then(Commands.literal("spirit")
+                                                .executes(BleachCommand::callSpirit)))
                                 .then(Commands.literal("reset")
                                         .executes(BleachCommand::resetZanpakuto))))
                 .then(Commands.literal("visored")
@@ -1554,6 +1558,28 @@ public final class BleachCommand {
         }
         BankaiLogic.reach(data, name.get(), player.level().getGameTime());
         return null;
+    }
+
+    /**
+     * Draws each soul's zanpakutō spirit out before it ({@link Materialisation#callOut}), saying why it passes over a
+     * soul it cannot, and counts the rest.
+     */
+    private static int callSpirit(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int called = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            Materialisation.Call call = Materialisation.callOut(player);
+            if (call == Materialisation.Call.CALLED) {
+                called++;
+            } else {
+                refuseArts(context.getSource(), player, Component.translatable(call.key()));
+            }
+        }
+        int count = called;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.bankai.spirit",
+                    count), true);
+        }
+        return count;
     }
 
     /** Forgets the bond, the leaning and the name. The soul's blades go back to nameless Asauchi. */

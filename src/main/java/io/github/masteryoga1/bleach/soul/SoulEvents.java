@@ -85,6 +85,7 @@ public final class SoulEvents {
         ZanpakutoEvents.register(bus);
         ShikaiEvents.register(bus);
         VisoredEvents.register(bus);
+        Materialisation.register(bus);
         KidoEvents.register(bus);
         TravelEvents.register(bus);
         DangaiEvents.register(bus);

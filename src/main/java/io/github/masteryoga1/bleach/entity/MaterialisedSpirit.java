@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.soul.Materialisation;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -29,15 +30,16 @@ import net.minecraft.world.level.LevelAccessor;
 /**
  * A zanpakutō's spirit drawn out of its wielder's inner world into this one (materialisation, gushōka). Each spirit
  * that can be drawn out has a type of its own, named by its file's {@code bankai.entity}, and a subclass of this, set
- * up from its wielder as an inner Hollow is from its host ({@link #setUp}). One set up by no one (summoned) stands
- * idle. It is never saved, drops nothing, gives nothing for the kill, and is in {@code #bleach:spirits}: only those who
- * see spirits see, hear or touch it, and no mundane creature takes it for a target. No spawner or natural spawning
- * makes one, and being far from players never takes it away; Peaceful does.
+ * up from its wielder as an inner Hollow is from its host ({@link #setUp}), drawn out by its call
+ * ({@link Materialisation#callOut}), and lives only while that call holds it: one held by no one (summoned, or its call
+ * over) goes at once. It is never saved, drops nothing, gives nothing for the kill, and is in {@code #bleach:spirits}:
+ * only those who see spirits see, hear or touch it, and no mundane creature takes it for a target. No spawner or
+ * natural spawning makes one, and being far from players never takes it away; Peaceful does.
  */
 public abstract class MaterialisedSpirit extends Monster {
     private static final float LOOK_RANGE = 8.0F;
 
-    /** Its wielder, set by {@link #setUp}; a summoned one has none. Server side only. */
+    /** Its wielder, set by {@link #setUp}; a summoned one has none, and goes on its first tick. Server side only. */
     @Nullable
     private Player wielder;
     @Nullable
@@ -106,6 +108,15 @@ public abstract class MaterialisedSpirit extends Monster {
         goalSelector.addGoal(0, new FloatGoal(this));
         goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, LOOK_RANGE));
         goalSelector.addGoal(3, new RandomLookAroundGoal(this));
+    }
+
+    /** On the server, after its tick: {@link Materialisation#upkeep} sends it home once any end has come. */
+    @Override
+    public void tick() {
+        super.tick();
+        if (level() instanceof ServerLevel && !isRemoved()) {
+            Materialisation.upkeep(this);
+        }
     }
 
     // ---- A piece of its wielder's soul, never a creature of its own ----
