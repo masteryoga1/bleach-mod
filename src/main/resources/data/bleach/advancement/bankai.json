@@ -4,7 +4,7 @@
     "icon": {
       "id": "bleach:asauchi",
       "components": {
-        "minecraft:custom_model_data": 1
+        "minecraft:custom_model_data": 4
       }
     },
     "title": {

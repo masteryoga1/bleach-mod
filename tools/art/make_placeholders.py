@@ -101,6 +101,15 @@ ZABI_WRAP = rgb(150, 36, 36)
 ZABI_WRAP_DARK = rgb(96, 20, 24)
 BRONZE = rgb(170, 120, 60)
 TOOTH = rgb(240, 236, 226)
+# Tensa Zangetsu: a slim black blade with a pale edge, a black hilt, and the chain broken off its end.
+TENSA = rgb(24, 24, 28)
+TENSA_SHADE = rgb(10, 10, 12)
+TENSA_EDGE = rgb(128, 132, 142)
+TENSA_GUARD = rgb(40, 40, 46)
+TENSA_WRAP = rgb(32, 30, 36)
+TENSA_WRAP_LIGHT = rgb(66, 62, 72)
+CHAIN = rgb(92, 92, 100)
+CHAIN_LIGHT = rgb(132, 132, 142)
 
 # The Quincy: a silver cross, white cloth with blue trim, and pale blue reishi.
 SILVER = rgb(206, 212, 222)
@@ -404,6 +413,33 @@ def zabimaru_shikai():
         c.put(px, 32 - px, ZABI_WRAP_DARK if px % 2 else ZABI_WRAP)
     for x, y in [(4, 23), (5, 24), (7, 26), (8, 27)]:
         c.put(x, y, BRONZE)
+    return c
+
+
+# The guard's 卍, five pixels square, row by row from the top: the top arm turns left and the left arm down.
+MANJI = ["XXX.X", "..X.X", "XXXXX", "X.X..", "X.XXX"]
+
+
+def tensa_zangetsu():
+    """Tensa Zangetsu: a slim black blade two pixels wide, longer than the Asauchi's, with a pale edge; the 卍 guard at
+    its root; a black hilt; and a few links of chain trailing off the pommel, broken at the canvas edge."""
+    c = Canvas(32, 32)
+    for i in range(20):
+        x, y = 11 + i, 20 - i
+        c.put(x, y, TENSA)
+        c.put(x - 1, y, TENSA_SHADE)
+        c.put(x, y + 1, TENSA_EDGE if i < 19 else CLEAR)
+    c.put(31, 0, TENSA_EDGE)
+    for row, cells in enumerate(MANJI):
+        for col, cell in enumerate(cells):
+            if cell == "X":
+                c.put(7 + col, 20 + row, TENSA_GUARD)
+    for i in range(5):
+        x, y = 7 - i, 25 + i
+        c.put(x, y, TENSA_WRAP_LIGHT if i % 2 == 0 else TENSA_WRAP)
+        c.put(x + 1, y, TENSA_WRAP)
+    for k, (x, y) in enumerate([(2, 30), (1, 30), (1, 31), (0, 31)]):
+        c.put(x, y, CHAIN if k % 2 == 0 else CHAIN_LIGHT)
     return c
 
 
@@ -2313,6 +2349,7 @@ TEXTURES = {
     "item/zangetsu.png": zangetsu,
     "item/zabimaru.png": zabimaru,
     "item/zabimaru_shikai.png": zabimaru_shikai,
+    "item/tensa_zangetsu.png": tensa_zangetsu,
     "item/shihakusho_kosode.png": kosode_icon,
     "item/shihakusho_hakama.png": hakama_icon,
     "item/waraji.png": waraji_icon,

@@ -243,6 +243,7 @@ public record ZanpakutoSpirit(ZanpakutoType type, Component name, Optional<Compo
      *
      * @param name        what the Bankai is called, which is not the spirit's own name
      * @param form        its look and how it hits; left out, the Shikai's, made stronger by the server's config
+     * @param model       the look a Bankai with no form takes; left out, Shikai's
      * @param releaseCost the share of maximum reiryoku a Bankai release costs, from 0 to 1; left out, the Shikai's cost
      *                    made dearer by the server's config
      * @param drain       the share of maximum reiryoku Bankai drains each second, from 0 to 1; left out, the Shikai's
@@ -251,11 +252,12 @@ public record ZanpakutoSpirit(ZanpakutoType type, Component name, Optional<Compo
      * @param test        how the spirit tests the soul that would subjugate it (default none: a plain duel)
      * @param entity      the entity type the spirit takes when it is drawn out into the world; without one it cannot be
      */
-    public record Bankai(Component name, Optional<Form> form, Optional<Float> releaseCost, Optional<Float> drain,
-                         BankaiAbility ability, BankaiTest test, Optional<ResourceLocation> entity) {
+    public record Bankai(Component name, Optional<Form> form, Optional<Integer> model, Optional<Float> releaseCost,
+                         Optional<Float> drain, BankaiAbility ability, BankaiTest test, Optional<ResourceLocation> entity) {
         public static final Codec<Bankai> CODEC = RecordCodecBuilder.<Bankai>create(instance -> instance.group(
                 ComponentSerialization.CODEC.fieldOf("name").forGetter(Bankai::name),
                 Form.CODEC.optionalFieldOf("form").forGetter(Bankai::form),
+                Codec.intRange(0, 1_000_000).optionalFieldOf("model").forGetter(Bankai::model),
                 Codec.FLOAT.optionalFieldOf("release_cost").forGetter(Bankai::releaseCost),
                 Codec.FLOAT.optionalFieldOf("drain").forGetter(Bankai::drain),
                 BankaiAbility.CODEC.optionalFieldOf("ability", BankaiAbility.NONE).forGetter(Bankai::ability),
@@ -265,11 +267,14 @@ public record ZanpakutoSpirit(ZanpakutoType type, Component name, Optional<Compo
 
         /** A Bankai of this name and nothing more, as a file that gives only {@code "bankai_name"} has. */
         public static Bankai named(Component name) {
-            return new Bankai(name, Optional.empty(), Optional.empty(), Optional.empty(), BankaiAbility.NONE,
-                    BankaiTest.NONE, Optional.empty());
+            return new Bankai(name, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    BankaiAbility.NONE, BankaiTest.NONE, Optional.empty());
         }
 
         private static DataResult<Bankai> validate(Bankai bankai) {
+            if (bankai.form().isPresent() && bankai.model().isPresent()) {
+                return DataResult.error(() -> "bankai gives a form or a model, not both");
+            }
             if (bankai.releaseCost().isPresent() && !isFraction(bankai.releaseCost().get())) {
                 return DataResult.error(() -> "bankai.release_cost must be between 0 and 1, not "
                         + bankai.releaseCost().get());

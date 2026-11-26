@@ -267,7 +267,8 @@ public final class ShikaiEvents {
      * Calls out the Bankai of the blade in Shikai in hand: "Bankai", then its name, heard nearby. After the checks a
      * release makes first, a soul that cannot pay is too weak. On success the soul pays the Bankai's cost, the blade
      * takes its form, its name is shown as a title, the Bankai advancement is earned, and it drains its own share while
-     * it lasts (see {@link #upkeep}). It trains nothing of its own.
+     * it lasts (see {@link #upkeep}), and its form's art comes on ({@link BankaiForms#keep}). It trains nothing of its
+     * own.
      */
     private static Result bankai(Player player, SoulData data, ItemStack stack, ZanpakutoBlade blade,
                                  ZanpakutoSpirit spirit, Component name) {
@@ -284,6 +285,7 @@ public final class ShikaiEvents {
         }
         data.shikaiAwayTicks = 0;
         data.lastShikaiChangeTick = player.tickCount;
+        BankaiForms.keep(player, data);
         speak(player, Component.translatable("speech.bleach.bankai", name));
         if (player instanceof ServerPlayer serverPlayer) {
             serverPlayer.connection.send(new ClientboundSetTitlesAnimationPacket(TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT));
@@ -330,7 +332,7 @@ public final class ShikaiEvents {
     /**
      * Seals every one of the soul's own released blades that can seal, wherever they are carried, steps
      * a constant release's Bankai down to Shikai, and ends what a release brought with it: the drain, a
-     * Bankai, a gathering Getsuga Tenshō and Zabimaru's drawn-back reach. The change is heard, and the
+     * Bankai and its form's art, a gathering Getsuga Tenshō and Zabimaru's drawn-back reach. The change is heard, and the
      * message shown, only if something was released; a Bankai that only fell back to Shikai says so.
      */
     public static void forceSeal(Player player, SoulData data, @Nullable String messageKey) {
@@ -351,6 +353,7 @@ public final class ShikaiEvents {
         data.shikaiAwayTicks = 0;
         cancelGather(player, data);
         removeRetract(player, data);
+        BankaiForms.clear(player);
         if (sealed || ended) {
             data.lastShikaiChangeTick = player.tickCount;
             float pitch = sealed ? 1.0F : BANKAI_PITCH;
@@ -383,7 +386,7 @@ public final class ShikaiEvents {
 
     /**
      * Ends the soul's Bankai and leaves its Shikai: each of its own blades in Bankai, wherever it is carried, falls back
-     * to Shikai. The fall is heard, and the message shown, only if a Bankai was released.
+     * to Shikai, and its form's art comes off. The fall is heard, and the message shown, only if a Bankai was released.
      */
     public static void endBankai(Player player, SoulData data, @Nullable String messageKey) {
         boolean ended = data.bankaiActive;
@@ -397,6 +400,7 @@ public final class ShikaiEvents {
         }
         data.bankaiActive = false;
         data.shikaiAwayTicks = 0;
+        BankaiForms.clear(player);
         if (ended) {
             data.lastShikaiChangeTick = player.tickCount;
             SpiritSenses.play(player, ModSounds.ZANPAKUTO_SEAL.get(), SoundSource.PLAYERS, 1.0F, BANKAI_PITCH, false);
@@ -652,6 +656,8 @@ public final class ShikaiEvents {
         if (data.shikaiActive || data.bankaiActive) {
             upkeep(player, data, now);
         }
+        // Every tick, so a Bankai put out of hand, a soul replaced or a copy in hand takes its art off by the next.
+        BankaiForms.keep(player, data);
         if (data.isGathering()) {
             if (!mayGetsuga(player, data, player.getMainHandItem(), now)) {
                 cancelGather(player, data);

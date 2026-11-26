@@ -217,6 +217,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_DRAIN_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue BANKAI_MIN_DRAIN;
     public static final ModConfigSpec.DoubleValue BANKAI_DAMAGE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPEED_MOVEMENT_BONUS;
+    public static final ModConfigSpec.DoubleValue BANKAI_SPEED_ATTACK_SPEED_BONUS;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1419,6 +1421,15 @@ public final class BleachConfig {
         BANKAI_DAMAGE_MULTIPLIER = builder
                 .comment("Bankai's attack damage as a multiple of its Shikai's, for a spirit whose file gives no form.")
                 .defineInRange("damage_multiplier", 1.5, 1.0, 10.0);
+        builder.push("speed");
+        BANKAI_SPEED_MOVEMENT_BONUS = builder
+                .comment("Movement speed a Bankai whose art is speed, as Tensa Zangetsu's is, adds while it is held, as a"
+                        + " share of the wielder's base speed. It adds to Hohō's and a Visored's mask's.")
+                .defineInRange("movement_bonus", 0.3, 0.0, 4.0);
+        BANKAI_SPEED_ATTACK_SPEED_BONUS = builder
+                .comment("Attack speed it adds while it is held, as a share of the attack speed the blade in hand gives.")
+                .defineInRange("attack_speed_bonus", 0.5, 0.0, 4.0);
+        builder.pop();
         builder.pop();
 
         builder.push("getsuga_tensho");

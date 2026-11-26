@@ -277,10 +277,10 @@ public final class BankaiTests {
     }
 
     /**
-     * The shipped spirits give their Bankai's name, art, test and spirit, and leave its form, cost and drain to the
-     * server's config. A file that gives only {@code "bankai_name"}, as both did before, still loads, with a Bankai of
-     * that name and nothing more; given both, {@code "bankai"} wins; given neither, there is no Bankai. A Bankai with no
-     * name, an unknown test or a drain past 1 fails to load.
+     * The shipped spirits give their Bankai's name, art, test and spirit, Zangetsu's its model too, and leave its form,
+     * cost and drain to the server's config. A file that gives only {@code "bankai_name"}, as both did before, still
+     * loads, with a Bankai of that name and nothing more; given both, {@code "bankai"} wins; given neither, there is no
+     * Bankai. A Bankai with no name, an unknown test or a drain past 1 fails to load.
      */
     @GameTest(template = "empty")
     public static void spiritFilesGiveTheirBankaiInEitherShape(GameTestHelper helper) {
@@ -289,7 +289,8 @@ public final class BankaiTests {
                         && zangetsu.ability() == ZanpakutoSpirit.BankaiAbility.SPEED
                         && zangetsu.test() == ZanpakutoSpirit.BankaiTest.SWORDS
                         && zangetsu.entity().equals(Optional.of(BleachMod.id("zangetsu_spirit")))
-                        && zangetsu.form().isEmpty() && zangetsu.releaseCost().isEmpty() && zangetsu.drain().isEmpty(),
+                        && zangetsu.form().isEmpty() && zangetsu.model().equals(Optional.of(4))
+                        && zangetsu.releaseCost().isEmpty() && zangetsu.drain().isEmpty(),
                 "Zangetsu's Bankai is " + zangetsu);
         ZanpakutoSpirit.Bankai zabimaru = ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZABIMARU).bankai().orElseThrow();
         helper.assertTrue(translates(zabimaru.name(), "zanpakuto.bleach.zabimaru.bankai")
