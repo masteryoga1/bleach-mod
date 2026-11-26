@@ -34,6 +34,8 @@ public final class BleachModelLayers {
     public static final ModelLayerLocation BANKAI_COAT = layer("bankai_coat");
     /** Hihiō Zabimaru's pelt, worn as the coat is (see {@link BankaiPeltModel}). */
     public static final ModelLayerLocation BANKAI_PELT = layer("bankai_pelt");
+    /** Zabimaru drawn out, the baboon and its snake tail (see {@link ZabimaruSpiritModel}). */
+    public static final ModelLayerLocation ZABIMARU_SPIRIT = layer("zabimaru_spirit");
 
     private BleachModelLayers() {
     }
@@ -60,5 +62,6 @@ public final class BleachModelLayers {
         event.registerLayerDefinition(HOLLOW_PLAYER_MASK, HollowMaskModel::createLayer);
         event.registerLayerDefinition(BANKAI_COAT, BankaiCoatModel::createLayer);
         event.registerLayerDefinition(BANKAI_PELT, BankaiPeltModel::createLayer);
+        event.registerLayerDefinition(ZABIMARU_SPIRIT, ZabimaruSpiritModel::createLayer);
     }
 }

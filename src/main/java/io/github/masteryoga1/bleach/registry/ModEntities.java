@@ -42,6 +42,7 @@ import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
+import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
@@ -335,6 +336,19 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .build(BleachMod.id("zangetsu_spirit").toString()));
 
+    /**
+     * Zabimaru drawn out: a great baboon whose snake tail is a part of it from its first tick (see ZabimaruSpirit). As
+     * Zangetsu, never saved, and never spawned by itself.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<ZabimaruSpirit>> ZABIMARU_SPIRIT =
+            ENTITY_TYPES.register("zabimaru_spirit", () -> EntityType.Builder
+                    .<ZabimaruSpirit>of(ZabimaruSpirit::new, MobCategory.MONSTER)
+                    .sized(1.4F, 2.2F)
+                    .eyeHeight(1.9F)
+                    .noSave()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("zabimaru_spirit").toString()));
+
     // ---- Pluses and the Garganta ----
 
     public static final DeferredHolder<EntityType<?>, EntityType<PlusSpirit>> PLUS =
@@ -575,6 +589,7 @@ public final class ModEntities {
         event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());
         event.put(ZANGETSU_SPIRIT.get(), MaterialisedSpirit.createAttributes().build());
+        event.put(ZABIMARU_SPIRIT.get(), MaterialisedSpirit.createAttributes().build());
         event.put(PLUS.get(), PlusSpirit.createAttributes().build());
         event.put(KISUKE_URAHARA.get(), KisukeUrahara.createAttributes().build());
     }
