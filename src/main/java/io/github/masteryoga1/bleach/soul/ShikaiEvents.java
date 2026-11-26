@@ -491,9 +491,10 @@ public final class ShikaiEvents {
     /**
      * Swings the gathered reiatsu out as a Getsuga Tenshō, as strong as the gathering and the soul's
      * reiryoku allow. Behind a Visored's mask it is the black crescent, half again as strong, decided as the
-     * blade swings ({@link VisoredLogic#blackGetsuga}). Loosed behind the mask near death, it lets the Hollow
-     * take the body ({@link VisoredLogic#losesControl}). Null, firing nothing, if nothing was gathering or the
-     * blade can no longer do it.
+     * blade swings ({@link VisoredLogic#blackGetsuga}); loosed in Bankai it is the black one too, half again as strong
+     * again ({@link BankaiForms#inBankai}), and the two multiply. Loosed behind the mask near death, it lets the Hollow
+     * take the body ({@link VisoredLogic#losesControl}); a Bankai's black alone does not. Null, firing nothing, if
+     * nothing was gathering or the blade can no longer do it.
      */
     @Nullable
     public static GetsugaTensho fire(Player player) {
@@ -519,10 +520,13 @@ public final class ShikaiEvents {
         player.swing(InteractionHand.MAIN_HAND, true);
         Vec3 look = player.getLookAngle();
         Vec3 root = player.getEyePosition().subtract(0.0, 0.4, 0.0);
-        // Read as the blade swings, so a mask that came off mid-gather gives a pale one; getsugaDamage reads it too.
-        boolean black = VisoredLogic.blackGetsuga(data);
+        // Read as the blade swings, so a mask that came off or a Bankai stepped down mid-gather gives a pale one;
+        // getsugaDamage reads the mask too.
+        boolean masked = VisoredLogic.blackGetsuga(data);
+        boolean bankai = BankaiForms.inBankai(player, data);
+        boolean black = masked || bankai;
         GetsugaTensho crescent = GetsugaTensho.launch(player.level(), player, root, look, charge,
-                ZanpakutoLogic.getsugaDamage(data, charge),
+                ZanpakutoLogic.getsugaDamage(data, charge, bankai),
                 GetsugaTensho.lifeTicksFor(BleachConfig.get(BleachConfig.GETSUGA_RANGE)),
                 stack.copy(), (ZanpakutoItem.blade(stack).colour() & 0xFFFFFF) | (black ? GetsugaTensho.BLACK : 0));
         SpiritSenses.play(player, ModSounds.GETSUGA_FIRE.get(), SoundSource.PLAYERS, 1.0F,
@@ -531,7 +535,7 @@ public final class ShikaiEvents {
         noteGetsugaFired(player, data, charge);
         // Reaching for the Hollow's power at the edge of death lets it in, even behind a beaten Hollow's mask
         // (Ch. 211-213, 218).
-        if (black && VisoredLogic.losesControl(data, player.getHealth(), player.getMaxHealth(), now)) {
+        if (masked && VisoredLogic.losesControl(data, player.getHealth(), player.getMaxHealth(), now)) {
             VisoredEvents.startTakeover(player, data, true, now);
         }
         return crescent;

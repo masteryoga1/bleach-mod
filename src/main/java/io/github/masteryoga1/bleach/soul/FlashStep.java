@@ -18,6 +18,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.phys.AABB;
@@ -100,13 +101,12 @@ public final class FlashStep {
                     ? "message.bleach.power_lent" : "message.bleach.flash_step.untrained");
             return;
         }
-        float cost = ShinigamiLogic.flashStepCost(data);
+        float cost = costFor(player, data);
         if (data.reiryoku() - cost < 0.5F) {
             refuse(player, "message.bleach.flash_step.too_weak");
             return;
         }
-        MobEffectInstance slowness = player.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
-        double distance = ShinigamiLogic.flashStepDistance(data, slowness != null ? slowness.getAmplifier() : -1);
+        double distance = distanceFor(player, data);
         if (distance < MIN_DISTANCE) {
             refuse(player, "message.bleach.flash_step.weighed_down");
             return;
@@ -131,6 +131,21 @@ public final class FlashStep {
         effects(level, end);
         level.playSound(null, start.x, start.y, start.z, SoundEvents.BREEZE_JUMP, SoundSource.PLAYERS, 0.5F, 1.6F);
         land(player, data, path, onFooting, grounded);
+    }
+
+    /**
+     * How far this soul's flash step goes now, in blocks: as far as its Hohō takes it, a quarter shorter for each level
+     * of Slowness, and further in a Bankai of speed, after Hohō's longest ({@link BankaiForms#shunpoDistanceFactor}).
+     */
+    public static double distanceFor(Player player, SoulData data) {
+        MobEffectInstance slowness = player.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
+        return ShinigamiLogic.flashStepDistance(data, slowness != null ? slowness.getAmplifier() : -1)
+                * BankaiForms.shunpoDistanceFactor(player, data);
+    }
+
+    /** What this soul's flash step costs now: what its Hohō makes it, less in a Bankai of speed, and at least 1. */
+    public static float costFor(Player player, SoulData data) {
+        return (float) Math.max(1.0, ShinigamiLogic.flashStepCost(data) * BankaiForms.shunpoCostFactor(player, data));
     }
 
     /**

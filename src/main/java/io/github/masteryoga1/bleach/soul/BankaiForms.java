@@ -21,10 +21,10 @@ import net.minecraft.world.item.ItemStack;
  * What a Bankai's form brings its wielder while it is held, on the server: the art its spirit's file names
  * ({@link ZanpakutoSpirit.BankaiAbility}). A soul holds its Bankai while its Bankai is released and its own blade is
  * in its main hand in Bankai; the two can disagree for up to the away time, so both are read. Tensa Zangetsu's art is
- * speed: its owner moves and swings faster, as transient modifiers on the player and never on the blade. Each art
- * puts its own on in its branch of {@link #keep} and lists their ids for {@link #clear}, so Hihiō Zabimaru's serpent
- * is a branch and a row to add. How it looks is the client's, read from the held stack alone, since a client knows no
- * spirits.
+ * speed: its owner moves and swings faster, as transient modifiers on the player and never on the blade, and flash
+ * steps further for less ({@link FlashStep#distanceFor}, {@link FlashStep#costFor}). Each art puts its own on in its
+ * branch of {@link #keep} and lists their ids for {@link #clear}, so Hihiō Zabimaru's serpent is a branch and a row to
+ * add. How it looks is the client's, read from the held stack alone, since a client knows no spirits.
  */
 public final class BankaiForms {
     /** The movement a Bankai of speed adds, as a share of the player's base speed, as Hohō's and the mask's are. */
@@ -84,6 +84,21 @@ public final class BankaiForms {
             // At nought it comes off, whatever it was filed under.
             HollowBody.setModifier(player, worn.attribute(), worn.id(), 0.0, AttributeModifier.Operation.ADD_VALUE);
         }
+    }
+
+    /** How much further this soul's flash step goes: more in a Bankai of speed, after Hohō's longest. */
+    public static double shunpoDistanceFactor(Player player, SoulData data) {
+        return speedy(player, data) ? BleachConfig.get(BleachConfig.BANKAI_SPEED_SHUNPO_DISTANCE_MULTIPLIER) : 1.0;
+    }
+
+    /** How much of its cost this soul's flash step keeps: less in a Bankai of speed. */
+    public static double shunpoCostFactor(Player player, SoulData data) {
+        return speedy(player, data) ? BleachConfig.get(BleachConfig.BANKAI_SPEED_SHUNPO_COST_MULTIPLIER) : 1.0;
+    }
+
+    /** Whether the soul holds a Bankai of speed, as Tensa Zangetsu is. */
+    private static boolean speedy(Player player, SoulData data) {
+        return held(player, data).orElse(ZanpakutoSpirit.BankaiAbility.NONE) == ZanpakutoSpirit.BankaiAbility.SPEED;
     }
 
     /** A share of the base, as Hohō's and the mask's are, so the arts add to theirs. */
