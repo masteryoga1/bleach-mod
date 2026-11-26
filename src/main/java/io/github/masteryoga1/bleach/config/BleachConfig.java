@@ -223,6 +223,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_SPEED_SHUNPO_DISTANCE_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue BANKAI_SPEED_SHUNPO_COST_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_REACH_BONUS;
+    public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_SWEEP_SHARE;
+    public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_BLAST_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BANKAI_SERPENT_BLAST_RANGE;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1450,6 +1453,19 @@ public final class BleachConfig {
                 .comment("Blocks a Bankai whose art is the serpent, as Hihiō Zabimaru's is, adds to its wielder's reach"
                         + " while it is held, on top of its Shikai's, except while the serpent draws back after a lash.")
                 .defineInRange("reach_bonus", 9.0, 0.0, 48.0);
+        BANKAI_SERPENT_SWEEP_SHARE = builder
+                .comment("The share of its Bankai's blade damage the serpent's passage deals to all it passes on its way"
+                        + " to a far blow, as a Cero strikes. What the blow struck takes the larger of the two. 0 turns the"
+                        + " passage off.")
+                .defineInRange("sweep_share", 0.5, 0.0, 4.0);
+        BANKAI_SERPENT_BLAST_MULTIPLIER = builder
+                .comment("Hikotsu Taihō, the serpent's blast, is gathered and paid for as a Getsuga Tenshō is, and is this"
+                        + " many times a named Getsuga Tenshō's damage, after its cap. Behind a Visored's mask, the mask's"
+                        + " too. It is never below 0.1, so a blast never strikes for nothing.")
+                .defineInRange("blast_multiplier", 1.5, 0.1, 10.0);
+        BANKAI_SERPENT_BLAST_RANGE = builder
+                .comment("How far Hikotsu Taihō reaches, in blocks, from the serpent's jaws.")
+                .defineInRange("blast_range", 32.0, 4.0, 128.0);
         builder.pop();
         builder.pop();
 

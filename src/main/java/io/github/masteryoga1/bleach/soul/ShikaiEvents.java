@@ -461,7 +461,8 @@ public final class ShikaiEvents {
             return GatherResult.NOT_YOURS;
         }
         Optional<ZanpakutoSpirit> spirit = spiritOf(player, data, blade);
-        if (!blade.isBound() || (spirit.isPresent() && spirit.get().ability() != ZanpakutoSpirit.Ability.GETSUGA_TENSHO)) {
+        if (!blade.isBound() || (spirit.isPresent() && spirit.get().ability() != ZanpakutoSpirit.Ability.GETSUGA_TENSHO
+                && !BankaiForms.serpentine(player, data))) {
             return GatherResult.NO_TECHNIQUE;
         }
         if (!blade.released()) {
@@ -493,8 +494,10 @@ public final class ShikaiEvents {
      * reiryoku allow. Behind a Visored's mask it is the black crescent, half again as strong, decided as the
      * blade swings ({@link VisoredLogic#blackGetsuga}); loosed in Bankai it is the black one too, half again as strong
      * again ({@link BankaiForms#inBankai}), and the two multiply. Loosed behind the mask near death, it lets the Hollow
-     * take the body ({@link VisoredLogic#losesControl}); a Bankai's black alone does not. Null, firing nothing, if
-     * nothing was gathering or the blade can no longer do it.
+     * take the body ({@link VisoredLogic#losesControl}); a Bankai's black alone does not. Held in Hihiō Zabimaru, the
+     * gathered reiatsu goes out instead as Hikotsu Taihō from the serpent's jaws ({@link HikotsuTaiho#fire}), at the
+     * Getsuga Tenshō's cost and cooldown, and counts towards no name. Null, firing no crescent, if nothing was
+     * gathering, the blade can no longer do it, or it was Hikotsu Taihō.
      */
     @Nullable
     public static GetsugaTensho fire(Player player) {
@@ -523,6 +526,18 @@ public final class ShikaiEvents {
         // Read as the blade swings, so a mask that came off or a Bankai stepped down mid-gather gives a pale one;
         // getsugaDamage reads the mask too.
         boolean masked = VisoredLogic.blackGetsuga(data);
+        if (BankaiForms.serpentine(player, data)) {
+            // Heard by the blast's own Cero sound, not a Getsuga Tenshō's.
+            HikotsuTaiho.fire(player, data, charge, ZanpakutoItem.blade(stack).colour() & 0xFFFFFF);
+            data.lastGetsugaAt = now;
+            if (charge >= SHOUT_CHARGE) {
+                speak(player, Component.translatable("speech.bleach.hikotsu_taiho"));
+            }
+            if (masked && VisoredLogic.losesControl(data, player.getHealth(), player.getMaxHealth(), now)) {
+                VisoredEvents.startTakeover(player, data, true, now);
+            }
+            return null;
+        }
         boolean bankai = BankaiForms.inBankai(player, data);
         boolean black = masked || bankai;
         GetsugaTensho crescent = GetsugaTensho.launch(player.level(), player, root, look, charge,
@@ -575,9 +590,10 @@ public final class ShikaiEvents {
     }
 
     /**
-     * Whether the held blade can still loose a Getsuga Tenshō: the soul's own, released, with the technique, power in
-     * hand, and not while its Hollow holds the body, and not while its arms are bound. Asked as it fires and at each
-     * tick of a gather, which a bind made since then cancels.
+     * Whether the held blade can still loose a Getsuga Tenshō, or in Hihiō Zabimaru Hikotsu Taihō: the soul's own,
+     * released, with the technique or the serpent held, power in hand, and not while its Hollow holds the body, and not
+     * while its arms are bound. Asked as it fires and at each tick of a gather, which a bind made since then cancels, as
+     * does stepping the serpent down or putting it out of hand.
      */
     private static boolean mayGetsuga(Player player, SoulData data, ItemStack stack, long now) {
         if (!ZanpakutoLogic.isOwnBlade(stack, player) || ShinigamiLogic.isPowerLent(data, now)
@@ -586,8 +602,9 @@ public final class ShikaiEvents {
             return false;
         }
         ZanpakutoBlade blade = ZanpakutoItem.blade(stack);
-        return blade.released() && spiritOf(player, data, blade)
-                .filter(spirit -> spirit.ability() == ZanpakutoSpirit.Ability.GETSUGA_TENSHO).isPresent();
+        return blade.released() && (spiritOf(player, data, blade)
+                .filter(spirit -> spirit.ability() == ZanpakutoSpirit.Ability.GETSUGA_TENSHO).isPresent()
+                || BankaiForms.serpentine(player, data));
     }
 
     // ---- Zabimaru's lash ----
@@ -618,7 +635,10 @@ public final class ShikaiEvents {
         }
         Vec3 at = target.getBoundingBox().getCenter();
         if (serpent) {
-            ZabimaruLash.serpent(player.level(), player, at);
+            float sweep = (float) (ZanpakutoLogic.form(spirit.get(), ZanpakutoStage.BANKAI).damage()
+                    * BleachConfig.get(BleachConfig.BANKAI_SERPENT_SWEEP_SHARE));
+            Vec3 root = player.getEyePosition().subtract(0.0, 0.4, 0.0);
+            ZabimaruLash.serpent(player.level(), player, at).sweepFrom(root, sweep);
         } else {
             ZabimaruLash.spawn(player.level(), player, at);
         }

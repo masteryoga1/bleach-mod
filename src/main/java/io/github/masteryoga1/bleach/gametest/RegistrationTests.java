@@ -7,6 +7,7 @@ import io.github.masteryoga1.bleach.entity.HeiligPfeil;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.ShriekerLeech;
+import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import io.github.masteryoga1.bleach.item.EmptyGintoItem;
 import io.github.masteryoga1.bleach.item.GintoItem;
 import io.github.masteryoga1.bleach.item.QuincyCrossItem;
@@ -21,6 +22,7 @@ import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.registry.ModWorldgen;
+import io.github.masteryoga1.bleach.soul.HikotsuTaiho;
 import io.github.masteryoga1.bleach.soul.QuincyArtsEvents;
 import io.github.masteryoga1.bleach.soul.QuincyEvents;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -170,7 +172,10 @@ public final class RegistrationTests {
         helper.succeed();
     }
 
-    /** The Asauchi as a zanpakutō, its blade data, the Shikai's two entities, Getsuga Tenshō's damage and the new sounds. */
+    /**
+     * The Asauchi as a zanpakutō, its blade data, the Shikai's two entities, the damage of Getsuga Tenshō, of Hihiō
+     * Zabimaru's passage and of Hikotsu Taihō, and the new sounds.
+     */
     @GameTest(template = "empty")
     public static void zanpakutoPartsAreRegistered(GameTestHelper helper) {
         helper.assertTrue(BuiltInRegistries.ITEM.get(BleachMod.id("asauchi")) instanceof ZanpakutoItem,
@@ -186,11 +191,15 @@ public final class RegistrationTests {
         helper.assertTrue(ModEntities.GETSUGA_TENSHO.get() == BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id("getsuga_tensho"))
                         && ModEntities.ZABIMARU_LASH.get() == BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id("zabimaru_lash")),
                 "the Getsuga Tenshō or Zabimaru's lash is registered under another name");
-        Optional<Holder.Reference<DamageType>> damage = helper.getLevel().registryAccess()
-                .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(GetsugaTensho.DAMAGE_TYPE);
-        helper.assertTrue(damage.isPresent(), "the Getsuga Tenshō damage type did not load");
-        helper.assertTrue(damage.get().is(BleachTags.PURIFIES), "the Getsuga Tenshō does not purify the Hollows it kills");
-        helper.assertFalse(damage.get().is(DamageTypeTags.IS_PROJECTILE), "the Getsuga Tenshō counts as a projectile");
+        List<ResourceKey<DamageType>> arts =
+                List.of(GetsugaTensho.DAMAGE_TYPE, ZabimaruLash.SERPENT_DAMAGE, HikotsuTaiho.DAMAGE);
+        for (ResourceKey<DamageType> art : arts) {
+            Optional<Holder.Reference<DamageType>> damage = helper.getLevel().registryAccess()
+                    .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(art);
+            helper.assertTrue(damage.isPresent(), art.location() + " did not load");
+            helper.assertTrue(damage.get().is(BleachTags.PURIFIES), art.location() + " does not purify the Hollows it kills");
+            helper.assertFalse(damage.get().is(DamageTypeTags.IS_PROJECTILE), art.location() + " counts as a projectile");
+        }
         for (String name : List.of("item.zanpakuto.whisper", "item.zanpakuto.jinzen", "item.zanpakuto.release",
                 "item.zanpakuto.seal", "item.zabimaru.lash", "entity.getsuga_tensho.gather", "entity.getsuga_tensho.fire")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");

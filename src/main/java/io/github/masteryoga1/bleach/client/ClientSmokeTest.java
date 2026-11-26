@@ -288,8 +288,9 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * step it all back down to Shikai, the coat no longer drawn, after which the Bankai is revoked and the blade put away.
  * Last, bound to Zabimaru with its Bankai granted, the soul calls Hihiō Zabimaru, seen from behind: the blade must reach
  * the client in Bankai in its own model, with the serpent's reach on the soul and its pelt drawn on it; a far blow at an
- * iron golem hung before it must bring out the serpent, drawn in bone; and the seal key must seal it all, the pelt no
- * longer drawn, after which the Bankai is revoked, the blade put away and the golem killed.
+ * iron golem hung before it must bring out the serpent, drawn in bone; Hikotsu Taihō must go from its jaws as a beam
+ * in Zabimaru's red; and the seal key must seal it all, the pelt no longer drawn, after which the Bankai is revoked,
+ * the blade put away and the golem killed.
  *
  * <p>Nearly all of it is seen with the camera behind the player, so the chain, mask, garb, saya,
  * NPCs, Hollows, zanpakutō, bow, arrows, veins, glove, wings, blades, casts, uniform, threads, rifts,
@@ -393,6 +394,8 @@ public final class ClientSmokeTest {
     /** How far before the soul's eyes the golem its serpent lashes at is hung, and the tag it is killed by. */
     private static final double LASHED_AHEAD = 8.0;
     private static final String LASHED_TAG = "bleach_smoke_lashed";
+    /** Zabimaru's colour, as its file gives it, which Hikotsu Taihō is loosed in. */
+    private static final int HIHIO_COLOUR = 0xE0483A;
     /** How far before the soul its lure is laid for the ambush's beat. */
     private static final double LAID_AHEAD = 8.0;
 
@@ -1905,6 +1908,10 @@ public final class ClientSmokeTest {
                 serpentsDrawn = ZabimaruLashRenderer.serpentFrames();
                 lashOnServer(minecraft);
             }
+            // Hikotsu Taihō, gathered for half a second and let go. The gather is allowed while the lash's serpent
+            // draws back (to +101), as it is meant to be: only a second lash waits for it.
+            case HIHIO_AT + 86 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_PRESS);
+            case HIHIO_AT + 96 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.TECHNIQUE_RELEASE);
             case HIHIO_AT + 105 -> BleachNetwork.requestZanpakutoKey(ZanpakutoKey.SEAL);
             // After the last window, nothing of the beat is left: no Bankai, no blade, no golem, the camera back.
             case HIHIO_AT + 119 -> {
@@ -2871,7 +2878,7 @@ public final class ClientSmokeTest {
 
     /**
      * The checks of Hihiō Zabimaru, each window from the step it follows: called, then its serpent lashed out, then
-     * sealed.
+     * Hikotsu Taihō, then sealed.
      */
     private static void checkHihioZabimaru(Minecraft minecraft, LocalPlayer player) {
         if (ticksInWorld == HIHIO_AT + 51) {
@@ -2885,6 +2892,14 @@ public final class ClientSmokeTest {
                         && nearest(minecraft, ZabimaruLash.class, 24.0, lash -> lash.isSerpent() && lash.age() >= 4) != null,
                 "Hihiō Zabimaru's serpent never lashed out on the client in bone at a blow eight blocks off")) {
             shot(minecraft, "hihio_zabimaru_serpent");
+        }
+        // The lash's serpent is back by then, so one out now is the blast's. CeroBeam.trace keeps the colour bare of
+        // alpha, 0xRRGGBB, as it is written here.
+        if (expectWithin(minecraft, HIHIO_AT + 97, HIHIO_AT + 104, () -> nearest(minecraft, CeroBeam.class, 48.0,
+                        beam -> beam.isFired() && beam.colour() == HIHIO_COLOUR) != null
+                        && nearest(minecraft, ZabimaruLash.class, 24.0, ZabimaruLash::isSerpent) != null,
+                "Hihiō Zabimaru's Hikotsu Taihō never reached the client as a red beam from its serpent's head")) {
+            shot(minecraft, "hikotsu_taiho");
         }
         expectWithin(minecraft, HIHIO_AT + 106, HIHIO_AT + 118, () -> windowsPassed.contains(HIHIO_AT + 51)
                         && sealedZabimaru(minecraft, player),
