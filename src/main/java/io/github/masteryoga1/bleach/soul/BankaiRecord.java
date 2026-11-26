@@ -56,4 +56,12 @@ public record BankaiRecord(long achievedAt, Component name, long windowEndsAt, O
     public boolean achieved() {
         return achievedAt != ZanpakutoBond.NEVER;
     }
+
+    /**
+     * Reached now, by this name: a spirit a Tenshintai drew out goes back into the blade, and the bouts fought and the
+     * time in Shikai are kept.
+     */
+    public BankaiRecord reached(long now, Component value) {
+        return new BankaiRecord(now, value, ZanpakutoBond.NEVER, Optional.empty(), 1.0F, tries, lastTryAt, shikaiTicks);
+    }
 }

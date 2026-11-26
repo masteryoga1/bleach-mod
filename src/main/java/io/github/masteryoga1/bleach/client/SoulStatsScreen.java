@@ -8,6 +8,7 @@ import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.ArrancarLogic;
 import io.github.masteryoga1.bleach.soul.ArrancarRank;
 import io.github.masteryoga1.bleach.soul.BaitRecord;
+import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.DevourLogic;
 import io.github.masteryoga1.bleach.soul.GranReyCero;
 import io.github.masteryoga1.bleach.soul.Hierro;
@@ -154,9 +155,10 @@ public final class SoulStatsScreen extends Screen {
     /**
      * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
      * more between sections, and the stats and powers headings only with {@code headers}; with no
-     * {@code graphics}, only measures them. A Visored, while the server has the path on, says so on its state
-     * row and gets two rows of its own after the zanpakutō's (see {@link #visoredRows}), and a soul with a Hollow
-     * rooted in it gets the rows of {@link #takeoverRows}.
+     * {@code graphics}, only measures them. A reached Bankai is named on the row under the zanpakutō's (see
+     * {@link BankaiLogic#screenLine}). A Visored, while the server has the path on, says so on its state row and gets
+     * two rows of its own after those (see {@link #visoredRows}), and a soul with a Hollow rooted in it gets the rows
+     * of {@link #takeoverRows}.
      *
      * @return where the next step starts
      */
@@ -209,6 +211,11 @@ public final class SoulStatsScreen extends Screen {
         Component zanpakuto = zanpakutoLine(player, data);
         if (zanpakuto != null) {
             text(graphics, zanpakuto, left, y, GREY);
+            y += line;
+        }
+        Component bankai = BankaiLogic.screenLine(data);
+        if (bankai != null) {
+            text(graphics, bankai, left, y, GREY);
             y += line;
         }
         if (visored) {

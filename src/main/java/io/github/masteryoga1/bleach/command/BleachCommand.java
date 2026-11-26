@@ -29,6 +29,8 @@ import io.github.masteryoga1.bleach.soul.BaitEvents;
 import io.github.masteryoga1.bleach.soul.BaitLogic;
 import io.github.masteryoga1.bleach.soul.BaitSite;
 import io.github.masteryoga1.bleach.soul.BaitSites;
+import io.github.masteryoga1.bleach.soul.BankaiLogic;
+import io.github.masteryoga1.bleach.soul.BankaiRecord;
 import io.github.masteryoga1.bleach.soul.Boss;
 import io.github.masteryoga1.bleach.soul.BossLedger;
 import io.github.masteryoga1.bleach.soul.DevourEvents;
@@ -153,6 +155,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach zanpakuto &lt;players&gt; spirit &lt;id&gt;
  * /bleach zanpakuto &lt;players&gt; name    (as if the spirit's test was passed)
  * /bleach zanpakuto &lt;players&gt; seal    (a constant release can be released for the first time again)
+ * /bleach zanpakuto &lt;players&gt; bankai &lt;grant|revoke&gt;   (as if the spirit was subjugated; revoke starts the
+ *                                    road over)
  * /bleach zanpakuto &lt;players&gt; reset
  * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|mask|unmask|takeover|reset&gt;
  *                                    (duel fights here, rooting as needed)
@@ -352,6 +356,11 @@ public final class BleachCommand {
                                         .executes(BleachCommand::learnName))
                                 .then(Commands.literal("seal")
                                         .executes(BleachCommand::sealZanpakuto))
+                                .then(Commands.literal("bankai")
+                                        .then(Commands.literal("grant")
+                                                .executes(context -> bankai(context, true)))
+                                        .then(Commands.literal("revoke")
+                                                .executes(context -> bankai(context, false))))
                                 .then(Commands.literal("reset")
                                         .executes(BleachCommand::resetZanpakuto))))
                 .then(Commands.literal("visored")
@@ -1386,8 +1395,9 @@ public final class BleachCommand {
             if (bond.named()) {
                 ShikaiEvents.forceSeal(player, data, null);
                 if (changed) {
-                    // A new spirit starts over: its first release and its technique are still to come.
-                    bond = bond.withFirstReleaseDone(false).withGetsugaFired(0).withGetsugaNamed(false);
+                    // A new spirit starts over: its first release, its technique and its Bankai are still to come.
+                    bond = bond.withFirstReleaseDone(false).withGetsugaFired(0).withGetsugaNamed(false)
+                            .withBankai(BankaiRecord.NONE);
                 }
                 bond = bond.asNamed(spirit.get().name().copy().withColor(spirit.get().colour()), spirit.get().isConstant());
             }
@@ -1490,6 +1500,57 @@ public final class BleachCommand {
             ZanpakutoItem.applyForm(stack, ZanpakutoSpirit.Form.ASAUCHI);
             stack.set(ModComponents.ZANPAKUTO_BLADE.get(), blade.withStage(ZanpakutoStage.SEALED));
         }
+    }
+
+    /**
+     * Grants Bankai as if the spirit had been subjugated, by the name its spirit gives it, or takes it away and starts
+     * the road to it over. Grant says why it passes over a soul without a Shinigami's power, one that does not know its
+     * zanpakutō's name, one that has Bankai already and one whose spirit has none in this world, and counts the rest;
+     * revoke never refuses and counts every soul named, as seal and reset do. Neither changes a blade.
+     */
+    private static int bankai(CommandContext<CommandSourceStack> context, boolean grant) throws CommandSyntaxException {
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            SoulData data = SoulLogic.get(player);
+            if (grant) {
+                Component refusal = grantBankai(player, data);
+                if (refusal != null) {
+                    refuseArts(context.getSource(), player, refusal);
+                    continue;
+                }
+            } else {
+                BankaiLogic.forget(data);
+            }
+            BleachNetwork.syncSoul(player, data);
+            changed++;
+        }
+        int count = changed;
+        if (count > 0) {
+            String key = grant ? "commands.bleach.zanpakuto.bankai.grant" : "commands.bleach.zanpakuto.bankai.revoke";
+            context.getSource().sendSuccess(() -> Component.translatable(key, count), true);
+        }
+        return count;
+    }
+
+    /** Gives one soul its Bankai now, or says why it cannot. */
+    @Nullable
+    private static Component grantBankai(ServerPlayer player, SoulData data) {
+        ZanpakutoBond bond = data.zanpakuto();
+        if (!ZanpakutoLogic.canWield(data)) {
+            return Component.translatable("commands.bleach.zanpakuto.bankai.no_power");
+        }
+        if (!bond.named()) {
+            return Component.translatable("commands.bleach.zanpakuto.bankai.nameless");
+        }
+        if (bond.bankai().achieved()) {
+            return Component.translatable("commands.bleach.zanpakuto.bankai.already");
+        }
+        Optional<Component> name = ZanpakutoSpirits.get(player.level(), bond.spirit()).flatMap(BankaiLogic::nameOf);
+        if (name.isEmpty()) {
+            return Component.translatable("commands.bleach.zanpakuto.bankai.none");
+        }
+        BankaiLogic.reach(data, name.get(), player.level().getGameTime());
+        return null;
     }
 
     /** Forgets the bond, the leaning and the name. The soul's blades go back to nameless Asauchi. */
