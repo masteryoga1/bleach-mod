@@ -265,7 +265,7 @@ public final class ReiatsuTests {
                 "garganta", "first_hollow", "mask_strike", "purified", "fishbone_d", "soul_burial", "jinzen",
                 "asauchi_bond", "zanpakuto_name", "shikai", "getsuga_tensho", "quincy", "heilig_pfeil", "hirenkyaku",
                 "blut_vene", "blut_arterie", "quincy_garb", "hollow_poison", "last_quincy", "devoured", "cannibal",
-                "souls_within", "cleansed", "senkaimon", "dangai", "hueco_mundo")) {
+                "souls_within", "cleansed", "senkaimon", "dangai", "hueco_mundo", "bankai")) {
             helper.assertTrue(helper.getLevel().getServer().getAdvancements().get(BleachMod.id(name)) != null,
                     "advancement bleach:" + name + " did not load");
         }

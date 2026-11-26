@@ -39,6 +39,7 @@ import io.github.masteryoga1.bleach.soul.ZanpakutoBond;
 import io.github.masteryoga1.bleach.soul.ZanpakutoLogic;
 import io.github.masteryoga1.bleach.world.AcademyLocator;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -500,9 +501,9 @@ public final class SoulStatsScreen extends Screen {
     }
 
     /**
-     * The zanpakutō's name and whether it is sealed, in Shikai or always released; before the name,
-     * how far the Asauchi bond has grown, once it has begun or while a nameless Asauchi is carried.
-     * Null when there is nothing to say. Whether it is in Shikai is read from the player's own blade.
+     * The zanpakutō's name and whether it is sealed, in Shikai, in Bankai or always released; before the
+     * name, how far the Asauchi bond has grown, once it has begun or while a nameless Asauchi is carried.
+     * Null when there is nothing to say. Whether it is in Shikai or Bankai is read from the player's own blade.
      * An Arrancar's line is its own blade's instead: in Resurrección (as the server last showed it),
      * sealed and settling with the time left before it can be released again, or sealed.
      */
@@ -525,11 +526,14 @@ public final class SoulStatsScreen extends Screen {
         }
         ZanpakutoBond bond = data.zanpakuto();
         if (bond.named()) {
+            ZanpakutoStage stage = ZanpakutoItem.blade(ZanpakutoLogic.findOwnBlade(player)).stage();
             String state;
-            if (bond.constant()) {
+            if (stage == ZanpakutoStage.BANKAI) {
+                state = "bankai";
+            } else if (bond.constant()) {
                 state = bond.firstReleaseDone() ? "constant" : "constant_waiting";
             } else {
-                state = ZanpakutoItem.blade(ZanpakutoLogic.findOwnBlade(player)).released() ? "released" : "sealed";
+                state = stage.isReleased() ? "released" : "sealed";
             }
             Component name = bond.name().getString().isEmpty()
                     ? Component.translatable("screen.bleach.jinzen.unknown_name") : bond.name();

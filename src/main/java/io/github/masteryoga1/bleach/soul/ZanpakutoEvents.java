@@ -218,7 +218,7 @@ public final class ZanpakutoEvents {
                     ZanpakutoItem.setReleased(stack, spirit.get(), false);
                 } else if (spirit.isPresent()) {
                     // Puts back a model or stats something else changed.
-                    ZanpakutoItem.applyForm(stack, blade.released() ? spirit.get().shikai() : spirit.get().sealed());
+                    ZanpakutoItem.applyForm(stack, ZanpakutoLogic.form(spirit.get(), blade.stage()));
                 }
             } else if (blade.released() && !blade.constant()) {
                 ShikaiEvents.sealStack(stack, player.level());
