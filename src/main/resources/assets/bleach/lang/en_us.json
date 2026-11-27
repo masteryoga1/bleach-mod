@@ -472,6 +472,10 @@
   "jinzen.bleach.reveal.command": "Call it with these words: %s, %s.",
   "jinzen.bleach.reveal.constant": "It has no command. Once you call its name, it will never seal again.",
   "jinzen.bleach.fail.retry": "The world fades. You may try again in %s.",
+  "jinzen.bleach.road.hours": "It will step out of the blade to test you for its Bankai once you have spent %s h %s min more with your Shikai released.",
+  "jinzen.bleach.road.weak": "It will step out of the blade to test you for its Bankai once your maximum reiryoku reaches %s.",
+  "jinzen.bleach.road.resting": "It tested you less than a day ago. It will step out of the blade again in %s.",
+  "jinzen.bleach.road.held": "It would step out of the blade to test you for its Bankai, but cannot now (%s).",
 
   "zanpakuto.bleach.zangetsu": "Zangetsu",
   "zanpakuto.bleach.zangetsu.bankai": "Tensa Zangetsu",

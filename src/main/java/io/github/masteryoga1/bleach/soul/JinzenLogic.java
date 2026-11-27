@@ -40,7 +40,9 @@ import org.joml.Vector3f;
  * to the meeting, where the spirit sets its test and, if the soul passes, tells it its name. The
  * server builds every page as finished text; the client only shows it and sends answers back. A soul whose
  * inner Hollow is ready to be faced meets that instead once it has settled: the Hollow steps out to fight it
- * (see {@link VisoredEvents#beginDuel}) and the sitting ends, unless the fight cannot start, when the world opens.
+ * (see {@link VisoredEvents#beginDuel}) and the sitting ends, unless the fight cannot start, when the world opens. With
+ * no Hollow ready, a soul past the slow road's gates has its spirit step out of the blade for its Bankai trial instead
+ * (see {@link SlowRoad}), and the sitting ends the same way; otherwise its visit says why not, or what the road still asks.
  */
 public final class JinzenLogic {
     public static final int SETTLE_TICKS = 60;
@@ -143,6 +145,7 @@ public final class JinzenLogic {
             if (elapsed >= SETTLE_TICKS) {
                 // A Bankai trial here keeps the Hollow in, so the inner world opens, as for any refusal.
                 String held = VisoredLogic.duelReady(data, now) ? BankaiTrial.duelRefusal(player) : null;
+                Component road = null;
                 if (held != null) {
                     player.displayClientMessage(Component.translatable(held).withStyle(ChatFormatting.GRAY), true);
                 } else if (VisoredLogic.duelReady(data, now)) {
@@ -152,8 +155,17 @@ public final class JinzenLogic {
                         return;
                     }
                     VisoredEvents.tell(player, start);
+                } else {
+                    // No Hollow waits, so the slow road may: its gate is read once, before the world opens.
+                    SlowRoad.Gate gate = SlowRoad.gate(player.level(), data, now);
+                    BankaiTrial.Start start = SlowRoad.handOver(player, gate, now);
+                    if (start == BankaiTrial.Start.STARTED) {
+                        stop(player, data);
+                        return;
+                    }
+                    road = SlowRoad.pageLine(player, data, now, gate, start);
                 }
-                JinzenPage page = open(player, data, now);
+                JinzenPage page = open(player, data, now, road);
                 if (player instanceof ServerPlayer serverPlayer && data.jinzen != null) {
                     BleachNetwork.openJinzen(serverPlayer, data.jinzen.id, page);
                 }
@@ -181,6 +193,11 @@ public final class JinzenLogic {
      * test can open one directly. The sitting's seed is drawn now.
      */
     public static JinzenPage open(Player player, SoulData data, long now) {
+        return open(player, data, now, null);
+    }
+
+    /** As above, a visit ending on this line from the slow road ({@link SlowRoad#pageLine}), if there is one. */
+    private static JinzenPage open(Player player, SoulData data, long now, @Nullable Component road) {
         JinzenSession old = data.jinzen;
         boolean fresh = old == null || old.opened;
         if (fresh) {
@@ -208,7 +225,7 @@ public final class JinzenLogic {
         session.finished = scene != JinzenScene.MEETING;
         session.page = switch (scene) {
             case MEETING -> meeting(player, data, session, spirit.orElseThrow(), now);
-            case VISIT -> visit(data, spirit.orElseThrow());
+            case VISIT -> visit(data, spirit.orElseThrow(), road);
             default -> new JinzenPage(scene, Component.translatable("screen.bleach.jinzen"), linesFor(scene, data, spirit, now),
                     Optional.empty(), lookFor(scene, spirit), true);
         };
@@ -350,12 +367,15 @@ public final class JinzenLogic {
         return new JinzenLook(spirit.innerWorld().backdrop(), spirit.innerWorld().tint());
     }
 
-    /** A named soul visits: the spirit's world, under its name, and what it is doing today. */
-    private static JinzenPage visit(SoulData data, ZanpakutoSpirit spirit) {
+    /** A named soul visits: the spirit's world, under its name, what it is doing today, and the slow road's word, if any. */
+    private static JinzenPage visit(SoulData data, ZanpakutoSpirit spirit, @Nullable Component road) {
         Component name = nameOf(data, spirit);
         List<Component> lines = new ArrayList<>(spirit.script().visit());
         if (lines.isEmpty()) {
             lines.add(Component.translatable("jinzen.bleach.reveal.name", name));
+        }
+        if (road != null) {
+            lines.add(road);
         }
         return new JinzenPage(JinzenScene.VISIT, name, lines, Optional.empty(), innerWorld(spirit), true);
     }

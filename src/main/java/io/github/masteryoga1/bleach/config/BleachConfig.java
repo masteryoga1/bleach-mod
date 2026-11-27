@@ -240,6 +240,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_BLADES;
     public static final ModConfigSpec.IntValue BANKAI_TENSHINTAI_WINDOW_DAYS;
     public static final ModConfigSpec.IntValue BANKAI_TENSHINTAI_PRICE;
+    public static final ModConfigSpec.IntValue BANKAI_ROAD_HOURS;
+    public static final ModConfigSpec.DoubleValue BANKAI_ROAD_MIN_MAX_REIRYOKU;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1543,6 +1545,16 @@ public final class BleachConfig {
         BANKAI_TENSHINTAI_PRICE = builder
                 .comment("Emeralds Kisuke Urahara asks for a Tenshintai.")
                 .defineInRange("price", 32, 1, 64);
+        builder.pop();
+        builder.push("road");
+        BANKAI_ROAD_HOURS = builder
+                .comment("Hours of play (72,000 ticks each) a soul must spend with its own Shikai released, in all, before"
+                        + " its spirit steps out of the blade as it sits in Jinzen, for a Bankai trial, once a game day:"
+                        + " the slow road to Bankai. 0 asks none.")
+                .defineInRange("slow_road_hours", 10, 0, 1_000);
+        BANKAI_ROAD_MIN_MAX_REIRYOKU = builder
+                .comment("Maximum reiryoku a soul needs before its spirit steps out of the blade for it by the slow road.")
+                .defineInRange("min_max_reiryoku", 1_000.0, 0.0, 10_000.0);
         builder.pop();
         builder.pop();
 
