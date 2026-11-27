@@ -163,6 +163,7 @@ public final class SoulEvents {
         if (player.tickCount % Tenshintai.KEEP_TICKS == 0) {
             Tenshintai.keep(player, data);
         }
+        SlowRoad.count(player, data, player.level().getGameTime());
 
         if (player.tickCount % MILESTONE_CHECK_TICKS == 0) {
             Milestones.check(player, data);

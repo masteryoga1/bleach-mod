@@ -29,6 +29,7 @@ import io.github.masteryoga1.bleach.soul.QuincyTeaching;
 import io.github.masteryoga1.bleach.soul.SanreiProgress;
 import io.github.masteryoga1.bleach.soul.ShinigamiLogic;
 import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
+import io.github.masteryoga1.bleach.soul.SlowRoad;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -157,7 +158,8 @@ public final class SoulStatsScreen extends Screen {
      * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
      * more between sections, and the stats and powers headings only with {@code headers}; with no
      * {@code graphics}, only measures them. A reached Bankai is named on the row under the zanpakutō's (see
-     * {@link BankaiLogic#screenLine}), and a Tenshintai set down has its rows there ({@link BankaiLogic#dollLines},
+     * {@link BankaiLogic#screenLine}), or before then the time its Shikai has been held released, towards the slow
+     * road ({@link SlowRoad#screenLine}); a Tenshintai set down has its rows there ({@link BankaiLogic#dollLines},
      * by the client's game time, the clock its window runs on). A Visored, while the server has the path on, says so
      * on its state row and gets two rows of its own after those (see {@link #visoredRows}), and a soul with a Hollow
      * rooted in it gets the rows of {@link #takeoverRows}.
@@ -216,6 +218,9 @@ public final class SoulStatsScreen extends Screen {
             y += line;
         }
         Component bankai = BankaiLogic.screenLine(data);
+        if (bankai == null) {
+            bankai = SlowRoad.screenLine(data);
+        }
         if (bankai != null) {
             text(graphics, bankai, left, y, GREY);
             y += line;
