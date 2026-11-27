@@ -2,7 +2,9 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.BossBar;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
+import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.BankaiRecord;
 import io.github.masteryoga1.bleach.soul.BankaiTrial;
@@ -13,6 +15,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.VisoredEvents;
+import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,7 +65,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * of 5 ticks from its start keeps others out of its ring and 2 blocks more, which at the default radius reaches past
  * the field into the next test's, so such a test begins its bout at the middle with the ring at its smallest, 6 blocks
  * ({@link #inSmallRing}). T7's creatures, placed at tick 0, are found by the ring, as they are inside the template's
- * own chunks, which tick entities before a test begins (mc GameTestInfo.java:101).
+ * own chunks, which tick entities before a test begins (mc GameTestInfo.java:101). T1 and T3 to T6 pin the trial's own
+ * rules, which every spirit's bout keeps, so they run their bouts as a spirit with no test of its own fights, with
+ * {@code spirit_tests} off: no spirit's own test changes them, and each such test is pinned apart, from T8 on.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -179,7 +184,7 @@ public final class BankaiTrialTests {
                 BankaiTrial.Start.WATCHING, reached, BankaiTrial.Start.REACHED,
                 ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.HUMAN, 500.0F)), BankaiTrial.Start.NO_POWER,
                 ZanpakutoTests.mock(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F)), BankaiTrial.Start.NAMELESS);
-        HihioZabimaruTests.clearingOnFailure(() -> {
+        Runnable steps = () -> HihioZabimaruTests.clearingOnFailure(() -> {
             clear(ichigo, joined);
             refused.keySet().forEach(BankaiTrialTests::clear);
         }, () -> {
@@ -241,6 +246,7 @@ public final class BankaiTrialTests {
                             && !BankaiSpiritTests.told(joined, "message.bleach.spirit.home"),
                     "the tries came to " + tried + ", or the soul was not told its time and its break-offs alone");
         });
+        KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS, false, steps);
         helper.succeed();
     }
 
@@ -354,7 +360,7 @@ public final class BankaiTrialTests {
             clear(ichigo, joined, low, light, kept, edge);
             zombie.discard();
         };
-        HihioZabimaruTests.clearingOnFailure(cleared, () -> {
+        Runnable steps = () -> HihioZabimaruTests.clearingOnFailure(cleared, () -> {
             helper.assertTrue(floor == 2.0F, "the loss health is " + floor + " where no config is set");
             ichigo.getAttribute(Attributes.MAX_ABSORPTION).setBaseValue(4.0);
             ichigo.setAbsorptionAmount(4.0F);
@@ -431,6 +437,7 @@ public final class BankaiTrialTests {
                     "its spirit's lighter blow left " + light.getHealth() + ", or ended the bout");
             Materialisation.sendHome(lightSpirit);
         });
+        KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS, false, steps);
         zombie.discard();
         helper.succeed();
     }
@@ -442,7 +449,8 @@ public final class BankaiTrialTests {
      * wielder gone into creative mode before the spirit's tick, or one whose power was lent after the blow, nor out of
      * a bout; and it strikes no more, so a blow on a wielder low enough to lose by it lands nothing, and it still yields.
      * A bout's bar counts it down by the second, and the time running out on a beaten spirit waits for it to yield.
-     * The ring is at its smallest throughout, as the clock's tick a second in keeps others out.
+     * The ring is at its smallest throughout, as the clock's tick a second in keeps others out. Its bouts are plain ones
+     * ({@code spirit_tests} off), as a spirit with no test of its own fights.
      */
     @GameTest(template = "field", timeoutTicks = 20)
     public static void beatingTheSpiritAchievesAndNamesBankai(GameTestHelper helper) {
@@ -460,7 +468,8 @@ public final class BankaiTrialTests {
         BankaiSpiritTests.stand(helper, watcher, FLOOR);
         Player lent = BankaiSpiritTests.wielder(helper, FLOOR), free = BankaiSpiritTests.wielder(helper, FLOOR);
         Player low = BankaiSpiritTests.wielder(helper, FLOOR), late = BankaiSpiritTests.wielder(helper, MIDDLE);
-        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(() -> clear(ichigo, watcher, lent, free, low, late), () -> {
+        Runnable steps = () -> inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(
+                () -> clear(ichigo, watcher, lent, free, low, late), () -> {
             List<Component> said = GateTests.run(level, "bleach zanpakuto @a[tag=bleach_trial_t4] bankai trial");
             String count = "commands.bleach.zanpakuto.bankai.trial";
             BankaiTrial.Trial commanded = BankaiTrial.trial(ichigo.getUUID());
@@ -527,6 +536,7 @@ public final class BankaiTrialTests {
             helper.assertTrue(record(late).achieved() && BankaiTrial.trial(late.getUUID()) == null,
                     "a spirit beaten as the time ran out did not yield");
         }));
+        KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS, false, steps);
         helper.succeed();
     }
 
@@ -543,7 +553,7 @@ public final class BankaiTrialTests {
         if (refusedOnPeaceful(helper, host, now)) {
             return;
         }
-        try {
+        Runnable steps = () -> {
             VisoredEvents.DuelStart start = VisoredEvents.beginDuel(host, data, now, false);
             BankaiTrial.Start refused = BankaiTrial.begin(host, now);
             helper.assertTrue(start == VisoredEvents.DuelStart.STARTED && refused == BankaiTrial.Start.BUSY
@@ -556,6 +566,9 @@ public final class BankaiTrialTests {
             Materialisation.upkeep(spirit);
             helper.assertTrue(start == VisoredEvents.DuelStart.STARTED && over(host, spirit, now),
                     "a bout went on as its wielder's fight with its inner Hollow came to " + start);
+        };
+        try {
+            KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS, false, steps);
         } finally {
             BankaiSpiritTests.end(now, host);
             clear(host);
@@ -593,7 +606,7 @@ public final class BankaiTrialTests {
             BankaiSpiritTests.end(now, host);
             BankaiSpiritTests.end(now, ichigo);
         };
-        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(clear, () -> {
+        Runnable steps = () -> inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(clear, () -> {
             helper.assertTrue(radius == 12, "the ring is " + radius + " blocks where no config is set");
             // At 6 blocks, two bouts meet within 14 of each other, and a bout and a fight within 18.
             MaterialisedSpirit spirit = begun(helper, ichigo, now).spirit();
@@ -624,6 +637,7 @@ public final class BankaiTrialTests {
                             && own == BankaiTrial.Start.BUSY && record(ichigo).tries() == 1 && record(host).tries() == 0,
                     "the fight came to " + duel + ", a bout 9.9 blocks off to " + start + " and one in it to " + own);
         }));
+        KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS, false, steps);
         clear.run();
         helper.succeed();
     }
@@ -694,6 +708,123 @@ public final class BankaiTrialTests {
                             + spirit.getDeltaMovement());
         }));
         clear.run();
+        helper.succeed();
+    }
+
+    /**
+     * T8. In a bout Zabimaru's health is split: the snake has a pool of its own, as full as the baboon's, its bar shows
+     * the two between them, after its own tick too, and the soul is told in chat. A beating on the snake to its floor
+     * leaves the baboon whole and fells the snake alone, the soul told; down alone for {@code halves_seconds}, not a tick
+     * less, timed from its first fall and not a later blow, it rises with {@code rise_share} of the full health, the
+     * soul told, both read from the config. The baboon felled alone rises so too, keeping what it has healed meanwhile,
+     * and the snake's pool is untouched. Both down together, the spirit is beaten and yields Hihiō Zabimaru on its tick.
+     * A time that runs out on a beaten spirit waits a second for it, and no more. With {@code spirit_tests} off, and out
+     * of a bout, Zabimaru has one pool, which a blow on the snake takes from. The ring is at its smallest, as the bout's
+     * ticks at multiples of 5 keep others out. The mock wielders wait at the corner, outside it.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void zabimarusHalvesMustFallTogether(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        DamageSources sources = level.damageSources();
+        long now = HollowPlayerTests.now(helper);
+        ServerPlayer renji = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(1.5, 1.0, 1.5));
+        SoulData soul = ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F);
+        renji.setData(SoulAttachments.SOUL, soul);
+        renji.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
+        ZanpakutoEvents.learnName(renji, soul, ZanpakutoSpirits.ZABIMARU.location(),
+                ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZABIMARU), renji.getMainHandItem());
+        BankaiSpiritTests.stand(helper, renji, MIDDLE);
+        if (refusedOnPeaceful(helper, renji, now)) {
+            return;
+        }
+        Player late = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZABIMARU);
+        Player plain = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZABIMARU);
+        Player free = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZABIMARU);
+        ZabimaruSpirit.Half snake = ZabimaruSpirit.Half.SNAKE, baboon = ZabimaruSpirit.Half.BABOON;
+        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(() -> clear(renji, late, plain, free), () -> {
+            helper.assertTrue(BankaiTrial.halvesSeconds() == 5 && BankaiTrial.riseShare() == 0.5, "the halves have "
+                    + BankaiTrial.halvesSeconds() + " seconds and rise with " + BankaiTrial.riseShare() + " by default");
+            ZabimaruSpirit zabimaru = (ZabimaruSpirit) begun(helper, renji, now).spirit();
+            float full = zabimaru.getMaxHealth(), floor = zabimaru.floor();
+            helper.assertTrue(zabimaru.split() && zabimaru.health(snake) == full && zabimaru.health(baboon) == full
+                            && BossBar.progress(zabimaru) == 1.0F && TestPlayers.chat(renji).stream()
+                                    .anyMatch(line -> GateTests.says(line, "message.bleach.bankai.trial.halves", -1)),
+                    "Zabimaru's halves began at " + zabimaru.health(baboon) + " and " + zabimaru.health(snake) + " of "
+                            + full + ", or were not split, or the soul was not told");
+            zabimaru.snake().hurt(sources.playerAttack(renji), 10_000.0F);
+            zabimaru.bar().tick();
+            helper.assertTrue(Math.abs(zabimaru.health(snake) - floor) < 1.0E-3 && zabimaru.getHealth() == full
+                            && zabimaru.down(snake) && !zabimaru.down(baboon) && !zabimaru.beaten()
+                            && Math.abs(BossBar.progress(zabimaru) - (full + floor) / (2.0F * full)) < 1.0E-4
+                            && zabimaru.bar().event().getProgress() == zabimaru.gauge()
+                            && BankaiSpiritTests.told(renji, "message.bleach.bankai.trial.down.snake")
+                            && !BankaiSpiritTests.told(renji, "message.bleach.bankai.trial.down.baboon"),
+                    "a beating on the snake left the halves at " + zabimaru.health(baboon) + " and "
+                            + zabimaru.health(snake) + ", the bar at " + zabimaru.bar().event().getProgress()
+                            + ", or beat Zabimaru, or was not told");
+            KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_HALVES_SECONDS, 2, () -> KidoTests.withConfig(
+                    BleachConfig.BANKAI_TRIAL_RISE_SHARE, 0.8, () -> {
+                // A second blow on the snake, down since now, does not time it again.
+                BankaiTrial.tick(renji, soul, now + 20L);
+                zabimaru.invulnerableTime = 0;
+                zabimaru.snake().hurt(sources.playerAttack(renji), 10_000.0F);
+                BankaiTrial.tick(renji, soul, now + 39L);
+                helper.assertTrue(zabimaru.down(snake), "the snake rose before its time");
+                BankaiTrial.tick(renji, soul, now + 40L);
+                float share = (float) (full * 0.8);
+                helper.assertTrue(!zabimaru.down(snake) && zabimaru.health(snake) == share
+                                && BankaiSpiritTests.told(renji, "message.bleach.bankai.trial.risen.snake"),
+                        "the snake down alone rose to " + zabimaru.health(snake) + ", or not at its time, or was not told");
+                zabimaru.invulnerableTime = 0;
+                zabimaru.hurt(sources.playerAttack(renji), 10_000.0F);
+                helper.assertTrue(zabimaru.down(baboon) && !zabimaru.beaten()
+                                && BankaiSpiritTests.told(renji, "message.bleach.bankai.trial.down.baboon"),
+                        "the baboon down alone beat Zabimaru, or was not told");
+                float healed = full * 0.9F;
+                zabimaru.setHealth(healed);
+                BankaiTrial.tick(renji, soul, now + 80L);
+                helper.assertTrue(!zabimaru.down(baboon) && zabimaru.getHealth() == healed && zabimaru.health(snake) == share
+                                && BankaiSpiritTests.told(renji, "message.bleach.bankai.trial.risen.baboon"),
+                        "the baboon, healed while down alone, rose to " + zabimaru.getHealth() + " with the snake at "
+                                + zabimaru.health(snake) + ", or not at its time, or was not told");
+            }));
+            zabimaru.invulnerableTime = 0;
+            zabimaru.hurt(sources.playerAttack(renji), 10_000.0F);
+            zabimaru.invulnerableTime = 0;
+            zabimaru.snake().hurt(sources.playerAttack(renji), 10_000.0F);
+            helper.assertTrue(zabimaru.beaten(), "both halves down together did not beat Zabimaru");
+            Materialisation.upkeep(zabimaru);
+            Component name = ZanpakutoSpirits.get(level, ZanpakutoSpirits.ZABIMARU.location())
+                    .flatMap(BankaiLogic::nameOf).orElseThrow();
+            helper.assertTrue(record(renji).achieved() && record(renji).name().equals(name)
+                    && BankaiTrial.trial(renji.getUUID()) == null, "Zabimaru beaten did not yield its Bankai");
+
+            BankaiSpiritTests.stand(helper, late, MIDDLE);
+            BankaiTrial.Trial trial = begun(helper, late, now);
+            ZabimaruSpirit beaten = (ZabimaruSpirit) trial.spirit();
+            beaten.hurt(sources.playerAttack(late), 10_000.0F);
+            beaten.invulnerableTime = 0;
+            beaten.snake().hurt(sources.playerAttack(late), 10_000.0F);
+            BankaiTrial.tick(late, SoulLogic.get(late), trial.endsAt() + 19L);
+            helper.assertTrue(beaten.beaten() && BankaiTrial.trial(late.getUUID()) == trial,
+                    "the time waited less than a second for a beaten Zabimaru");
+            BankaiTrial.tick(late, SoulLogic.get(late), trial.endsAt() + 20L);
+            helper.assertTrue(over(late, beaten, now), "the time waited a second and more, or wrote " + record(late));
+
+            BankaiSpiritTests.stand(helper, plain, MIDDLE);
+            KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS, false, () -> {
+                ZabimaruSpirit whole = (ZabimaruSpirit) begun(helper, plain, now).spirit();
+                whole.snake().hurt(sources.playerAttack(plain), 5.0F);
+                helper.assertTrue(!whole.split() && whole.getHealth() < whole.getMaxHealth()
+                        && whole.health(snake) == whole.getHealth(), "with spirit_tests off Zabimaru's halves were split");
+                clear(plain);
+            });
+            ZabimaruSpirit drawn = (ZabimaruSpirit) BankaiSpiritTests.drawOut(helper, free);
+            drawn.snake().hurt(sources.playerAttack(free), 5.0F);
+            helper.assertTrue(!drawn.split() && drawn.getHealth() < drawn.getMaxHealth(),
+                    "Zabimaru out of a bout had its halves split");
+            clear(free);
+        }));
         helper.succeed();
     }
 }
