@@ -149,9 +149,16 @@ public final class BossBar {
         return event;
     }
 
-    /** How full a boss's bar is: its health over its most. */
+    /** A boss whose bar shows more than its one health, such as a body whose health is split between two halves. */
+    public interface Gauged {
+        /** How full its bar is: 0 empty, 1 full. */
+        float gauge();
+    }
+
+    /** How full a boss's bar is: its health over its most, or what its own gauge says. */
     public static float progress(LivingEntity boss) {
-        return Mth.clamp(boss.getHealth() / boss.getMaxHealth(), 0.0F, 1.0F);
+        float full = boss instanceof Gauged gauged ? gauged.gauge() : boss.getHealth() / boss.getMaxHealth();
+        return Mth.clamp(full, 0.0F, 1.0F);
     }
 
     private boolean gone() {

@@ -234,6 +234,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_BOUT_SECONDS;
     public static final ModConfigSpec.DoubleValue BANKAI_TRIAL_LOSS_HEALTH;
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_RING_RADIUS;
+    public static final ModConfigSpec.BooleanValue BANKAI_TRIAL_SPIRIT_TESTS;
+    public static final ModConfigSpec.IntValue BANKAI_TRIAL_HALVES_SECONDS;
+    public static final ModConfigSpec.DoubleValue BANKAI_TRIAL_RISE_SHARE;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1510,6 +1513,18 @@ public final class BleachConfig {
                         + " everyone else out. No trial begins, and no inner Hollow comes out, where its ring would meet"
                         + " another trial's or an inner Hollow fight's.")
                 .defineInRange("ring_radius", 12, 6, 24);
+        BANKAI_TRIAL_SPIRIT_TESTS = builder
+                .comment("Whether a zanpakutō spirit tests its soul in a Bankai trial in its own way, as its file's"
+                        + " bankai test says, rather than in a plain bout.")
+                .define("spirit_tests", true);
+        BANKAI_TRIAL_HALVES_SECONDS = builder
+                .comment("Seconds within which a spirit tested by its two halves (Zabimaru) must have both beaten down to"
+                        + " their floor in its Bankai trial; a half down alone for longer rises again.")
+                .defineInRange("halves_seconds", 5, 1, 30);
+        BANKAI_TRIAL_RISE_SHARE = builder
+                .comment("The share of its full health with which a half beaten down alone rises again, unless it has"
+                        + " more by then.")
+                .defineInRange("rise_share", 0.5, 0.2, 1.0);
         builder.pop();
         builder.pop();
 

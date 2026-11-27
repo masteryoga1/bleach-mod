@@ -2,7 +2,9 @@ package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
+import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +48,10 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  * bout is lost, so no spirit ever kills its wielder, in a bout or out of one. While a bout lasts the two can touch
  * nothing living but each other, and the spirit's bar counts its seconds down.
  *
+ * <p>While {@code spirit_tests} is on, a spirit whose file sets a test of its own ({@code bankai.test}) tests its soul
+ * so ({@link #testOf}): Zabimaru by its two halves, both to be beaten down together ({@link ZabimaruSpirit#splitHalves}).
+ * Any other spirit, or one whose body cannot take its test, fights a plain bout.
+ *
  * <p>A ring of {@code ring_radius} blocks, lit in the spirit's colour, stands where the wielder began: it keeps the
  * two in and everyone else out, as the inner Hollow's ring does, and no bout begins where its ring would meet
  * another's, a bout's or a fight with an inner Hollow's; that fight asks {@link #duelRefusal} the same of a bout.
@@ -60,6 +66,7 @@ public final class BankaiTrial {
     private static final String ARENA = "message.bleach.bankai.trial.arena", BARRIER = "message.bleach.bankai.trial.barrier";
     private static final String IN_TRIAL = "message.bleach.bankai.trial.duel_in_trial";
     private static final String NEAR = "message.bleach.bankai.trial.duel_near";
+    private static final String HALVES = "message.bleach.bankai.trial.halves";
     private static final int SECOND_TICKS = 20, KEEP_OUT_INTERVAL_TICKS = 5, RING_INTERVAL_TICKS = 10, RING_POINTS = 48;
     /** How far above and below the centre others are kept out, and how high above it the ring is lit, in blocks. */
     private static final double KEEP_OUT_HEIGHT = 8.0, RING_LIFT = 0.2;
@@ -146,18 +153,26 @@ public final class BankaiTrial {
         if (crowded(level, wielder.position())) {
             return Start.CROWDED;
         }
+        ZanpakutoSpirit.BankaiTest test = testOf(wielder, data);
         // No room, or a rung that changed since; never ALREADY, as the call replaces a spirit out.
         Materialisation.Call call = Materialisation.callOut(wielder, true);
         if (call != Materialisation.Call.CALLED) {
             return Start.valueOf(call.name());
         }
         // Held by its call from before it joined the world, so it is there.
-        return open(wielder, data, Materialisation.of(wielder.getUUID()), now);
+        return open(wielder, data, Materialisation.of(wielder.getUUID()), now, test);
     }
 
-    /** The bout begins with this spirit, out before its wielder: held, its try counted, and its clock and ring shown. */
-    private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, long now) {
+    /**
+     * The bout begins with this spirit, out before its wielder: held, its try counted, its clock and ring shown, and its
+     * test set: a Zabimaru tested by its two halves has its health split between them, and its wielder is told so.
+     */
+    private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, long now,
+            ZanpakutoSpirit.BankaiTest test) {
         int seconds = boutSeconds();
+        if (test == ZanpakutoSpirit.BankaiTest.TWO_HALVES && spirit instanceof ZabimaruSpirit zabimaru) {
+            zabimaru.splitHalves(now);
+        }
         Trial trial = new Trial(wielder, spirit, wielder.level().dimension(), wielder.position(), now,
                 now + seconds * (long) SECOND_TICKS, spirit.bar().event().getName());
         TRIALS.put(wielder.getUUID(), trial);
@@ -168,12 +183,28 @@ public final class BankaiTrial {
             ring(level, trial, ringRadius());
         }
         wielder.sendSystemMessage(Component.translatable(BEGUN, seconds).withStyle(ChatFormatting.GRAY));
+        if (spirit instanceof ZabimaruSpirit zabimaru && zabimaru.split()) {
+            wielder.sendSystemMessage(Component.translatable(HALVES).withStyle(ChatFormatting.GRAY));
+        }
         return Start.STARTED;
     }
 
     /**
-     * Each server tick of a living player in a bout, in this order: a break-off ends it, then the time, which waits for
-     * a spirit beaten as it runs out to yield on its own tick; the wielder taken off anything it rides, and the ring
+     * The test this soul's spirit sets it in a Bankai trial, by its file's {@code bankai.test}: none, a plain bout, while
+     * {@code spirit_tests} is off, or for a spirit with no Bankai in this world.
+     */
+    private static ZanpakutoSpirit.BankaiTest testOf(Player wielder, SoulData data) {
+        if (!BleachConfig.get(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS)) {
+            return ZanpakutoSpirit.BankaiTest.NONE;
+        }
+        return ZanpakutoSpirits.get(wielder.level(), data.zanpakuto().spirit()).flatMap(ZanpakutoSpirit::bankai)
+                .map(ZanpakutoSpirit.Bankai::test).orElse(ZanpakutoSpirit.BankaiTest.NONE);
+    }
+
+    /**
+     * Each server tick of a living player in a bout, in this order: a break-off ends it, then the time, which waits a
+     * second at most for a spirit beaten as it runs out to yield on its own tick; a half of Zabimaru down alone too long
+     * rises again ({@code halves_seconds}, {@code rise_share}); the wielder taken off anything it rides, and the ring
      * keeping the two in; then every 5 ticks from the start the ring keeps everyone else out, every 10 it is lit, and
      * each second creatures drop their grudges against the two and the clock is shown.
      */
@@ -186,9 +217,12 @@ public final class BankaiTrial {
             end(trial, End.BROKEN_OFF, false);
             return;
         }
-        if (now >= trial.endsAt && !trial.spirit.beaten()) {
+        if (now >= trial.endsAt && (!trial.spirit.beaten() || now >= trial.endsAt + SECOND_TICKS)) {
             end(trial, End.TIME, false);
             return;
+        }
+        if (trial.spirit instanceof ZabimaruSpirit zabimaru) {
+            zabimaru.rise(now, halvesSeconds() * (long) SECOND_TICKS, riseShare());
         }
         double radius = ringRadius();
         // A rider's own motion is thrown away each tick, so a mount would carry the wielder past the ring's push.
@@ -331,6 +365,16 @@ public final class BankaiTrial {
     /** The ring's radius, in blocks. */
     public static int ringRadius() {
         return BleachConfig.get(BleachConfig.BANKAI_TRIAL_RING_RADIUS);
+    }
+
+    /** How long two halves have to be beaten down together, in seconds. */
+    public static int halvesSeconds() {
+        return BleachConfig.get(BleachConfig.BANKAI_TRIAL_HALVES_SECONDS);
+    }
+
+    /** The share of its full health with which a half down alone rises again. */
+    public static double riseShare() {
+        return BleachConfig.get(BleachConfig.BANKAI_TRIAL_RISE_SHARE);
     }
 
     /**
