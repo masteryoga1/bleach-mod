@@ -92,8 +92,12 @@ public final class EspadaTests {
     /** How far a set-down creature may be from where it was taken, and a post's centre from the Fracción. */
     private static final double LANDING_EPSILON = 0.5;
     private static final double POST_EPSILON = 1.0;
-    /** How far the Espada walks away from its Fracción: past the {@code follow_leash} of 64. */
-    private static final double AWAY_BLOCKS = 70.0;
+    /**
+     * How far the Espada walks away from its Fracción: past the {@code follow_leash} of 64 by more than the field is
+     * wide. The field's walls keep the Fracción west of x 15.7, so from an Espada at 4.5 + 90 it stays 78.8 or more
+     * away whatever it does. At 70 it stood 68 away, and a stroll begun before the Espada left could close the 4.
+     */
+    private static final double AWAY_BLOCKS = 90.0;
     /** How near the cage its quiet tear must stand. */
     private static final double TEAR_NEAR = 3.0;
 
@@ -740,7 +744,8 @@ public final class EspadaTests {
                     espada.moveTo(homeAbsolute.x + AWAY_BLOCKS, homeAbsolute.y, homeAbsolute.z);
                 }))
                 .thenExecuteAfter(25, step(spawned, () -> {
-                    helper.assertTrue(fraccion.leader() == null, "a Fracción still finds its Espada 70 blocks away");
+                    helper.assertTrue(fraccion.leader() == null,
+                            "a Fracción still finds its Espada " + (int) AWAY_BLOCKS + " blocks away");
                     helper.assertTrue(fraccion.hasRestriction(), "a Fracción whose Espada is away holds no post");
                     helper.assertTrue(fraccion.getRestrictRadius() == BleachConfig.get(BleachConfig.FRACCION_POST_RADIUS),
                             "the post's radius is " + fraccion.getRestrictRadius());
