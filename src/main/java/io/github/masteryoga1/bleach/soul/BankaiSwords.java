@@ -34,11 +34,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * holds, the blow lands, every other blade crumbles, and from then on every blow of the soul's lands.
  */
 public final class BankaiSwords {
-    /** How near the centre no blade rises, so none stands at the soul's feet, in blocks. */
+    /** How near the centre no blade rises, so none stands at the soul's feet or the doll's, in blocks. */
     private static final double CLEAR = 1.5;
-    /** How far a blade's spot may stand above and below the soul's feet, in blocks: a step up, two down. */
+    /** How far a blade's spot may stand above and below the centre's feet, in blocks: a step up, two down. */
     private static final int UP = 1, DOWN = 2;
-    /** How far above its feet the soul's eyes are taken to be as it looks for open ground, in blocks. */
+    /** How far above the centre's feet the eyes that look for open ground are taken to be, in blocks. */
     private static final double EYES = 1.5;
     /** The blades of bouts ended as their spirits left the world, which go at the end of the server tick. */
     static final List<TrialBlade> PENDING = new ArrayList<>();
