@@ -128,6 +128,11 @@ public final class BossBar {
         event.setOverlay(overlay);
     }
 
+    /** A new name on the same bar, as a clock on it counts down: its viewers keep it. */
+    public void rename(Component name) {
+        event.setName(name);
+    }
+
     /** Takes the bar from everyone: its boss died or left, or is hidden. */
     public void clear() {
         event.removeAllPlayers();

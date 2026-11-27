@@ -37,10 +37,11 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
  * <p>Every end sends the spirit home with nothing kept ({@link #sendHome}), seen on the spirit's tick, which goes on as
  * long as its wielder is near: its wielder dies, is removed (logged out), is in another world (at once, on the event),
  * strays past {@link #LEAVE_DISTANCE}, loses the power or the name, binds another spirit or faces its inner Hollow; a
- * spirit beaten to its floor goes home too. It comes and goes in its colour's dust, with a line to its wielder.
- * Reaching Bankai or having it revoked ends nothing. A spirit that leaves its world any other way (its chunk unloaded,
- * Peaceful, a death) is forgotten as it leaves, so its wielder may call again at once. The spirits out are held only in
- * memory, by their wielders' UUIDs, on the server thread, and none is ever saved.
+ * spirit beaten to its floor goes home too, or, in a Bankai trial, yields ({@link BankaiTrial#yields}). It comes and
+ * goes in its colour's dust, with a line to its wielder. Reaching Bankai or having it revoked ends nothing. A spirit
+ * that leaves its world any other way (its chunk unloaded, Peaceful, a death) is forgotten as it leaves, so its wielder
+ * may call again at once. The spirits out are held only in memory, by their wielders' UUIDs, on the server thread, and
+ * none is ever saved.
  */
 public final class Materialisation {
     /** How far before its wielder a spirit steps out, in blocks, as the inner Hollow does. */
@@ -210,12 +211,12 @@ public final class Materialisation {
 
     /**
      * Each tick of a spirit: a spirit that is not its wielder's own (never set up, summoned, or dying) goes at once, one
-     * whose wielder has met any end goes home, and so does one beaten to its floor.
+     * whose wielder has met any end goes home, and so does one beaten to its floor, unless it yields in a Bankai trial.
      */
     public static void upkeep(MaterialisedSpirit spirit) {
         if (of(spirit.wielderId()) != spirit || endCame(spirit)) {
             sendHome(spirit);
-        } else if (spirit.beaten()) {
+        } else if (spirit.beaten() && !BankaiTrial.yields(spirit)) {
             sendHome(spirit, BEATEN);
         }
     }

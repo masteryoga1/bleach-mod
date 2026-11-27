@@ -31,6 +31,7 @@ import io.github.masteryoga1.bleach.soul.BaitSite;
 import io.github.masteryoga1.bleach.soul.BaitSites;
 import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.BankaiRecord;
+import io.github.masteryoga1.bleach.soul.BankaiTrial;
 import io.github.masteryoga1.bleach.soul.Boss;
 import io.github.masteryoga1.bleach.soul.BossLedger;
 import io.github.masteryoga1.bleach.soul.DevourEvents;
@@ -159,6 +160,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * /bleach zanpakuto &lt;players&gt; bankai &lt;grant|revoke&gt;   (as if the spirit was subjugated; revoke starts the
  *                                    road over)
  * /bleach zanpakuto &lt;players&gt; bankai spirit   (draws the spirit out before its wielder)
+ * /bleach zanpakuto &lt;players&gt; bankai trial    (begins the Bankai trial: a bout with the spirit, beaten to win)
  * /bleach zanpakuto &lt;players&gt; reset
  * /bleach visored &lt;players&gt; &lt;root|ready|duel|subdue|mask|unmask|takeover|reset&gt;
  *                                    (duel fights here, rooting as needed)
@@ -364,7 +366,9 @@ public final class BleachCommand {
                                         .then(Commands.literal("revoke")
                                                 .executes(context -> bankai(context, false)))
                                         .then(Commands.literal("spirit")
-                                                .executes(BleachCommand::callSpirit)))
+                                                .executes(BleachCommand::callSpirit))
+                                        .then(Commands.literal("trial")
+                                                .executes(BleachCommand::beginBankaiTrial)))
                                 .then(Commands.literal("reset")
                                         .executes(BleachCommand::resetZanpakuto))))
                 .then(Commands.literal("visored")
@@ -1577,6 +1581,28 @@ public final class BleachCommand {
         int count = called;
         if (count > 0) {
             context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.bankai.spirit",
+                    count), true);
+        }
+        return count;
+    }
+
+    /**
+     * Begins each soul's Bankai trial where it stands ({@link BankaiTrial#begin}), saying why it passes over a soul it
+     * cannot, and counts the rest. It skips no rule of the trial's.
+     */
+    private static int beginBankaiTrial(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        int begun = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(context, "players")) {
+            BankaiTrial.Start start = BankaiTrial.begin(player, player.level().getGameTime());
+            if (start == BankaiTrial.Start.STARTED) {
+                begun++;
+            } else {
+                refuseArts(context.getSource(), player, Component.translatable(start.key()));
+            }
+        }
+        int count = begun;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Component.translatable("commands.bleach.zanpakuto.bankai.trial",
                     count), true);
         }
         return count;

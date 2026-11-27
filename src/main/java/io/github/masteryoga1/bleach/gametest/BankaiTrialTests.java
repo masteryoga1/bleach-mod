@@ -10,22 +10,39 @@ import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import net.minecraft.ChatFormatting;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageSources;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.damagesource.DamageContainer;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -43,6 +60,7 @@ public final class BankaiTrialTests {
     /** Where the tests stand their wielders on the field's floor, as a test sees it: a corner, and the middle. */
     static final Vec3 FLOOR = new Vec3(1.5, 2.0, 1.5), MIDDLE = new Vec3(8.5, 2.0, 8.5);
     static final String BEGUN = "message.bleach.bankai.trial.begun", BROKEN = "message.bleach.bankai.trial.broken_off";
+    static final String WON = "message.bleach.bankai.trial.won", YIELDED = "message.bleach.bankai.trial.yielded";
 
     private BankaiTrialTests() {
     }
@@ -88,6 +106,22 @@ public final class BankaiTrialTests {
                 Materialisation.sendHome(spirit);
             }
         }
+    }
+
+    /** Whether this spirit's bar reads its own name, by this key, and these seconds left, as a bout's clock shows them. */
+    static boolean clock(MaterialisedSpirit spirit, String name, long seconds) {
+        return spirit.bar().event().getName().getContents() instanceof TranslatableContents words
+                && words.getKey().equals("bossbar.bleach.bankai_trial") && words.getArgs().length == 2
+                && words.getArgs()[0] instanceof Component named && GateTests.says(named, name, -1)
+                && Long.valueOf(seconds).equals(words.getArgs()[1]);
+    }
+
+    /**
+     * The damage a blow of 1,000 from this source comes to on this joined soul once every listener has weighed it, the
+     * loss among them: posted by hand, as a soul just joined is never hurt (mc ServerPlayer.java:758).
+     */
+    static float weighed(ServerPlayer soul, DamageSource source) {
+        return NeoForge.EVENT_BUS.post(new LivingDamageEvent.Pre(soul, new DamageContainer(source, 1_000.0F))).getNewDamage();
     }
 
     /**
@@ -261,6 +295,210 @@ public final class BankaiTrialTests {
         } finally {
             Materialisation.sendHome(spirit);
         }
+        helper.succeed();
+    }
+
+    /**
+     * T3. A spirit's blow that would leave its wielder at {@code loss_health} (2 where no config is set) or below stops
+     * there and the bout is lost: through absorption, which goes first, with a totem in hand, which is kept, on a
+     * wielder already below it, whose health stands, and on one it leaves at exactly the floor, a joined soul told so in
+     * chat; a blow that absorption alone keeps above the floor lands whole. Out of a bout the spirit's last blow
+     * stops the same way, and it goes home saying it won, with no try counted. While a bout lasts the wielder's blow,
+     * arrow and Getsuga Tenshō on a zombie or another soul, and theirs on it, are stopped, while a fall and its spirit's
+     * lighter blow land and the bout runs on.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void aLossStopsAtTheFloorAndNeverKills(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        DamageSources sources = level.damageSources();
+        long now = HollowPlayerTests.now(helper);
+        float floor = BankaiTrial.lossHealth();
+        Player ichigo = BankaiSpiritTests.wielder(helper, MIDDLE);
+        if (refusedOnPeaceful(helper, ichigo, now)) {
+            return;
+        }
+        ServerPlayer joined = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F), true);
+        BankaiSpiritTests.stand(helper, joined, FLOOR);
+        Player low = BankaiSpiritTests.wielder(helper, MIDDLE), light = BankaiSpiritTests.wielder(helper, MIDDLE);
+        Player kept = BankaiSpiritTests.wielder(helper, MIDDLE), edge = BankaiSpiritTests.wielder(helper, MIDDLE);
+        Player other = BankaiSpiritTests.wielder(helper, FLOOR);
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, 3, 2, 12);
+        Runnable cleared = () -> {
+            clear(ichigo, joined, low, light, kept, edge);
+            zombie.discard();
+        };
+        HihioZabimaruTests.clearingOnFailure(cleared, () -> {
+            helper.assertTrue(floor == 2.0F, "the loss health is " + floor + " where no config is set");
+            ichigo.getAttribute(Attributes.MAX_ABSORPTION).setBaseValue(4.0);
+            ichigo.setAbsorptionAmount(4.0F);
+            ichigo.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.TOTEM_OF_UNDYING));
+            MaterialisedSpirit spirit = begun(helper, ichigo, now).spirit();
+            ichigo.hurt(sources.mobAttack(spirit), 1_000.0F);
+            helper.assertTrue(ichigo.isAlive() && Math.abs(ichigo.getHealth() - floor) < 1.0E-3
+                            && ichigo.getAbsorptionAmount() == 0.0F && ichigo.getOffhandItem().is(Items.TOTEM_OF_UNDYING)
+                            && over(ichigo, spirit, now),
+                    "the losing blow left " + ichigo.getHealth() + " and " + ichigo.getAbsorptionAmount()
+                            + " absorption, spent the totem, or left the bout going");
+            low.setHealth(1.5F);
+            MaterialisedSpirit lowSpirit = begun(helper, low, now).spirit();
+            low.hurt(sources.mobAttack(lowSpirit), 5.0F);
+            helper.assertTrue(low.isAlive() && low.getHealth() == 1.5F && over(low, lowSpirit, now),
+                    "a blow on a wielder below the floor left " + low.getHealth() + ", or the bout going");
+            // On Normal a creature's blow is not scaled (mc Player.java:873-885). A fresh mock has 20 health and no
+            // armour, effects or enchantments, and its spirit's reiatsu matches its own, so nothing cuts the blow before
+            // it reaches the loss at LivingDamageEvent.Pre, where the absorption is still to be taken (nfp
+            // Player.java.patch, actuallyHurt). So 19 through 4 absorption leaves 20 - (19 - 4) = 5, above the floor,
+            // and lands whole, and 18 with none leaves exactly the floor, 2, and loses.
+            MinecraftServer server = level.getServer();
+            Difficulty difficulty = server.getWorldData().getDifficulty();
+            server.setDifficulty(Difficulty.NORMAL, true);
+            try {
+                kept.getAttribute(Attributes.MAX_ABSORPTION).setBaseValue(4.0);
+                kept.setAbsorptionAmount(4.0F);
+                MaterialisedSpirit keptSpirit = begun(helper, kept, now).spirit();
+                kept.hurt(sources.mobAttack(keptSpirit), 19.0F);
+                helper.assertTrue(kept.getHealth() == 5.0F && kept.getAbsorptionAmount() == 0.0F
+                                && BankaiTrial.trial(kept.getUUID()) != null && !keptSpirit.isRemoved(),
+                        "a blow its absorption kept above the floor left " + kept.getHealth() + ", or ended the bout");
+                Materialisation.sendHome(keptSpirit);
+                MaterialisedSpirit edgeSpirit = begun(helper, edge, now).spirit();
+                edge.hurt(sources.mobAttack(edgeSpirit), 18.0F);
+                helper.assertTrue(edge.getHealth() == floor && over(edge, edgeSpirit, now),
+                        "a blow to exactly the floor left " + edge.getHealth() + ", or the bout going");
+            } finally {
+                server.setDifficulty(difficulty, true);
+            }
+
+            MaterialisedSpirit its = begun(helper, joined, now).spirit();
+            float lost = weighed(joined, sources.mobAttack(its));
+            helper.assertTrue(Math.abs(joined.getHealth() - lost - floor) < 1.0E-3 && over(joined, its, now)
+                            && TestPlayers.chat(joined).stream().anyMatch(line -> GateTests.says(line,
+                                    "message.bleach.bankai.trial.lost", -1)),
+                    "a joined soul's losing blow came to " + lost + ", left the bout going, or was not told");
+            MaterialisedSpirit free = BankaiSpiritTests.drawOut(helper, joined);
+            float won = weighed(joined, sources.mobAttack(free));
+            helper.assertTrue(Math.abs(joined.getHealth() - won - floor) < 1.0E-3 && BankaiSpiritTests.gone(joined, free)
+                            && BankaiSpiritTests.told(joined, "message.bleach.spirit.won") && record(joined).tries() == 1,
+                    "a spirit out of a bout dealt its wielder " + won + ", stayed out, said nothing or counted a try");
+
+            MaterialisedSpirit lightSpirit = begun(helper, light, now).spirit();
+            Arrow arrow = new Arrow(EntityType.ARROW, level);
+            for (LivingEntity victim : List.of(zombie, other)) {
+                for (DamageSource source : List.of(sources.playerAttack(light), sources.arrow(arrow, light),
+                        BankaiSpiritTests.getsuga(level, arrow, light))) {
+                    helper.assertTrue(!victim.hurt(source, 5.0F) && victim.getHealth() == victim.getMaxHealth(),
+                            "the wielder's " + source.getMsgId() + " landed on " + victim + " in a bout");
+                }
+            }
+            for (DamageSource source : List.of(sources.playerAttack(other), sources.mobAttack(zombie))) {
+                helper.assertTrue(!light.hurt(source, 5.0F) && light.getHealth() == light.getMaxHealth(),
+                        "a blow of " + source.getMsgId() + " from " + source.getEntity() + " landed on a wielder in a bout");
+            }
+            helper.assertTrue(light.hurt(sources.fall(), 3.0F) && light.getHealth() < light.getMaxHealth(),
+                    "a fall did not hurt a wielder in a bout");
+            light.invulnerableTime = 0;
+            float before = light.getHealth();
+            light.hurt(sources.mobAttack(lightSpirit), 3.0F);
+            helper.assertTrue(light.getHealth() < before && light.getHealth() > floor
+                            && BankaiTrial.trial(light.getUUID()) != null && !lightSpirit.isRemoved(),
+                    "its spirit's lighter blow left " + light.getHealth() + ", or ended the bout");
+            Materialisation.sendHome(lightSpirit);
+        });
+        zombie.discard();
+        helper.succeed();
+    }
+
+    /**
+     * T4. The command begins a joined soul's bout, counting one, and passes over a Human, saying why. Its spirit beaten
+     * to its floor yields on its tick: the soul reaches Bankai by the name the grant gives, its try kept, told so in gold
+     * in chat with the key that calls it, and on its action bar as the spirit goes. A beaten spirit yields nothing to a
+     * wielder gone into creative mode before the spirit's tick, or one whose power was lent after the blow, nor out of
+     * a bout; and it strikes no more, so a blow on a wielder low enough to lose by it lands nothing, and it still yields.
+     * A bout's bar counts it down by the second, and the time running out on a beaten spirit waits for it to yield.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void beatingTheSpiritAchievesAndNamesBankai(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        DamageSources sources = level.damageSources();
+        long now = HollowPlayerTests.now(helper);
+        ServerPlayer ichigo = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F), true,
+                "bleach_trial_t4");
+        BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.HUMAN, 500.0F), false, "bleach_trial_t4");
+        BankaiSpiritTests.stand(helper, ichigo, MIDDLE);
+        if (refusedOnPeaceful(helper, ichigo, now)) {
+            return;
+        }
+        ServerPlayer watcher = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F), true);
+        BankaiSpiritTests.stand(helper, watcher, FLOOR);
+        Player lent = BankaiSpiritTests.wielder(helper, FLOOR), free = BankaiSpiritTests.wielder(helper, FLOOR);
+        Player low = BankaiSpiritTests.wielder(helper, FLOOR), late = BankaiSpiritTests.wielder(helper, MIDDLE);
+        HihioZabimaruTests.clearingOnFailure(() -> clear(ichigo, watcher, lent, free, low, late), () -> {
+            List<Component> said = GateTests.run(level, "bleach zanpakuto @a[tag=bleach_trial_t4] bankai trial");
+            String count = "commands.bleach.zanpakuto.bankai.trial";
+            BankaiTrial.Trial commanded = BankaiTrial.trial(ichigo.getUUID());
+            helper.assertTrue(commanded != null && said.size() == 2
+                            && said.stream().anyMatch(line -> line.getContents() instanceof TranslatableContents words
+                                    && words.getKey().equals(count) && Integer.valueOf(1).equals(words.getArgs()[0]))
+                            && said.stream().anyMatch(line -> BankaiTests.refused(line, BankaiTrial.Start.NO_POWER.key())),
+                    "the command said " + said.stream().map(Component::getString).toList());
+            MaterialisedSpirit spirit = commanded.spirit();
+            spirit.hurt(sources.playerAttack(ichigo), 10_000.0F);
+            Materialisation.upkeep(spirit);
+            BankaiRecord record = record(ichigo);
+            Component name = ZanpakutoSpirits.get(level, ZanpakutoSpirits.ZANGETSU.location())
+                    .flatMap(BankaiLogic::nameOf).orElseThrow();
+            helper.assertTrue(record.achieved() && record.achievedAt() == now && record.name().equals(name)
+                            && record.tries() == 1 && BankaiTrial.trial(ichigo.getUUID()) == null
+                            && BankaiSpiritTests.gone(ichigo, spirit),
+                    "beating the spirit left " + record + ", or the bout or the spirit");
+            helper.assertTrue(TestPlayers.chat(ichigo).stream().anyMatch(line -> GateTests.says(line, WON, -1)
+                            && TextColor.fromLegacyFormat(ChatFormatting.GOLD).equals(line.getStyle().getColor())
+                            && line.getContents() instanceof TranslatableContents words && words.getArgs().length == 2
+                            && words.getArgs()[0].equals(name)) && BankaiSpiritTests.told(ichigo, YIELDED),
+                    "the soul was not told in gold that its spirit yielded its Bankai, or not as it went");
+
+            MaterialisedSpirit watched = begun(helper, watcher, now).spirit();
+            watched.hurt(sources.playerAttack(watcher), 10_000.0F);
+            watcher.setGameMode(GameType.CREATIVE);
+            Materialisation.upkeep(watched);
+            helper.assertTrue(BankaiTrial.trial(watcher.getUUID()) == null && BankaiSpiritTests.gone(watcher, watched)
+                            && !record(watcher).achieved() && BankaiSpiritTests.told(watcher, BROKEN),
+                    "a beaten spirit yielded to a wielder gone into creative mode, or stayed");
+            MaterialisedSpirit lentSpirit = begun(helper, lent, now).spirit();
+            lentSpirit.hurt(sources.playerAttack(lent), 10_000.0F);
+            SoulData lentSoul = SoulLogic.get(lent);
+            lentSoul.setShinigami(lentSoul.shinigami().withPowerLentUntil(now + 1_000L));
+            Materialisation.upkeep(lentSpirit);
+            helper.assertTrue(over(lent, lentSpirit, now), "a beaten spirit yielded to a wielder whose power was lent");
+            low.setHealth(3.0F);
+            MaterialisedSpirit lowSpirit = begun(helper, low, now).spirit();
+            lowSpirit.hurt(sources.playerAttack(low), 10_000.0F);
+            helper.assertTrue(!low.hurt(sources.mobAttack(lowSpirit), 5.0F) && low.getHealth() == 3.0F
+                            && BankaiTrial.trial(low.getUUID()) != null,
+                    "a beaten spirit's blow landed on its wielder at 3, or lost the bout");
+            Materialisation.upkeep(lowSpirit);
+            helper.assertTrue(record(low).achieved() && BankaiTrial.trial(low.getUUID()) == null
+                    && BankaiSpiritTests.gone(low, lowSpirit), "a beaten spirit that struck at its wielder did not yield");
+            MaterialisedSpirit beaten = BankaiSpiritTests.drawOut(helper, free);
+            beaten.hurt(sources.playerAttack(free), 10_000.0F);
+            Materialisation.upkeep(beaten);
+            helper.assertTrue(BankaiSpiritTests.gone(free, beaten) && !record(free).achieved(),
+                    "a spirit beaten out of a bout gave its Bankai, or stayed out");
+
+            BankaiTrial.Trial trial = begun(helper, late, now);
+            String bar = "bossbar.bleach.zangetsu_spirit";
+            helper.assertTrue(clock(trial.spirit(), bar, BankaiTrial.boutSeconds()),
+                    "the spirit's bar reads " + trial.spirit().bar().event().getName() + " as the bout begins");
+            BankaiTrial.tick(late, SoulLogic.get(late), now + 20L);
+            helper.assertTrue(clock(trial.spirit(), bar, BankaiTrial.boutSeconds() - 1L),
+                    "the spirit's bar reads " + trial.spirit().bar().event().getName() + " a second in");
+            trial.spirit().hurt(sources.playerAttack(late), 10_000.0F);
+            BankaiTrial.tick(late, SoulLogic.get(late), trial.endsAt() + 1L);
+            helper.assertTrue(BankaiTrial.trial(late.getUUID()) == trial, "the time ran out on a beaten spirit");
+            Materialisation.upkeep(trial.spirit());
+            helper.assertTrue(record(late).achieved() && BankaiTrial.trial(late.getUUID()) == null,
+                    "a spirit beaten as the time ran out did not yield");
+        });
         helper.succeed();
     }
 }
