@@ -2,7 +2,6 @@ package io.github.masteryoga1.bleach.client;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import net.minecraft.client.model.HumanoidArmorModel;
-import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
@@ -24,7 +23,7 @@ public final class BleachModelLayers {
     public static final ModelLayerLocation HELL_GATE = layer("hell_gate");
     public static final ModelLayerLocation SHRIEKER_LEECH = layer("shrieker_leech");
     public static final ModelLayerLocation GRAND_FISHER = layer("grand_fisher");
-    /** A Vasto Lorde: a person's shape, the humanoid mesh on a 64 by 64 texture. */
+    /** A Vasto Lorde: a person's shape with the bone of its look (see {@link VastoLordeModel}). */
     public static final ModelLayerLocation VASTO_LORDE = layer("vasto_lorde");
     public static final ModelLayerLocation SANREI_GLOVE = layer("sanrei_glove");
     public static final ModelLayerLocation VOLLSTANDIG = layer("vollstandig");
@@ -58,8 +57,7 @@ public final class BleachModelLayers {
         event.registerLayerDefinition(HELL_GATE, HellGateModel::createLayer);
         event.registerLayerDefinition(SHRIEKER_LEECH, ShriekerLeechModel::createLayer);
         event.registerLayerDefinition(GRAND_FISHER, GrandFisherModel::createBodyLayer);
-        event.registerLayerDefinition(VASTO_LORDE,
-                () -> LayerDefinition.create(HumanoidModel.createMesh(CubeDeformation.NONE, 0.0F), 64, 64));
+        event.registerLayerDefinition(VASTO_LORDE, VastoLordeModel::createBodyLayer);
         event.registerLayerDefinition(SANREI_GLOVE, SanreiGloveModel::createLayer);
         event.registerLayerDefinition(VOLLSTANDIG, VollstandigModel::createLayer);
         event.registerLayerDefinition(VEIN_SHELL,

@@ -1115,11 +1115,19 @@ VASTO_HEAD = (0, 0, 8, 8, 8)
 VASTO_BODY = (16, 16, 8, 12, 4)
 VASTO_ARM = (40, 16, 4, 12, 4)
 VASTO_LEG = (0, 16, 4, 12, 4)
+# The bone of the looks, each net in the texture's lower half, which the humanoid mesh leaves free: the plated look's
+# plate over the top of the chest and its pauldron over each shoulder (the left mirroring the right), on the body; the
+# horned look's two horns and the crested look's crest, on the mask.
+VASTO_PLATE = (36, 32, 8, 3, 1)
+VASTO_PAULDRON = (0, 48, 5, 2, 5)
+VASTO_HORNS = ((0, 32, 2, 5, 2), (8, 32, 2, 5, 2))
+VASTO_CREST = (16, 32, 1, 3, 8)
 
 
 def vasto_lorde():
     """A Vasto Lorde's hide: black and faintly mottled over the head, body, arm and leg, the hole through the middle of
-    the chest, and bone-white claws round the last row of each hand and foot. The hat layer stays clear."""
+    the chest, and bone-white claws round the last row of each hand and foot; and the plated look's bone, shaded along
+    the foot of each side. The hat layer stays clear."""
     c = Canvas(64, 64)
     for part in (VASTO_HEAD, VASTO_BODY, VASTO_ARM, VASTO_LEG):
         box(c, *part, HOLLOW_BLACK)
@@ -1131,13 +1139,18 @@ def vasto_lorde():
     for part in (VASTO_ARM, VASTO_LEG):
         for x0, y0, x1, y1 in faces(*part)[2:]:   # its right, front, left and back, each its last row
             c.rect(x0, y1 - 1, x1, y1, BONE)
+    for part in (VASTO_PLATE, VASTO_PAULDRON):
+        box(c, *part, BONE)
+        for x0, y0, x1, y1 in faces(*part)[2:]:
+            c.rect(x0, y1 - 1, x1, y1, BONE_SHADE)
     return c
 
 
 def vasto_lorde_mask():
     """A narrow bone face over the front of the head: two slits for eyes slanting down towards a shaded ridge between
     them, and a mouth of fangs along its foot; the face wraps a pixel round each side, and the crown's front rows are
-    bone too, so the mask shows from aside and above."""
+    bone too, so the mask shows from aside and above. The horned look's horns and the crested look's crest are bone,
+    the horns shaded at the back and the crest along its left."""
     c = Canvas(64, 64)
     x0, y0, x1, y1 = faces(*VASTO_HEAD)[3]   # the front: (8, 8) to (16, 16)
     c.rect(x0, y0, x1, y1, BONE)
@@ -1153,6 +1166,11 @@ def vasto_lorde_mask():
     c.rect(lx0, ly0, lx0 + 1, ly1 - 1, BONE)
     tx0, ty0, tx1, ty1 = faces(*VASTO_HEAD)[0]   # the crown: its front rows, nearest v + d
     c.rect(tx0, ty1 - 2, tx1, ty1, BONE)
+    for horn in VASTO_HORNS:
+        box(c, *horn, BONE)
+        c.rect(*faces(*horn)[5], BONE_SHADE)
+    box(c, *VASTO_CREST, BONE)
+    c.rect(*faces(*VASTO_CREST)[4], BONE_SHADE)
     return c
 
 

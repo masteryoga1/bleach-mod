@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.Menos;
+import io.github.masteryoga1.bleach.entity.VastoLorde;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.resources.ResourceLocation;
@@ -112,15 +113,15 @@ public final class VisoredLogic {
 
     /**
      * Whether a blow from this creature can leave Hollow reiatsu in this soul's wound: a Menos-class Hollow, which
-     * is a Gillian, an Adjuchas, an Arrancar, or a Hollow or Arrancar player of that rank, the mod's stand-in for
-     * Aizen's wound. A Substitute takes it from any Hollow, mob or player, as Ichigo's came another way. Its own
-     * inner Hollow never counts.
+     * is a Gillian, an Adjuchas, a Vasto Lorde, an Arrancar, or a Hollow or Arrancar player of that rank, the mod's
+     * stand-in for Aizen's wound. A Substitute takes it from any Hollow, mob or player, as Ichigo's came another way.
+     * Its own inner Hollow never counts.
      */
     public static boolean isWoundingSource(LivingEntity attacker, SoulData victim) {
         if (attacker instanceof InnerHollow) {
             return false;
         }
-        if (attacker instanceof Menos || attacker instanceof ArrancarNpc) {
+        if (attacker instanceof Menos || attacker instanceof VastoLorde || attacker instanceof ArrancarNpc) {
             return true;
         }
         SoulData soul = attacker instanceof Player && SoulLogic.hasSoul(attacker) ? SoulLogic.get(attacker) : null;

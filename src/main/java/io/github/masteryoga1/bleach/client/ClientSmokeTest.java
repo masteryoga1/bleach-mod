@@ -2032,12 +2032,16 @@ public final class ClientSmokeTest {
                 command(minecraft, "clear @s bleach:tenshintai");
                 command(minecraft, "tp @s ~ ~ ~ ~ 0");
             }
-            // A Vasto Lorde, a Shinigami's eyes still on the world, summoned standing still on the ground before the soul
-            // and facing it, in air cleared as for the bosses before it.
+            // Three Vasto Lorde, one of each look, plated, horned and crested from the soul's left, a Shinigami's eyes still
+            // on the world, summoned standing still on the ground before the soul and facing it, in air cleared as for the
+            // bosses before them; their bars show at the top of the screen.
             case VASTO_LORDE_AT -> {
                 command(minecraft, "tp @s ~ ~ ~ 180 0");
                 command(minecraft, "fill ~-3 ~ ~-8 ~3 ~4 ~-1 air");
-                command(minecraft, "summon bleach:vasto_lorde ~ ~ ~-5 " + STILL);
+                for (int look = 0; look < VastoLorde.LOOKS; look++) {
+                    command(minecraft, "summon bleach:vasto_lorde ~" + (look - 1) * 2 + " ~ ~-5 "
+                            + STILL.replace("}", ",Look:" + look + "}"));
+                }
             }
             case VASTO_LORDE_AT + 40 -> shot(minecraft, "vasto_lorde");
             case VASTO_LORDE_AT + 42 -> command(minecraft, "kill @e[type=bleach:vasto_lorde]");
@@ -3104,12 +3108,13 @@ public final class ClientSmokeTest {
     }
 
     /**
-     * The checks of the Vasto Lorde's beat: summoned, it reaches the client unhidden, looked at for its shot; killed by
-     * command, it is gone.
+     * The checks of the Vasto Lorde's beat: summoned, the three reach the client unhidden, each in the look its summon
+     * named, which only the server's sending gives the client; the middle one, the nearest, is looked at for their shot.
+     * Killed by command, they are gone.
      */
     private static void checkVastoLorde(Minecraft minecraft) {
         if (expectWithin(minecraft, VASTO_LORDE_AT + 2, VASTO_LORDE_AT + 35, () -> vastoLordeSeen(minecraft),
-                "the summoned Vasto Lorde never reached the client unhidden")) {
+                "the three summoned Vasto Lorde never reached the client unhidden, one in each look")) {
             VastoLorde vasto = nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive);
             if (vasto != null) {
                 // Its middle, so the whole of it, mask and all, is in the shot.
@@ -3118,12 +3123,16 @@ public final class ClientSmokeTest {
         }
         expectWithin(minecraft, VASTO_LORDE_AT + 44, VASTO_LORDE_AT + 100,
                 () -> nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive) == null,
-                "the Vasto Lorde killed by command still lives");
+                "a Vasto Lorde killed by command still lives");
     }
 
     private static boolean vastoLordeSeen(Minecraft minecraft) {
-        return nearest(minecraft, VastoLorde.class, SUMMONED_RANGE,
-                vasto -> vasto.isAlive() && !ClientSouls.isHiddenFromViewer(vasto)) != null;
+        LocalPlayer player = minecraft.player;
+        Set<Integer> looks = minecraft.level.getEntitiesOfClass(VastoLorde.class,
+                        player.getBoundingBox().inflate(SUMMONED_RANGE),
+                        vasto -> vasto.isAlive() && !ClientSouls.isHiddenFromViewer(vasto))
+                .stream().map(VastoLorde::look).collect(Collectors.toSet());
+        return looks.equals(Set.of(VastoLorde.PLATED, VastoLorde.HORNED, VastoLorde.CRESTED));
     }
 
     /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has, with his cleaver in hand. */
