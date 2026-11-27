@@ -70,6 +70,11 @@ public record BankaiRecord(long achievedAt, Component name, long windowEndsAt, O
         return new BankaiRecord(achievedAt, name, windowEndsAt, doll, spiritHealth, tries + 1, now, shikaiTicks);
     }
 
+    /** These ticks more spent with the Shikai released, towards Bankai by Jinzen alone ({@link SlowRoad}). */
+    public BankaiRecord trained(long ticks) {
+        return new BankaiRecord(achievedAt, name, windowEndsAt, doll, spiritHealth, tries, lastTryAt, shikaiTicks + ticks);
+    }
+
     /** A Tenshintai set down here, its window open until {@code endsAt}, its spirit whole; the tries and the last kept. */
     public BankaiRecord dollAt(GlobalPos place, long endsAt) {
         return new BankaiRecord(achievedAt, name, endsAt, Optional.of(place), 1.0F, tries, lastTryAt, shikaiTicks);

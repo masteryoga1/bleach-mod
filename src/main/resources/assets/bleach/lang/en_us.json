@@ -322,6 +322,7 @@
   "screen.bleach.soul.zanpakuto.settling": "sealed, %s before it can be released",
   "screen.bleach.soul.bankai": "Bankai: %s",
   "screen.bleach.soul.bankai.unnamed": "reached",
+  "screen.bleach.soul.shikai_time": "Time in Shikai: %s h %s min",
   "screen.bleach.soul.tenshintai": "Tenshintai: %s d %s h left, %s",
   "screen.bleach.soul.tenshintai.at": "standing at %s, %s, %s",
   "screen.bleach.soul.tenshintai.away": "standing in another world",

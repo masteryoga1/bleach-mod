@@ -99,6 +99,8 @@ public final class SoulData {
     SoulAppearance lastSentAppearance;
     /** Tick of the last release or seal, for the release cooldown. */
     int lastReleaseChangeTick = -1000;
+    /** Ticks in Shikai counted towards the slow road and not yet written onto the Bankai record ({@link SlowRoad}). */
+    int roadTicks;
     /** Fire ticks from just before an unaware player's hit passed through, to undo what the hit set alight. */
     int fireBeforeIgnoredHit = NO_FIRE_RECORDED;
     /** Set on the respawned copy when this death turned a Substitute into a Shinigami. */
