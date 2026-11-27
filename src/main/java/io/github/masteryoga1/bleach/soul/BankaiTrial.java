@@ -50,7 +50,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  *
  * <p>While {@code spirit_tests} is on, a spirit whose file sets a test of its own ({@code bankai.test}) tests its soul
  * so ({@link #testOf}): Zabimaru by its two halves, both to be beaten down together ({@link ZabimaruSpirit#splitHalves}),
- * and Zangetsu with blades risen about the soul, one of them true ({@link BankaiSwords}).
+ * and Zangetsu with blades risen about the soul, of which only the true one reaches him ({@link BankaiSwords}).
  * Any other spirit, or one whose body cannot take its test, fights a plain bout.
  *
  * <p>A ring of {@code ring_radius} blocks, lit in the spirit's colour, stands where the wielder began: it keeps the
@@ -67,7 +67,7 @@ public final class BankaiTrial {
     private static final String ARENA = "message.bleach.bankai.trial.arena", BARRIER = "message.bleach.bankai.trial.barrier";
     private static final String IN_TRIAL = "message.bleach.bankai.trial.duel_in_trial";
     private static final String NEAR = "message.bleach.bankai.trial.duel_near";
-    private static final String HALVES = "message.bleach.bankai.trial.halves";
+    private static final String HALVES = "message.bleach.bankai.trial.halves", BLADES = "message.bleach.bankai.trial.blades";
     private static final int SECOND_TICKS = 20, KEEP_OUT_INTERVAL_TICKS = 5, RING_INTERVAL_TICKS = 10, RING_POINTS = 48;
     /** How far above and below the centre others are kept out, and how high above it the ring is lit, in blocks. */
     private static final double KEEP_OUT_HEIGHT = 8.0, RING_LIFT = 0.2;
@@ -85,8 +85,8 @@ public final class BankaiTrial {
      * but STARTED with the reason a command says, the call's own for its own.
      */
     public enum Start {
-        STARTED(false), DEAD(true), WATCHING(false), ALREADY(false), REACHED(false), CROWDED(false), NO_POWER(true),
-        NAMELESS(true), NO_SPIRIT(true), NO_TYPE(true), BUSY(true), PEACEFUL(true), NO_ROOM(true);
+        STARTED(false), DEAD(true), WATCHING(false), ALREADY(false), REACHED(false), CROWDED(false), NO_GROUND(false),
+        NO_POWER(true), NAMELESS(true), NO_SPIRIT(true), NO_TYPE(true), BUSY(true), PEACEFUL(true), NO_ROOM(true);
 
         private final boolean called;
 
@@ -130,9 +130,10 @@ public final class BankaiTrial {
     /**
      * Begins the wielder's bout where it stands, or says why not: the wielder a spectator or in creative mode, in a
      * bout already, or past Bankai, then the call's own refusals, a dead wielder's among them, then a spot where its
-     * ring would meet another's ({@link #crowded}). A spirit it has out is replaced by one afresh and whole, and only
-     * once the new one has room, so a refused bout leaves it out. The try is counted only once the bout has begun. On
-     * the client: NO_SPIRIT.
+     * ring would meet another's ({@link #crowded}), and for a test with blades one where fewer than half of them find
+     * ground ({@link BankaiSwords#ground}). A spirit it has out is replaced by one afresh and whole, and only once the
+     * new one has room, so a refused bout leaves it out. The try is counted only once the bout has begun. On the
+     * client: NO_SPIRIT.
      */
     public static Start begin(Player wielder, long now) {
         if (!(wielder.level() instanceof ServerLevel level)) {
@@ -158,6 +159,9 @@ public final class BankaiTrial {
         ZanpakutoSpirit.BankaiTest test = testOf(wielder, data);
         boolean withBlades = test == ZanpakutoSpirit.BankaiTest.SWORDS;
         List<Vec3> ground = withBlades ? BankaiSwords.ground(level, wielder, wielder.position(), ringRadius()) : List.of();
+        if (withBlades && tooLittleGround(ground.size())) {
+            return Start.NO_GROUND;
+        }
         // No room, or a rung that changed since; never ALREADY, as the call replaces a spirit out.
         Materialisation.Call call = Materialisation.callOut(wielder, true);
         if (call != Materialisation.Call.CALLED) {
@@ -170,7 +174,7 @@ public final class BankaiTrial {
     /**
      * The bout begins with this spirit, out before its wielder: held, its try counted, its clock and ring shown, and its
      * test set: a Zabimaru tested by its two halves has its health split between them, and its wielder is told so; a
-     * soul tested with blades has them risen on this ground in its spirit's Shikai look.
+     * soul tested with blades has them risen on this ground in its spirit's Shikai look, and is told so.
      */
     private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, long now,
             ZanpakutoSpirit.BankaiTest test, List<Vec3> ground) {
@@ -195,6 +199,9 @@ public final class BankaiTrial {
         wielder.sendSystemMessage(Component.translatable(BEGUN, seconds).withStyle(ChatFormatting.GRAY));
         if (spirit instanceof ZabimaruSpirit zabimaru && zabimaru.split()) {
             wielder.sendSystemMessage(Component.translatable(HALVES).withStyle(ChatFormatting.GRAY));
+        }
+        if (swords != null) {
+            wielder.sendSystemMessage(Component.translatable(BLADES).withStyle(ChatFormatting.GRAY));
         }
         return Start.STARTED;
     }
@@ -375,9 +382,14 @@ public final class BankaiTrial {
         return (float) BleachConfig.get(BleachConfig.BANKAI_TRIAL_LOSS_HEALTH);
     }
 
-    /** How many blades rise for a test with blades: forty. */
+    /** How many blades rise for a test with blades. */
     public static int blades() {
-        return 40;
+        return BleachConfig.get(BleachConfig.BANKAI_TRIAL_BLADES);
+    }
+
+    /** Whether so few spots were found that fewer than half the blades would rise, which refuses the trial. */
+    public static boolean tooLittleGround(int spots) {
+        return 2 * spots < blades();
     }
 
     /** The ring's radius, in blocks. */
@@ -508,6 +520,8 @@ public final class BankaiTrial {
      * arrows, waves and blasts too) on anything else, is stopped before anything else weighs it, as at the inner
      * Hollow's fight. Blocks, lava and falls still hurt the wielder; the spirit's own guard keeps others' blows off it.
      * A beaten spirit strikes no more, in a bout or out of one: a blow before its next tick would turn a won bout to a loss.
+     * A spirit that tests with blades is reached only as they allow ({@link BankaiSwords#lands}), weighed after the
+     * refusals above, so a blow one of them stops breaks no blade.
      */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
         LivingEntity victim = event.getEntity();
@@ -517,8 +531,10 @@ public final class BankaiTrial {
         }
         Trial guarded = victim instanceof Player wielder ? TRIALS.get(wielder.getUUID()) : null;
         Trial striking = attacker instanceof Player striker ? TRIALS.get(striker.getUUID()) : null;
+        Trial struck = victim instanceof MaterialisedSpirit body ? trialOf(body) : null;
         if (guarded != null && attacker != guarded.spirit || striking != null && victim != striking.spirit
-                || attacker instanceof MaterialisedSpirit spirit && spirit.beaten()) {
+                || attacker instanceof MaterialisedSpirit spirit && spirit.beaten()
+                || struck != null && struck.swords != null && !struck.swords.lands(struck.wielder, event.getSource())) {
             event.setCanceled(true);
         }
     }
