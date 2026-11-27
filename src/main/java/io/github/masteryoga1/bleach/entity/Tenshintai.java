@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.soul.BankaiLogic;
@@ -8,6 +9,7 @@ import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
@@ -36,17 +38,22 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
 /**
  * The Tenshintai, Kisuke's doll that forces a zanpakutō spirit out, set down from its item ({@link #setDown}) by a soul
- * that knows its zanpakutō's name. Where it stands is on the soul's record ({@link BankaiRecord#doll}), never here: a
- * doll is never saved and goes with its chunk. One that record no longer names (Bankai reached, granted, revoked or
- * reset, another spirit bound) crumbles on its next tick; one whose soul is gone (logged out, respawned) goes quietly.
- * A made thing, not a spirit: everyone sees it, and nothing hurts, pushes or moves it.
+ * that knows its zanpakutō's name, to stand for {@code [bankai.tenshintai] window_days} game days, its window. Where it
+ * stands and when its window ends are on the soul's record ({@link BankaiRecord#doll}, {@link BankaiRecord#windowEndsAt}),
+ * never here: a doll is never saved, goes with its chunk, and stands again by its soul's tick wherever the record says
+ * ({@link #keep}). One that record no longer names (its window over, Bankai reached, granted, revoked or reset, another
+ * spirit bound) crumbles on its next tick; one whose soul is gone (logged out, respawned) goes quietly. A made thing,
+ * not a spirit: everyone sees it, and nothing hurts, pushes or moves it.
  */
 public class Tenshintai extends Entity {
     /** Its box, in blocks: a life-sized doll's. */
     public static final float WIDTH = 0.6F, HEIGHT = 1.95F;
+    /** How often, in a soul's own ticks, its doll is looked for and stood again. */
+    public static final int KEEP_TICKS = 20;
     private static final String SET_DOWN = "message.bleach.tenshintai.set_down", STANDS = "message.bleach.tenshintai.stands";
     private static final String NO_SPOT = "message.bleach.tenshintai.no_spot", REACHED = "message.bleach.tenshintai.reached";
     private static final String NO_POWER = "message.bleach.tenshintai.no_power";
+    private static final String CRUMBLED = "message.bleach.tenshintai.crumbled";
     private static final int CRUMBLE_PARTICLES = 30;
 
     /** The doll standing for each soul, by its UUID, while that doll is in its world. Server thread only. */
@@ -67,21 +74,22 @@ public class Tenshintai extends Entity {
     }
 
     /**
-     * Sets this soul's doll down at {@code at}, on the block under it, facing the soul, and says so; or says why not,
-     * changing nothing: a soul that may not hold Bankai or holds it already, a doll of its own standing, or no sturdy
-     * top or no room for it there.
+     * Sets this soul's doll down at {@code at}, on the block under it, facing the soul, its window opening now, and says
+     * so; or says why not, changing nothing but a window over, which closes first: a soul that may not hold Bankai or
+     * holds it already, a doll of its own standing in its window, or no sturdy top or no room for it there.
      *
      * @return null once it stands, else the key of the line that says why not
      */
     @Nullable
     public static String setDown(ServerLevel level, Player owner, BlockPos at) {
+        long now = level.getGameTime();
         SoulData data = SoulLogic.get(owner);
+        closeIfOver(owner, data, now);
         BankaiRecord record = data.zanpakuto().bankai();
         if (!BankaiLogic.mayHold(data) || record.achieved()) {
             return record.achieved() ? REACHED : NO_POWER;
         }
-        Tenshintai standing = STANDING.get(owner.getUUID());
-        if (standing != null && !standing.isRemoved()) {
+        if (record.doll().isPresent()) {
             return STANDS;
         }
         AABB box = ModEntities.TENSHINTAI.get().getDimensions().makeBoundingBox(Vec3.atBottomCenterOf(at));
@@ -90,14 +98,56 @@ public class Tenshintai extends Entity {
             return NO_SPOT;
         }
         GlobalPos place = GlobalPos.of(level.dimension(), at);
-        data.setZanpakuto(data.zanpakuto().withBankai(record.dollAt(place)));
-        if (owner instanceof ServerPlayer player) {
-            BleachNetwork.syncSoul(player, data);
-        }
+        write(owner, data, record.dollAt(place, now + windowTicks()));
         stand(level, owner, place);
         level.playSound(null, at, SoundEvents.ARMOR_STAND_PLACE, SoundSource.PLAYERS, 1.0F, 1.0F);
-        owner.sendSystemMessage(Component.translatable(SET_DOWN).withStyle(ChatFormatting.GRAY));
+        owner.sendSystemMessage(Component.translatable(SET_DOWN, windowDays()).withStyle(ChatFormatting.GRAY));
         return null;
+    }
+
+    /**
+     * Each {@link #KEEP_TICKS} of a living soul's ticks: a window over closes, and the doll its record names in the
+     * soul's own world stands again there, facing the soul, where that place ticks entities and none of its own stands.
+     */
+    public static void keep(Player owner, SoulData data) {
+        if (!(owner.level() instanceof ServerLevel level) || closeIfOver(owner, data, level.getGameTime())) {
+            return;
+        }
+        Optional<GlobalPos> place = data.zanpakuto().bankai().doll();
+        Tenshintai standing = STANDING.get(owner.getUUID());
+        if (place.isEmpty() || !place.get().dimension().equals(level.dimension())
+                || standing != null && standing.owner == owner && !standing.isRemoved() && standing.named()
+                || !level.isPositionEntityTicking(place.get().pos())) {
+            return;
+        }
+        stand(level, owner, place.get());
+    }
+
+    /**
+     * Closes this soul's window once it is over: the record forgets the doll and its window, the soul is told so in
+     * chat, and the doll crumbles on its next tick. A doll set down with no window on its record, as one was before
+     * windows were kept, closes at once.
+     *
+     * @return whether it closed now
+     */
+    private static boolean closeIfOver(Player owner, SoulData data, long now) {
+        BankaiRecord record = data.zanpakuto().bankai();
+        if (record.doll().isEmpty() || now < record.windowEndsAt()) {
+            return false;
+        }
+        write(owner, data, record.closed());
+        owner.sendSystemMessage(Component.translatable(CRUMBLED).withStyle(ChatFormatting.GRAY));
+        return true;
+    }
+
+    /** How many game days a doll stands from its setting down ({@code [bankai.tenshintai] window_days}). */
+    public static int windowDays() {
+        return BleachConfig.get(BleachConfig.BANKAI_TENSHINTAI_WINDOW_DAYS);
+    }
+
+    /** The same in ticks of the game time its record is read by. */
+    public static long windowTicks() {
+        return windowDays() * (long) Level.TICKS_PER_DAY;
     }
 
     /** The doll standing for this soul, or null with none in its world. For the tests. */
@@ -106,8 +156,12 @@ public class Tenshintai extends Entity {
         return STANDING.get(owner);
     }
 
-    /** Stands this soul's doll at its place, facing the soul. */
+    /** Stands this soul's doll at its place, facing the soul, the soul's doll before it gone. */
     private static void stand(ServerLevel level, Player owner, GlobalPos place) {
+        Tenshintai old = STANDING.remove(owner.getUUID());
+        if (old != null) {
+            old.discard();
+        }
         Vec3 at = Vec3.atBottomCenterOf(place.pos());
         Vec3 toOwner = owner.position().subtract(at);
         Tenshintai doll = new Tenshintai(ModEntities.TENSHINTAI.get(), level);
@@ -115,6 +169,14 @@ public class Tenshintai extends Entity {
         doll.owner = owner;
         if (level.addFreshEntity(doll)) {
             STANDING.put(owner.getUUID(), doll);
+        }
+    }
+
+    /** Writes the soul's record and sends it to its client. */
+    private static void write(Player owner, SoulData data, BankaiRecord record) {
+        data.setZanpakuto(data.zanpakuto().withBankai(record));
+        if (owner instanceof ServerPlayer player) {
+            BleachNetwork.syncSoul(player, data);
         }
     }
 

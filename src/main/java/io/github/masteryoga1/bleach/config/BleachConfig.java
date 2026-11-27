@@ -238,6 +238,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_HALVES_SECONDS;
     public static final ModConfigSpec.DoubleValue BANKAI_TRIAL_RISE_SHARE;
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_BLADES;
+    public static final ModConfigSpec.IntValue BANKAI_TENSHINTAI_WINDOW_DAYS;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1531,6 +1532,12 @@ public final class BleachConfig {
                         + " with blades (Zangetsu); one of them is true. No such trial begins where fewer than half of"
                         + " them find ground.")
                 .defineInRange("blades", 40, 2, 64);
+        builder.pop();
+        builder.push("tenshintai");
+        BANKAI_TENSHINTAI_WINDOW_DAYS = builder
+                .comment("Game days a Tenshintai stands from its setting down, holding its soul's zanpakutō spirit out to be"
+                        + " fought by it; then it crumbles.")
+                .defineInRange("window_days", 3, 1, 30);
         builder.pop();
         builder.pop();
 
