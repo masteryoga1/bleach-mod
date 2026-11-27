@@ -19,7 +19,7 @@ import net.minecraft.world.entity.monster.Monster;
  * The kinds of Hollow and everything that sets them apart, in one table so the balance lives in one
  * place: their Normal-difficulty stats, how hard they chase and bite, their reiatsu, how big they may
  * grow, where the mask sits, how they are drawn and how often they come through a Garganta. The
- * Menos Grande rows never come by the arrival pool: {@link Menos#arrivalKind} picks them.
+ * Menos Grande rows never come by the arrival pool: {@link Menos#arrivalKind} picks them. Nor does the Vasto Lorde's.
  */
 public enum HollowKind implements StringRepresentable {
     SPIDER("spider", new Stats(60.0, 5.0, 2.0, 0.30, 32.0, 0.0, 0.0, 0.6), 20, 1.0, 50.0F, 10,
@@ -61,7 +61,15 @@ public enum HollowKind implements StringRepresentable {
      */
     GRAND_FISHER("grand_fisher", new Stats(180.0, 8.0, 4.0, 0.25, 40.0, 0.6, 1.0, 1.0), 30, 1.0, 200.0F, 50,
             null, 1.0F, 1.0F,
-            new MaskSpot(1.15, 3.1, 1.2), new Look(2.0F, 0.25F, 0.4F, 1.6F), 0, Float.MAX_VALUE);
+            new MaskSpot(1.15, 3.1, 1.2), new Look(2.0F, 0.25F, 0.4F, 1.6F), 0, Float.MAX_VALUE),
+    /**
+     * A Vasto Lorde, the highest class of Menos Grande, human-sized, and a boss: it comes alone and never by chance, and
+     * it is no Menos here ({@link #isVasto}). Its health and attack here are only the config's defaults
+     * ([bosses.vasto_lorde]), which set them as it spawns; its armour is the heaviest of any Hollow's.
+     */
+    VASTO_LORDE("vasto_lorde", new Stats(400.0, 16.0, 14.0, 0.35, 48.0, 1.0, 1.0, 1.0), 20, 1.2, 2500.0F, 100,
+            null, 1.0F, 1.0F,
+            new MaskSpot(0.25, 1.75, 0.5), new Look(1.0F, 0.0F, 0.1F, 0.5F), 0, Float.MAX_VALUE);
 
     public static final Codec<HollowKind> CODEC = StringRepresentable.fromEnum(HollowKind::values);
 
@@ -145,9 +153,17 @@ public enum HollowKind implements StringRepresentable {
                 .add(Attributes.SAFE_FALL_DISTANCE, SAFE_FALL_DISTANCE);
     }
 
-    /** Whether this kind is a Menos Grande: a Gillian or an Adjuchas. */
+    /**
+     * Whether this kind is a Menos Grande that the Menos rules take: a Gillian or an Adjuchas. Never the Vasto Lorde, which
+     * no Menos arrival builds, no Menos cap or count holds, and no Menos eats ({@link #isVasto}).
+     */
     public boolean isMenos() {
         return this == GILLIAN || this == ADJUCHAS;
+    }
+
+    /** Whether this kind is the Vasto Lorde, the Menos class above the Adjuchas, which comes alone and is no Menos here. */
+    public boolean isVasto() {
+        return this == VASTO_LORDE;
     }
 
     /**

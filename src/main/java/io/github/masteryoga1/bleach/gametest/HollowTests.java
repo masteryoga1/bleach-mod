@@ -93,7 +93,8 @@ public final class HollowTests {
             new KindStats(HollowKind.GILLIAN, 300.0, 14.0, 8.0, 0.18),
             new KindStats(HollowKind.ADJUCHAS, 140.0, 9.0, 10.0, 0.34),
             new KindStats(HollowKind.SHRIEKER, 120.0, 7.0, 4.0, 0.25),
-            new KindStats(HollowKind.GRAND_FISHER, 180.0, 8.0, 4.0, 0.25));
+            new KindStats(HollowKind.GRAND_FISHER, 180.0, 8.0, 4.0, 0.25),
+            new KindStats(HollowKind.VASTO_LORDE, 400.0, 16.0, 14.0, 0.35));
 
     private HollowTests() {
     }
@@ -185,6 +186,7 @@ public final class HollowTests {
         helper.assertFalse(ModEntities.ADJUCHAS.get().canSerialize(), "an Adjuchas is saved with the world");
         helper.assertFalse(ModEntities.SHRIEKER.get().canSerialize(), "a Shrieker is saved with the world");
         helper.assertFalse(ModEntities.GRAND_FISHER.get().canSerialize(), "Grand Fisher is saved with the world");
+        helper.assertFalse(ModEntities.VASTO_LORDE.get().canSerialize(), "a Vasto Lorde is saved with the world");
         helper.assertFalse(ModEntities.CERO_BEAM.get().canSerialize(), "a Cero is saved with the world");
         helper.succeed();
     }
@@ -192,8 +194,8 @@ public final class HollowTests {
     @GameTest(template = "field")
     public static void hollowsGetASoulOnTheirFirstTick(GameTestHelper helper) {
         List<Hollow> hollows = new ArrayList<>();
-        int x = 2;
-        // Two blocks apart, so all seven that are no Menos fit the field's row, Grand Fisher at its end.
+        int x = 1;
+        // Two blocks apart, so all eight that are no Menos fit the field's row, the human-sized Vasto Lorde at its end.
         for (HollowKind kind : HollowKind.values()) {
             if (kind.isMenos()) {
                 // Too big for this row; MenosTests checks a Gillian's soul.

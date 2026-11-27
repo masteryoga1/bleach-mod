@@ -149,9 +149,13 @@ public final class MenosTests {
                 "the Gillian kind has the wrong entity type");
         helper.assertTrue(ModEntities.hollowType(HollowKind.ADJUCHAS) == ModEntities.ADJUCHAS.get(),
                 "the Adjuchas kind has the wrong entity type");
+        // The Vasto Lorde is a Menos class in canon, but none of the Menos rules is its: only isVasto names it.
         for (HollowKind kind : HollowKind.values()) {
             boolean menos = kind == HollowKind.GILLIAN || kind == HollowKind.ADJUCHAS;
             helper.assertTrue(kind.isMenos() == menos, kind.getSerializedName() + (menos ? " is not" : " is") + " a Menos");
+            boolean vasto = kind == HollowKind.VASTO_LORDE;
+            helper.assertTrue(kind.isVasto() == vasto,
+                    kind.getSerializedName() + (vasto ? " is not" : " is") + " a Vasto Lorde");
         }
         List<HollowKind> pool = HollowLogic.arrivalPool(100_000.0F);
         helper.assertFalse(pool.contains(HollowKind.GILLIAN) || pool.contains(HollowKind.ADJUCHAS),

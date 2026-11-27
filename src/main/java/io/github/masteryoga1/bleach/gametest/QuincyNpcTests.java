@@ -680,6 +680,8 @@ public final class QuincyNpcTests {
         helper.assertFalse(QuincyNpcLogic.hunterMayCome(HollowKind.FISHBONE_D, false), "the Hunter may follow the first Hollow");
         helper.assertFalse(QuincyNpcLogic.hunterMayCome(HollowKind.SPIDER, true), "the Hunter may follow a summoned Garganta");
         helper.assertFalse(QuincyNpcLogic.hunterMayCome(HollowKind.SHRIEKER, false), "the Hunter may follow the Shrieker");
+        helper.assertFalse(QuincyNpcLogic.hunterMayCome(HollowKind.VASTO_LORDE, false),
+                "the Hunter may follow a Vasto Lorde");
         helper.succeed();
     }
 

@@ -131,7 +131,8 @@ public final class RegistrationTests {
     @GameTest(template = "empty")
     public static void hollowsAndPlusesAreRegistered(GameTestHelper helper) {
         for (String name : List.of("spider_hollow", "hexapodus", "hound_hollow", "serpent_hollow", "fishbone_d", "plus",
-                "garganta", "shrieker", "shrieker_leech", "grand_fisher", "grand_fisher_lure", "hell_gate")) {
+                "garganta", "shrieker", "shrieker_leech", "grand_fisher", "grand_fisher_lure", "hell_gate",
+                "vasto_lorde")) {
             helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.containsKey(BleachMod.id(name)), "bleach:" + name + " is not an entity type");
         }
         for (String name : List.of("spider_hollow_spawn_egg", "hexapodus_spawn_egg", "hound_hollow_spawn_egg",
@@ -156,6 +157,9 @@ public final class RegistrationTests {
         EntityType<?> fisher = ModEntities.GRAND_FISHER.get();
         helper.assertTrue(!fisher.canSerialize() && fisher.canSummon(),
                 "bleach:grand_fisher is saved, or cannot be summoned");
+        EntityType<?> vasto = ModEntities.VASTO_LORDE.get();
+        helper.assertTrue(vasto.is(SoulLogic.SPIRITS) && vasto.is(BleachTags.HOLLOWS) && !vasto.canSerialize()
+                && vasto.canSummon(), "bleach:vasto_lorde is no spirit or Hollow, is saved, or cannot be summoned");
         EntityType<?> lure = ModEntities.GRAND_FISHER_LURE.get();
         helper.assertTrue(lure.is(SoulLogic.SPIRITS) && !lure.is(BleachTags.HOLLOWS) && !lure.canSerialize()
                 && !lure.canSummon(), "bleach:grand_fisher_lure is no spirit, is a Hollow, or is saved or summoned");
