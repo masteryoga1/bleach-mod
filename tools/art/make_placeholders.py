@@ -1109,6 +1109,53 @@ def grand_fisher_mask():
     return c
 
 
+# A Vasto Lorde: a person's shape, in the humanoid layout the zombie's layer uses (the left arm and leg mirror the right
+# ones' nets), each box as (u, v, w, h, d).
+VASTO_HEAD = (0, 0, 8, 8, 8)
+VASTO_BODY = (16, 16, 8, 12, 4)
+VASTO_ARM = (40, 16, 4, 12, 4)
+VASTO_LEG = (0, 16, 4, 12, 4)
+
+
+def vasto_lorde():
+    """A Vasto Lorde's hide: black and faintly mottled over the head, body, arm and leg, the hole through the middle of
+    the chest, and bone-white claws round the last row of each hand and foot. The hat layer stays clear."""
+    c = Canvas(64, 64)
+    for part in (VASTO_HEAD, VASTO_BODY, VASTO_ARM, VASTO_LEG):
+        box(c, *part, HOLLOW_BLACK)
+    mottle(c, 0, 0, 56, 32, HOLLOW_SHADE, 5)
+    x0, y0, x1, y1 = faces(*VASTO_BODY)[3]   # the chest's front: (20, 20) to (28, 32)
+    hole(c, x0 + 2, y0 + 5)
+    # The corners it rounds off its rim are cleared, which on a hide would be holes right through: hide again.
+    paint_where(c, [(x0, y0, x1, y1)], HOLLOW_BLACK, lambda x, y: c.get(x, y)[3] == 0)
+    for part in (VASTO_ARM, VASTO_LEG):
+        for x0, y0, x1, y1 in faces(*part)[2:]:   # its right, front, left and back, each its last row
+            c.rect(x0, y1 - 1, x1, y1, BONE)
+    return c
+
+
+def vasto_lorde_mask():
+    """A narrow bone face over the front of the head: two slits for eyes slanting down towards a shaded ridge between
+    them, and a mouth of fangs along its foot; the face wraps a pixel round each side, and the crown's front rows are
+    bone too, so the mask shows from aside and above."""
+    c = Canvas(64, 64)
+    x0, y0, x1, y1 = faces(*VASTO_HEAD)[3]   # the front: (8, 8) to (16, 16)
+    c.rect(x0, y0, x1, y1, BONE)
+    c.rect(x0 + 3, y0 + 1, x0 + 5, y0 + 5, BONE_SHADE)
+    for dx, dy in ((1, 3), (2, 3), (2, 4), (5, 3), (6, 3), (5, 4)):
+        c.put(x0 + dx, y0 + dy, VOID)
+    c.rect(x0 + 1, y0 + 6, x1 - 1, y0 + 7, VOID)
+    for dx in (2, 5):                         # the fangs, from above
+        c.put(x0 + dx, y0 + 6, BONE)
+    rx0, ry0, rx1, ry1 = faces(*VASTO_HEAD)[2]   # the right side: its column nearest the front
+    c.rect(rx1 - 1, ry0, rx1, ry1 - 1, BONE)
+    lx0, ly0, lx1, ly1 = faces(*VASTO_HEAD)[4]   # the left side: its column nearest the front
+    c.rect(lx0, ly0, lx0 + 1, ly1 - 1, BONE)
+    tx0, ty0, tx1, ty1 = faces(*VASTO_HEAD)[0]   # the crown: its front rows, nearest v + d
+    c.rect(tx0, ty1 - 2, tx1, ty1, BONE)
+    return c
+
+
 # Grand Fisher's lure: a small girl, on the slim player skin's layout, and the stalk she hangs from.
 LURE_SKIN = rgb(238, 206, 186)
 LURE_HAIR = rgb(58, 40, 34)
@@ -2646,6 +2693,9 @@ TEXTURES = {
     "entity/hollow/grand_fisher.png": grand_fisher,
     "entity/hollow/grand_fisher_mask.png": grand_fisher_mask,
     "entity/hollow/grand_fisher_mask_cracked.png": cracked(grand_fisher_mask, [(66, 9), (67, 12), (65, 15), (67, 17)]),
+    "entity/hollow/vasto_lorde.png": vasto_lorde,
+    "entity/hollow/vasto_lorde_mask.png": vasto_lorde_mask,
+    "entity/hollow/vasto_lorde_mask_cracked.png": cracked(vasto_lorde_mask, [(10, 9), (11, 11), (10, 13), (12, 15)]),
     "entity/grand_fisher_lure.png": grand_fisher_lure,
     "entity/grand_fisher_stalk.png": grand_fisher_stalk,
     "entity/garganta.png": garganta,

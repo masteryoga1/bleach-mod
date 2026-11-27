@@ -42,6 +42,7 @@ import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.Tenshintai;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.entity.TrialBlade;
+import io.github.masteryoga1.bleach.entity.VastoLorde;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
@@ -248,6 +249,17 @@ public final class ModEntities {
                     .noSave()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("grand_fisher").toString()));
+
+    /** A Vasto Lorde: a human-sized boss Hollow, no Menos here. Never saved. */
+    public static final DeferredHolder<EntityType<?>, EntityType<VastoLorde>> VASTO_LORDE =
+            ENTITY_TYPES.register("vasto_lorde", () -> EntityType.Builder
+                    .<VastoLorde>of(VastoLorde::new, MobCategory.MONSTER)
+                    .sized(0.7F, 2.0F)
+                    .eyeHeight(1.75F)
+                    .fireImmune()
+                    .noSave()
+                    .clientTrackingRange(10)
+                    .build(BleachMod.id("vasto_lorde").toString()));
 
     /**
      * Grand Fisher's lure, a small girl on a stalk from its brow. Never saved and never summoned: it comes only from its
@@ -596,6 +608,7 @@ public final class ModEntities {
             case ADJUCHAS -> ADJUCHAS.get();
             case SHRIEKER -> SHRIEKER.get();
             case GRAND_FISHER -> GRAND_FISHER.get();
+            case VASTO_LORDE -> VASTO_LORDE.get();
         };
     }
 
@@ -617,6 +630,7 @@ public final class ModEntities {
         event.put(SHRIEKER.get(), Shrieker.createAttributes().build());
         event.put(GRAND_FISHER.get(), GrandFisher.createAttributes().build());
         event.put(GRAND_FISHER_LURE.get(), GrandFisherLure.createAttributes().build());
+        event.put(VASTO_LORDE.get(), VastoLorde.createAttributes().build());
         event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
         event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());

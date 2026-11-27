@@ -347,14 +347,15 @@ public final class HellGateTests {
 
     /**
      * The share of sinners, on arrivals finalised as spawns are: at 0 none is a sinner; at 1 every lesser one is, but
-     * never a Menos, Fishbone D nor Grand Fisher; the mark is kept through a save and a load; a practice Hollow never is
-     * one; and a Hollow a Plus turns into rolls the share as any arrival does. The Shrieker, always one, is left to its
-     * own tests.
+     * never a Menos, a Vasto Lorde, Fishbone D nor Grand Fisher; the mark is kept through a save and a load; a practice
+     * Hollow never is one; and a Hollow a Plus turns into rolls the share as any arrival does. The Shrieker, always one,
+     * is left to its own tests.
      */
     @GameTest(template = "field")
     public static void theShareMarksArrivalsButNeverAMenosFishboneDOrAPracticeHollow(GameTestHelper helper) {
         List<HollowKind> kinds = List.of(HollowKind.SPIDER, HollowKind.HEXAPODUS, HollowKind.HOUND, HollowKind.SERPENT,
-                HollowKind.FISHBONE_D, HollowKind.GILLIAN, HollowKind.ADJUCHAS, HollowKind.GRAND_FISHER);
+                HollowKind.FISHBONE_D, HollowKind.GILLIAN, HollowKind.ADJUCHAS, HollowKind.GRAND_FISHER,
+                HollowKind.VASTO_LORDE);
         List<HollowKind> lesser = List.of(HollowKind.SPIDER, HollowKind.HEXAPODUS, HollowKind.HOUND, HollowKind.SERPENT);
         KidoTests.withConfig(BleachConfig.SINNER_SHARE, 0.0, () -> kinds.forEach(kind -> helper.assertFalse(
                 arrival(helper, kind).isSinner(), "a share of 0 made a " + kind + " arrival a sinner")));

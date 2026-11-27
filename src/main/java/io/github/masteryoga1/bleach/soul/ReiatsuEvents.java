@@ -12,6 +12,7 @@ import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
+import io.github.masteryoga1.bleach.entity.VastoLorde;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -62,14 +63,14 @@ public final class ReiatsuEvents {
      * Every creature that walks by pathfinding can be frightened into running, except a Shinigami NPC,
      * a Quincy NPC, who stands their ground, Fishbone D, who has come for one soul and does not back
      * down, an Arrancar NPC, who has come to fight, an inner Hollow, which is its host's own power, a
-     * gatekeeper, who keeps his post, and a Shrieker or Grand Fisher, bosses that do not leave the fight they came for,
-     * and a zanpakutō's spirit drawn out, which is its wielder's own power too.
+     * gatekeeper, who keeps his post, and a Shrieker, Grand Fisher or Vasto Lorde, bosses that do not leave the fight they
+     * came for, and a zanpakutō's spirit drawn out, which is its wielder's own power too.
      */
     private static void onEntityJoin(EntityJoinLevelEvent event) {
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof PathfinderMob mob && !(mob instanceof ShinigamiNpc)
                 && !(mob instanceof QuincyNpc) && !(mob instanceof FishboneD) && !(mob instanceof ArrancarNpc)
                 && !(mob instanceof InnerHollow) && !(mob instanceof GateKeeper) && !(mob instanceof Shrieker)
-                && !(mob instanceof GrandFisher) && !(mob instanceof MaterialisedSpirit)
+                && !(mob instanceof GrandFisher) && !(mob instanceof VastoLorde) && !(mob instanceof MaterialisedSpirit)
                 && mob.goalSelector.getAvailableGoals().stream().noneMatch(goal -> goal.getGoal() instanceof ReiatsuFleeGoal)) {
             mob.goalSelector.addGoal(0, new ReiatsuFleeGoal(mob));
         }

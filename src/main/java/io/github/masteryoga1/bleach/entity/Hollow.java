@@ -720,11 +720,11 @@ public abstract class Hollow extends Monster {
     /**
      * Whether a Hollow of this kind arriving with this roll was a sinner in life: {@code [bosses] sinner_share} of them.
      * Never a Menos, a heap of souls with no one life to answer for, nor Fishbone D, whose purifying shows a new Shinigami
-     * what the blade does for a soul, nor Grand Fisher, no sinner ({@link GrandFisher}). A Shrieker always is
-     * ({@link Shrieker#isSinner}).
+     * what the blade does for a soul, nor Grand Fisher, no sinner ({@link GrandFisher}), nor a Vasto Lorde, a heap of
+     * souls as a Menos is. A Shrieker always is ({@link Shrieker#isSinner}).
      */
     public static boolean rollsSinner(HollowKind kind, double roll) {
-        return !kind.isMenos() && kind != HollowKind.FISHBONE_D && kind != HollowKind.GRAND_FISHER
+        return !kind.isMenos() && !kind.isVasto() && kind != HollowKind.FISHBONE_D && kind != HollowKind.GRAND_FISHER
                 && roll < BleachConfig.get(BleachConfig.SINNER_SHARE);
     }
 

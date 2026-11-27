@@ -34,6 +34,7 @@ import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.Tenshintai;
 import io.github.masteryoga1.bleach.entity.TrialBlade;
+import io.github.masteryoga1.bleach.entity.VastoLorde;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
@@ -413,10 +414,12 @@ public final class ClientSmokeTest {
     private static final int BLADES_AT = SPIRITS_AT + 120, LEAST_BLADES = 20;
     /** How many times a trial's blade had been drawn as the trial began. */
     private static int bladesDrawn;
-    /** The Tenshintai's beat, as the trial's ends, and the run ends after it. */
+    /** The Tenshintai's beat, as the trial's ends. */
     private static final int TENSHINTAI_AT = BLADES_AT + 120;
     /** How many times a Tenshintai had been drawn as its beat began. */
     private static int dollsDrawn;
+    /** A Vasto Lorde's beat, as the Tenshintai's ends, and the run ends after it. */
+    private static final int VASTO_LORDE_AT = TENSHINTAI_AT + 120;
     /** How far Zabimaru's snake may trail its place at a turning baboon's back on the client, in blocks. */
     private static final double SNAKE_TRAIL = 0.75;
     /** How far before the soul's eyes the golem its serpent lashes at is hung, and the tag it is killed by. */
@@ -696,6 +699,7 @@ public final class ClientSmokeTest {
         checkSpirits(minecraft);
         checkBlades(minecraft);
         checkDoll(minecraft);
+        checkVastoLorde(minecraft);
         if (finished) {
             return;
         }
@@ -2028,7 +2032,16 @@ public final class ClientSmokeTest {
                 command(minecraft, "clear @s bleach:tenshintai");
                 command(minecraft, "tp @s ~ ~ ~ ~ 0");
             }
-            case TENSHINTAI_AT + 120 -> {
+            // A Vasto Lorde, a Shinigami's eyes still on the world, summoned standing still on the ground before the soul
+            // and facing it, in air cleared as for the bosses before it.
+            case VASTO_LORDE_AT -> {
+                command(minecraft, "tp @s ~ ~ ~ 180 0");
+                command(minecraft, "fill ~-3 ~ ~-8 ~3 ~4 ~-1 air");
+                command(minecraft, "summon bleach:vasto_lorde ~ ~ ~-5 " + STILL);
+            }
+            case VASTO_LORDE_AT + 40 -> shot(minecraft, "vasto_lorde");
+            case VASTO_LORDE_AT + 42 -> command(minecraft, "kill @e[type=bleach:vasto_lorde]");
+            case VASTO_LORDE_AT + 120 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -3090,6 +3103,29 @@ public final class ClientSmokeTest {
         return count(minecraft, Tenshintai.class, 8.0) == 1 && TenshintaiRenderer.drawnFrames() > dollsDrawn;
     }
 
+    /**
+     * The checks of the Vasto Lorde's beat: summoned, it reaches the client unhidden, looked at for its shot; killed by
+     * command, it is gone.
+     */
+    private static void checkVastoLorde(Minecraft minecraft) {
+        if (expectWithin(minecraft, VASTO_LORDE_AT + 2, VASTO_LORDE_AT + 35, () -> vastoLordeSeen(minecraft),
+                "the summoned Vasto Lorde never reached the client unhidden")) {
+            VastoLorde vasto = nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive);
+            if (vasto != null) {
+                // Its middle, so the whole of it, mask and all, is in the shot.
+                look(minecraft, vasto.position().add(0.0, vasto.getBbHeight() * 0.5, 0.0));
+            }
+        }
+        expectWithin(minecraft, VASTO_LORDE_AT + 44, VASTO_LORDE_AT + 100,
+                () -> nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive) == null,
+                "the Vasto Lorde killed by command still lives");
+    }
+
+    private static boolean vastoLordeSeen(Minecraft minecraft) {
+        return nearest(minecraft, VastoLorde.class, SUMMONED_RANGE,
+                vasto -> vasto.isAlive() && !ClientSouls.isHiddenFromViewer(vasto)) != null;
+    }
+
     /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has, with his cleaver in hand. */
     private static boolean zangetsuOut(Minecraft minecraft) {
         ZangetsuSpirit zangetsu = nearest(minecraft, ZangetsuSpirit.class, 16.0, spirit -> true);
@@ -3348,8 +3384,9 @@ public final class ClientSmokeTest {
      * and before the last tick of each of the Gate of Hell's last three windows, so a stalled server's Gate and the
      * windows move together; before the last tick of Tensa Zangetsu's and Hihiō Zabimaru's first windows, for a
      * Bankai a slow server has not yet let settle; and before the last tick of each of the spirits' windows, for a
-     * spirit a slow server has not yet brought out or taken away, and of the trial's and the Tenshintai's, for its
-     * blades and the doll likewise. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
+     * spirit a slow server has not yet brought out or taken away, and of the trial's, the Tenshintai's and the Vasto
+     * Lorde's, for its blades, the doll and the boss likewise. Past {@link #SERVER_WAIT_TICKS} it goes on, and the check
+     * fails as before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
@@ -3374,7 +3411,11 @@ public final class ClientSmokeTest {
                 && count(minecraft, TrialBlade.class, 32.0) != 0
                 || ticksInWorld == TENSHINTAI_AT + 49 && !windowsPassed.contains(TENSHINTAI_AT + 3) && !dollStands(minecraft)
                 || ticksInWorld == TENSHINTAI_AT + 99 && !windowsPassed.contains(TENSHINTAI_AT + 61)
-                && count(minecraft, Tenshintai.class, 32.0) != 0;
+                && count(minecraft, Tenshintai.class, 32.0) != 0
+                || ticksInWorld == VASTO_LORDE_AT + 34 && !windowsPassed.contains(VASTO_LORDE_AT + 2)
+                && !vastoLordeSeen(minecraft)
+                || ticksInWorld == VASTO_LORDE_AT + 99 && !windowsPassed.contains(VASTO_LORDE_AT + 44)
+                && nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive) != null;
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

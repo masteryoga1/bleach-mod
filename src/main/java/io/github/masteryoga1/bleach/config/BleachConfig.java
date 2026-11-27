@@ -564,6 +564,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue GRAND_FISHER_AMBUSH_MIN_REIRYOKU;
     public static final ModConfigSpec.IntValue GRAND_FISHER_LURE_WAIT_SECONDS;
 
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_HEALTH;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_DAMAGE;
+
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
     public static final ModConfigSpec.DoubleValue VASTO_TEAR_CHANCE;
@@ -2521,8 +2524,8 @@ public final class BleachConfig {
         builder.push("bosses");
         SINNER_SHARE = builder
                 .comment("Share of the lesser Hollows that were sinners in life, whom the Gate of Hell takes when"
-                        + " a zanpakutō cuts them down. Never a Menos, Fishbone D or Grand Fisher; every Shrieker is"
-                        + " one, whatever this says.")
+                        + " a zanpakutō cuts them down. Never a Menos, a Vasto Lorde, Fishbone D or Grand Fisher; every"
+                        + " Shrieker is one, whatever this says.")
                 .defineInRange("sinner_share", 0.0, 0.0, 1.0);
         builder.push("shrieker");
         SHRIEKER_HEALTH = builder
@@ -2604,6 +2607,14 @@ public final class BleachConfig {
                 .comment("Seconds a lure laid alone waits for her prey to come near or strike her before she fades and"
                         + " nothing came.")
                 .defineInRange("lure_wait_seconds", 300, 10, 3_600);
+        builder.pop();
+        builder.push("vasto_lorde");
+        VASTO_LORDE_HEALTH = builder
+                .comment("A Vasto Lorde's health on Normal, before the hollows health multiplier. Easy takes some away.")
+                .defineInRange("health", 400.0, 1.0, 10_000.0);
+        VASTO_LORDE_DAMAGE = builder
+                .comment("Damage of a Vasto Lorde's blow on Normal, before the hollows damage multiplier.")
+                .defineInRange("damage", 16.0, 0.0, 200.0);
         builder.pop();
         builder.pop();
 

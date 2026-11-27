@@ -22,6 +22,7 @@ import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.entity.VastoLorde;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModEffects;
@@ -279,6 +280,10 @@ public final class BleachClient {
                         new GrandFisherModel(context.bakeLayer(BleachModelLayers.GRAND_FISHER)),
                         HollowKind.GRAND_FISHER, 90.0F));
         event.registerEntityRenderer(ModEntities.GRAND_FISHER_LURE.get(), GrandFisherLureRenderer::new);
+        event.registerEntityRenderer(ModEntities.VASTO_LORDE.get(),
+                context -> new HollowRenderer<VastoLorde, HumanoidModel<VastoLorde>>(context,
+                        new HumanoidModel<>(context.bakeLayer(BleachModelLayers.VASTO_LORDE)),
+                        HollowKind.VASTO_LORDE, 90.0F));
         event.registerEntityRenderer(ModEntities.HELL_GATE.get(), HellGateRenderer::new);
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);
