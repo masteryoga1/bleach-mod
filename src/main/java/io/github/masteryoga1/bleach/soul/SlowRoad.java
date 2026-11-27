@@ -1,14 +1,23 @@
 package io.github.masteryoga1.bleach.soul;
 
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoStage;
 import javax.annotation.Nullable;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 /**
- * The slow road to Bankai, by Jinzen alone, for a world with no Tenshintai to hand: so far, its hours.
+ * The slow road to Bankai, by Jinzen alone, for a world with no Tenshintai to hand. A soul whose power is its own, whose
+ * bond is full, whose spirit has a Bankai, whose own Shikai has been released for {@code [bankai.road] slow_road_hours}
+ * hours of play in all and whose maximum reiryoku is at least {@code min_max_reiryoku} has its spirit step out of the
+ * blade as it settles in Jinzen, for a Bankai trial where it sits, as the command's bout
+ * ({@link BankaiTrial#begin(Player, long)}), at most one a game day: one begun less than a day before, by any road,
+ * holds it back. Every end of that bout is the trial's own.
  *
  * <p>The hours are the record's {@code shikai_ticks}, counted on the soul's own tick while it holds its own blade released
  * in Shikai in its main hand (a constant release too), its power its own and Bankai not reached. They are held back on
@@ -22,6 +31,9 @@ public final class SlowRoad {
     /** Counted ticks held back on the soul before they are written onto its record. */
     private static final int WRITE_TICKS = 20;
     private static final long MINUTE_TICKS = HOUR_TICKS / 60L;
+
+    /** Whether the road opens now: OPEN, closed to this soul (OFF), or the first gate it has still to pass. */
+    public enum Gate { OPEN, OFF, HOURS, WEAK, RESTING }
 
     private SlowRoad() {
     }
@@ -57,6 +69,71 @@ public final class SlowRoad {
     /** The ticks this soul has spent in its Shikai on the road: those written and those held back. */
     public static long ticks(SoulData data) {
         return data.zanpakuto().bankai().shikaiTicks() + data.roadTicks;
+    }
+
+    /**
+     * The road for this soul now, in this order: OFF once Bankai is reached, below a full bond, with its power not its
+     * own or with a spirit that has no Bankai in this world; HOURS short of its hours; WEAK below the maximum reiryoku;
+     * RESTING within a game day of the last bout's start, by any road (a last bout after now, from a save carried to a
+     * younger world, holds nothing back); else OPEN.
+     */
+    public static Gate gate(Level level, SoulData data, long now) {
+        ZanpakutoBond bond = data.zanpakuto();
+        if (bond.bankai().achieved() || !bond.isFull() || !Materialisation.mayCall(data, now)
+                || ZanpakutoSpirits.get(level, bond.spirit()).flatMap(ZanpakutoSpirit::bankai).isEmpty()) {
+            return Gate.OFF;
+        }
+        if (ticks(data) < hoursTicks()) {
+            return Gate.HOURS;
+        }
+        if (data.maxReiryoku() < minMaxReiryoku()) {
+            return Gate.WEAK;
+        }
+        long last = bond.bankai().lastTryAt();
+        return last <= now && now - last < Level.TICKS_PER_DAY ? Gate.RESTING : Gate.OPEN;
+    }
+
+    /**
+     * Jinzen's hand-over once the soul has settled and no inner Hollow waits, at the gate read before its world opens:
+     * open, its Bankai trial begins where it sits or is refused as the trial says; any other, nothing is tried (null).
+     */
+    @Nullable
+    public static BankaiTrial.Start handOver(Player player, Gate gate, long now) {
+        return gate == Gate.OPEN ? BankaiTrial.begin(player, now) : null;
+    }
+
+    /**
+     * The visit's last line, for the gate the hand-over read and what came of its bout: why the bout was refused, in the
+     * words the trial's command uses, or what the first gate short of which the soul stands still asks; null when the
+     * road is closed to the soul, or its bout began.
+     */
+    @Nullable
+    public static Component pageLine(Player player, SoulData data, long now, Gate gate, @Nullable BankaiTrial.Start start) {
+        if (start != null && start != BankaiTrial.Start.STARTED) {
+            Component refused = Component.translatable("commands.bleach.quincy.arts_refused", player.getDisplayName(),
+                    Component.translatable(start.key()));
+            return Component.translatable("jinzen.bleach.road.held", refused);
+        }
+        return switch (gate) {
+            case HOURS -> {
+                long minutes = Math.ceilDiv(hoursTicks() - ticks(data), MINUTE_TICKS);
+                yield Component.translatable("jinzen.bleach.road.hours", minutes / 60L, minutes % 60L);
+            }
+            case WEAK -> Component.translatable("jinzen.bleach.road.weak", (int) Math.ceil(minMaxReiryoku()));
+            case RESTING -> Component.translatable("jinzen.bleach.road.resting",
+                    JinzenLogic.duration(data.zanpakuto().bankai().lastTryAt() + Level.TICKS_PER_DAY - now));
+            default -> null;
+        };
+    }
+
+    /** The hours in Shikai the road asks ({@code [bankai.road] slow_road_hours}), in ticks. */
+    public static long hoursTicks() {
+        return BleachConfig.get(BleachConfig.BANKAI_ROAD_HOURS) * HOUR_TICKS;
+    }
+
+    /** The maximum reiryoku the road asks ({@code [bankai.road] min_max_reiryoku}). */
+    public static double minMaxReiryoku() {
+        return BleachConfig.get(BleachConfig.BANKAI_ROAD_MIN_MAX_REIRYOKU);
     }
 
     /**
