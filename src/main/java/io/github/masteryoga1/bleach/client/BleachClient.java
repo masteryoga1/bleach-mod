@@ -281,8 +281,8 @@ public final class BleachClient {
                         HollowKind.GRAND_FISHER, 90.0F));
         event.registerEntityRenderer(ModEntities.GRAND_FISHER_LURE.get(), GrandFisherLureRenderer::new);
         event.registerEntityRenderer(ModEntities.VASTO_LORDE.get(),
-                context -> new HollowRenderer<VastoLorde, HumanoidModel<VastoLorde>>(context,
-                        new HumanoidModel<>(context.bakeLayer(BleachModelLayers.VASTO_LORDE)),
+                context -> new HollowRenderer<VastoLorde, VastoLordeModel>(context,
+                        new VastoLordeModel(context.bakeLayer(BleachModelLayers.VASTO_LORDE)),
                         HollowKind.VASTO_LORDE, 90.0F));
         event.registerEntityRenderer(ModEntities.HELL_GATE.get(), HellGateRenderer::new);
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);

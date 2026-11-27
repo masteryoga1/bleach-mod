@@ -1136,7 +1136,8 @@ public final class BleachConfig {
                 .comment("Seconds a Hollow cannot heal after a blow to its mask.")
                 .defineInRange("mask_regeneration_pause_seconds", 10, 0, 600);
         MASK_FRAGMENT_CHANCE = builder
-                .comment("Chance that a player's blow which freshly cracks a Hollow's mask knocks a fragment loose, once in each Hollow's life. Fishbone D always gives one.")
+                .comment("Chance that a player's blow which freshly cracks a Hollow's mask knocks a fragment loose, once"
+                        + " in each Hollow's life. Fishbone D, a Menos and a Vasto Lorde always give one.")
                 .defineInRange("mask_fragment_chance", 0.25, 0.0, 1.0);
         HUNT_UNAWARE = builder
                 .comment("Whether Hollows hunt players who cannot see them.")

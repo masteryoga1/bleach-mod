@@ -112,7 +112,7 @@ public final class ShriekerTests {
     }
 
     /** Whether the bar is shown to this very player object. */
-    private static boolean holds(BossBar bar, ServerPlayer player) {
+    static boolean holds(BossBar bar, ServerPlayer player) {
         return bar.players().stream().anyMatch(shown -> shown == player);
     }
 
