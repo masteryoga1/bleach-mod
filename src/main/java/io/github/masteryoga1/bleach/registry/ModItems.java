@@ -16,6 +16,7 @@ import io.github.masteryoga1.bleach.item.QuincyGarbItem;
 import io.github.masteryoga1.bleach.item.SanreiGloveItem;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.item.ShihakushoItem;
+import io.github.masteryoga1.bleach.item.TenshintaiItem;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import java.util.List;
 import net.minecraft.ChatFormatting;
@@ -197,6 +198,10 @@ public final class ModItems {
     /** A mask fragment, a filled Gintō and bone meal: crushed, it draws Hollows. See {@link HollowBaitItem}. */
     public static final DeferredItem<HollowBaitItem> HOLLOW_BAIT = ITEMS.register("hollow_bait",
             () -> new HollowBaitItem(new Item.Properties().stacksTo(16)));
+
+    /** A Tenshintai, folded, to be set down as the doll. See {@link TenshintaiItem}. */
+    public static final DeferredItem<TenshintaiItem> TENSHINTAI = ITEMS.register("tenshintai",
+            () -> new TenshintaiItem(new Item.Properties().stacksTo(1)));
 
     /**
      * An Arrancar's zanpakutō: the torn piece of its mask, become a sealed blade that holds its Hollow power.

@@ -69,4 +69,16 @@ public record BankaiRecord(long achievedAt, Component name, long windowEndsAt, O
     public BankaiRecord tried(long now) {
         return new BankaiRecord(achievedAt, name, windowEndsAt, doll, spiritHealth, tries + 1, now, shikaiTicks);
     }
+
+    /** A Tenshintai set down here, no window open and its spirit whole; the tries and the last are kept. */
+    public BankaiRecord dollAt(GlobalPos place) {
+        return new BankaiRecord(achievedAt, name, ZanpakutoBond.NEVER, Optional.of(place), 1.0F, tries, lastTryAt,
+                shikaiTicks);
+    }
+
+    /** No doll set down, and so no window and no wounds either. */
+    public BankaiRecord closed() {
+        return new BankaiRecord(achievedAt, name, ZanpakutoBond.NEVER, Optional.empty(), 1.0F, tries, lastTryAt,
+                shikaiTicks);
+    }
 }

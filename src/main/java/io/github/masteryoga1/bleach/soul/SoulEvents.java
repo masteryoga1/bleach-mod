@@ -5,6 +5,7 @@ import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.Hollow;
+import io.github.masteryoga1.bleach.entity.Tenshintai;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.item.SeeleSchneiderItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
@@ -87,6 +88,7 @@ public final class SoulEvents {
         VisoredEvents.register(bus);
         Materialisation.register(bus);
         BankaiTrial.register(bus);
+        Tenshintai.register(bus);
         KidoEvents.register(bus);
         TravelEvents.register(bus);
         DangaiEvents.register(bus);
