@@ -171,6 +171,9 @@ public final class RegistrationTests {
         helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id("zabimaru_spirit")) == zabimaru
                         && zabimaru.is(SoulLogic.SPIRITS) && !zabimaru.is(BleachTags.HOLLOWS) && !zabimaru.canSerialize(),
                 "bleach:zabimaru_spirit is not registered, is no spirit, is a Hollow, or is saved");
+        EntityType<?> blade = ModEntities.TRIAL_BLADE.get();
+        helper.assertTrue(blade.is(SoulLogic.SPIRITS) && !blade.canSerialize() && !blade.canSummon(),
+                "bleach:trial_blade is not a spirit, or is saved or summoned");
         Optional<Holder.Reference<DamageType>> burst = helper.getLevel().registryAccess()
                 .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(ShriekerLeech.BURST);
         // Every leech that bursts at once lands, through the hurt cooldown the one before it left.

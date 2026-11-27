@@ -49,7 +49,8 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  * nothing living but each other, and the spirit's bar counts its seconds down.
  *
  * <p>While {@code spirit_tests} is on, a spirit whose file sets a test of its own ({@code bankai.test}) tests its soul
- * so ({@link #testOf}): Zabimaru by its two halves, both to be beaten down together ({@link ZabimaruSpirit#splitHalves}).
+ * so ({@link #testOf}): Zabimaru by its two halves, both to be beaten down together ({@link ZabimaruSpirit#splitHalves}),
+ * and Zangetsu with blades risen about the soul, one of them true ({@link BankaiSwords}).
  * Any other spirit, or one whose body cannot take its test, fights a plain bout.
  *
  * <p>A ring of {@code ring_radius} blocks, lit in the spirit's colour, stands where the wielder began: it keeps the
@@ -103,17 +104,17 @@ public final class BankaiTrial {
 
     /**
      * One bout: the player object that began it (a respawn or an End exit makes a new one, which breaks it off), its
-     * spirit, its world, where the wielder stood, when it began and when its time runs out, and its spirit's bar's own
-     * name, which the bar shows beside the seconds left.
+     * spirit, its world, where the wielder stood, when it began and when its time runs out, its spirit's bar's own name,
+     * which the bar shows beside the seconds left, and the blades of its test, for a spirit that tests with them.
      */
     public record Trial(Player wielder, MaterialisedSpirit spirit, ResourceKey<Level> level, Vec3 centre, long startedAt,
-            long endsAt, Component name) {
+            long endsAt, Component name, @Nullable BankaiSwords swords) {
     }
 
     /**
      * The shield first of all, so nothing else weighs a blow that should not land; the loss last of all, after every
      * other change to the blow; and a spirit leaving its world ends its bout, as do its wielder's logging out and death
-     * and the server stopping.
+     * and the server stopping; and at each server tick's end the blades of bouts ended as their spirits left go.
      */
     public static void register(IEventBus bus) {
         bus.addListener(EventPriority.HIGHEST, BankaiTrial::onIncomingDamage);
@@ -123,6 +124,7 @@ public final class BankaiTrial {
         bus.addListener(BankaiTrial::onDeath);
         bus.addListener(BankaiTrial::onServerStopping);
         bus.addListener(BankaiTrial::onServerStopped);
+        bus.addListener(BankaiSwords::onServerTick);
     }
 
     /**
@@ -154,27 +156,35 @@ public final class BankaiTrial {
             return Start.CROWDED;
         }
         ZanpakutoSpirit.BankaiTest test = testOf(wielder, data);
+        boolean withBlades = test == ZanpakutoSpirit.BankaiTest.SWORDS;
+        List<Vec3> ground = withBlades ? BankaiSwords.ground(level, wielder, wielder.position(), ringRadius()) : List.of();
         // No room, or a rung that changed since; never ALREADY, as the call replaces a spirit out.
         Materialisation.Call call = Materialisation.callOut(wielder, true);
         if (call != Materialisation.Call.CALLED) {
             return Start.valueOf(call.name());
         }
         // Held by its call from before it joined the world, so it is there.
-        return open(wielder, data, Materialisation.of(wielder.getUUID()), now, test);
+        return open(wielder, data, Materialisation.of(wielder.getUUID()), now, test, ground);
     }
 
     /**
      * The bout begins with this spirit, out before its wielder: held, its try counted, its clock and ring shown, and its
-     * test set: a Zabimaru tested by its two halves has its health split between them, and its wielder is told so.
+     * test set: a Zabimaru tested by its two halves has its health split between them, and its wielder is told so; a
+     * soul tested with blades has them risen on this ground in its spirit's Shikai look.
      */
     private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, long now,
-            ZanpakutoSpirit.BankaiTest test) {
+            ZanpakutoSpirit.BankaiTest test, List<Vec3> ground) {
         int seconds = boutSeconds();
         if (test == ZanpakutoSpirit.BankaiTest.TWO_HALVES && spirit instanceof ZabimaruSpirit zabimaru) {
             zabimaru.splitHalves(now);
         }
+        BankaiSwords swords = null;
+        if (test == ZanpakutoSpirit.BankaiTest.SWORDS && wielder.level() instanceof ServerLevel server) {
+            int look = ZanpakutoSpirits.get(server, data.zanpakuto().spirit()).map(its -> its.shikai().model()).orElse(0);
+            swords = BankaiSwords.raise(server, wielder, ground, blades(), look);
+        }
         Trial trial = new Trial(wielder, spirit, wielder.level().dimension(), wielder.position(), now,
-                now + seconds * (long) SECOND_TICKS, spirit.bar().event().getName());
+                now + seconds * (long) SECOND_TICKS, spirit.bar().event().getName(), swords);
         TRIALS.put(wielder.getUUID(), trial);
         ZanpakutoBond bond = data.zanpakuto();
         data.setZanpakuto(bond.withBankai(bond.bankai().tried(now)));
@@ -275,14 +285,17 @@ public final class BankaiTrial {
     }
 
     /**
-     * Ends this bout if it is still under way: off the table first, so its spirit's going home does not end it again;
-     * then the win's record or the loss's or the time's line in chat; then its spirit sent home with the end's line,
-     * unless the spirit is leaving its world already, where a discard would change the world as it moves the spirit:
-     * then only the line.
+     * Ends this bout if it is still under way: off the table first, so its spirit's going home does not end it again,
+     * and its blades cleared ({@link BankaiSwords#clear}); then the win's record or the loss's or the time's line in
+     * chat; then its spirit sent home with the end's line, unless the spirit is leaving its world already, where a
+     * discard would change the world as it moves the spirit: then only the line.
      */
     private static void end(Trial trial, End end, boolean leaving) {
         if (!TRIALS.remove(trial.wielder.getUUID(), trial)) {
             return;
+        }
+        if (trial.swords != null) {
+            trial.swords.clear(leaving);
         }
         Player wielder = trial.wielder;
         String line = end == End.WIN ? YIELDED : end == End.BROKEN_OFF ? BROKEN : HOME;
@@ -360,6 +373,11 @@ public final class BankaiTrial {
     /** The wielder's health at which its spirit's last blow stops. */
     public static float lossHealth() {
         return (float) BleachConfig.get(BleachConfig.BANKAI_TRIAL_LOSS_HEALTH);
+    }
+
+    /** How many blades rise for a test with blades: forty. */
+    public static int blades() {
+        return 40;
     }
 
     /** The ring's radius, in blocks. */
@@ -562,8 +580,9 @@ public final class BankaiTrial {
         breakOffAll();
     }
 
-    /** A closed world's bouts went with it, unsaved: none is held into the next world a game opens. */
+    /** A closed world's bouts and blades went with it, unsaved: none is held into the next world a game opens. */
     private static void onServerStopped(ServerStoppedEvent event) {
         TRIALS.clear();
+        BankaiSwords.PENDING.clear();
     }
 }
