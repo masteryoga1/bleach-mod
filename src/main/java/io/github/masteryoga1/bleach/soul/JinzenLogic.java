@@ -141,7 +141,11 @@ public final class JinzenLogic {
                 motes(player, data);
             }
             if (elapsed >= SETTLE_TICKS) {
-                if (VisoredLogic.duelReady(data, now)) {
+                // A Bankai trial here keeps the Hollow in, so the inner world opens, as for any refusal.
+                String held = VisoredLogic.duelReady(data, now) ? BankaiTrial.duelRefusal(player) : null;
+                if (held != null) {
+                    player.displayClientMessage(Component.translatable(held).withStyle(ChatFormatting.GRAY), true);
+                } else if (VisoredLogic.duelReady(data, now)) {
                     VisoredEvents.DuelStart start = VisoredEvents.beginDuel(player, data, now, false);
                     if (start == VisoredEvents.DuelStart.STARTED) {
                         stop(player, data);

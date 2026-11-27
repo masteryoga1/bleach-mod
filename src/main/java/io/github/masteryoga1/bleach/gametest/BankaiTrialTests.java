@@ -1,21 +1,25 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
 import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.BankaiRecord;
 import io.github.masteryoga1.bleach.soul.BankaiTrial;
+import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.Materialisation;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
+import io.github.masteryoga1.bleach.soul.VisoredEvents;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
@@ -35,10 +39,12 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
@@ -52,15 +58,20 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Tests for the Bankai trial, a bout with one's own zanpakutō spirit. Each test asks only about its own wielders and
  * spirits, and every bout ends within the tick it began in, so none outlives its test: on a failure, every soul the
  * test began or may have begun a bout for is cleared, the refused ones too. So the server stop's {@code breakOffAll},
- * which T2 calls by hand and which ends every bout there is, finds only its own.
+ * which T2 calls by hand and which ends every bout there is, finds only its own. A bout ticked by hand at a multiple
+ * of 5 ticks from its start keeps others out of its ring and 2 blocks more, which at the default radius reaches past
+ * the field into the next test's, so such a test begins its bout at the middle with the ring at its smallest, 6 blocks
+ * ({@link #inSmallRing}). T7's creatures, placed at tick 0, are found by the ring, as they are inside the template's
+ * own chunks, which tick entities before a test begins (mc GameTestInfo.java:101).
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
 public final class BankaiTrialTests {
-    /** Where the tests stand their wielders on the field's floor, as a test sees it: a corner, and the middle. */
-    static final Vec3 FLOOR = new Vec3(1.5, 2.0, 1.5), MIDDLE = new Vec3(8.5, 2.0, 8.5);
+    /** Where the tests stand their wielders on the field's floor, as a test sees it: a corner, the middle, the far corner. */
+    static final Vec3 FLOOR = new Vec3(1.5, 2.0, 1.5), MIDDLE = new Vec3(8.5, 2.0, 8.5), FAR = new Vec3(14.5, 2.0, 14.5);
     static final String BEGUN = "message.bleach.bankai.trial.begun", BROKEN = "message.bleach.bankai.trial.broken_off";
     static final String WON = "message.bleach.bankai.trial.won", YIELDED = "message.bleach.bankai.trial.yielded";
+    static final String NEAR = "message.bleach.bankai.trial.duel_near", BARRIER = "message.bleach.bankai.trial.barrier";
 
     private BankaiTrialTests() {
     }
@@ -71,6 +82,21 @@ public final class BankaiTrialTests {
         BankaiTrial.Trial trial = BankaiTrial.trial(wielder.getUUID());
         helper.assertTrue(start == BankaiTrial.Start.STARTED && trial != null, "the bout did not begin: " + start);
         return trial;
+    }
+
+    /**
+     * Runs these steps with the ring at its smallest, 6 blocks, which from the middle stays inside the field: for a test
+     * that ticks a bout by hand at a multiple of 5 ticks from its start, when the ring keeps others out.
+     */
+    static void inSmallRing(Runnable steps) {
+        KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_RING_RADIUS, 6, steps);
+    }
+
+    /** A wielder at the far corner, facing north, so its spirit steps out inside the field. */
+    static Player farWielder(GameTestHelper helper) {
+        Player wielder = BankaiSpiritTests.wielder(helper, FAR);
+        wielder.setYRot(180.0F);
+        return wielder;
     }
 
     static BankaiRecord record(Player wielder) {
@@ -223,10 +249,11 @@ public final class BankaiTrialTests {
      * logging out, each on its event; another player object of the same UUID, on that one's tick; losing the power, as
      * the spirit's own tick sends it home; another world, on its event; straying 40 blocks from where it began, on the
      * wielder's tick; the spirit unloaded with its chunk, or killed by {@code /kill}; and the time running out. The
-     * server stop's {@code breakOffAll} ends two at once, called by hand: posting a stop would run every stop listener
-     * on the live server, so of the bout's own listeners only the death's and the logout's are posted through the bus,
-     * and the stop's wiring is read, not tested. A spirit carried into an unloaded chunk ends its bout too, left in the
-     * world for the world to finish moving.
+     * server stop's {@code breakOffAll} ends two at once, at the field's opposite corners with the ring at its smallest,
+     * so the two rings do not meet. It is called by hand: posting a stop would run every stop listener on the live
+     * server, so of the bout's own listeners only the death's and the logout's are posted through the bus, and the
+     * stop's wiring is read, not tested. A spirit carried into an unloaded chunk ends its bout too, left in the world for
+     * the world to finish moving.
      */
     @GameTest(template = "field", timeoutTicks = 20)
     public static void everyBreakOffEndsTheTrialWithNothingWritten(GameTestHelper helper) {
@@ -279,12 +306,12 @@ public final class BankaiTrialTests {
             });
         });
 
-        Player[] pair = {BankaiSpiritTests.wielder(helper, MIDDLE), BankaiSpiritTests.wielder(helper, FLOOR)};
-        HihioZabimaruTests.clearingOnFailure(() -> clear(pair), () -> {
+        Player[] pair = {BankaiSpiritTests.wielder(helper, FLOOR), farWielder(helper)};
+        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(() -> clear(pair), () -> {
             MaterialisedSpirit first = begun(helper, pair[0], now).spirit(), second = begun(helper, pair[1], now).spirit();
             BankaiTrial.breakOffAll();
             helper.assertTrue(over(pair[0], first, now) && over(pair[1], second, now), "breakOffAll left a bout going");
-        });
+        }));
         Player carried = BankaiSpiritTests.wielder(helper, MIDDLE);
         MaterialisedSpirit spirit = begun(helper, carried, now).spirit();
         try {
@@ -415,6 +442,7 @@ public final class BankaiTrialTests {
      * wielder gone into creative mode before the spirit's tick, or one whose power was lent after the blow, nor out of
      * a bout; and it strikes no more, so a blow on a wielder low enough to lose by it lands nothing, and it still yields.
      * A bout's bar counts it down by the second, and the time running out on a beaten spirit waits for it to yield.
+     * The ring is at its smallest throughout, as the clock's tick a second in keeps others out.
      */
     @GameTest(template = "field", timeoutTicks = 20)
     public static void beatingTheSpiritAchievesAndNamesBankai(GameTestHelper helper) {
@@ -432,7 +460,7 @@ public final class BankaiTrialTests {
         BankaiSpiritTests.stand(helper, watcher, FLOOR);
         Player lent = BankaiSpiritTests.wielder(helper, FLOOR), free = BankaiSpiritTests.wielder(helper, FLOOR);
         Player low = BankaiSpiritTests.wielder(helper, FLOOR), late = BankaiSpiritTests.wielder(helper, MIDDLE);
-        HihioZabimaruTests.clearingOnFailure(() -> clear(ichigo, watcher, lent, free, low, late), () -> {
+        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(() -> clear(ichigo, watcher, lent, free, low, late), () -> {
             List<Component> said = GateTests.run(level, "bleach zanpakuto @a[tag=bleach_trial_t4] bankai trial");
             String count = "commands.bleach.zanpakuto.bankai.trial";
             BankaiTrial.Trial commanded = BankaiTrial.trial(ichigo.getUUID());
@@ -498,7 +526,174 @@ public final class BankaiTrialTests {
             Materialisation.upkeep(trial.spirit());
             helper.assertTrue(record(late).achieved() && BankaiTrial.trial(late.getUUID()) == null,
                     "a spirit beaten as the time ran out did not yield");
-        });
+        }));
+        helper.succeed();
+    }
+
+    /**
+     * T5. No bout begins while its wielder faces its inner Hollow, and nothing is counted; a fight begun in a bout
+     * sends the spirit home on its tick, which ends the bout with nothing written but the try.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void aVisoredDuelRefusesAndBreaksOffATrial(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player host = BankaiSpiritTests.host(helper);
+        SoulData data = SoulLogic.get(host);
+        BankaiSpiritTests.ready(data, now);
+        if (refusedOnPeaceful(helper, host, now)) {
+            return;
+        }
+        try {
+            VisoredEvents.DuelStart start = VisoredEvents.beginDuel(host, data, now, false);
+            BankaiTrial.Start refused = BankaiTrial.begin(host, now);
+            helper.assertTrue(start == VisoredEvents.DuelStart.STARTED && refused == BankaiTrial.Start.BUSY
+                            && BankaiTrial.trial(host.getUUID()) == null && record(host).tries() == 0,
+                    "the fight came to " + start + ", and a bout in it to " + refused);
+            BankaiSpiritTests.end(now, host);
+            MaterialisedSpirit spirit = begun(helper, host, now).spirit();
+            BankaiSpiritTests.ready(data, now);
+            start = VisoredEvents.beginDuel(host, data, now, false);
+            Materialisation.upkeep(spirit);
+            helper.assertTrue(start == VisoredEvents.DuelStart.STARTED && over(host, spirit, now),
+                    "a bout went on as its wielder's fight with its inner Hollow came to " + start);
+        } finally {
+            BankaiSpiritTests.end(now, host);
+            clear(host);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * T6. No two rings meet: a bout is refused within twice the ring and 2 blocks of another, here at its smallest,
+     * and begins farther off; and within the two rings and 2 of a soul's fight with its inner Hollow, found by its host
+     * among the server's players, with nothing counted, while the host itself is told it is busy. No inner Hollow comes
+     * out for a soul in a bout, or as near one: Jinzen opens the inner world instead, and the forced command says why.
+     * Where no config is set the ring is 12 blocks.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void twoRingsMayNotMeet(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        Player ichigo = BankaiSpiritTests.host(helper);
+        SoulData data = SoulLogic.get(ichigo);
+        if (refusedOnPeaceful(helper, ichigo, now)) {
+            return;
+        }
+        BankaiSpiritTests.stand(helper, ichigo, FLOOR);
+        Player beside = BankaiSpiritTests.wielder(helper, MIDDLE), far = farWielder(helper);
+        ServerPlayer host = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 900.0F), true,
+                "bleach_trial_t6");
+        BankaiSpiritTests.stand(helper, host, FAR);
+        SoulData hostData = SoulLogic.get(host);
+        BankaiSpiritTests.ready(hostData, now);
+        BankaiSpiritTests.ready(data, now);
+        int radius = BankaiTrial.ringRadius();
+        Runnable clear = () -> {
+            clear(ichigo, beside, far);
+            BankaiSpiritTests.end(now, host);
+            BankaiSpiritTests.end(now, ichigo);
+        };
+        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(clear, () -> {
+            helper.assertTrue(radius == 12, "the ring is " + radius + " blocks where no config is set");
+            // At 6 blocks, two bouts meet within 14 of each other, and a bout and a fight within 18.
+            MaterialisedSpirit spirit = begun(helper, ichigo, now).spirit();
+            BankaiTrial.Start near = BankaiTrial.begin(beside, now), apart = BankaiTrial.begin(far, now);
+            clear(far);
+            helper.assertTrue(near == BankaiTrial.Start.CROWDED && record(beside).tries() == 0
+                            && !Materialisation.holds(beside.getUUID()) && apart == BankaiTrial.Start.STARTED,
+                    "a bout 9.9 blocks from another came to " + near + ", and one 18.4 off to " + apart);
+            helper.assertTrue("message.bleach.bankai.trial.duel_in_trial".equals(BankaiTrial.duelRefusal(ichigo))
+                            && NEAR.equals(BankaiTrial.duelRefusal(beside)) && BankaiTrial.duelRefusal(host) == null,
+                    "a soul in a bout, or 9.9 blocks from one, may bring its inner Hollow out, or one 18.4 off may not");
+            BankaiSpiritTests.stand(helper, host, MIDDLE);
+            List<Component> said = GateTests.run(level, "bleach visored @a[tag=bleach_trial_t6] duel");
+            helper.assertTrue(said.size() == 1 && BankaiTests.refused(said.get(0), NEAR) && !VisoredEvents.isDuelling(host),
+                    "the forced fight beside a bout said " + said.stream().map(Component::getString).toList());
+            ichigo.setShiftKeyDown(true);
+            ichigo.setOnGround(true);
+            JinzenLogic.begin(ichigo, data, now);
+            JinzenLogic.tick(ichigo, data, ichigo.getMainHandItem(), JinzenLogic.SETTLE_TICKS, now);
+            helper.assertTrue(!VisoredEvents.isDuelling(ichigo) && BankaiTrial.trial(ichigo.getUUID()) != null
+                            && data.jinzen() != null && data.jinzen().opened(),
+                    "Jinzen in a bout brought the ready Hollow out, or opened no inner world");
+            Materialisation.sendHome(spirit);
+
+            VisoredEvents.DuelStart duel = VisoredEvents.beginDuel(host, hostData, now, true);
+            BankaiTrial.Start start = BankaiTrial.begin(ichigo, now), own = BankaiTrial.begin(host, now);
+            helper.assertTrue(duel == VisoredEvents.DuelStart.STARTED && start == BankaiTrial.Start.CROWDED
+                            && own == BankaiTrial.Start.BUSY && record(ichigo).tries() == 1 && record(host).tries() == 0,
+                    "the fight came to " + duel + ", a bout 9.9 blocks off to " + start + " and one in it to " + own);
+        }));
+        clear.run();
+        helper.succeed();
+    }
+
+    /**
+     * T7. The ring keeps the two in and everyone else out, here at its smallest, 6 blocks: the two inside it are let be;
+     * a creature inside is pushed out, unless the push would drop it off a pillar, and drops its grudge against the
+     * wielder; a joined soul inside is pushed out and told why, and one in creative mode is let be; a mounted wielder is
+     * taken off; and the wielder and its spirit past the ring are pushed back in.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void theRingKeepsTheTwoInAndOthersOut(GameTestHelper helper) {
+        long now = HollowPlayerTests.now(helper);
+        Player ichigo = BankaiSpiritTests.wielder(helper, MIDDLE);
+        SoulData data = SoulLogic.get(ichigo);
+        if (refusedOnPeaceful(helper, ichigo, now)) {
+            return;
+        }
+        BlockPos[] pillar = {new BlockPos(12, 2, 8), new BlockPos(12, 3, 8), new BlockPos(12, 4, 8)};
+        for (BlockPos block : pillar) {
+            helper.setBlock(block, Blocks.STONE);
+        }
+        Zombie inside = HollowPlayerTests.placed(helper, EntityType.ZOMBIE, 8, 4);
+        Zombie perched = QuincyTests.still(helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(12.5, 5.0, 8.5)));
+        ServerPlayer bystander = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F), false);
+        BankaiSpiritTests.stand(helper, bystander, new Vec3(4.5, 2.0, 8.5));
+        ServerPlayer watching = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F), false);
+        watching.setGameMode(GameType.CREATIVE);
+        BankaiSpiritTests.stand(helper, watching, new Vec3(4.5, 2.0, 4.5));
+        Boat boat = helper.spawn(EntityType.BOAT, new Vec3(15.5, 2.0, 8.5));
+        Runnable clear = () -> {
+            clear(ichigo);
+            inside.discard();
+            perched.discard();
+            boat.discard();
+            for (BlockPos block : pillar) {
+                helper.setBlock(block, Blocks.AIR);
+            }
+        };
+        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(clear, () -> {
+            inside.setTarget(ichigo);
+            BankaiTrial.Trial trial = begun(helper, ichigo, now);
+            MaterialisedSpirit spirit = trial.spirit();
+            BankaiTrial.tick(ichigo, data, now);
+            helper.assertTrue(inside.getDeltaMovement().z < -0.5 && inside.getTarget() == null
+                            && perched.getDeltaMovement().horizontalDistanceSqr() == 0.0
+                            && ichigo.getDeltaMovement().horizontalDistanceSqr() == 0.0
+                            && spirit.getDeltaMovement().horizontalDistanceSqr() == 0.0,
+                    "the ring pushed the creature inside by " + inside.getDeltaMovement() + ", the one on the pillar by "
+                            + perched.getDeltaMovement() + ", the wielder by " + ichigo.getDeltaMovement()
+                            + " and its spirit by " + spirit.getDeltaMovement() + ", or the one inside kept its grudge");
+            helper.assertTrue(bystander.getDeltaMovement().x < -0.5 && BankaiSpiritTests.told(bystander, BARRIER)
+                            && watching.getDeltaMovement().horizontalDistanceSqr() == 0.0
+                            && !BankaiSpiritTests.told(watching, BARRIER),
+                    "the ring pushed the soul inside by " + bystander.getDeltaMovement() + " and the one in creative mode by "
+                            + watching.getDeltaMovement() + ", or told the wrong one why");
+            helper.assertTrue(ichigo.startRiding(boat, true), "the wielder could not get into the boat");
+            BankaiTrial.tick(ichigo, data, now + 1L);
+            helper.assertTrue(!ichigo.isPassenger(), "the wielder rode on in its bout");
+            Vec3 past = helper.absoluteVec(new Vec3(15.5, 2.0, 8.5));
+            ichigo.teleportTo(past.x, past.y, past.z);
+            ichigo.setDeltaMovement(Vec3.ZERO);
+            spirit.setPos(trial.centre().add(0.0, 0.0, 7.0));
+            BankaiTrial.tick(ichigo, data, now + 2L);
+            helper.assertTrue(ichigo.getDeltaMovement().x < -0.5 && spirit.getDeltaMovement().z < -0.5
+                            && BankaiTrial.trial(ichigo.getUUID()) == trial,
+                    "past the ring, the wielder was pushed by " + ichigo.getDeltaMovement() + " and its spirit by "
+                            + spirit.getDeltaMovement());
+        }));
+        clear.run();
         helper.succeed();
     }
 }

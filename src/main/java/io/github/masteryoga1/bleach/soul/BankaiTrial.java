@@ -12,13 +12,17 @@ import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
@@ -41,6 +45,10 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  * it, as the grant gives it. A spirit's blow that would leave its wielder at {@code loss_health} stops there, and the
  * bout is lost, so no spirit ever kills its wielder, in a bout or out of one. While a bout lasts the two can touch
  * nothing living but each other, and the spirit's bar counts its seconds down.
+ *
+ * <p>A ring of {@code ring_radius} blocks, lit in the spirit's colour, stands where the wielder began: it keeps the
+ * two in and everyone else out, as the inner Hollow's ring does, and no bout begins where its ring would meet
+ * another's, a bout's or a fight with an inner Hollow's; that fight asks {@link #duelRefusal} the same of a bout.
  */
 public final class BankaiTrial {
     private static final String BEGUN = "message.bleach.bankai.trial.begun", TIME_UP = "message.bleach.bankai.trial.time";
@@ -49,7 +57,14 @@ public final class BankaiTrial {
     private static final String YIELDED = "message.bleach.bankai.trial.yielded", SPIRIT_WON = "message.bleach.spirit.won";
     private static final String KEY = "commands.bleach.zanpakuto.bankai.trial", CLOCK = "bossbar.bleach.bankai_trial";
     private static final String RELEASE_KEY = "key.bleach.zanpakuto_release";
-    private static final int SECOND_TICKS = 20;
+    private static final String ARENA = "message.bleach.bankai.trial.arena", BARRIER = "message.bleach.bankai.trial.barrier";
+    private static final String IN_TRIAL = "message.bleach.bankai.trial.duel_in_trial";
+    private static final String NEAR = "message.bleach.bankai.trial.duel_near";
+    private static final int SECOND_TICKS = 20, KEEP_OUT_INTERVAL_TICKS = 5, RING_INTERVAL_TICKS = 10, RING_POINTS = 48;
+    /** How far above and below the centre others are kept out, and how high above it the ring is lit, in blocks. */
+    private static final double KEEP_OUT_HEIGHT = 8.0, RING_LIFT = 0.2;
+    /** How far from the centre a creature's grudge against either of the two is dropped, in blocks. */
+    private static final double AGGRO_RANGE = 32.0;
 
     /** Every bout under way, by its wielder's UUID. Server thread only. */
     private static final Map<UUID, Trial> TRIALS = new HashMap<>();
@@ -62,8 +77,8 @@ public final class BankaiTrial {
      * but STARTED with the reason a command says, the call's own for its own.
      */
     public enum Start {
-        STARTED(false), DEAD(true), WATCHING(false), ALREADY(false), REACHED(false), NO_POWER(true), NAMELESS(true),
-        NO_SPIRIT(true), NO_TYPE(true), BUSY(true), PEACEFUL(true), NO_ROOM(true);
+        STARTED(false), DEAD(true), WATCHING(false), ALREADY(false), REACHED(false), CROWDED(false), NO_POWER(true),
+        NAMELESS(true), NO_SPIRIT(true), NO_TYPE(true), BUSY(true), PEACEFUL(true), NO_ROOM(true);
 
         private final boolean called;
 
@@ -105,12 +120,13 @@ public final class BankaiTrial {
 
     /**
      * Begins the wielder's bout where it stands, or says why not: the wielder a spectator or in creative mode, in a
-     * bout already, or past Bankai, then the call's own refusals, a dead wielder's among them. A spirit it has out is
-     * replaced by one afresh and whole, and only once the new one has room, so a refused bout leaves it out. The try is
-     * counted only once the bout has begun. On the client: NO_SPIRIT.
+     * bout already, or past Bankai, then the call's own refusals, a dead wielder's among them, then a spot where its
+     * ring would meet another's ({@link #crowded}). A spirit it has out is replaced by one afresh and whole, and only
+     * once the new one has room, so a refused bout leaves it out. The try is counted only once the bout has begun. On
+     * the client: NO_SPIRIT.
      */
     public static Start begin(Player wielder, long now) {
-        if (!(wielder.level() instanceof ServerLevel)) {
+        if (!(wielder.level() instanceof ServerLevel level)) {
             return Start.NO_SPIRIT;
         }
         if (wielder.isSpectator() || wielder.isCreative()) {
@@ -127,6 +143,9 @@ public final class BankaiTrial {
         if (refusal != null) {
             return Start.valueOf(refusal.name());
         }
+        if (crowded(level, wielder.position())) {
+            return Start.CROWDED;
+        }
         // No room, or a rung that changed since; never ALREADY, as the call replaces a spirit out.
         Materialisation.Call call = Materialisation.callOut(wielder, true);
         if (call != Materialisation.Call.CALLED) {
@@ -136,7 +155,7 @@ public final class BankaiTrial {
         return open(wielder, data, Materialisation.of(wielder.getUUID()), now);
     }
 
-    /** The bout begins with this spirit, out before its wielder: held, its try counted, and its clock on its bar. */
+    /** The bout begins with this spirit, out before its wielder: held, its try counted, and its clock and ring shown. */
     private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, long now) {
         int seconds = boutSeconds();
         Trial trial = new Trial(wielder, spirit, wielder.level().dimension(), wielder.position(), now,
@@ -145,24 +164,53 @@ public final class BankaiTrial {
         ZanpakutoBond bond = data.zanpakuto();
         data.setZanpakuto(bond.withBankai(bond.bankai().tried(now)));
         showTime(trial, now);
+        if (wielder.level() instanceof ServerLevel level) {
+            ring(level, trial, ringRadius());
+        }
         wielder.sendSystemMessage(Component.translatable(BEGUN, seconds).withStyle(ChatFormatting.GRAY));
         return Start.STARTED;
     }
 
     /**
-     * Each server tick of a living player in a bout: a break-off ends it, then the time, which waits for a spirit
-     * beaten as it runs out to yield on its own tick, and each second the clock.
+     * Each server tick of a living player in a bout, in this order: a break-off ends it, then the time, which waits for
+     * a spirit beaten as it runs out to yield on its own tick; the wielder taken off anything it rides, and the ring
+     * keeping the two in; then every 5 ticks from the start the ring keeps everyone else out, every 10 it is lit, and
+     * each second creatures drop their grudges against the two and the clock is shown.
      */
     public static void tick(Player wielder, SoulData data, long now) {
         Trial trial = TRIALS.get(wielder.getUUID());
-        if (trial == null || wielder.level().isClientSide()) {
+        if (trial == null || !(wielder.level() instanceof ServerLevel level)) {
             return;
         }
         if (brokenOff(wielder, data, trial)) {
             end(trial, End.BROKEN_OFF, false);
-        } else if (now >= trial.endsAt && !trial.spirit.beaten()) {
+            return;
+        }
+        if (now >= trial.endsAt && !trial.spirit.beaten()) {
             end(trial, End.TIME, false);
-        } else if (Math.floorMod(now - trial.startedAt, SECOND_TICKS) == 0) {
+            return;
+        }
+        double radius = ringRadius();
+        // A rider's own motion is thrown away each tick, so a mount would carry the wielder past the ring's push.
+        if (wielder.isPassenger()) {
+            wielder.stopRiding();
+        }
+        if (horizontal(wielder.position(), trial.centre) > radius) {
+            VisoredEvents.push(wielder, outward(wielder, trial.centre).reverse());
+            tell(wielder, ARENA);
+        }
+        if (horizontal(trial.spirit.position(), trial.centre) > radius) {
+            VisoredEvents.push(trial.spirit, outward(trial.spirit, trial.centre).reverse());
+        }
+        long elapsed = now - trial.startedAt;
+        if (Math.floorMod(elapsed, KEEP_OUT_INTERVAL_TICKS) == 0) {
+            keepOut(level, trial, radius);
+        }
+        if (Math.floorMod(elapsed, RING_INTERVAL_TICKS) == 0) {
+            ring(level, trial, radius);
+        }
+        if (Math.floorMod(elapsed, SECOND_TICKS) == 0) {
+            dropGrudges(level, trial);
             showTime(trial, now);
         }
     }
@@ -278,6 +326,118 @@ public final class BankaiTrial {
     /** The wielder's health at which its spirit's last blow stops. */
     public static float lossHealth() {
         return (float) BleachConfig.get(BleachConfig.BANKAI_TRIAL_LOSS_HEALTH);
+    }
+
+    /** The ring's radius, in blocks. */
+    public static int ringRadius() {
+        return BleachConfig.get(BleachConfig.BANKAI_TRIAL_RING_RADIUS);
+    }
+
+    /**
+     * Whether a bout begun here would have its ring meet another: a bout's in this world within twice the ring and 2
+     * blocks, or a fight with an inner Hollow's within the two rings and 2. The fights are found by their hosts, who
+     * are the server's players.
+     */
+    private static boolean crowded(ServerLevel level, Vec3 centre) {
+        double radius = ringRadius();
+        for (Trial other : TRIALS.values()) {
+            if (other.level == level.dimension() && horizontal(other.centre, centre) <= 2.0 * radius + 2.0) {
+                return true;
+            }
+        }
+        double apart = radius + VisoredLogic.arenaRadius() + 2.0;
+        for (ServerPlayer host : level.getServer().getPlayerList().getPlayers()) {
+            VisoredEvents.Duel duel = VisoredEvents.duel(host.getUUID());
+            if (duel != null && duel.level() == level.dimension() && horizontal(duel.centre(), centre) <= apart) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Why this soul's inner Hollow may not come out to fight it now, or null when it may: the soul is in a bout with
+     * its spirit, or another's bout stands so close that the two rings would meet. Jinzen and the command ask this
+     * before {@link VisoredEvents#beginDuel}, which knows nothing of the bouts.
+     */
+    @Nullable
+    public static String duelRefusal(Player host) {
+        if (TRIALS.containsKey(host.getUUID())) {
+            return IN_TRIAL;
+        }
+        double apart = ringRadius() + VisoredLogic.arenaRadius() + 2.0;
+        for (Trial trial : TRIALS.values()) {
+            if (trial.level == host.level().dimension() && horizontal(trial.centre, host.position()) <= apart) {
+                return NEAR;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Pushes every creature and player but the two back out of the ring, and tells a pushed player why, unless the
+     * push would leave it somewhere unsafe ({@link VisoredEvents#safeOutward}). Spectators, creative players and
+     * players the wielder may not harm pass, as at the inner Hollow's ring.
+     */
+    private static void keepOut(ServerLevel level, Trial trial, double radius) {
+        Vec3 centre = trial.centre;
+        AABB box = new AABB(centre, centre).inflate(radius + 2.0, KEEP_OUT_HEIGHT, radius + 2.0);
+        for (LivingEntity other : level.getEntitiesOfClass(LivingEntity.class, box, each -> keptOut(trial, each))) {
+            Vec3 out = outward(other, centre);
+            if (horizontal(other.position(), centre) <= radius + 1.0 && VisoredEvents.safeOutward(level, other, out)) {
+                VisoredEvents.push(other, out);
+                if (other instanceof Player player) {
+                    tell(player, BARRIER);
+                }
+            }
+        }
+    }
+
+    /** Whether the ring keeps this one out: a creature alive but the spirit, or a player the wielder may harm. */
+    private static boolean keptOut(Trial trial, LivingEntity each) {
+        return each != trial.spirit && each != trial.wielder && each.isAlive() && (each instanceof Mob
+                || each instanceof Player player && !player.isSpectator() && !player.isCreative()
+                && trial.wielder.canHarmPlayer(player));
+    }
+
+    /** Creatures nearby that have taken either of the two as their target drop it, the brain's memory too. */
+    private static void dropGrudges(ServerLevel level, Trial trial) {
+        AABB box = new AABB(trial.centre, trial.centre).inflate(AGGRO_RANGE);
+        for (Mob mob : level.getEntitiesOfClass(Mob.class, box, creature -> creature != trial.spirit)) {
+            LivingEntity target = mob.getTarget();
+            if (target == trial.wielder || target == trial.spirit) {
+                mob.setTarget(null);
+            }
+            if (mob.getBrain().isMemoryValue(MemoryModuleType.ATTACK_TARGET, trial.wielder)
+                    || mob.getBrain().isMemoryValue(MemoryModuleType.ATTACK_TARGET, trial.spirit)) {
+                mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
+            }
+        }
+    }
+
+    /** The way straight out from the centre along the ground, as a unit vector; east for a body right on it. */
+    private static Vec3 outward(LivingEntity entity, Vec3 centre) {
+        Vec3 away = new Vec3(entity.getX() - centre.x, 0.0, entity.getZ() - centre.z);
+        return away.lengthSqr() < 1.0E-6 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
+    }
+
+    /** The ring's light in its spirit's colour, a little above where the wielder first stood. */
+    private static void ring(ServerLevel level, Trial trial, double radius) {
+        DustParticleOptions dust = new DustParticleOptions(Vec3.fromRGB24(trial.spirit.colour()).toVector3f(), 1.0F);
+        for (int i = 0; i < RING_POINTS; i++) {
+            double angle = i * (Math.PI * 2.0 / RING_POINTS);
+            SpiritSenses.particles(level, dust, trial.centre.x + Math.cos(angle) * radius, trial.centre.y + RING_LIFT,
+                    trial.centre.z + Math.sin(angle) * radius, 1, 0.0, 0.0, 0.0, 0.0);
+        }
+    }
+
+    private static double horizontal(Vec3 a, Vec3 b) {
+        return a.subtract(b).horizontalDistance();
+    }
+
+    /** A line about the bout on this player's action bar, in grey. */
+    private static void tell(Player player, String key) {
+        player.displayClientMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY), true);
     }
 
     /**

@@ -1684,6 +1684,10 @@ public final class BleachCommand {
                 }
             }
             case DUEL -> {
+                String held = BankaiTrial.duelRefusal(player);
+                if (held != null) {
+                    return Component.translatable(held);
+                }
                 // The line the player would have seen on its action bar; a forced start is never NOT_READY.
                 VisoredEvents.DuelStart start = VisoredEvents.beginDuel(player, data, now, true);
                 if (start != VisoredEvents.DuelStart.STARTED) {

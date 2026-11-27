@@ -233,6 +233,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_FLOOR_SHARE;
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_BOUT_SECONDS;
     public static final ModConfigSpec.DoubleValue BANKAI_TRIAL_LOSS_HEALTH;
+    public static final ModConfigSpec.IntValue BANKAI_TRIAL_RING_RADIUS;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1504,6 +1505,11 @@ public final class BleachConfig {
                 .comment("A soul's health at which its zanpakutō's spirit's last blow stops, in its Bankai trial or out of"
                         + " one, and the spirit goes home: 2 is one heart. No spirit ever kills its wielder.")
                 .defineInRange("loss_health", 2.0, 1.0, 20.0);
+        BANKAI_TRIAL_RING_RADIUS = builder
+                .comment("Blocks from where a Bankai trial begins to its ring, which keeps the soul and its spirit in and"
+                        + " everyone else out. No trial begins, and no inner Hollow comes out, where its ring would meet"
+                        + " another trial's or an inner Hollow fight's.")
+                .defineInRange("ring_radius", 12, 6, 24);
         builder.pop();
         builder.pop();
 

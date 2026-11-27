@@ -140,7 +140,7 @@ public final class BankaiSpiritTests {
     }
 
     /** A mock host as VisoredTests makes one: a Shinigami who knows Zangetsu's name, 900 reiryoku, full, at the middle. */
-    private static Player host(GameTestHelper helper) {
+    static Player host(GameTestHelper helper) {
         Player player = wielder(helper, MIDDLE);
         SoulLogic.get(player).setMaxReiryoku(900.0F);
         SoulLogic.get(player).setReiryoku(900.0F);
@@ -148,12 +148,12 @@ public final class BankaiSpiritTests {
     }
 
     /** A Hollow rooted in this soul a day ago, ready to be faced now, as VisoredTests readies one. */
-    private static void ready(SoulData data, long now) {
+    static void ready(SoulData data, long now) {
         VisoredLogic.setRecord(data, VisoredLogic.record(data).withRootedAt(now - 24_000L).withDuelReadyAt(now));
     }
 
     /** Ends the host's fight with its inner Hollow, as VisoredTests does, so none is left in the table for another test. */
-    private static void end(long now, Player host) {
+    static void end(long now, Player host) {
         VisoredEvents.endAll(host, SoulLogic.get(host), now);
     }
 
