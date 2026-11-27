@@ -160,6 +160,9 @@ public final class SoulEvents {
         QuincyEvents.tick(player, data, meditating);
         VisoredEvents.tick(player, data, player.level().getGameTime());
         BankaiTrial.tick(player, data, player.level().getGameTime());
+        if (player.tickCount % Tenshintai.KEEP_TICKS == 0) {
+            Tenshintai.keep(player, data);
+        }
 
         if (player.tickCount % MILESTONE_CHECK_TICKS == 0) {
             Milestones.check(player, data);

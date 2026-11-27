@@ -44,6 +44,7 @@ public final class TenshintaiItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip.bleach.tenshintai").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip.bleach.tenshintai", Tenshintai.windowDays())
+                .withStyle(ChatFormatting.GRAY));
     }
 }

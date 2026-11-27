@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.Tenshintai;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
@@ -20,7 +21,9 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.locale.Language;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -31,17 +34,22 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for the Tenshintai (8k1): the doll set down, refused and crumbling. Each test asks only about its own souls and
- * dolls, and every doll a test set down is taken away however it ends, by its end's clean-up. A mock soul is told
- * nothing, so a line is asked of a joined soul.
+ * Tests for the Tenshintai (8k1): the doll set down, refused and crumbling, stood again by its soul's ticks, after a
+ * logout too, and crumbling as its window ends. Each test asks only about its own souls and dolls, and every doll a test
+ * set down is taken away however it ends, by its end's clean-up. A mock soul is told nothing, so a line is asked of a
+ * joined soul.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -50,7 +58,7 @@ public final class TenshintaiTests {
     static final BlockPos DOLL = new BlockPos(8, 2, 7);
     static final String SET_DOWN = "message.bleach.tenshintai.set_down", STANDS = "message.bleach.tenshintai.stands";
     static final String NO_SPOT = "message.bleach.tenshintai.no_spot", NO_POWER = "message.bleach.tenshintai.no_power";
-    static final String REACHED = "message.bleach.tenshintai.reached";
+    static final String REACHED = "message.bleach.tenshintai.reached", CRUMBLED = "message.bleach.tenshintai.crumbled";
 
     private TenshintaiTests() {
     }
@@ -97,6 +105,17 @@ public final class TenshintaiTests {
     static void clearedAtEnd(GameTestHelper helper, List<Player> souls) {
         ChunkPos chunk = new ChunkPos(helper.absolutePos(BlockPos.ZERO));
         ShakonmakuTests.hold(helper, helper.getLevel(), chunk.x, chunk.z).atEnd(() -> clear(souls));
+    }
+
+    /** The dolls standing within a block of this spot of the test. */
+    static List<Tenshintai> dollsAt(GameTestHelper helper, BlockPos relative) {
+        return helper.getLevel().getEntitiesOfClass(Tenshintai.class, new AABB(helper.absolutePos(relative)).inflate(1.0));
+    }
+
+    /** Whether this line says a doll was set down to stand for these game days. */
+    static boolean setDownFor(Component line, int days) {
+        return line.getContents() instanceof TranslatableContents words && words.getKey().equals(SET_DOWN)
+                && words.getArgs().length == 1 && words.getArgs()[0].equals(days);
     }
 
     /**
@@ -191,5 +210,107 @@ public final class TenshintaiTests {
                         && owners.stream().allMatch(soul -> Tenshintai.standing(soul.getUUID()) == null)
                         && !doll.isRemoved() && doll.tickCount > 0 && Tenshintai.standing(ichigo.getUUID()) == doll,
                 "a doll its soul's record no longer names, or whose soul is gone, still stands, or one it names fell"));
+    }
+
+    /**
+     * K2. A doll and its window outlast its soul's logging out. The doll goes with the player object; the soul saved and
+     * read back into a new player object has its record as it was, window and all, and its tick stands the doll again
+     * where the record says, once, facing it, the window untouched, but not where no chunk ticks. The doll's type is
+     * never saved, so a restart leaves the record alone to stand it again.
+     */
+    @GameTest(template = "field", timeoutTicks = 40)
+    public static void aDollStandsAgainAfterItsSoulsLogout(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        Player ichigo = BankaiSpiritTests.wielder(helper, BankaiTrialTests.MIDDLE);
+        Player away = BankaiSpiritTests.wielder(helper, BankaiTrialTests.FLOOR);
+        Player loaded = helper.makeMockPlayer(GameType.SURVIVAL);
+        clearedAtEnd(helper, List.of(ichigo, away, loaded));
+        List<Tenshintai> first = new ArrayList<>(1);
+        List<BankaiRecord> saved = new ArrayList<>(1);
+        helper.startSequence()
+                .thenExecute(() -> {
+                    first.add(setDown(helper, ichigo, DOLL));
+                    saved.add(BankaiTrialTests.record(ichigo));
+                    // A logout: its event, then the player taken out of its world (mc PlayerList.java:349-362).
+                    NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(ichigo));
+                    ichigo.discard();
+                    loaded.load(ichigo.saveWithoutId(new CompoundTag()));
+                    // Reading takes a mock's own profile's UUID (mc Player.java:765); a login reads the soul's own.
+                    loaded.setUUID(ichigo.getUUID());
+                    helper.assertTrue(saved.get(0).windowEndsAt() > now
+                                    && BankaiTrialTests.record(loaded).equals(saved.get(0))
+                                    && !ModEntities.TENSHINTAI.get().canSerialize(),
+                            "the soul read back has " + BankaiTrialTests.record(loaded) + ", not " + saved.get(0)
+                                    + ", or the doll is saved");
+                    SoulData far = SoulLogic.get(away);
+                    GlobalPos nowhere = GlobalPos.of(level.dimension(), new BlockPos(30_000, 70, 30_000));
+                    far.setZanpakuto(far.zanpakuto().withBankai(far.zanpakuto().bankai()
+                            .dollAt(nowhere, now + Tenshintai.windowTicks())));
+                    Tenshintai.keep(away, far);
+                    helper.assertTrue(Tenshintai.standing(away.getUUID()) == null
+                                    && BankaiTrialTests.record(away).doll().equals(Optional.of(nowhere)),
+                            "a doll stood where no chunk ticks, or its window closed while open");
+                })
+                .thenWaitUntil(() -> helper.assertTrue(first.get(0).isRemoved()
+                        && Tenshintai.standing(ichigo.getUUID()) == null, "the doll outlived its soul's logout"))
+                .thenExecute(() -> {
+                    Tenshintai.keep(loaded, SoulLogic.get(loaded));
+                    Tenshintai again = Tenshintai.standing(loaded.getUUID());
+                    Tenshintai.keep(loaded, SoulLogic.get(loaded));
+                    List<Tenshintai> there = dollsAt(helper, DOLL);
+                    helper.assertTrue(again != null && Tenshintai.standing(loaded.getUUID()) == again
+                                    && there.equals(List.of(again)) && facesMiddle(helper, again, DOLL)
+                                    && BankaiTrialTests.record(loaded).equals(saved.get(0)),
+                            "the soul read back had " + there + " stood again for its doll, and its record reads "
+                                    + BankaiTrialTests.record(loaded));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * K4. A joined soul's own ticks keep its doll for its window and then let it go. Set down, the doll's window lasts
+     * {@code window_days} game days, and the soul is told so. Gone as with its chunk, the doll its record names stands
+     * again by the soul's own tick, facing it, the window untouched; once the window is over, the soul's tick closes it:
+     * the record forgets the doll, the soul is told in chat, and the doll crumbles.
+     */
+    @GameTest(template = "field", timeoutTicks = 120)
+    public static void aDollStandsByItsSoulsTicksUntilItsWindowEnds(GameTestHelper helper) {
+        ServerPlayer ichigo = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 500.0F), true);
+        BankaiSpiritTests.stand(helper, ichigo, BankaiTrialTests.MIDDLE);
+        clearedAtEnd(helper, List.of(ichigo));
+        long now = HollowPlayerTests.now(helper);
+        List<Tenshintai> dolls = new ArrayList<>(2);
+        KidoTests.withConfig(BleachConfig.BANKAI_TENSHINTAI_WINDOW_DAYS, 1, () -> dolls.add(setDown(helper, ichigo, DOLL)));
+        BankaiRecord set = BankaiTrialTests.record(ichigo);
+        helper.assertTrue(set.windowEndsAt() == now + 24_000L && set.doll().equals(Optional.of(place(helper, DOLL)))
+                        && TestPlayers.chat(ichigo).stream().anyMatch(line -> setDownFor(line, 1)),
+                "set down with a window of one game day, the record reads " + set + ", or the soul was not told so");
+        // Its doll goes as its chunk's unloading would take it.
+        dolls.get(0).discard();
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, Tenshintai.standing(ichigo.getUUID()) != null,
+                        "the soul's own tick never stood its doll again"))
+                .thenExecute(() -> {
+                    Tenshintai again = Tenshintai.standing(ichigo.getUUID());
+                    helper.assertTrue(dollsAt(helper, DOLL).equals(List.of(again)) && facesMiddle(helper, again, DOLL)
+                                    && BankaiTrialTests.record(ichigo).equals(set),
+                            "the soul's tick stood " + dollsAt(helper, DOLL) + " again, its record "
+                                    + BankaiTrialTests.record(ichigo));
+                    dolls.add(again);
+                    // Its window nearly over: it ends 30 ticks on.
+                    SoulData data = SoulLogic.get(ichigo);
+                    data.setZanpakuto(data.zanpakuto().withBankai(set.dollAt(place(helper, DOLL),
+                            HollowPlayerTests.now(helper) + 30L)));
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, dolls.get(1).isRemoved()
+                                && Tenshintai.standing(ichigo.getUUID()) == null,
+                        "the doll still stood as its window ended, its record " + BankaiTrialTests.record(ichigo)))
+                .thenExecute(() -> helper.assertTrue(BankaiTrialTests.record(ichigo).equals(set.closed())
+                                && TestPlayers.chat(ichigo).stream().anyMatch(line -> GateTests.says(line, CRUMBLED, -1))
+                                && Language.getInstance().has(CRUMBLED),
+                        "its window over, the soul's record reads " + BankaiTrialTests.record(ichigo)
+                                + ", or the soul was not told its doll crumbled"))
+                .thenSucceed();
     }
 }
