@@ -157,9 +157,10 @@ public final class SoulStatsScreen extends Screen {
      * Every row above the next step, from the title at {@code top}, {@code line} apart with {@code gap}
      * more between sections, and the stats and powers headings only with {@code headers}; with no
      * {@code graphics}, only measures them. A reached Bankai is named on the row under the zanpakutō's (see
-     * {@link BankaiLogic#screenLine}). A Visored, while the server has the path on, says so on its state row and gets
-     * two rows of its own after those (see {@link #visoredRows}), and a soul with a Hollow rooted in it gets the rows
-     * of {@link #takeoverRows}.
+     * {@link BankaiLogic#screenLine}), and a Tenshintai set down has its rows there ({@link BankaiLogic#dollLines},
+     * by the client's game time, the clock its window runs on). A Visored, while the server has the path on, says so
+     * on its state row and gets two rows of its own after those (see {@link #visoredRows}), and a soul with a Hollow
+     * rooted in it gets the rows of {@link #takeoverRows}.
      *
      * @return where the next step starts
      */
@@ -217,6 +218,10 @@ public final class SoulStatsScreen extends Screen {
         Component bankai = BankaiLogic.screenLine(data);
         if (bankai != null) {
             text(graphics, bankai, left, y, GREY);
+            y += line;
+        }
+        for (Component doll : BankaiLogic.dollLines(data, player.level().getGameTime(), player.level().dimension())) {
+            text(graphics, doll, left, y, GREY);
             y += line;
         }
         if (visored) {

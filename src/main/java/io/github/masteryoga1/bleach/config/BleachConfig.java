@@ -239,6 +239,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_TRIAL_RISE_SHARE;
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_BLADES;
     public static final ModConfigSpec.IntValue BANKAI_TENSHINTAI_WINDOW_DAYS;
+    public static final ModConfigSpec.IntValue BANKAI_TENSHINTAI_PRICE;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1539,6 +1540,9 @@ public final class BleachConfig {
                 .comment("Game days a Tenshintai stands from its setting down, holding its soul's zanpakutō spirit out to be"
                         + " fought by it; then it crumbles.")
                 .defineInRange("window_days", 3, 1, 30);
+        BANKAI_TENSHINTAI_PRICE = builder
+                .comment("Emeralds Kisuke Urahara asks for a Tenshintai.")
+                .defineInRange("price", 32, 1, 64);
         builder.pop();
         builder.pop();
 

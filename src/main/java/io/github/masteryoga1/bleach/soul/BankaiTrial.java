@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.BossBar;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
 import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
@@ -39,10 +40,11 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
 /**
  * The subjugation (kuppuku): a soul's Bankai trial, a bout of {@code [bankai.trial] bout_seconds} with its own
- * zanpakutō spirit, drawn out afresh to be beaten down. Its try is counted as it begins, and no end but the win
- * writes anything more: the time, the loss, a break-off seen on the wielder's tick, its logging out or death, the
- * server stopping, or the spirit leaving its world for any reason, so whatever sends a drawn-out spirit home ends the
- * bout. The bouts are held only in memory, by their wielders' UUIDs, on the server thread.
+ * zanpakutō spirit, drawn out afresh to be beaten down. Its try is counted as it begins; the win writes the Bankai, and
+ * the other ends nothing more but the wounds of a bout by a Tenshintai: the time, the loss, a break-off seen on the
+ * wielder's tick, its logging out or death, the server stopping, or the spirit leaving its world for any reason, so
+ * whatever sends a drawn-out spirit home ends the bout. The bouts are held only in memory, by their wielders' UUIDs,
+ * on the server thread.
  *
  * <p>A spirit beaten to its floor in a bout yields ({@link #yields}): the soul reaches Bankai by its spirit's name for
  * it, as the grant gives it. A spirit's blow that would leave its wielder at {@code loss_health} stops there, and the
@@ -58,7 +60,8 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  * Tenshintai for a bout by the doll: it keeps the two in and everyone else out, as the inner Hollow's ring does, and no
  * bout begins where its ring would meet another's, a bout's or a fight with an inner Hollow's; that fight asks
  * {@link #duelRefusal} the same of a bout. A bout by the doll has its time up with the doll's window at the latest,
- * bar the second's grace any bout gives a spirit beaten as its time runs out.
+ * bar the second's grace any bout gives a spirit beaten as its time runs out, and its spirit keeps its wounds from one
+ * bout by the doll to the next, never below its floor ({@link #keptShare}).
  */
 public final class BankaiTrial {
     private static final String BEGUN = "message.bleach.bankai.trial.begun", TIME_UP = "message.bleach.bankai.trial.time";
@@ -108,10 +111,11 @@ public final class BankaiTrial {
     /**
      * One bout: the player object that began it (a respawn or an End exit makes a new one, which breaks it off), its
      * spirit, its world, its ring's centre, when it began and when its time runs out, its spirit's bar's own name,
-     * which the bar shows beside the seconds left, and the blades of its test, for a spirit that tests with them.
+     * which the bar shows beside the seconds left, the blades of its test, for a spirit that tests with them, and
+     * whether it is fought by a Tenshintai.
      */
     public record Trial(Player wielder, MaterialisedSpirit spirit, ResourceKey<Level> level, Vec3 centre, long startedAt,
-            long endsAt, Component name, @Nullable BankaiSwords swords) {
+            long endsAt, Component name, @Nullable BankaiSwords swords, boolean byDoll) {
     }
 
     /**
@@ -136,15 +140,20 @@ public final class BankaiTrial {
      * The try is counted only once the bout has begun. On the client: NO_SPIRIT.
      */
     public static Start begin(Player wielder, long now) {
-        return begin(wielder, wielder.position(), Long.MAX_VALUE, now);
+        return begin(wielder, wielder.position(), Long.MAX_VALUE, false, now);
     }
 
     /**
      * Begins the wielder's bout as above, its ring about this centre, and its time up by {@code endsBy} at the latest: a
      * Tenshintai's, about the doll and within its window, which its caller closes first once it is over, as the doll's
-     * strike does, so {@code endsBy} is after now.
+     * strike does, so {@code endsBy} is after now. Its spirit keeps its wounds from one such bout to the next.
      */
     public static Start begin(Player wielder, Vec3 centre, long endsBy, long now) {
+        return begin(wielder, centre, endsBy, true, now);
+    }
+
+    /** Either bout, by the doll or not. */
+    private static Start begin(Player wielder, Vec3 centre, long endsBy, boolean byDoll, long now) {
         List<Vec3> ground = new ArrayList<>();
         Start refusal = refusal(wielder, centre, ground);
         if (refusal != null) {
@@ -159,7 +168,7 @@ public final class BankaiTrial {
         long endsAt = Math.min(now + boutSeconds() * (long) SECOND_TICKS, endsBy);
         // Held by its call from before it joined the world, so it is there.
         return open(wielder, data, Materialisation.of(wielder.getUUID()), centre, endsAt, now, testOf(wielder, data),
-                ground);
+                ground, byDoll);
     }
 
     /**
@@ -210,10 +219,15 @@ public final class BankaiTrial {
      * The bout begins with this spirit, out before its wielder, its ring about this centre and its time running out at
      * {@code endsAt}: held, its try counted, its clock and ring shown, and its test set: a Zabimaru tested by its two
      * halves has its health split between them, and its wielder is told so; a soul tested with blades has them risen on
-     * this ground in its spirit's Shikai look, and is told so.
+     * this ground in its spirit's Shikai look, and is told so. A spirit fought by the doll begins with the wounds the
+     * last such bout left it ({@link #keptShare}), unbeaten, as a blow must still bring it to its floor; set before a
+     * Zabimaru's health is split, so both halves begin with them.
      */
     private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, Vec3 centre, long endsAt, long now,
-            ZanpakutoSpirit.BankaiTest test, List<Vec3> ground) {
+            ZanpakutoSpirit.BankaiTest test, List<Vec3> ground, boolean byDoll) {
+        if (byDoll) {
+            spirit.setHealth(keptShare(data.zanpakuto().bankai().spiritHealth()) * spirit.getMaxHealth());
+        }
         if (test == ZanpakutoSpirit.BankaiTest.TWO_HALVES && spirit instanceof ZabimaruSpirit zabimaru) {
             zabimaru.splitHalves(now);
         }
@@ -223,7 +237,7 @@ public final class BankaiTrial {
             swords = BankaiSwords.raise(server, wielder, ground, blades(), look);
         }
         Trial trial = new Trial(wielder, spirit, wielder.level().dimension(), centre, now, endsAt,
-                spirit.bar().event().getName(), swords);
+                spirit.bar().event().getName(), swords, byDoll);
         TRIALS.put(wielder.getUUID(), trial);
         ZanpakutoBond bond = data.zanpakuto();
         data.setZanpakuto(bond.withBankai(bond.bankai().tried(now)));
@@ -267,7 +281,7 @@ public final class BankaiTrial {
             return;
         }
         if (brokenOff(wielder, data, trial)) {
-            end(trial, End.BROKEN_OFF, false);
+            end(trial, End.BROKEN_OFF, false, data);
             return;
         }
         if (now >= trial.endsAt && (!trial.spirit.beaten() || now >= trial.endsAt + SECOND_TICKS)) {
@@ -327,18 +341,30 @@ public final class BankaiTrial {
         }
     }
 
+    /** Ends this bout as below, a bout by the doll's wounds kept on its wielder's record. */
+    private static void end(Trial trial, End end, boolean leaving) {
+        end(trial, end, leaving, SoulLogic.get(trial.wielder));
+    }
+
     /**
      * Ends this bout if it is still under way: off the table first, so its spirit's going home does not end it again,
-     * and its blades cleared ({@link BankaiSwords#clear}); then the win's record or the loss's or the time's line in
-     * chat; then its spirit sent home with the end's line, unless the spirit is leaving its world already, where a
-     * discard would change the world as it moves the spirit: then only the line.
+     * and its blades cleared ({@link BankaiSwords#clear}); then, for a bout by the doll ended any way but the win, the
+     * share of health its spirit has ({@link BossBar#progress}, both halves' for a split Zabimaru) kept for the next on
+     * {@code soul}, the wielder's or that of the new player object that broke it off, while it names a doll still;
+     * then the win's record or the loss's or the time's line in chat; then its spirit sent home with the end's line,
+     * unless the spirit is leaving its world already, where a discard would change the world as it moves the spirit:
+     * then only the line.
      */
-    private static void end(Trial trial, End end, boolean leaving) {
+    private static void end(Trial trial, End end, boolean leaving, SoulData soul) {
         if (!TRIALS.remove(trial.wielder.getUUID(), trial)) {
             return;
         }
         if (trial.swords != null) {
             trial.swords.clear(leaving);
+        }
+        BankaiRecord record = soul.zanpakuto().bankai();
+        if (trial.byDoll && end != End.WIN && record.doll().isPresent()) {
+            soul.setZanpakuto(soul.zanpakuto().withBankai(record.wounded(keptShare(BossBar.progress(trial.spirit)))));
         }
         Player wielder = trial.wielder;
         String line = end == End.WIN ? YIELDED : end == End.BROKEN_OFF ? BROKEN : HOME;
@@ -388,6 +414,14 @@ public final class BankaiTrial {
         }
         wielder.sendSystemMessage(Component.translatable(WON, name.get(), Component.keybind(RELEASE_KEY))
                 .withStyle(ChatFormatting.GOLD));
+    }
+
+    /**
+     * The share of its health a spirit keeps between bouts by the doll: never below its floor's ({@code [bankai.spirit]
+     * floor_share}), so one killed, which reads 0, comes back at its floor.
+     */
+    public static float keptShare(float share) {
+        return Math.max(share, (float) BleachConfig.get(BleachConfig.BANKAI_SPIRIT_FLOOR_SHARE));
     }
 
     /** The bout of the wielder with this UUID, or null when it has none. */

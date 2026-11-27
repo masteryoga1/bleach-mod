@@ -2,7 +2,9 @@ package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
 import io.github.masteryoga1.bleach.entity.Tenshintai;
+import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
@@ -31,17 +33,20 @@ import net.minecraft.locale.Language;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSources;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -54,12 +59,13 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for the Tenshintai (8k1): the doll set down, refused and crumbling, stood again by its soul's ticks, after a
- * logout too, and crumbling as its window ends; struck, drawing its soul's spirit out for a bout by it; and refused where
- * no bout could begin by it. Each test asks only about its own souls and dolls: every bout ends within the tick it began
- * in, and every doll a test set down is taken away however it ends, by its end's clean-up. Their dolls are set down and
- * their bouts fought as by a spirit with no test of its own ({@code spirit_tests} off), so no ground about a doll is
- * asked for Zangetsu's blades, but where K5 asks for it. On Peaceful no doll is set down, as no bout could begin by it.
- * A mock soul is told nothing, so a line is asked of a joined soul.
+ * logout too, and crumbling as its window ends; struck, drawing its soul's spirit out for a bout by it; refused where
+ * no bout could begin by it; and its spirit keeping its wounds from one bout by it to the next. Each test asks only
+ * about its own souls and dolls: every bout ends within the tick it began in, and every doll a test set down is taken
+ * away however it ends, by its end's clean-up. Their dolls are set down and their bouts fought as by a spirit with no
+ * test of its own ({@code spirit_tests} off), so no ground about a doll is asked for Zangetsu's blades, but where K5
+ * asks for it and K6 asks Zabimaru's two halves what they kept. On Peaceful no doll is set down, as no bout could begin
+ * by it. A mock soul is told nothing, so a line is asked of a joined soul.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -73,6 +79,8 @@ public final class TenshintaiTests {
     static final String UNRELEASED = "message.bleach.tenshintai.unreleased", ALREADY = "message.bleach.tenshintai.already";
     static final String CROWDED = "message.bleach.tenshintai.crowded", NO_GROUND = "message.bleach.tenshintai.no_ground";
     static final String PEACEFUL = "message.bleach.tenshintai.peaceful";
+    static final String WINDOW = "screen.bleach.soul.tenshintai", AT = "screen.bleach.soul.tenshintai.at";
+    static final String AWAY = "screen.bleach.soul.tenshintai.away", SPRING = "screen.bleach.soul.tenshintai.spring";
 
     private TenshintaiTests() {
     }
@@ -153,6 +161,19 @@ public final class TenshintaiTests {
                 "a doll was set down on Peaceful: " + said);
         helper.succeed();
         return true;
+    }
+
+    /** This soul strikes its doll and a bout by the doll begins, or the test fails; the bout's spirit. */
+    static MaterialisedSpirit struck(GameTestHelper helper, Player soul, Tenshintai doll) {
+        soul.attack(doll);
+        BankaiTrial.Trial trial = BankaiTrial.trial(soul.getUUID());
+        helper.assertTrue(trial != null && trial.byDoll(), "the strike began no bout by the doll: " + trial);
+        return trial.spirit();
+    }
+
+    /** This soul's bout runs out: its tick at the bout's end, which ends it on the time. */
+    static void runOut(Player soul) {
+        BankaiTrial.tick(soul, SoulLogic.get(soul), BankaiTrial.trial(soul.getUUID()).endsAt());
     }
 
     /**
@@ -384,7 +405,9 @@ public final class TenshintaiTests {
 
     /**
      * K3. Struck with its soul's blade sealed, or by another soul, the doll begins nothing, and the soul is told why.
-     * Struck with the blade released, the spirit comes out for a bout about the doll, its 300 seconds well inside the
+     * Its soul's screen shows the days and hours its window has left, rounded up to the hour, and where it stands, or
+     * that it stands in another world, then where to heal; a soul with no doll has no such lines. Struck with the blade
+     * released, the spirit comes out for a bout about the doll, its 300 seconds well inside the
      * window, which the strike leaves as it was; in the bout a second doll is refused, the soul told so as the trial
      * refuses it, and a second strike begins nothing. A bout struck near the window's end ends with the window, and a
      * window over waits for the bout under way, then closes at the next strike, its soul told the doll crumbled.
@@ -408,6 +431,22 @@ public final class TenshintaiTests {
             helper.assertTrue(BankaiTrial.trial(ichigo.getUUID()) == null && BankaiTrial.trial(other.getUUID()) == null
                             && BankaiTrialTests.record(ichigo).equals(set) && BankaiSpiritTests.told(ichigo, UNRELEASED),
                     "a strike with the blade sealed, or by another soul, began a bout, or the soul was not told why");
+            // An hour is 1,000 ticks: the window's whole days as it opens, and one hour with 999 ticks left.
+            ResourceKey<Level> here = helper.getLevel().dimension();
+            BlockPos at = helper.absolutePos(DOLL);
+            Component there = Component.translatable(AT, at.getX(), at.getY(), at.getZ());
+            Component away = Component.translatable(AWAY), spring = Component.translatable(SPRING);
+            long days = Tenshintai.windowDays();
+            SoulData soul = SoulLogic.get(ichigo);
+            helper.assertTrue(BankaiLogic.dollLines(soul, now, here)
+                            .equals(List.of(Component.translatable(WINDOW, days, 0L, there), spring))
+                            && BankaiLogic.dollLines(soul, set.windowEndsAt() - 999L, here)
+                                    .equals(List.of(Component.translatable(WINDOW, 0L, 1L, there), spring))
+                            && BankaiLogic.dollLines(soul, now, Level.NETHER)
+                                    .equals(List.of(Component.translatable(WINDOW, days, 0L, away), spring))
+                            && BankaiLogic.dollLines(SoulLogic.get(other), now, here).isEmpty()
+                            && List.of(WINDOW, AT, AWAY, SPRING).stream().allMatch(Language.getInstance()::has),
+                    "set down, the soul screen reads " + BankaiLogic.dollLines(soul, now, here));
 
             release(helper, ichigo);
             ichigo.attack(doll);
@@ -514,5 +553,105 @@ public final class TenshintaiTests {
             clear.run();
         });
         helper.succeed();
+    }
+
+    /**
+     * K6. A spirit fought by the doll keeps its wounds from one bout by it to the next: the share of its health it had
+     * as a bout by the doll ran out or broke off (a logout among them) it has as the next begins, never below its floor,
+     * so one killed comes back at its floor, unbeaten. A bout broken off by a new player object for the soul, as a
+     * respawn makes, keeps them on that object's record, not the old one's. A command bout begins whole and keeps
+     * nothing, and a win leaves no wounds, window or doll on the record, and the doll crumbles. Zabimaru keeps the mean
+     * of its two halves, and both begin at it.
+     */
+    @GameTest(template = "field", timeoutTicks = 40)
+    public static void aSecondBoutFindsItsWoundsKept(GameTestHelper helper) {
+        DamageSources sources = helper.getLevel().damageSources();
+        long now = HollowPlayerTests.now(helper);
+        Player ichigo = BankaiSpiritTests.wielder(helper, BankaiTrialTests.MIDDLE);
+        if (refusedOnPeaceful(helper, ichigo)) {
+            return;
+        }
+        Player renji = ZanpakutoTests.named(helper, ZanpakutoSpirits.ZABIMARU);
+        BankaiSpiritTests.stand(helper, renji, BankaiTrialTests.MIDDLE);
+        Player respawned = helper.makeMockPlayer(GameType.SURVIVAL);
+        clearedAtEnd(helper, List.of(ichigo, renji, respawned));
+        float floorShare = (float) BleachConfig.get(BleachConfig.BANKAI_SPIRIT_FLOOR_SHARE);
+        List<Tenshintai> dolls = new ArrayList<>(1);
+        plain(() -> {
+            Tenshintai doll = setDown(helper, ichigo, DOLL);
+            dolls.add(doll);
+            release(helper, ichigo);
+            MaterialisedSpirit first = struck(helper, ichigo, doll);
+            helper.assertTrue(first.getHealth() == first.getMaxHealth()
+                    && BankaiTrialTests.record(ichigo).spiritHealth() == 1.0F, "the first bout's spirit was not whole");
+            first.setHealth(0.6F * first.getMaxHealth());
+            runOut(ichigo);
+            BankaiRecord timed = BankaiTrialTests.record(ichigo);
+            MaterialisedSpirit second = struck(helper, ichigo, doll);
+            helper.assertTrue(Math.abs(timed.spiritHealth() - 0.6F) < 1.0E-4F
+                            && Math.abs(second.getHealth() - 0.6F * second.getMaxHealth()) < 1.0E-3F,
+                    "a time-out kept " + timed.spiritHealth() + ", and the next bout began at " + second.getHealth());
+            second.setHealth(0.3F * second.getMaxHealth());
+            // A logout's event, its soul kept, so the doll stands on; it seals the release, so the soul releases again.
+            NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(ichigo));
+            BankaiRecord left = BankaiTrialTests.record(ichigo);
+            release(helper, ichigo);
+            MaterialisedSpirit third = struck(helper, ichigo, doll);
+            helper.assertTrue(Math.abs(left.spiritHealth() - 0.3F) < 1.0E-4F
+                            && Math.abs(third.getHealth() - 0.3F * third.getMaxHealth()) < 1.0E-3F,
+                    "a logout kept " + left.spiritHealth() + ", and the next bout began at " + third.getHealth());
+            third.setHealth(0.45F * third.getMaxHealth());
+            // A new player object with the soul's UUID and a copy of its record, as K2 reads one back, ticks.
+            respawned.load(ichigo.saveWithoutId(new CompoundTag()));
+            respawned.setUUID(ichigo.getUUID());
+            BankaiTrial.tick(respawned, SoulLogic.get(respawned), now);
+            float moved = BankaiTrialTests.record(respawned).spiritHealth();
+            helper.assertTrue(BankaiTrial.trial(ichigo.getUUID()) == null && Math.abs(moved - 0.45F) < 1.0E-4F
+                            && BankaiTrialTests.record(ichigo).spiritHealth() == left.spiritHealth(),
+                    "broken off by a new player object, the bout kept " + moved + " on it and "
+                            + BankaiTrialTests.record(ichigo).spiritHealth() + " on the old one");
+            // Killed, as /kill leaves it: it reads 0 and comes back at its floor.
+            MaterialisedSpirit fourth = struck(helper, ichigo, doll);
+            fourth.setHealth(0.0F);
+            runOut(ichigo);
+            helper.assertTrue(BankaiTrialTests.record(ichigo).spiritHealth() == floorShare
+                    && BankaiTrial.keptShare(0.0F) == floorShare, "a spirit killed kept less than its floor");
+            BankaiTrial.Trial command = BankaiTrialTests.begun(helper, ichigo, now);
+            helper.assertTrue(!command.byDoll() && command.spirit().getHealth() == command.spirit().getMaxHealth()
+                    && command.centre().equals(ichigo.position()), "the command's bout read the doll's wounds");
+            command.spirit().setHealth(0.5F * command.spirit().getMaxHealth());
+            BankaiTrialTests.clear(ichigo);
+            MaterialisedSpirit last = struck(helper, ichigo, doll);
+            helper.assertTrue(BankaiTrialTests.record(ichigo).spiritHealth() == floorShare
+                            && Math.abs(last.getHealth() - last.floor()) < 1.0E-3F && !last.beaten(),
+                    "after a command bout the doll's spirit began at " + last.getHealth() + ", or beaten");
+            helper.assertTrue(BankaiTrial.yields(last), "the doll's spirit did not yield");
+            BankaiRecord won = BankaiTrialTests.record(ichigo);
+            helper.assertTrue(won.achieved() && won.windowEndsAt() == ZanpakutoBond.NEVER && won.doll().isEmpty()
+                    && won.spiritHealth() == 1.0F, "the win left the record " + won);
+        });
+        // Zabimaru, its halves split: the snake beaten down, the baboon whole.
+        KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_SPIRIT_TESTS, true, () -> {
+            Tenshintai doll = setDown(helper, renji, new BlockPos(8, 2, 5));
+            ZanpakutoItem.setReleased(renji.getMainHandItem(), ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZABIMARU),
+                    true);
+            ZabimaruSpirit first = (ZabimaruSpirit) struck(helper, renji, doll);
+            float mean = (first.getMaxHealth() + first.floor()) / (2.0F * first.getMaxHealth());
+            first.snake().hurt(sources.playerAttack(renji), 10_000.0F);
+            helper.assertTrue(first.split() && first.down(ZabimaruSpirit.Half.SNAKE), "the snake was not beaten down");
+            runOut(renji);
+            float kept = BankaiTrialTests.record(renji).spiritHealth();
+            ZabimaruSpirit next = (ZabimaruSpirit) struck(helper, renji, doll);
+            float share = kept * next.getMaxHealth();
+            helper.assertTrue(Math.abs(kept - mean) < 1.0E-4F && next.split()
+                            && Math.abs(next.health(ZabimaruSpirit.Half.BABOON) - share) < 1.0E-3F
+                            && Math.abs(next.health(ZabimaruSpirit.Half.SNAKE) - share) < 1.0E-3F && !next.beaten()
+                            && !next.down(ZabimaruSpirit.Half.SNAKE) && !next.down(ZabimaruSpirit.Half.BABOON),
+                    "Zabimaru kept " + kept + ", not " + mean + ", or its halves began at "
+                            + next.health(ZabimaruSpirit.Half.BABOON) + " and " + next.health(ZabimaruSpirit.Half.SNAKE));
+            BankaiTrialTests.clear(renji);
+        });
+        helper.succeedWhen(() -> helper.assertTrue(dolls.get(0).isRemoved()
+                && Tenshintai.standing(ichigo.getUUID()) == null, "the doll outlived its spirit's yielding"));
     }
 }
