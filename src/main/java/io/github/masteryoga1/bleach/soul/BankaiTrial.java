@@ -6,6 +6,7 @@ import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -53,9 +54,11 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  * and Zangetsu with blades risen about the soul, of which only the true one reaches him ({@link BankaiSwords}).
  * Any other spirit, or one whose body cannot take its test, fights a plain bout.
  *
- * <p>A ring of {@code ring_radius} blocks, lit in the spirit's colour, stands where the wielder began: it keeps the
- * two in and everyone else out, as the inner Hollow's ring does, and no bout begins where its ring would meet
- * another's, a bout's or a fight with an inner Hollow's; that fight asks {@link #duelRefusal} the same of a bout.
+ * <p>A ring of {@code ring_radius} blocks, lit in the spirit's colour, stands where the wielder began, or about its
+ * Tenshintai for a bout by the doll: it keeps the two in and everyone else out, as the inner Hollow's ring does, and no
+ * bout begins where its ring would meet another's, a bout's or a fight with an inner Hollow's; that fight asks
+ * {@link #duelRefusal} the same of a bout. A bout by the doll has its time up with the doll's window at the latest,
+ * bar the second's grace any bout gives a spirit beaten as its time runs out.
  */
 public final class BankaiTrial {
     private static final String BEGUN = "message.bleach.bankai.trial.begun", TIME_UP = "message.bleach.bankai.trial.time";
@@ -104,7 +107,7 @@ public final class BankaiTrial {
 
     /**
      * One bout: the player object that began it (a respawn or an End exit makes a new one, which breaks it off), its
-     * spirit, its world, where the wielder stood, when it began and when its time runs out, its spirit's bar's own name,
+     * spirit, its world, its ring's centre, when it began and when its time runs out, its spirit's bar's own name,
      * which the bar shows beside the seconds left, and the blades of its test, for a spirit that tests with them.
      */
     public record Trial(Player wielder, MaterialisedSpirit spirit, ResourceKey<Level> level, Vec3 centre, long startedAt,
@@ -128,14 +131,52 @@ public final class BankaiTrial {
     }
 
     /**
-     * Begins the wielder's bout where it stands, or says why not: the wielder a spectator or in creative mode, in a
-     * bout already, or past Bankai, then the call's own refusals, a dead wielder's among them, then a spot where its
-     * ring would meet another's ({@link #crowded}), and for a test with blades one where fewer than half of them find
-     * ground ({@link BankaiSwords#ground}). A spirit it has out is replaced by one afresh and whole, and only once the
-     * new one has room, so a refused bout leaves it out. The try is counted only once the bout has begun. On the
-     * client: NO_SPIRIT.
+     * Begins the wielder's bout where it stands, as the command does, or says why not ({@link #refusal}). A spirit it
+     * has out is replaced by one afresh and whole, and only once the new one has room, so a refused bout leaves it out.
+     * The try is counted only once the bout has begun. On the client: NO_SPIRIT.
      */
     public static Start begin(Player wielder, long now) {
+        return begin(wielder, wielder.position(), Long.MAX_VALUE, now);
+    }
+
+    /**
+     * Begins the wielder's bout as above, its ring about this centre, and its time up by {@code endsBy} at the latest: a
+     * Tenshintai's, about the doll and within its window, which its caller closes first once it is over, as the doll's
+     * strike does, so {@code endsBy} is after now.
+     */
+    public static Start begin(Player wielder, Vec3 centre, long endsBy, long now) {
+        List<Vec3> ground = new ArrayList<>();
+        Start refusal = refusal(wielder, centre, ground);
+        if (refusal != null) {
+            return refusal;
+        }
+        // No room, or a rung that changed since; never ALREADY, as the call replaces a spirit out.
+        Materialisation.Call call = Materialisation.callOut(wielder, true);
+        if (call != Materialisation.Call.CALLED) {
+            return Start.valueOf(call.name());
+        }
+        SoulData data = SoulLogic.get(wielder);
+        long endsAt = Math.min(now + boutSeconds() * (long) SECOND_TICKS, endsBy);
+        // Held by its call from before it joined the world, so it is there.
+        return open(wielder, data, Materialisation.of(wielder.getUUID()), centre, endsAt, now, testOf(wielder, data),
+                ground);
+    }
+
+    /**
+     * Why a bout about this centre may not begin now, or null when it may, in this order: the wielder a spectator or in
+     * creative mode, in a bout already, or past Bankai, then the call's own refusals, a dead wielder's among them, then a
+     * centre where its ring would meet another's ({@link #crowded}), and for a test with blades one where fewer than
+     * half of them find ground ({@link BankaiSwords#ground}). Nothing changes: a Tenshintai asks it as it is set down.
+     * On the client: NO_SPIRIT.
+     */
+    @Nullable
+    public static Start refusal(Player wielder, Vec3 centre) {
+        return refusal(wielder, centre, new ArrayList<>());
+    }
+
+    /** As above, the ground found for a test's blades added to {@code ground}. */
+    @Nullable
+    private static Start refusal(Player wielder, Vec3 centre, List<Vec3> ground) {
         if (!(wielder.level() instanceof ServerLevel level)) {
             return Start.NO_SPIRIT;
         }
@@ -153,32 +194,26 @@ public final class BankaiTrial {
         if (refusal != null) {
             return Start.valueOf(refusal.name());
         }
-        if (crowded(level, wielder.position())) {
+        if (crowded(level, centre)) {
             return Start.CROWDED;
         }
-        ZanpakutoSpirit.BankaiTest test = testOf(wielder, data);
-        boolean withBlades = test == ZanpakutoSpirit.BankaiTest.SWORDS;
-        List<Vec3> ground = withBlades ? BankaiSwords.ground(level, wielder, wielder.position(), ringRadius()) : List.of();
-        if (withBlades && tooLittleGround(ground.size())) {
-            return Start.NO_GROUND;
+        if (testOf(wielder, data) == ZanpakutoSpirit.BankaiTest.SWORDS) {
+            ground.addAll(BankaiSwords.ground(level, wielder, centre, ringRadius()));
+            if (tooLittleGround(ground.size())) {
+                return Start.NO_GROUND;
+            }
         }
-        // No room, or a rung that changed since; never ALREADY, as the call replaces a spirit out.
-        Materialisation.Call call = Materialisation.callOut(wielder, true);
-        if (call != Materialisation.Call.CALLED) {
-            return Start.valueOf(call.name());
-        }
-        // Held by its call from before it joined the world, so it is there.
-        return open(wielder, data, Materialisation.of(wielder.getUUID()), now, test, ground);
+        return null;
     }
 
     /**
-     * The bout begins with this spirit, out before its wielder: held, its try counted, its clock and ring shown, and its
-     * test set: a Zabimaru tested by its two halves has its health split between them, and its wielder is told so; a
-     * soul tested with blades has them risen on this ground in its spirit's Shikai look, and is told so.
+     * The bout begins with this spirit, out before its wielder, its ring about this centre and its time running out at
+     * {@code endsAt}: held, its try counted, its clock and ring shown, and its test set: a Zabimaru tested by its two
+     * halves has its health split between them, and its wielder is told so; a soul tested with blades has them risen on
+     * this ground in its spirit's Shikai look, and is told so.
      */
-    private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, long now,
+    private static Start open(Player wielder, SoulData data, MaterialisedSpirit spirit, Vec3 centre, long endsAt, long now,
             ZanpakutoSpirit.BankaiTest test, List<Vec3> ground) {
-        int seconds = boutSeconds();
         if (test == ZanpakutoSpirit.BankaiTest.TWO_HALVES && spirit instanceof ZabimaruSpirit zabimaru) {
             zabimaru.splitHalves(now);
         }
@@ -187,8 +222,8 @@ public final class BankaiTrial {
             int look = ZanpakutoSpirits.get(server, data.zanpakuto().spirit()).map(its -> its.shikai().model()).orElse(0);
             swords = BankaiSwords.raise(server, wielder, ground, blades(), look);
         }
-        Trial trial = new Trial(wielder, spirit, wielder.level().dimension(), wielder.position(), now,
-                now + seconds * (long) SECOND_TICKS, spirit.bar().event().getName(), swords);
+        Trial trial = new Trial(wielder, spirit, wielder.level().dimension(), centre, now, endsAt,
+                spirit.bar().event().getName(), swords);
         TRIALS.put(wielder.getUUID(), trial);
         ZanpakutoBond bond = data.zanpakuto();
         data.setZanpakuto(bond.withBankai(bond.bankai().tried(now)));
@@ -196,7 +231,8 @@ public final class BankaiTrial {
         if (wielder.level() instanceof ServerLevel level) {
             ring(level, trial, ringRadius());
         }
-        wielder.sendSystemMessage(Component.translatable(BEGUN, seconds).withStyle(ChatFormatting.GRAY));
+        wielder.sendSystemMessage(Component.translatable(BEGUN, VisoredLogic.secondsUntil(endsAt, now))
+                .withStyle(ChatFormatting.GRAY));
         if (spirit instanceof ZabimaruSpirit zabimaru && zabimaru.split()) {
             wielder.sendSystemMessage(Component.translatable(HALVES).withStyle(ChatFormatting.GRAY));
         }
@@ -268,7 +304,7 @@ public final class BankaiTrial {
 
     /**
      * The break-offs a drawn-out spirit's own ends lack: another player object for the wielder, which is a spectator
-     * or in creative mode, past Bankai, or more than {@link Materialisation#LEAVE_DISTANCE} blocks from where it began.
+     * or in creative mode, past Bankai, or more than {@link Materialisation#LEAVE_DISTANCE} blocks from its ring's centre.
      */
     private static boolean brokenOff(Player wielder, SoulData data, Trial trial) {
         return trial.wielder != wielder || wielder.isSpectator() || wielder.isCreative()
@@ -495,7 +531,7 @@ public final class BankaiTrial {
         return away.lengthSqr() < 1.0E-6 ? new Vec3(1.0, 0.0, 0.0) : away.normalize();
     }
 
-    /** The ring's light in its spirit's colour, a little above where the wielder first stood. */
+    /** The ring's light in its spirit's colour, a little above the ring's centre. */
     private static void ring(ServerLevel level, Trial trial, double radius) {
         DustParticleOptions dust = new DustParticleOptions(Vec3.fromRGB24(trial.spirit.colour()).toVector3f(), 1.0F);
         for (int i = 0; i < RING_POINTS; i++) {

@@ -1511,9 +1511,10 @@ public final class BleachConfig {
                         + " one, and the spirit goes home: 2 is one heart. No spirit ever kills its wielder.")
                 .defineInRange("loss_health", 2.0, 1.0, 20.0);
         BANKAI_TRIAL_RING_RADIUS = builder
-                .comment("Blocks from where a Bankai trial begins to its ring, which keeps the soul and its spirit in and"
-                        + " everyone else out. No trial begins, and no inner Hollow comes out, where its ring would meet"
-                        + " another trial's or an inner Hollow fight's.")
+                .comment("Blocks from a Bankai trial's centre (where its soul began or, for a bout by a Tenshintai, the"
+                        + " doll) to its ring, which keeps the soul and its spirit in and everyone else out. No trial"
+                        + " begins, and no inner Hollow comes out, where its ring would meet another trial's or an inner"
+                        + " Hollow fight's.")
                 .defineInRange("ring_radius", 12, 6, 24);
         BANKAI_TRIAL_SPIRIT_TESTS = builder
                 .comment("Whether a zanpakutō spirit tests its soul in a Bankai trial in its own way, as its file's"

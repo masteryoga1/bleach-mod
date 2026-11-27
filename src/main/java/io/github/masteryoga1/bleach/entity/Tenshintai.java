@@ -1,12 +1,14 @@
 package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.item.ZanpakutoItem;
 import io.github.masteryoga1.bleach.network.BleachNetwork;
 import io.github.masteryoga1.bleach.registry.ModEntities;
-import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.BankaiRecord;
+import io.github.masteryoga1.bleach.soul.BankaiTrial;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoBlade;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -38,12 +40,14 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
 /**
  * The Tenshintai, Kisuke's doll that forces a zanpakutō spirit out, set down from its item ({@link #setDown}) by a soul
- * that knows its zanpakutō's name, to stand for {@code [bankai.tenshintai] window_days} game days, its window. Where it
- * stands and when its window ends are on the soul's record ({@link BankaiRecord#doll}, {@link BankaiRecord#windowEndsAt}),
- * never here: a doll is never saved, goes with its chunk, and stands again by its soul's tick wherever the record says
- * ({@link #keep}). One that record no longer names (its window over, Bankai reached, granted, revoked or reset, another
- * spirit bound) crumbles on its next tick; one whose soul is gone (logged out, respawned) goes quietly. A made thing,
- * not a spirit: everyone sees it, and nothing hurts, pushes or moves it.
+ * that knows its zanpakutō's name, to stand for {@code [bankai.tenshintai] window_days} game days, its window. Struck by
+ * its soul with its own zanpakutō released, it begins a Bankai trial by it, the ring about the doll, as often as the
+ * soul likes within the window. Where it stands and when its window ends are on the soul's record
+ * ({@link BankaiRecord#doll}, {@link BankaiRecord#windowEndsAt}), never here: a doll is never saved, goes with its chunk,
+ * and stands again by its soul's tick wherever the record says ({@link #keep}). One that record no longer names (its
+ * window over, Bankai reached, granted, revoked or reset, another spirit bound) crumbles on its next tick; one whose
+ * soul is gone (logged out, respawned) goes quietly. A made thing, not a spirit: everyone sees it, and nothing hurts,
+ * pushes or moves it.
  */
 public class Tenshintai extends Entity {
     /** Its box, in blocks: a life-sized doll's. */
@@ -51,9 +55,10 @@ public class Tenshintai extends Entity {
     /** How often, in a soul's own ticks, its doll is looked for and stood again. */
     public static final int KEEP_TICKS = 20;
     private static final String SET_DOWN = "message.bleach.tenshintai.set_down", STANDS = "message.bleach.tenshintai.stands";
-    private static final String NO_SPOT = "message.bleach.tenshintai.no_spot", REACHED = "message.bleach.tenshintai.reached";
-    private static final String NO_POWER = "message.bleach.tenshintai.no_power";
+    private static final String NO_SPOT = "message.bleach.tenshintai.no_spot";
     private static final String CRUMBLED = "message.bleach.tenshintai.crumbled";
+    private static final String NOT_YOURS = "message.bleach.tenshintai.not_yours";
+    private static final String UNRELEASED = "message.bleach.tenshintai.unreleased";
     private static final int CRUMBLE_PARTICLES = 30;
 
     /** The doll standing for each soul, by its UUID, while that doll is in its world. Server thread only. */
@@ -75,8 +80,9 @@ public class Tenshintai extends Entity {
 
     /**
      * Sets this soul's doll down at {@code at}, on the block under it, facing the soul, its window opening now, and says
-     * so; or says why not, changing nothing but a window over, which closes first: a soul that may not hold Bankai or
-     * holds it already, a doll of its own standing in its window, or no sturdy top or no room for it there.
+     * so; or says why not, changing nothing but a window over, which closes first: no bout could begin by the doll there
+     * ({@link BankaiTrial#refusal}: a soul that may not hold Bankai or holds it already among the reasons, and Zangetsu's
+     * ground), a doll of its own standing in its window, or no sturdy top or no room for it there.
      *
      * @return null once it stands, else the key of the line that says why not
      */
@@ -85,10 +91,11 @@ public class Tenshintai extends Entity {
         long now = level.getGameTime();
         SoulData data = SoulLogic.get(owner);
         closeIfOver(owner, data, now);
-        BankaiRecord record = data.zanpakuto().bankai();
-        if (!BankaiLogic.mayHold(data) || record.achieved()) {
-            return record.achieved() ? REACHED : NO_POWER;
+        BankaiTrial.Start refusal = BankaiTrial.refusal(owner, Vec3.atBottomCenterOf(at));
+        if (refusal != null) {
+            return refusalKey(refusal);
         }
+        BankaiRecord record = data.zanpakuto().bankai();
         if (record.doll().isPresent()) {
             return STANDS;
         }
@@ -124,15 +131,16 @@ public class Tenshintai extends Entity {
     }
 
     /**
-     * Closes this soul's window once it is over: the record forgets the doll and its window, the soul is told so in
-     * chat, and the doll crumbles on its next tick. A doll set down with no window on its record, as one was before
-     * windows were kept, closes at once.
+     * Closes this soul's window once it is over and no bout of the soul's is under way (one by the doll has its time up
+     * with the window at the latest): the record forgets the doll and its window, the soul is told so in chat, and the doll
+     * crumbles on its next tick. A doll set down with no window on its record, as one was before windows were kept,
+     * closes at once.
      *
      * @return whether it closed now
      */
     private static boolean closeIfOver(Player owner, SoulData data, long now) {
         BankaiRecord record = data.zanpakuto().bankai();
-        if (record.doll().isEmpty() || now < record.windowEndsAt()) {
+        if (record.doll().isEmpty() || now < record.windowEndsAt() || BankaiTrial.trial(owner.getUUID()) != null) {
             return false;
         }
         write(owner, data, record.closed());
@@ -154,6 +162,25 @@ public class Tenshintai extends Entity {
     @Nullable
     public static Tenshintai standing(UUID owner) {
         return STANDING.get(owner);
+    }
+
+    /**
+     * The doll's line for a bout the trial refuses: the call's refusals of power and name as one, and of its spirit, and
+     * the rest each its own. A bout begun is no refusal, and has ALREADY's.
+     */
+    public static String refusalKey(BankaiTrial.Start start) {
+        return switch (start) {
+            case DEAD, NO_POWER, NAMELESS -> "message.bleach.tenshintai.no_power";
+            case NO_SPIRIT, NO_TYPE -> "message.bleach.tenshintai.no_spirit";
+            case STARTED, ALREADY -> "message.bleach.tenshintai.already";
+            case WATCHING -> "message.bleach.tenshintai.watching";
+            case REACHED -> "message.bleach.tenshintai.reached";
+            case CROWDED -> "message.bleach.tenshintai.crowded";
+            case NO_GROUND -> "message.bleach.tenshintai.no_ground";
+            case BUSY -> "message.bleach.tenshintai.busy";
+            case PEACEFUL -> "message.bleach.tenshintai.peaceful";
+            case NO_ROOM -> "message.bleach.tenshintai.no_room";
+        };
     }
 
     /** Stands this soul's doll at its place, facing the soul, the soul's doll before it gone. */
@@ -201,10 +228,45 @@ public class Tenshintai extends Entity {
         }
     }
 
-    /** A blow stops here, before anything a blow does (mc Player.attack): the doll takes none. */
+    /** A blow stops here, before anything a blow does (mc Player.attack): the doll takes none, but is struck. */
     @Override
     public boolean skipAttackInteraction(Entity attacker) {
+        if (attacker instanceof Player player && level() instanceof ServerLevel level) {
+            struck(level, player);
+        }
         return true;
+    }
+
+    /**
+     * Struck by its soul with its own zanpakutō released in its main hand, a bout by the doll begins, unless its window
+     * is over, which closes; anyone else, a blade not released or a bout the trial refuses is told why not.
+     */
+    private void struck(ServerLevel level, Player player) {
+        if (player != owner || !named()) {
+            tell(player, NOT_YOURS);
+            return;
+        }
+        ZanpakutoBlade blade = ZanpakutoItem.blade(player.getMainHandItem());
+        if (!blade.isOwnedBy(player.getUUID()) || !blade.released()) {
+            tell(player, UNRELEASED);
+            return;
+        }
+        long now = level.getGameTime();
+        SoulData data = SoulLogic.get(player);
+        if (closeIfOver(player, data, now)) {
+            return;
+        }
+        BankaiTrial.Start start = BankaiTrial.begin(player, position(), data.zanpakuto().bankai().windowEndsAt(), now);
+        if (start != BankaiTrial.Start.STARTED) {
+            tell(player, refusalKey(start));
+        } else if (player instanceof ServerPlayer server) {
+            BleachNetwork.syncSoul(server, data);
+        }
+    }
+
+    /** A line on this player's action bar, in grey. */
+    private static void tell(Player player, String key) {
+        player.displayClientMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY), true);
     }
 
     /** It can be aimed at, as a body can; shots pass through. */
