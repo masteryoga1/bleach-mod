@@ -392,7 +392,7 @@ public final class BankaiSpiritTests {
     }
 
     /** A Getsuga Tenshō's blow, its wave (here this projectile) the direct cause and this soul the one who loosed it. */
-    private static DamageSource getsuga(ServerLevel level, Entity wave, Player owner) {
+    static DamageSource getsuga(ServerLevel level, Entity wave, Player owner) {
         return new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
                 .getHolderOrThrow(GetsugaTensho.DAMAGE_TYPE), wave, owner);
     }

@@ -232,6 +232,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_BLOW_PER_ROOT;
     public static final ModConfigSpec.DoubleValue BANKAI_SPIRIT_FLOOR_SHARE;
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_BOUT_SECONDS;
+    public static final ModConfigSpec.DoubleValue BANKAI_TRIAL_LOSS_HEALTH;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1491,7 +1492,7 @@ public final class BleachConfig {
                 .defineInRange("blow_per_root", 0.1, 0.0, 10.0);
         BANKAI_SPIRIT_FLOOR_SHARE = builder
                 .comment("The share of its full health that no blow takes a spirit below but /kill: beaten there, it goes"
-                        + " home.")
+                        + " home, or in a Bankai trial yields.")
                 .defineInRange("floor_share", 0.1, 0.01, 0.5);
         builder.pop();
         builder.push("trial");
@@ -1499,6 +1500,10 @@ public final class BleachConfig {
                 .comment("Seconds a soul has in its Bankai trial to beat its zanpakutō's spirit down, before the spirit goes"
                         + " back into its inner world with nothing won or lost but the try.")
                 .defineInRange("bout_seconds", 300, 30, 1_800);
+        BANKAI_TRIAL_LOSS_HEALTH = builder
+                .comment("A soul's health at which its zanpakutō's spirit's last blow stops, in its Bankai trial or out of"
+                        + " one, and the spirit goes home: 2 is one heart. No spirit ever kills its wielder.")
+                .defineInRange("loss_health", 2.0, 1.0, 20.0);
         builder.pop();
         builder.pop();
 

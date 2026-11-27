@@ -108,6 +108,8 @@ import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -145,7 +147,11 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.levelgen.FlatLevelSource;
+import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldOptions;
+import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -3861,10 +3867,21 @@ public final class ClientSmokeTest {
         LevelSettings settings = new LevelSettings("bleach-smoke-test-" + System.currentTimeMillis(),
                 GameType.SURVIVAL, false, Difficulty.PEACEFUL, true, new GameRules(), WorldDataConfiguration.DEFAULT);
         minecraft.createWorldOpenFlows().createFreshLevel(settings.levelName(), settings,
-                WorldOptions.defaultWithRandomSeed(),
-                registries -> registries.registryOrThrow(Registries.WORLD_PRESET)
-                        .getHolderOrThrow(WorldPresets.FLAT).value().createWorldDimensions(),
-                minecraft.screen);
+                WorldOptions.defaultWithRandomSeed(), ClientSmokeTest::openGround, minecraft.screen);
+    }
+
+    /**
+     * Vanilla's flat world, but with no structure set. Its preset brings villages and strongholds, and the seed and the
+     * spawn are random: one CI run woke in a village, stood its Quincy on a path 1/16 low, and a village block took the
+     * Heilig Pfeil meant for the Hollow. Every beat here counts on open grass about the player.
+     */
+    private static WorldDimensions openGround(RegistryAccess registries) {
+        WorldDimensions flat = registries.registryOrThrow(Registries.WORLD_PRESET)
+                .getHolderOrThrow(WorldPresets.FLAT).value().createWorldDimensions();
+        FlatLevelGeneratorSettings preset =
+                ((FlatLevelSource) flat.dimensions().get(LevelStem.OVERWORLD).generator()).settings();
+        return flat.replaceOverworldGenerator(registries, new FlatLevelSource(
+                preset.withBiomeAndLayers(preset.getLayersInfo(), Optional.of(HolderSet.empty()), preset.getBiome())));
     }
 
     private static void command(Minecraft minecraft, String command) {
