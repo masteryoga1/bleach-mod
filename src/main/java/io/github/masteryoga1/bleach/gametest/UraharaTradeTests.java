@@ -5,26 +5,34 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.DialogueView;
 import io.github.masteryoga1.bleach.entity.KisukeUrahara;
 import io.github.masteryoga1.bleach.entity.NpcAction;
+import io.github.masteryoga1.bleach.entity.Tenshintai;
 import io.github.masteryoga1.bleach.entity.UraharaCounter;
 import io.github.masteryoga1.bleach.quincy.Bloodline;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.VisoredLogic;
+import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
+import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.locale.Language;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ServerboundSelectTradePacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.MerchantMenu;
@@ -42,8 +50,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Kisuke Urahara's trades (7n4): what he sells each kind of soul and for how much, sales paid in emeralds through the
- * vanilla merchant screen with the day's stock of bait, and the press and what ends a trade. Each test closes the screens
- * it opened, takes away what it set down or joined and puts back the bait setting, however it ends.
+ * vanilla merchant screen with the day's stock of bait, and the press and what ends a trade; and his Tenshintai, one at
+ * a time (8k1). Each test closes the screens it opened, takes away what it set down or joined and puts back the bait
+ * setting, however it ends.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -92,8 +101,8 @@ public final class UraharaTradeTests {
                     && KisukeUrahara.unreadyFor(soul, now).isEmpty(), view + " offers " + NpcAction.offeredIn(view)
                     + ", greyed " + KisukeUrahara.unreadyFor(soul, now) + ", to a soul he sells " + wares);
         });
-        MerchantOffers fresh = UraharaCounter.offersFor(List.of(pager, bait), false);
-        MerchantOffers soldOut = UraharaCounter.offersFor(List.of(bait), true);
+        MerchantOffers fresh = UraharaCounter.offersFor(List.of(pager, bait), false, false);
+        MerchantOffers soldOut = UraharaCounter.offersFor(List.of(bait), true, false);
         helper.assertTrue(fresh.size() == 2 && sells(fresh.get(0), pager, 5, UraharaCounter.UNLIMITED, 0)
                 && sells(fresh.get(1), bait, 16, 1, 0) && !fresh.get(1).isOutOfStock(),
                 "his offers are " + fresh.get(0).getCostA() + " for " + fresh.get(0).getResult() + " and "
@@ -229,6 +238,93 @@ public final class UraharaTradeTests {
                 .thenSucceed();
     }
 
+    /**
+     * Test 4. A Tenshintai is sold to a soul whose spirit could be drawn out to be fought for its Bankai: one that knows
+     * its zanpakutō's name, a Shinigami, a Substitute or a Visored, its power its own, short of Bankai, with no doll on
+     * its record; a named Human is sold none. It is sold one at a time, for {@code [bankai.tenshintai] price} emeralds,
+     * 32 unless set: sold out while the soul carries one, so a soul that buys it finds it sold out on the screen it
+     * bought on, which stays open, and on the next, until the doll is gone from its inventory, and gone from his wares
+     * once a doll is set down. He tells the buyer how it is used, and where best.
+     */
+    @GameTest(template = "empty")
+    public static void uraharaSellsOneTenshintaiAtATime(GameTestHelper helper) {
+        long now = helper.getLevel().getGameTime();
+        Item pager = ModItems.DENREISHINKI.get();
+        Item bait = ModItems.HOLLOW_BAIT.get();
+        Item doll = ModItems.TENSHINTAI.get();
+        GlobalPos spot = GlobalPos.of(helper.getLevel().dimension(), helper.absolutePos(BlockPos.ZERO));
+        long ends = now + Tenshintai.windowTicks();
+        SoulData lent = named(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 500.0F));
+        lent.setShinigami(lent.shinigami().withPowerLentUntil(now + 1200L));
+        SoulData reached = named(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 500.0F));
+        BankaiLogic.reach(reached, Component.literal("Tensa Zangetsu"), now);
+        SoulData standing = named(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 500.0F));
+        standing.setZanpakuto(standing.zanpakuto().withBankai(standing.zanpakuto().bankai().dollAt(spot, ends)));
+        SoulData visored = named(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 500.0F));
+        VisoredLogic.setRecord(visored, VisoredLogic.record(visored).withRootedAt(0L).withSubduedAt(1L));
+        Map<SoulData, List<Item>> expected = new LinkedHashMap<>();
+        expected.put(named(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 500.0F)), List.of(pager, bait, doll));
+        expected.put(named(helper, ShinigamiTests.substitute(500.0F)), List.of(pager, bait, doll));
+        expected.put(visored, List.of(pager, bait, doll));
+        expected.put(lent, List.of(bait));
+        expected.put(reached, List.of(pager, bait));
+        expected.put(standing, List.of(pager, bait));
+        expected.put(ShinigamiTests.soul(SoulState.SHINIGAMI, 500.0F), List.of(pager, bait));
+        // Named, but with no Shinigami's power to draw a spirit out with.
+        expected.put(named(helper, awareHuman()), List.of(bait));
+        expected.forEach((soul, wares) -> {
+            List<Item> sold = UraharaCounter.waresFor(soul, now);
+            helper.assertTrue(sold.equals(wares), "Urahara sells " + sold + " to a soul in "
+                    + KisukeUrahara.viewFor(soul) + ", not " + wares);
+        });
+        MerchantOffers fresh = UraharaCounter.offersFor(List.of(pager, bait, doll), false, false);
+        MerchantOffers inHand = UraharaCounter.offersFor(List.of(pager, bait, doll), false, true);
+        helper.assertTrue(fresh.size() == 3 && sells(fresh.get(2), doll, 32, 1, 0) && !fresh.get(2).isOutOfStock()
+                        && sells(inHand.get(1), bait, 16, 1, 0) && sells(inHand.get(2), doll, 32, 1, 1)
+                        && inHand.get(2).isOutOfStock(),
+                "his Tenshintai is offered as " + fresh.get(2).getCostA() + " for " + fresh.get(2).getResult()
+                        + ", or is in stock while the soul carries one");
+        KidoTests.withConfig(BleachConfig.BANKAI_TENSHINTAI_PRICE, 5, () -> helper.assertTrue(
+                sells(UraharaCounter.offersFor(List.of(doll), false, false).get(0), doll, 5, 1, 0),
+                "with its price set to 5, his Tenshintai is offered for " + UraharaCounter.dollPrice()));
+
+        // Held first, so its end closes the screens before the players leave and nothing drops in the world.
+        ShakonmakuTests.Cleanup held = hold(helper);
+        KisukeUrahara urahara = helper.spawn(ModEntities.KISUKE_URAHARA.get(), HIM);
+        held.atEnd(() -> TravelTests.discard(urahara));
+        ServerPlayer buyer = customer(helper, held, GameType.SURVIVAL,
+                named(helper, ShinigamiTests.soul(SoulState.SHINIGAMI, 500.0F)), 64);
+        MerchantMenu menu = shelves(helper, urahara, buyer);
+        buy(buyer, menu, 2);
+        String word = "message.bleach.urahara.tenshintai";
+        helper.assertTrue(menu.stillValid(buyer) && menu.getOffers().get(2).isOutOfStock()
+                        && TestPlayers.chat(buyer).stream()
+                                .anyMatch(line -> TenshintaiTests.says(line, word, Tenshintai.windowDays()))
+                        && Language.getInstance().has(word),
+                "a Tenshintai bought closed the screen, stayed in stock on it, or came with no word from him");
+        buyer.closeContainer();
+        helper.assertTrue(has(buyer, doll, 1, 32), "the Tenshintai's sale left " + carried(buyer));
+        menu = shelves(helper, urahara, buyer);
+        helper.assertTrue(menu.getOffers().get(2).isOutOfStock(), "reopened, a second Tenshintai was in stock");
+        buyer.closeContainer();
+        // Its inventory emptied, the doll with it, as a doll set down or put away leaves it.
+        buyer.getInventory().clearContent();
+        menu = shelves(helper, urahara, buyer);
+        helper.assertTrue(!menu.getOffers().get(2).isOutOfStock(), "with its doll gone, none was in stock");
+        buyer.closeContainer();
+        // A doll set down on its record, then cleared again before the soul's own tick could stand one.
+        SoulData bought = buyer.getData(SoulAttachments.SOUL);
+        bought.setZanpakuto(bought.zanpakuto().withBankai(bought.zanpakuto().bankai().dollAt(spot, ends)));
+        try {
+            menu = shelves(helper, urahara, buyer);
+            helper.assertTrue(menu.getOffers().size() == 2, "with its doll set down, he still sold the soul another");
+            buyer.closeContainer();
+        } finally {
+            bought.setZanpakuto(bought.zanpakuto().withBankai(bought.zanpakuto().bankai().closed()));
+        }
+        helper.succeed();
+    }
+
     // ---- Helpers ----
 
     /** The test's own chunk and the ring about it held entity-ticking, so the joined souls tick; and its end. */
@@ -265,8 +361,22 @@ public final class UraharaTradeTests {
 
     /** As the screen does: picks the first offer, which sets out its payment from the inventory, and shift-takes it. */
     private static void buy(ServerPlayer customer, MerchantMenu menu) {
-        customer.connection.handleSelectTrade(new ServerboundSelectTradePacket(0));
+        buy(customer, menu, 0);
+    }
+
+    /** As the screen does: picks this offer, which sets out its payment from the inventory, and shift-takes it. */
+    private static void buy(ServerPlayer customer, MerchantMenu menu, int offer) {
+        customer.connection.handleSelectTrade(new ServerboundSelectTradePacket(offer));
         menu.clicked(2, 0, ClickType.QUICK_MOVE, customer);
+    }
+
+    /** This soul once it has learned Zangetsu's name, as a mock player's, for the fresh Asauchi in its hand. */
+    private static SoulData named(GameTestHelper helper, SoulData soul) {
+        Player player = ZanpakutoTests.mock(helper, soul);
+        player.setItemInHand(InteractionHand.MAIN_HAND, ZanpakutoTests.asauchi());
+        ZanpakutoEvents.learnName(player, soul, ZanpakutoSpirits.ZANGETSU.location(),
+                ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU), player.getMainHandItem());
+        return soul;
     }
 
     /** Opens his wares with the payment set out for the first, ready to be taken, as the screen shows it. */

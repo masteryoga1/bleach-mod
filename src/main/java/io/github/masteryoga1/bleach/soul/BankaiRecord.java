@@ -75,6 +75,11 @@ public record BankaiRecord(long achievedAt, Component name, long windowEndsAt, O
         return new BankaiRecord(achievedAt, name, endsAt, Optional.of(place), 1.0F, tries, lastTryAt, shikaiTicks);
     }
 
+    /** The share of its health the doll's spirit kept as a bout by the doll ended, for the next. */
+    public BankaiRecord wounded(float share) {
+        return new BankaiRecord(achievedAt, name, windowEndsAt, doll, share, tries, lastTryAt, shikaiTicks);
+    }
+
     /** No doll set down, and so no window and no wounds either. */
     public BankaiRecord closed() {
         return new BankaiRecord(achievedAt, name, ZanpakutoBond.NEVER, Optional.empty(), 1.0F, tries, lastTryAt,

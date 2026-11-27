@@ -3,7 +3,9 @@ package io.github.masteryoga1.bleach.entity;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.item.DenreishinkiItem;
 import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.BankaiRecord;
 import io.github.masteryoga1.bleach.soul.KidoLogic;
+import io.github.masteryoga1.bleach.soul.Materialisation;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -12,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -36,6 +39,8 @@ import net.minecraft.world.level.Level;
 public final class UraharaCounter extends Marker implements Merchant {
     /** The merchant screen's title, the shop's name. */
     private static final String TITLE = "container.bleach.urahara_shop";
+    /** His word with a Tenshintai sold. */
+    private static final String DOLL_WORD = "message.bleach.urahara.tenshintai";
     /** Emeralds for a Denreishinki: a librarian's compass costs 4, and the pager takes a little more iron and a shard. */
     public static final int DENREISHINKI_PRICE = 5;
     /** Emeralds for Hollow Bait, as rare as a mask fragment and a filled Gintō make it. */
@@ -44,6 +49,8 @@ public final class UraharaCounter extends Marker implements Merchant {
     public static final int BAIT_A_DAY = 1;
     /** The Denreishinki's stock: it never runs out. */
     public static final int UNLIMITED = Integer.MAX_VALUE;
+    /** How many Tenshintai he sells a soul at a time. */
+    public static final int DOLLS_AT_ONCE = 1;
 
     private final KisukeUrahara keeper;
     private final ServerPlayer customer;
@@ -57,7 +64,7 @@ public final class UraharaCounter extends Marker implements Merchant {
         this.keeper = keeper;
         this.customer = customer;
         this.wares = wares;
-        this.offers = offersFor(wares, baitSoldToday(customer, keeper.level()));
+        this.offers = offersFor(wares, baitSoldToday(customer, keeper.level()), carriesDoll(customer));
     }
 
     /** Opens the merchant screen on his wares for this soul, if he sells it any. Server side, once the press is checked. */
@@ -69,11 +76,13 @@ public final class UraharaCounter extends Marker implements Merchant {
     }
 
     /**
-     * What he sells this soul, cheaper first: a Denreishinki to a soul it answers to, and, while the server allows bait,
-     * Hollow Bait to one that could crush it somewhere, some day (aware, and no Hollow or Arrancar: its first refusals).
+     * What he sells this soul, cheaper first: a Denreishinki to a soul it answers to; while the server allows bait,
+     * Hollow Bait to one that could crush it somewhere, some day (aware, and no Hollow or Arrancar: its first refusals);
+     * and a Tenshintai to one whose spirit could be drawn out to be fought for its Bankai ({@link Materialisation#mayCall}:
+     * it knows the name and its power is its own), short of Bankai, with no doll on its record.
      */
     public static List<Item> waresFor(SoulData soul, long now) {
-        List<Item> wares = new ArrayList<>(2);
+        List<Item> wares = new ArrayList<>(3);
         if (DenreishinkiItem.canRead(soul, now)) {
             wares.add(ModItems.DENREISHINKI.get());
         }
@@ -81,22 +90,39 @@ public final class UraharaCounter extends Marker implements Merchant {
                 && soul.state() != SoulState.ARRANCAR) {
             wares.add(ModItems.HOLLOW_BAIT.get());
         }
+        BankaiRecord bankai = soul.zanpakuto().bankai();
+        if (Materialisation.mayCall(soul, now) && !bankai.achieved() && bankai.doll().isEmpty()) {
+            wares.add(ModItems.TENSHINTAI.get());
+        }
         return wares;
     }
 
     /**
      * His offers for these wares, one of each for emeralds alone, at prices no demand or reputation moves and with no xp:
-     * the Denreishinki without end, the bait one a day, already sold out when the soul bought it today.
+     * the Denreishinki without end, the bait one a day, already sold out when the soul bought it today, and the doll one
+     * at a time, sold out while the soul carries one (so once bought it is sold out on the screen it was bought on,
+     * which stays open, his wares for the soul being the same until the doll is set down).
      */
-    public static MerchantOffers offersFor(List<Item> wares, boolean baitSoldToday) {
+    public static MerchantOffers offersFor(List<Item> wares, boolean baitSoldToday, boolean dollCarried) {
         MerchantOffers offers = new MerchantOffers();
         for (Item ware : wares) {
-            boolean bait = ware == ModItems.HOLLOW_BAIT.get();
-            offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, bait ? BAIT_PRICE : DENREISHINKI_PRICE),
-                    Optional.empty(), new ItemStack(ware), bait && baitSoldToday ? BAIT_A_DAY : 0,
-                    bait ? BAIT_A_DAY : UNLIMITED, 0, 0.0F));
+            boolean bait = ware == ModItems.HOLLOW_BAIT.get(), doll = ware == ModItems.TENSHINTAI.get();
+            int price = bait ? BAIT_PRICE : doll ? dollPrice() : DENREISHINKI_PRICE;
+            int stock = bait ? BAIT_A_DAY : doll ? DOLLS_AT_ONCE : UNLIMITED;
+            offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, price), Optional.empty(), new ItemStack(ware),
+                    bait && baitSoldToday || doll && dollCarried ? stock : 0, stock, 0, 0.0F));
         }
         return offers;
+    }
+
+    /** Emeralds for a Tenshintai ({@code [bankai.tenshintai] price}). */
+    public static int dollPrice() {
+        return BleachConfig.get(BleachConfig.BANKAI_TENSHINTAI_PRICE);
+    }
+
+    /** Whether this soul carries a Tenshintai anywhere in its inventory. */
+    public static boolean carriesDoll(Player customer) {
+        return customer.getInventory().contains(stack -> stack.is(ModItems.TENSHINTAI.get()));
     }
 
     /** Whether this soul bought its Hollow Bait on this world's day, the mod's own ({@link KidoLogic#lessonDay}). */
@@ -133,12 +159,19 @@ public final class UraharaCounter extends Marker implements Merchant {
     public void overrideOffers(MerchantOffers offers) {
     }
 
-    /** A sale: its offer's stock goes down, and bait sold is noted on the soul, so it is sold out until another day. */
+    /**
+     * A sale: its offer's stock goes down, and bait sold is noted on the soul, so it is sold out until another day; with
+     * a Tenshintai sold he says how it is used, and where best: the cavern under Sōkyoku Hill, with its spring.
+     */
     @Override
     public void notifyTrade(MerchantOffer offer) {
         offer.increaseUses();
         if (offer.getResult().is(ModItems.HOLLOW_BAIT.get())) {
             customer.setData(SoulAttachments.SHOP_BAIT_DAY, day(keeper.level()));
+        }
+        if (offer.getResult().is(ModItems.TENSHINTAI.get())) {
+            customer.sendSystemMessage(Component.translatable(DOLL_WORD, Tenshintai.windowDays())
+                    .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         }
     }
 

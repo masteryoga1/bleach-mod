@@ -1,13 +1,18 @@
 package io.github.masteryoga1.bleach.soul;
 
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirit;
+import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 
 /**
  * Bankai's rules that need no world: who may hold one, the name it takes from its spirit, reaching it and starting the
- * road over, and the soul screen's line. The soul's side is the {@link BankaiRecord} its bond keeps; the spirit's is
+ * road over, and the soul screen's lines. The soul's side is the {@link BankaiRecord} its bond keeps; the spirit's is
  * {@link ZanpakutoSpirit.Bankai}.
  */
 public final class BankaiLogic {
@@ -52,5 +57,26 @@ public final class BankaiLogic {
         Component name = bankai.name().getString().isEmpty()
                 ? Component.translatable("screen.bleach.soul.bankai.unnamed") : bankai.name();
         return Component.translatable("screen.bleach.soul.bankai", name);
+    }
+
+    /**
+     * The soul screen's lines for a Tenshintai, under the Bankai's, for a soul that may hold one with a doll on its
+     * record: the game days and hours its window has left (hours of 1,000 ticks, rounded up) and where the doll stands,
+     * or that it stands in another world than {@code here}; then where to heal between bouts, the hot spring under
+     * Sōkyoku Hill. None otherwise. It reads the soul and the clock it is given, the client's level's on the screen,
+     * which every world shares, so the screen and a test ask the same question.
+     */
+    public static List<Component> dollLines(SoulData data, long now, ResourceKey<Level> here) {
+        Optional<GlobalPos> doll = data.zanpakuto().bankai().doll();
+        if (!mayHold(data) || doll.isEmpty()) {
+            return List.of();
+        }
+        BlockPos at = doll.get().pos();
+        Component where = doll.get().dimension().equals(here)
+                ? Component.translatable("screen.bleach.soul.tenshintai.at", at.getX(), at.getY(), at.getZ())
+                : Component.translatable("screen.bleach.soul.tenshintai.away");
+        long hours = Math.max(0L, (data.zanpakuto().bankai().windowEndsAt() - now + 999L) / 1_000L);
+        return List.of(Component.translatable("screen.bleach.soul.tenshintai", hours / 24L, hours % 24L, where),
+                Component.translatable("screen.bleach.soul.tenshintai.spring"));
     }
 }

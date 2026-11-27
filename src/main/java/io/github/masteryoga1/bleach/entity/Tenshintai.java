@@ -42,12 +42,12 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
  * The Tenshintai, Kisuke's doll that forces a zanpakutō spirit out, set down from its item ({@link #setDown}) by a soul
  * that knows its zanpakutō's name, to stand for {@code [bankai.tenshintai] window_days} game days, its window. Struck by
  * its soul with its own zanpakutō released, it begins a Bankai trial by it, the ring about the doll, as often as the
- * soul likes within the window. Where it stands and when its window ends are on the soul's record
- * ({@link BankaiRecord#doll}, {@link BankaiRecord#windowEndsAt}), never here: a doll is never saved, goes with its chunk,
- * and stands again by its soul's tick wherever the record says ({@link #keep}). One that record no longer names (its
- * window over, Bankai reached, granted, revoked or reset, another spirit bound) crumbles on its next tick; one whose
- * soul is gone (logged out, respawned) goes quietly. A made thing, not a spirit: everyone sees it, and nothing hurts,
- * pushes or moves it.
+ * soul likes within the window, the spirit keeping its wounds from one bout to the next. Where it stands and when its
+ * window ends are on the soul's record ({@link BankaiRecord#doll}, {@link BankaiRecord#windowEndsAt}), never here: a doll
+ * is never saved, goes with its chunk, and stands again by its soul's tick wherever the record says ({@link #keep}). One
+ * that record no longer names (its window over, Bankai reached, granted, revoked or reset, another spirit bound) crumbles
+ * on its next tick; one whose soul is gone (logged out, respawned) goes quietly. A made thing, not a spirit: everyone sees
+ * it, and nothing hurts, pushes or moves it.
  */
 public class Tenshintai extends Entity {
     /** Its box, in blocks: a life-sized doll's. */
