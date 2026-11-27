@@ -174,6 +174,12 @@ public final class RegistrationTests {
         EntityType<?> blade = ModEntities.TRIAL_BLADE.get();
         helper.assertTrue(blade.is(SoulLogic.SPIRITS) && !blade.canSerialize() && !blade.canSummon(),
                 "bleach:trial_blade is not a spirit, or is saved or summoned");
+        EntityType<?> doll = ModEntities.TENSHINTAI.get();
+        helper.assertTrue(BuiltInRegistries.ENTITY_TYPE.get(BleachMod.id("tenshintai")) == doll
+                        && !doll.is(SoulLogic.SPIRITS) && !doll.canSerialize() && !doll.canSummon() && doll.fireImmune()
+                        && BuiltInRegistries.ITEM.get(BleachMod.id("tenshintai")) == ModItems.TENSHINTAI.get()
+                        && new ItemStack(ModItems.TENSHINTAI.get()).getMaxStackSize() == 1,
+                "bleach:tenshintai is not registered, is a spirit, is saved, summoned or burnt, or its item stacks");
         Optional<Holder.Reference<DamageType>> burst = helper.getLevel().registryAccess()
                 .registryOrThrow(Registries.DAMAGE_TYPE).getHolder(ShriekerLeech.BURST);
         // Every leech that bursts at once lands, through the hurt cooldown the one before it left.

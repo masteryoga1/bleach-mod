@@ -39,6 +39,7 @@ import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.entity.Tenshintai;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
 import io.github.masteryoga1.bleach.entity.TrialBlade;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
@@ -364,6 +365,21 @@ public final class ModEntities {
                     .clientTrackingRange(10)
                     .updateInterval(Integer.MAX_VALUE)
                     .build(BleachMod.id("trial_blade").toString()));
+
+    /**
+     * A Tenshintai set down (see Tenshintai): a made thing everyone sees, never saved or summoned and never moving, so
+     * once it is there nothing more goes out; its soul's record keeps where it stands.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<Tenshintai>> TENSHINTAI =
+            ENTITY_TYPES.register("tenshintai", () -> EntityType.Builder
+                    .<Tenshintai>of(Tenshintai::new, MobCategory.MISC)
+                    .sized(Tenshintai.WIDTH, Tenshintai.HEIGHT)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(Integer.MAX_VALUE)
+                    .build(BleachMod.id("tenshintai").toString()));
 
     // ---- Pluses and the Garganta ----
 

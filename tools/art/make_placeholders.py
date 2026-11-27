@@ -173,6 +173,10 @@ URAHARA_ROBE = rgb(40, 44, 40)
 URAHARA_GETA = rgb(120, 84, 50)
 URAHARA_HAT_GREEN = rgb(46, 110, 64)
 URAHARA_HAT_WHITE = rgb(237, 237, 224)
+# The Tenshintai: a life-sized doll of pale cloth, stitched with dark seams, its head blank.
+TENSHINTAI_CLOTH = rgb(214, 204, 184)
+TENSHINTAI_SHADE = rgb(184, 172, 150)
+TENSHINTAI_SEAM = rgb(92, 80, 70)
 # The gatekeepers, by gate in the plan's order (GateState.NAMES): Kaiwan, Higonyūdō, Jidanbō and Danzōmaru.
 GATE_KEEPER_SKIN, GATE_KEEPER_HAIR = rgb(196, 150, 112), rgb(40, 30, 26)
 GATE_NAMES = ("shoryumon", "shuwaimon", "hakutomon", "kokuryomon")
@@ -2003,6 +2007,38 @@ def training_dummy():
     return c
 
 
+def tenshintai():
+    """A Tenshintai, a doll faintly like a person, in the humanoid layout the zombie's layer uses (the left arm and leg
+    mirror the right ones' nets): pale cloth on the head, body, arm and leg, shaded on the back and underneath, a dark
+    seam round the neck, shoulder and hip and round the waist, wrist and ankle, and down the middle of the body before
+    and behind, and a head with no face. The hat layer stays clear."""
+    c = Canvas(64, 64)
+    for u, v, w, h, d in ((0, 0, 8, 8, 8), (16, 16, 8, 12, 4), (40, 16, 4, 12, 4), (0, 16, 4, 12, 4)):
+        box(c, u, v, w, h, d, TENSHINTAI_CLOTH)
+        net = faces(u, v, w, h, d)
+        for x0, y0, x1, y1 in (net[1], net[5]):    # underneath and the back
+            c.rect(x0, y0, x1, y1, TENSHINTAI_SHADE)
+    for y in (20, 30):
+        c.rect(0, y, 56, y + 1, TENSHINTAI_SEAM)   # round the hip, neck and shoulder, then the ankle, waist and wrist
+    c.rect(23, 21, 25, 30, TENSHINTAI_SEAM)       # down the middle of the body's front
+    c.rect(35, 21, 37, 30, TENSHINTAI_SEAM)       # and of its back
+    return c
+
+
+def tenshintai_icon():
+    """The doll in the hand, seen from the front: a pale cloth figure with a blank head, its arms held a little off its
+    sides, its far edges in shade, and a dark seam down its middle and round its waist."""
+    c = Canvas(16, 16)
+    for x0, y0, x1, y1 in ((6, 1, 10, 5), (5, 5, 11, 11), (3, 6, 4, 12), (12, 6, 13, 12), (4, 6, 5, 7), (11, 6, 12, 7),
+                           (5, 11, 7, 15), (9, 11, 11, 15)):
+        c.rect(x0, y0, x1, y1, TENSHINTAI_CLOTH)
+    for x0, y0, x1, y1 in ((9, 1, 10, 5), (10, 5, 11, 11), (12, 6, 13, 12), (10, 11, 11, 15)):
+        c.rect(x0, y0, x1, y1, TENSHINTAI_SHADE)
+    c.rect(7, 5, 9, 11, TENSHINTAI_SEAM)
+    c.rect(5, 9, 11, 10, TENSHINTAI_SEAM)
+    return c
+
+
 def gate_keeper(gate):
     """A drawing function for a gatekeeper's skin, in the player skin layout with wide arms: weathered skin on the head
     and arms, dark hair over the top, back and sides of the head and two rows down the face, two dark eyes, the keeper's
@@ -2641,6 +2677,7 @@ TEXTURES = {
     "item/caja_negacion.png": caja_negacion_icon,
     "item/mask_fragment.png": mask_fragment_icon,
     "item/hollow_bait.png": hollow_bait_icon,
+    "item/tenshintai.png": tenshintai_icon,
     "entity/heilig_pfeil.png": heilig_pfeil,
     "entity/blut_vene.png": blut_vene,
     "entity/tensa_zangetsu_coat.png": tensa_zangetsu_coat,
@@ -2672,6 +2709,7 @@ TEXTURES = {
     "entity/duty_shinigami.png": duty_shinigami,
     "entity/kisuke_urahara.png": kisuke_urahara,
     "entity/training_dummy.png": training_dummy,
+    "entity/tenshintai.png": tenshintai,
     **{"entity/gate_keeper/%s.png" % name: gate_keeper(gate) for gate, name in enumerate(GATE_NAMES)},
     "entity/inner_hollow.png": inner_hollow,
     "entity/zangetsu_spirit.png": zangetsu_spirit,
