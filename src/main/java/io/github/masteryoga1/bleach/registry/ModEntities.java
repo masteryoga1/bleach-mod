@@ -40,6 +40,7 @@ import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.TrainingDummy;
+import io.github.masteryoga1.bleach.entity.TrialBlade;
 import io.github.masteryoga1.bleach.entity.WoundedShinigami;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
@@ -348,6 +349,21 @@ public final class ModEntities {
                     .noSave()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("zabimaru_spirit").toString()));
+
+    /**
+     * A blade risen in a Bankai trial (see TrialBlade): never saved or summoned, and never moving, so once it is there
+     * only its synced data goes out as it changes.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<TrialBlade>> TRIAL_BLADE =
+            ENTITY_TYPES.register("trial_blade", () -> EntityType.Builder
+                    .<TrialBlade>of(TrialBlade::new, MobCategory.MISC)
+                    .sized(TrialBlade.WIDTH, TrialBlade.HEIGHT)
+                    .noSave()
+                    .noSummon()
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .updateInterval(Integer.MAX_VALUE)
+                    .build(BleachMod.id("trial_blade").toString()));
 
     // ---- Pluses and the Garganta ----
 

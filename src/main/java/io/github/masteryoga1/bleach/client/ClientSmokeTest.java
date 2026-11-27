@@ -32,6 +32,7 @@ import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.Shrieker;
 import io.github.masteryoga1.bleach.entity.ShriekerLeech;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
+import io.github.masteryoga1.bleach.entity.TrialBlade;
 import io.github.masteryoga1.bleach.entity.ZabimaruLash;
 import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.entity.ZangetsuSpirit;
@@ -402,11 +403,15 @@ public final class ClientSmokeTest {
     /**
      * The first tick of the materialised spirits' beat, as Hihiō Zabimaru's ends, 15 ticks after its seal; no step
      * here releases Bankai, so the settle does not apply.
-     * Its steps and checks count from here, and the run ends after.
+     * Its steps and checks count from here.
      */
     private static final int SPIRITS_AT = HIHIO_AT + 120;
     /** How many times a spirit's body had been drawn as it came out. */
     private static int spiritsDrawn;
+    /** The Bankai trial's beat, as the spirits' ends, and the run ends after it; half its 40 blades are enough to see. */
+    private static final int BLADES_AT = SPIRITS_AT + 120, LEAST_BLADES = 20;
+    /** How many times a trial's blade had been drawn as the trial began. */
+    private static int bladesDrawn;
     /** How far Zabimaru's snake may trail its place at a turning baboon's back on the client, in blocks. */
     private static final double SNAKE_TRAIL = 0.75;
     /** How far before the soul's eyes the golem its serpent lashes at is hung, and the tag it is killed by. */
@@ -684,6 +689,7 @@ public final class ClientSmokeTest {
         checkBankai(minecraft, player, soul);
         checkHihioZabimaru(minecraft, player);
         checkSpirits(minecraft);
+        checkBlades(minecraft);
         if (finished) {
             return;
         }
@@ -1972,7 +1978,27 @@ public final class ClientSmokeTest {
                 command(minecraft, "tp @s ~ ~ ~ ~ 0");
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }
-            case SPIRITS_AT + 120 -> {
+            // Bound to Zangetsu once more, its power full, the soul faces north and looks well down, and begins its Bankai
+            // trial by command: his blades rise about it, and resistance keeps his blows off. Its reset sends him home,
+            // which ends the trial, and the blades go with it.
+            case BLADES_AT -> {
+                bladesDrawn = TrialBladeRenderer.drawnFrames();
+                command(minecraft, "bleach zanpakuto @s spirit bleach:zangetsu");
+                command(minecraft, "bleach zanpakuto @s bond 1000");
+                command(minecraft, "bleach zanpakuto @s name");
+                command(minecraft, "bleach reiryoku @s 800 800");
+                command(minecraft, "effect give @s minecraft:resistance 30 4 true");
+                command(minecraft, "tp @s ~ ~ ~ 180 35");
+                command(minecraft, "bleach zanpakuto @s bankai trial");
+            }
+            case BLADES_AT + 60 -> command(minecraft, "bleach zanpakuto @s reset");
+            // Then the Asauchi its naming handed it goes, and the resistance, and its eyes are level again.
+            case BLADES_AT + 61 -> {
+                command(minecraft, "clear @s bleach:asauchi");
+                command(minecraft, "effect clear @s minecraft:resistance");
+                command(minecraft, "tp @s ~ ~ ~ ~ 0");
+            }
+            case BLADES_AT + 120 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -3005,6 +3031,20 @@ public final class ClientSmokeTest {
                 "Zabimaru still stood on the client after it had gone");
     }
 
+    /** The checks of the trial's beat: its blades stand about the soul on the client, drawn, and are gone once it ends. */
+    private static void checkBlades(Minecraft minecraft) {
+        if (expectWithin(minecraft, BLADES_AT + 2, BLADES_AT + 50, () -> bladesStand(minecraft),
+                "the Bankai trial's blades never stood about the soul on the client, drawn")) {
+            shot(minecraft, "trial_blades");
+        }
+        expectWithin(minecraft, BLADES_AT + 61, BLADES_AT + 100, () -> count(minecraft, TrialBlade.class, 32.0) == 0,
+                "the trial's blades still stood on the client after it had ended");
+    }
+
+    private static boolean bladesStand(Minecraft minecraft) {
+        return count(minecraft, TrialBlade.class, 32.0) >= LEAST_BLADES && TrialBladeRenderer.drawnFrames() > bladesDrawn;
+    }
+
     /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has, with his cleaver in hand. */
     private static boolean zangetsuOut(Minecraft minecraft) {
         ZangetsuSpirit zangetsu = nearest(minecraft, ZangetsuSpirit.class, 16.0, spirit -> true);
@@ -3263,8 +3303,8 @@ public final class ClientSmokeTest {
      * and before the last tick of each of the Gate of Hell's last three windows, so a stalled server's Gate and the
      * windows move together; before the last tick of Tensa Zangetsu's and Hihiō Zabimaru's first windows, for a
      * Bankai a slow server has not yet let settle; and before the last tick of each of the spirits' windows, for a
-     * spirit a slow server has not yet brought out or taken away. Past {@link #SERVER_WAIT_TICKS} it goes on, and the
-     * check fails as before.
+     * spirit a slow server has not yet brought out or taken away, and of the trial's, for its blades likewise. Past
+     * {@link #SERVER_WAIT_TICKS} it goes on, and the check fails as before.
      */
     private static boolean waitsForServer(Minecraft minecraft, LocalPlayer player) {
         boolean late = ticksInWorld == COURT_BY_TICK - 1 && !atCourt(minecraft, player)
@@ -3283,7 +3323,10 @@ public final class ClientSmokeTest {
                 && !spiritGone(minecraft, ZangetsuSpirit.class)
                 || ticksInWorld == SPIRITS_AT + 99 && !windowsPassed.contains(SPIRITS_AT + 62) && !zabimaruOut(minecraft)
                 || ticksInWorld == SPIRITS_AT + 117 && !windowsPassed.contains(SPIRITS_AT + 106)
-                && !spiritGone(minecraft, ZabimaruSpirit.class);
+                && !spiritGone(minecraft, ZabimaruSpirit.class)
+                || ticksInWorld == BLADES_AT + 49 && !windowsPassed.contains(BLADES_AT + 2) && !bladesStand(minecraft)
+                || ticksInWorld == BLADES_AT + 99 && !windowsPassed.contains(BLADES_AT + 61)
+                && count(minecraft, TrialBlade.class, 32.0) != 0;
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

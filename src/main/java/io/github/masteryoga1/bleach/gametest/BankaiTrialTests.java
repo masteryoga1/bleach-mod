@@ -4,9 +4,11 @@ import io.github.masteryoga1.bleach.BleachMod;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.BossBar;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
+import io.github.masteryoga1.bleach.entity.TrialBlade;
 import io.github.masteryoga1.bleach.entity.ZabimaruSpirit;
 import io.github.masteryoga1.bleach.soul.BankaiLogic;
 import io.github.masteryoga1.bleach.soul.BankaiRecord;
+import io.github.masteryoga1.bleach.soul.BankaiSwords;
 import io.github.masteryoga1.bleach.soul.BankaiTrial;
 import io.github.masteryoga1.bleach.soul.JinzenLogic;
 import io.github.masteryoga1.bleach.soul.Materialisation;
@@ -17,6 +19,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.soul.VisoredEvents;
 import io.github.masteryoga1.bleach.soul.ZanpakutoEvents;
 import io.github.masteryoga1.bleach.zanpakuto.ZanpakutoSpirits;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -646,7 +649,7 @@ public final class BankaiTrialTests {
      * T7. The ring keeps the two in and everyone else out, here at its smallest, 6 blocks: the two inside it are let be;
      * a creature inside is pushed out, unless the push would drop it off a pillar, and drops its grudge against the
      * wielder; a joined soul inside is pushed out and told why, and one in creative mode is let be; a mounted wielder is
-     * taken off; and the wielder and its spirit past the ring are pushed back in.
+     * taken off; and the wielder and its spirit past the ring are pushed back in. Zangetsu's blades stand through it all.
      */
     @GameTest(template = "field", timeoutTicks = 20)
     public static void theRingKeepsTheTwoInAndOthersOut(GameTestHelper helper) {
@@ -706,6 +709,9 @@ public final class BankaiTrialTests {
                             && BankaiTrial.trial(ichigo.getUUID()) == trial,
                     "past the ring, the wielder was pushed by " + ichigo.getDeltaMovement() + " and its spirit by "
                             + spirit.getDeltaMovement());
+            helper.assertTrue(trial.swords() != null && trial.swords().blades().stream().allMatch(blade -> !blade.isRemoved()
+                    && BankaiSwords.stands(blade) && blade.getDeltaMovement().lengthSqr() == 0.0),
+                    "the ring took or pushed its bout's blades, or none rose");
         }));
         clear.run();
         helper.succeed();
@@ -826,5 +832,72 @@ public final class BankaiTrialTests {
             clear(free);
         }));
         helper.succeed();
+    }
+
+    /**
+     * T9. A bout with Zangetsu raises 40 blades about its soul as it begins: one a block, on the field's floor inside the
+     * ring, the farthest near its edge and none at the soul's feet, all in his Shikai's look, none held, the true one
+     * among them, and none taken by a portal or pressing a plate. They go at once as the time runs out; when the bout
+     * ends as its spirit leaves the world they stand in no bout, and go at the end of the server tick. None rises behind
+     * a wall, out of the soul's sight. The ring is at its smallest, so the blades stay in the field.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void theBladesRiseOnOpenGroundAndGoWithTheBout(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = HollowPlayerTests.now(helper);
+        Player ichigo = BankaiSpiritTests.wielder(helper, MIDDLE);
+        if (refusedOnPeaceful(helper, ichigo, now)) {
+            return;
+        }
+        Player unloaded = BankaiSpiritTests.wielder(helper, MIDDLE), behind = BankaiSpiritTests.wielder(helper, MIDDLE);
+        // A wall three high, its face 2.5 blocks east of the soul: 8 open blocks behind it in the ring, 55 before it.
+        Iterable<BlockPos> wall = BlockPos.betweenClosed(11, 2, 0, 11, 4, 15);
+        Runnable clear = () -> {
+            clear(ichigo, unloaded, behind);
+            wall.forEach(block -> helper.setBlock(block, Blocks.AIR));
+        };
+        List<TrialBlade> left = new ArrayList<>();
+        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(clear, () -> {
+            BankaiTrial.Trial trial = begun(helper, ichigo, now);
+            List<TrialBlade> blades = List.copyOf(trial.swords().blades());
+            int look = ZanpakutoTests.spirit(helper, ZanpakutoSpirits.ZANGETSU).shikai().model();
+            helper.assertTrue(BankaiTrial.blades() == 40 && blades.size() == 40 && blades.contains(trial.swords().real())
+                            && blades.stream().map(Entity::blockPosition).distinct().count() == 40 && look != 0,
+                    blades.size() + " blades rose, or two in one block, or the true one is not among them");
+            helper.assertTrue(!blades.get(0).canUsePortal(false) && blades.get(0).isIgnoringBlockTriggers(),
+                    "a blade may be taken through a portal, or press a plate");
+            double farthest = 0.0;
+            for (TrialBlade blade : blades) {
+                double away = blade.position().subtract(trial.centre()).horizontalDistance();
+                farthest = Math.max(farthest, away);
+                helper.assertTrue(BankaiSwords.stands(blade) && !blade.held() && blade.model() == look && away >= 1.5
+                                && away <= 5.0 && blade.getY() == trial.centre().y
+                                && level.getBlockState(blade.blockPosition().below()).is(Blocks.STONE),
+                        "a blade stands at " + blade.position() + " in look " + blade.model() + ", held " + blade.held());
+            }
+            helper.assertTrue(farthest > 4.0, "the farthest blade stands only " + farthest + " from the centre");
+            BankaiTrial.tick(ichigo, SoulLogic.get(ichigo), now + BankaiTrial.boutSeconds() * 20L);
+            helper.assertTrue(BankaiTrial.trial(ichigo.getUUID()) == null && blades.stream().allMatch(Entity::isRemoved),
+                    "the blades outlived a bout whose time ran out");
+
+            BankaiTrial.Trial bout = begun(helper, unloaded, now);
+            left.addAll(bout.swords().blades());
+            bout.spirit().setRemoved(Entity.RemovalReason.UNLOADED_TO_CHUNK);
+            helper.assertTrue(BankaiTrial.trial(unloaded.getUUID()) == null
+                            && left.stream().noneMatch(blade -> blade.isRemoved() || BankaiSwords.stands(blade)),
+                    "the blades were taken in the spirit's leaving, or stood on in no bout");
+
+            wall.forEach(block -> helper.setBlock(block, Blocks.STONE));
+            List<TrialBlade> walled = List.copyOf(begun(helper, behind, now).swords().blades());
+            left.addAll(walled);
+            helper.assertTrue(walled.size() == 40 && walled.stream().allMatch(blade -> helper.relativeVec(blade.position()).x
+                    < 11.0), "a blade rose behind a wall, out of its soul's sight");
+            clear.run();
+        }));
+        // A tick on, after the end of the last server tick, when a leaving end's blades go.
+        helper.runAfterDelay(1, () -> {
+            helper.assertTrue(left.stream().allMatch(Entity::isRemoved), "a blade outlived its bout by a tick");
+            helper.succeed();
+        });
     }
 }
