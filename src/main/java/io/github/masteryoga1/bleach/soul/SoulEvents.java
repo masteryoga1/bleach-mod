@@ -86,6 +86,7 @@ public final class SoulEvents {
         ShikaiEvents.register(bus);
         VisoredEvents.register(bus);
         Materialisation.register(bus);
+        BankaiTrial.register(bus);
         KidoEvents.register(bus);
         TravelEvents.register(bus);
         DangaiEvents.register(bus);
@@ -156,6 +157,7 @@ public final class SoulEvents {
 
         QuincyEvents.tick(player, data, meditating);
         VisoredEvents.tick(player, data, player.level().getGameTime());
+        BankaiTrial.tick(player, data, player.level().getGameTime());
 
         if (player.tickCount % MILESTONE_CHECK_TICKS == 0) {
             Milestones.check(player, data);
