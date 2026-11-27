@@ -237,6 +237,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.BooleanValue BANKAI_TRIAL_SPIRIT_TESTS;
     public static final ModConfigSpec.IntValue BANKAI_TRIAL_HALVES_SECONDS;
     public static final ModConfigSpec.DoubleValue BANKAI_TRIAL_RISE_SHARE;
+    public static final ModConfigSpec.IntValue BANKAI_TRIAL_BLADES;
 
     public static final ModConfigSpec.DoubleValue GETSUGA_BASE_DAMAGE;
     public static final ModConfigSpec.DoubleValue GETSUGA_DAMAGE_PER_ROOT_REIRYOKU;
@@ -1525,6 +1526,11 @@ public final class BleachConfig {
                 .comment("The share of its full health with which a half beaten down alone rises again, unless it has"
                         + " more by then.")
                 .defineInRange("rise_share", 0.5, 0.2, 1.0);
+        BANKAI_TRIAL_BLADES = builder
+                .comment("How many blades rise from open ground in the ring of a Bankai trial whose spirit tests its soul"
+                        + " with blades (Zangetsu); one of them is true. No such trial begins where fewer than half of"
+                        + " them find ground.")
+                .defineInRange("blades", 40, 2, 64);
         builder.pop();
         builder.pop();
 

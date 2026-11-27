@@ -5,10 +5,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
@@ -21,8 +28,10 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * Zangetsu's test in a Bankai trial (a file's {@code bankai.test} {@code "swords"}): as the bout begins, blades rise from
  * open ground in its ring ({@link #ground}), one of them true, picked at random, and go with the bout. Server thread only.
  *
- * <p>All look alike, and nothing in the world shows which is true: the server alone knows ({@link #real}). For now they
- * only stand, and the spirit is beaten as in a plain bout.
+ * <p>All look alike, and nothing in the world shows which is true: the server alone knows ({@link #real}). The soul
+ * takes one up by using it ({@link #takeUp}), one at a time, and nothing reaches its spirit but a blow of its own hand
+ * with a blade taken up ({@link #lands}): a false one shatters at that first clash and the blow is lost; the true one
+ * holds, the blow lands, every other blade crumbles, and from then on every blow of the soul's lands.
  */
 public final class BankaiSwords {
     /** How near the centre no blade rises, so none stands at the soul's feet, in blocks. */
@@ -33,9 +42,17 @@ public final class BankaiSwords {
     private static final double EYES = 1.5;
     /** The blades of bouts ended as their spirits left the world, which go at the end of the server tick. */
     static final List<TrialBlade> PENDING = new ArrayList<>();
+    private static final String TAKEN = "message.bleach.bankai.trial.blade_taken";
+    private static final String SHATTERED = "message.bleach.bankai.trial.blade_shattered";
+    private static final String FOUND = "message.bleach.bankai.trial.blade_found";
+    private static final String UNTOUCHED = "message.bleach.bankai.trial.untouched";
 
     private final List<TrialBlade> blades;
     private final TrialBlade real;
+    /** The blade its soul has taken up, if any; and whether it has found the true one. */
+    @Nullable
+    private TrialBlade held;
+    private boolean found;
 
     private BankaiSwords(List<TrialBlade> blades, TrialBlade real) {
         this.blades = blades;
@@ -146,5 +163,83 @@ public final class BankaiSwords {
     /** The true blade, which nothing in the world marks: for the tests. */
     public TrialBlade real() {
         return real;
+    }
+
+    @Nullable
+    public TrialBlade held() {
+        return held;
+    }
+
+    /**
+     * The soul takes up this blade of its own bout, still on the ground, by using it: the one it held goes back to its
+     * spot, so it holds one at a time. False for anyone else's use, a spectator's, or a blade of no bout of the user's.
+     */
+    public static boolean takeUp(Player player, TrialBlade blade) {
+        BankaiTrial.Trial trial = BankaiTrial.trial(player.getUUID());
+        BankaiSwords swords = trial == null || trial.wielder() != player ? null : trial.swords();
+        if (swords == null || player.isSpectator() || blade.held() || !swords.blades.contains(blade)) {
+            return false;
+        }
+        if (swords.held != null) {
+            swords.held.setHeld(false);
+        }
+        swords.held = blade;
+        blade.setHeld(true);
+        tell(player, TAKEN);
+        return true;
+    }
+
+    /**
+     * Whether this blow of its soul's reaches the spirit: every blow once the true blade is found, or once it has gone
+     * with its chunk, so no unload leaves a spirit none can beat, and one that passes every guard with the soul as its
+     * attacker ({@code /damage} by it; {@code /kill} names none and never comes here); until then, only a blow of the
+     * soul's own hand with a blade taken up, its first clash. A false blade shatters and the
+     * blow is lost; the true one holds, the blow lands, and the rest crumble away. A shot, a wave or any other blow from
+     * afar breaks nothing and lands nothing.
+     */
+    boolean lands(Player wielder, DamageSource source) {
+        if (found || real.isRemoved() || source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            return true;
+        }
+        TrialBlade blade = held;
+        if (blade == null || source.getDirectEntity() != wielder) {
+            tell(wielder, UNTOUCHED);
+            return false;
+        }
+        if (blade != real) {
+            held = null;
+            blades.remove(blade);
+            gone(blade, true);
+            tell(wielder, SHATTERED);
+            return false;
+        }
+        found = true;
+        for (TrialBlade other : List.copyOf(blades)) {
+            if (other != real) {
+                blades.remove(other);
+                gone(other, false);
+            }
+        }
+        tell(wielder, FOUND);
+        return true;
+    }
+
+    /** A blade shatters, as it breaks on its spirit with a sound, or crumbles away with a puff; both only to the aware. */
+    private static void gone(TrialBlade blade, boolean shattered) {
+        if (blade.level() instanceof ServerLevel level) {
+            double y = blade.getY() + TrialBlade.HEIGHT / 2.0;
+            SpiritSenses.particles(level, shattered ? ParticleTypes.CRIT : ParticleTypes.POOF, blade.getX(), y,
+                    blade.getZ(), shattered ? 12 : 4, 0.1, 0.3, 0.1, shattered ? 0.3 : 0.02);
+            if (shattered) {
+                SpiritSenses.play(level, blade.getX(), y, blade.getZ(), SoundEvents.ITEM_BREAK, SoundSource.PLAYERS,
+                        1.0F, 0.8F, false);
+            }
+        }
+        blade.discard();
+    }
+
+    /** A line to the soul's action bar, in grey, so blow after blow overwrites it rather than filling the chat. */
+    private static void tell(Player player, String key) {
+        player.displayClientMessage(Component.translatable(key).withStyle(ChatFormatting.GRAY), true);
     }
 }

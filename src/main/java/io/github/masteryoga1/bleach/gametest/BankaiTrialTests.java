@@ -26,8 +26,10 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -36,8 +38,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageSources;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -262,7 +266,9 @@ public final class BankaiTrialTests {
      * so the two rings do not meet. It is called by hand: posting a stop would run every stop listener on the live
      * server, so of the bout's own listeners only the death's and the logout's are posted through the bus, and the
      * stop's wiring is read, not tested. A spirit carried into an unloaded chunk ends its bout too, left in the world for
-     * the world to finish moving.
+     * the world to finish moving. Each bout's blades go with it: at once, or, where the bout ended as its spirit left the
+     * world, at the end of the server tick, so a tick on none is left. The corner bouts raise 12, as each finds only 28
+     * open blocks in its ring.
      */
     @GameTest(template = "field", timeoutTicks = 20)
     public static void everyBreakOffEndsTheTrialWithNothingWritten(GameTestHelper helper) {
@@ -306,23 +312,38 @@ public final class BankaiTrialTests {
         });
         ends.put("the time", (wielder, spirit) -> BankaiTrial.tick(wielder, SoulLogic.get(wielder),
                 now + BankaiTrial.boutSeconds() * 20L));
+        // The ends seen on the wielder's side, whose blades go at once; the rest come as the spirit leaves the world.
+        List<String> atOnce = List.of("its death", "logging out", "another body", "straying", "the time");
+        List<TrialBlade> left = new ArrayList<>();
         ends.forEach((end, cause) -> {
             Player wielder = BankaiSpiritTests.wielder(helper, MIDDLE);
             HihioZabimaruTests.clearingOnFailure(() -> clear(wielder), () -> {
-                MaterialisedSpirit spirit = begun(helper, wielder, now).spirit();
+                BankaiTrial.Trial trial = begun(helper, wielder, now);
+                MaterialisedSpirit spirit = trial.spirit();
+                List<TrialBlade> blades = List.copyOf(trial.swords().blades());
                 cause.accept(wielder, spirit);
                 helper.assertTrue(over(wielder, spirit, now), "the bout outlasted " + end + ", or wrote " + record(wielder));
+                helper.assertTrue(blades.stream().allMatch(blade -> atOnce.contains(end) ? blade.isRemoved()
+                        : !BankaiSwords.stands(blade)), "a blade still stood in the bout after " + end);
+                left.addAll(blades);
             });
         });
 
         Player[] pair = {BankaiSpiritTests.wielder(helper, FLOOR), farWielder(helper)};
-        inSmallRing(() -> HihioZabimaruTests.clearingOnFailure(() -> clear(pair), () -> {
-            MaterialisedSpirit first = begun(helper, pair[0], now).spirit(), second = begun(helper, pair[1], now).spirit();
+        inSmallRing(() -> KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_BLADES, 12,
+                () -> HihioZabimaruTests.clearingOnFailure(() -> clear(pair), () -> {
+            BankaiTrial.Trial one = begun(helper, pair[0], now), two = begun(helper, pair[1], now);
+            List<TrialBlade> theirs = new ArrayList<>(one.swords().blades());
+            theirs.addAll(two.swords().blades());
             BankaiTrial.breakOffAll();
-            helper.assertTrue(over(pair[0], first, now) && over(pair[1], second, now), "breakOffAll left a bout going");
-        }));
+            helper.assertTrue(over(pair[0], one.spirit(), now) && over(pair[1], two.spirit(), now),
+                    "breakOffAll left a bout going");
+            helper.assertTrue(theirs.stream().allMatch(Entity::isRemoved), "breakOffAll left a blade standing");
+        })));
         Player carried = BankaiSpiritTests.wielder(helper, MIDDLE);
-        MaterialisedSpirit spirit = begun(helper, carried, now).spirit();
+        BankaiTrial.Trial carriedTrial = begun(helper, carried, now);
+        MaterialisedSpirit spirit = carriedTrial.spirit();
+        left.addAll(carriedTrial.swords().blades());
         try {
             spirit.setPos(spirit.getX() + 10_000.0, spirit.getY(), spirit.getZ());
             helper.assertTrue(BankaiTrial.trial(carried.getUUID()) == null && !Materialisation.holds(carried.getUUID())
@@ -331,7 +352,11 @@ public final class BankaiTrialTests {
         } finally {
             Materialisation.sendHome(spirit);
         }
-        helper.succeed();
+        // A tick on, after the end of the last server tick, when a leaving end's blades go.
+        helper.runAfterDelay(1, () -> {
+            helper.assertTrue(left.stream().allMatch(Entity::isRemoved), "a blade outlived its bout by a tick");
+            helper.succeed();
+        });
     }
 
     /**
@@ -839,7 +864,9 @@ public final class BankaiTrialTests {
      * ring, the farthest near its edge and none at the soul's feet, all in his Shikai's look, none held, the true one
      * among them, and none taken by a portal or pressing a plate. They go at once as the time runs out; when the bout
      * ends as its spirit leaves the world they stand in no bout, and go at the end of the server tick. None rises behind
-     * a wall, out of the soul's sight. The ring is at its smallest, so the blades stay in the field.
+     * a wall, out of the soul's sight, and a soul on the wall's top, with ground for 8 blades in its ring, is refused
+     * with nothing counted and no spirit out, a line there to say why. The ring is at its smallest, 6 blocks, or 7 for the
+     * walled bout, for more ground before the wall; either keeps the blades in the field.
      */
     @GameTest(template = "field", timeoutTicks = 20)
     public static void theBladesRiseOnOpenGroundAndGoWithTheBout(GameTestHelper helper) {
@@ -850,10 +877,11 @@ public final class BankaiTrialTests {
             return;
         }
         Player unloaded = BankaiSpiritTests.wielder(helper, MIDDLE), behind = BankaiSpiritTests.wielder(helper, MIDDLE);
-        // A wall three high, its face 2.5 blocks east of the soul: 8 open blocks behind it in the ring, 55 before it.
+        Player perched = BankaiSpiritTests.wielder(helper, new Vec3(11.5, 5.0, 8.5));
+        // A wall three high, its face 2.5 blocks east of the soul: at 7 blocks, 17 open blocks behind it, 76 before it.
         Iterable<BlockPos> wall = BlockPos.betweenClosed(11, 2, 0, 11, 4, 15);
         Runnable clear = () -> {
-            clear(ichigo, unloaded, behind);
+            clear(ichigo, unloaded, behind, perched);
             wall.forEach(block -> helper.setBlock(block, Blocks.AIR));
         };
         List<TrialBlade> left = new ArrayList<>();
@@ -888,10 +916,23 @@ public final class BankaiTrialTests {
                     "the blades were taken in the spirit's leaving, or stood on in no bout");
 
             wall.forEach(block -> helper.setBlock(block, Blocks.STONE));
-            List<TrialBlade> walled = List.copyOf(begun(helper, behind, now).swords().blades());
+            List<TrialBlade> walled = new ArrayList<>();
+            KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_RING_RADIUS, 7,
+                    () -> walled.addAll(begun(helper, behind, now).swords().blades()));
             left.addAll(walled);
             helper.assertTrue(walled.size() == 40 && walled.stream().allMatch(blade -> helper.relativeVec(blade.position()).x
                     < 11.0), "a blade rose behind a wall, out of its soul's sight");
+            clear(behind);
+            BankaiTrial.Start start = BankaiTrial.begin(perched, now);
+            helper.assertTrue(start == BankaiTrial.Start.NO_GROUND && record(perched).tries() == 0
+                            && !Materialisation.holds(perched.getUUID()) && Language.getInstance().has(start.key()),
+                    "a soul with ground for 8 blades came to " + start + ", or the refusal has no line");
+            // Half is enough: 20 spots for 40 blades, and 9 for 17, but not 19 or 8.
+            helper.assertTrue(!BankaiTrial.tooLittleGround(20) && BankaiTrial.tooLittleGround(19),
+                    "the ground's rule is not half of 40 blades");
+            KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_BLADES, 17, () -> helper.assertTrue(
+                    !BankaiTrial.tooLittleGround(9) && BankaiTrial.tooLittleGround(8),
+                    "the ground's rule is not half of 17 blades"));
             clear.run();
         }));
         // A tick on, after the end of the last server tick, when a leaving end's blades go.
@@ -899,5 +940,99 @@ public final class BankaiTrialTests {
             helper.assertTrue(left.stream().allMatch(Entity::isRemoved), "a blade outlived its bout by a tick");
             helper.succeed();
         });
+    }
+
+    /**
+     * T10. In a bout with {@code blades} at 12, 12 rise, the soul told so in chat, and nothing of its soul's reaches
+     * Zangetsu until it holds the true one: not a blow with no blade, the soul told so, nor an arrow with one, which
+     * breaks nothing; another soul's blow is turned away by the spirit's own guard, which breaks nothing and tells the
+     * soul nothing. Using a blade takes it up, into no inventory; another's use takes nothing, and taking up a second
+     * puts the first back. A false blade shatters at its first clash, the blow lost; the true one holds, the blow lands
+     * and the rest crumble away, the soul told each time; from then on an arrow lands too, and a beating to the floor
+     * yields Bankai, the true blade gone with the bout. Zangetsu out of a bout takes a blow with no blade, as before, and
+     * so does one whose true blade has gone from the world. No bout is ticked, so the ring stays at 12.
+     */
+    @GameTest(template = "field", timeoutTicks = 20)
+    public static void onlyTheTrueBladeCutsZangetsu(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        DamageSources sources = level.damageSources();
+        long now = HollowPlayerTests.now(helper);
+        ServerPlayer ichigo = BankaiTests.join(helper, ZanpakutoTests.soul(SoulState.SHINIGAMI, 800.0F), true);
+        BankaiSpiritTests.stand(helper, ichigo, MIDDLE);
+        if (refusedOnPeaceful(helper, ichigo, now)) {
+            return;
+        }
+        Player other = BankaiSpiritTests.wielder(helper, FLOOR), far = farWielder(helper);
+        Arrow arrow = new Arrow(EntityType.ARROW, level);
+        String untouched = "message.bleach.bankai.trial.untouched", taken = "message.bleach.bankai.trial.blade_taken";
+        String shattered = "message.bleach.bankai.trial.blade_shattered", found = "message.bleach.bankai.trial.blade_found";
+        HihioZabimaruTests.clearingOnFailure(() -> clear(ichigo, far), () -> {
+            KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_BLADES, 12, () -> begun(helper, ichigo, now));
+            BankaiTrial.Trial trial = BankaiTrial.trial(ichigo.getUUID());
+            MaterialisedSpirit spirit = trial.spirit();
+            BankaiSwords swords = trial.swords();
+            TrialBlade real = swords.real();
+            List<TrialBlade> falses = swords.blades().stream().filter(blade -> blade != real).limit(2).toList();
+            TrialBlade first = falses.get(0), second = falses.get(1);
+            float full = spirit.getHealth();
+            long carried = ichigo.getInventory().items.stream().filter(stack -> !stack.isEmpty()).count();
+            helper.assertTrue(swords.blades().size() == 12 && TestPlayers.chat(ichigo).stream()
+                            .anyMatch(line -> GateTests.says(line, "message.bleach.bankai.trial.blades", -1)),
+                    swords.blades().size() + " blades rose for 12, or the soul was not told of them");
+            helper.assertTrue(!spirit.hurt(sources.playerAttack(other), 5.0F) && spirit.getHealth() == full
+                            && !BankaiSpiritTests.told(ichigo, untouched),
+                    "another soul's blow reached Zangetsu, or told his soul it was untouched");
+            helper.assertTrue(!spirit.hurt(sources.playerAttack(ichigo), 5.0F) && spirit.getHealth() == full
+                            && BankaiSpiritTests.told(ichigo, untouched),
+                    "a blow with no blade reached Zangetsu, or its soul was not told why not");
+            // A blow past every guard that names the soul as its attacker, as /damage ... by it does, needs no blade.
+            DamageSource past = new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                    .getHolderOrThrow(DamageTypes.GENERIC_KILL), ichigo);
+            helper.assertTrue(spirit.hurt(past, 1.0F) && spirit.getHealth() < full,
+                    "a blow past every guard by Zangetsu's soul was refused for want of a blade");
+            spirit.setHealth(full);
+            spirit.invulnerableTime = 0;
+            helper.assertTrue(first.interact(other, InteractionHand.MAIN_HAND) == InteractionResult.PASS && !first.held()
+                            && first.interact(ichigo, InteractionHand.MAIN_HAND).consumesAction() && first.held()
+                            && !first.isPickable() && swords.held() == first && BankaiSpiritTests.told(ichigo, taken)
+                            && ichigo.getInventory().items.stream().filter(stack -> !stack.isEmpty()).count() == carried,
+                    "a blade was taken up by another, or not by its soul, or into its inventory");
+            second.interact(ichigo, InteractionHand.MAIN_HAND);
+            helper.assertTrue(second.held() && !first.held() && first.isPickable() && swords.held() == second,
+                    "taking up a second blade did not put the first back");
+            helper.assertTrue(!spirit.hurt(sources.arrow(arrow, ichigo), 5.0F) && second.held() && !second.isRemoved(),
+                    "an arrow reached Zangetsu with a false blade held, or broke it");
+            helper.assertTrue(!spirit.hurt(sources.playerAttack(ichigo), 5.0F) && spirit.getHealth() == full
+                            && second.isRemoved() && swords.held() == null && !swords.blades().contains(second)
+                            && BankaiSpiritTests.told(ichigo, shattered),
+                    "a false blade's clash cut Zangetsu, or the blade stood on");
+            real.interact(ichigo, InteractionHand.MAIN_HAND);
+            helper.assertTrue(spirit.hurt(sources.playerAttack(ichigo), 5.0F) && spirit.getHealth() < full
+                            && first.isRemoved() && swords.blades().equals(List.of(real))
+                            && BankaiSpiritTests.told(ichigo, found),
+                    "the true blade's clash did not cut Zangetsu, or the rest stood on");
+            float cut = spirit.getHealth();
+            spirit.invulnerableTime = 0;
+            helper.assertTrue(spirit.hurt(sources.arrow(arrow, ichigo), 5.0F) && spirit.getHealth() < cut,
+                    "an arrow did not reach Zangetsu once the true blade was found");
+            spirit.invulnerableTime = 0;
+            spirit.hurt(sources.playerAttack(ichigo), 10_000.0F);
+            Materialisation.upkeep(spirit);
+            helper.assertTrue(record(ichigo).achieved() && BankaiTrial.trial(ichigo.getUUID()) == null && real.isRemoved(),
+                    "beaten with the true blade, Zangetsu did not yield, or the blade outlived the bout");
+
+            MaterialisedSpirit free = BankaiSpiritTests.drawOut(helper, far);
+            helper.assertTrue(free.hurt(sources.playerAttack(far), 5.0F) && free.getHealth() < free.getMaxHealth(),
+                    "Zangetsu out of a bout took no blow without a blade");
+            clear(far);
+            KidoTests.withConfig(BleachConfig.BANKAI_TRIAL_BLADES, 12, () -> begun(helper, far, now));
+            BankaiTrial.Trial valve = BankaiTrial.trial(far.getUUID());
+            valve.swords().real().discard();
+            helper.assertTrue(valve.spirit().hurt(sources.playerAttack(far), 5.0F)
+                            && valve.spirit().getHealth() < valve.spirit().getMaxHealth(),
+                    "with its true blade gone from the world, a blow with no blade did not reach Zangetsu");
+            clear(far);
+        });
+        helper.succeed();
     }
 }
