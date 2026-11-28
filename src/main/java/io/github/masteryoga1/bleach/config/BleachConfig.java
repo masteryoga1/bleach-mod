@@ -570,6 +570,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue VASTO_LORDE_MAX_ALIVE;
     public static final ModConfigSpec.IntValue VASTO_LORDE_LOOK_SECONDS;
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_CHANCE;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_CERO_DAMAGE;
+    public static final ModConfigSpec.IntValue VASTO_LORDE_CERO_COOLDOWN_SECONDS;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2639,6 +2641,15 @@ public final class BleachConfig {
                         + " Arrancar too, while fewer than max_alive live there. Never on Peaceful or with mob spawning"
                         + " off. 0 stops them coming by themselves.")
                 .defineInRange("chance", 0.1, 0.0, 1.0);
+        VASTO_LORDE_CERO_DAMAGE = builder
+                .comment("Damage of a Vasto Lorde's Cero on Normal, before the hollows damage multiplier. It gathers and"
+                        + " reaches as a Vasto Lorde player's does ([hollow_evolution.vasto_lorde] cero_charge_ticks,"
+                        + " [hollow_evolution] cero_range), breaking soft blocks only where [menos] cero_breaks_blocks and"
+                        + " mob griefing allow.")
+                .defineInRange("cero_damage", 20.0, 0.0, 200.0);
+        VASTO_LORDE_CERO_COOLDOWN_SECONDS = builder
+                .comment("Seconds between a Vasto Lorde's Cero and its next, and up to a second more at random.")
+                .defineInRange("cero_cooldown_seconds", 5, 1, 120);
         builder.pop();
         builder.pop();
 

@@ -91,14 +91,14 @@ public final class MenosTests {
     }
 
     /** Turns a mob, head and body too, to this yaw. */
-    private static void face(LivingEntity entity, float yaw) {
+    static void face(LivingEntity entity, float yaw) {
         entity.setYRot(yaw);
         entity.setYHeadRot(yaw);
         entity.setYBodyRot(yaw);
     }
 
     /** A still husk here. */
-    private static Husk husk(GameTestHelper helper, int x, int z) {
+    static Husk husk(GameTestHelper helper, int x, int z) {
         return QuincyTests.still(helper.spawnWithNoFreeWill(EntityType.HUSK, x, 2, z));
     }
 
