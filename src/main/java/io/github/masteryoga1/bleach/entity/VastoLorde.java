@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.registry.ModEntities;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -55,6 +56,14 @@ public class VastoLorde extends Hollow {
 
     public static AttributeSupplier.Builder createAttributes() {
         return HollowKind.VASTO_LORDE.attributes().add(Attributes.ARMOR_TOUGHNESS, TOUGHNESS);
+    }
+
+    /**
+     * The Vasto Lorde alive in this world's loaded chunks, however they came. One in a chunk on its way out is not
+     * counted: it goes with its chunk, as none is saved.
+     */
+    public static int aliveIn(ServerLevel level) {
+        return level.getEntities(ModEntities.VASTO_LORDE.get(), Entity::isAlive).size();
     }
 
     @Override
