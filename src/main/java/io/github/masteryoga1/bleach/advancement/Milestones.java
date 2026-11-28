@@ -141,6 +141,8 @@ public final class Milestones {
     public static final String GRAND_FISHER = "grand_fisher";
     /** Brought a Vasto Lorde down: killed, purified or devoured one by a blow of one's own. Granted when it happens. */
     public static final String VASTO_LORDE_FALLEN = "vasto_lorde_fallen";
+    /** Brought Runuganga down: a blow of one's own slew or purified him while water soaked him. Granted when it happens. */
+    public static final String RUNUGANGA = "runuganga";
     /**
      * Became a Gillian by devouring. Granted when it happens and by {@link #check}, as are the two below,
      * which also count a form set by command or reached before a purification.

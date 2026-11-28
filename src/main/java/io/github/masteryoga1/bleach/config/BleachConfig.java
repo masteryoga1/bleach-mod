@@ -586,6 +586,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue RUNUGANGA_REFORM_SHARE;
     public static final ModConfigSpec.IntValue RUNUGANGA_RETURN_DAYS;
     public static final ModConfigSpec.IntValue RUNUGANGA_LANDING_GRACE_SECONDS;
+    public static final ModConfigSpec.IntValue RUNUGANGA_SOAK_SECONDS;
+    public static final ModConfigSpec.DoubleValue RUNUGANGA_SOAKED_HARM;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2709,7 +2711,8 @@ public final class BleachConfig {
                 .defineInRange("damage", 12.0, 0.0, 200.0);
         RUNUGANGA_REFORM_SECONDS = builder
                 .comment("Seconds Runuganga lies as sand once a blow has brought him to his last health, harmed only by"
-                        + " /kill and the void, before he rises again.")
+                        + " /kill and the void while he is dry, before he rises again; soaked, he is struck as sand and"
+                        + " does not rise.")
                 .defineInRange("reform_seconds", 5, 1, 600);
         RUNUGANGA_REFORM_SHARE = builder
                 .comment("The share of his health Runuganga rises out of the sand with, or what he has if that is more.")
@@ -2724,6 +2727,14 @@ public final class BleachConfig {
                         + " nor sets out against it unless it strikes him, so a newcomer may find its feet. Landing again"
                         + " in that time does not lengthen it. 0 gives none.")
                 .defineInRange("landing_grace_seconds", 30, 0, 600);
+        RUNUGANGA_SOAK_SECONDS = builder
+                .comment("Seconds water keeps Runuganga soaked after it last reaches him. Soaked he has no last health to"
+                        + " slump at, takes soaked_harm times a blow's harm, can be struck even as sand and does not rise"
+                        + " from it, so a blow ends him.")
+                .defineInRange("soak_seconds", 10, 1, 120);
+        RUNUGANGA_SOAKED_HARM = builder
+                .comment("How many times a blow's harm Runuganga takes while he is soaked.")
+                .defineInRange("soaked_harm", 2.0, 1.0, 10.0);
         builder.pop();
         builder.pop();
 

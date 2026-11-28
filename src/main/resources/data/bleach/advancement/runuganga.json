@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:vasto_lorde_fallen",
+  "display": {
+    "icon": {
+      "id": "minecraft:water_bucket"
+    },
+    "title": {
+      "translate": "advancements.bleach.runuganga.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.runuganga.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "runuganga": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "runuganga"
+      }
+    }
+  }
+}

@@ -10,6 +10,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -28,14 +29,15 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * Runuganga as a boss of the ledger, one at a time and away return_days after a death, and the rules he rises by: out of
  * Hueco Mundo's level sand ({@link Runuganga#onTheSand}) for an intruder on it ({@link #draws}) past its landing grace,
  * 8 to 16 blocks from it, over three seconds with sand thrown up and a rumble; never on Peaceful, with mob spawning off,
- * or for a minute after he sank away. He loads no chunk and rises only where creatures tick. Nothing looks for him by
- * itself yet: dry, no blow ends him, so his coming waits for the water that lets one. A summon raises him near its
- * player as a look would, keeping none of the rules of when.
+ * or for a minute after he sank away. He loads no chunk and rises only where creatures tick. Now that water lets a blow
+ * end him, a look is made for him every five seconds while a player is in Hueco Mundo ({@link #look}). A summon raises
+ * him near its player as a look would, keeping none of the rules of when.
  */
 public final class RunugangaComing implements Boss {
     public static final String ID = "runuganga";
@@ -45,6 +47,8 @@ public final class RunugangaComing implements Boss {
     public static final double NEAREST = 8.0, FURTHEST = 16.0;
     /** How long after he sinks away no look brings him: a minute. */
     public static final int REST_TICKS = 1_200;
+    /** How often a look is made for him: every five seconds. */
+    public static final int LOOK_TICKS = 100;
     private static final int TRIES = 16;
     /** The ledger's game time until which he rests; the server's one, put back as it stops. */
     private static long restUntil;
@@ -88,6 +92,34 @@ public final class RunugangaComing implements Boss {
         }
         return comeNear(near.serverLevel(), near.getRandom(), near) != null ? null
                 : Component.translatable("commands.bleach.boss.summon.no_ground", near.getDisplayName(), name());
+    }
+
+    /** Each server tick, a look for the souls in Hueco Mundo ({@link #look}). */
+    static void onServerTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        ServerLevel level = server.getLevel(BleachWorlds.HUECO_MUNDO);
+        if (level != null) {
+            look(server, level, level.players(), server.getTickCount());
+        }
+    }
+
+    /**
+     * The look on this tick of the server's for these souls in Hueco Mundo: a roll every {@link #LOOK_TICKS}, on a server
+     * that looks for him by itself, while a soul is there; what rose, or null.
+     */
+    @Nullable
+    public static Runuganga look(MinecraftServer server, ServerLevel level, List<? extends Player> souls, int tick) {
+        return lookNow(tick) && looksBy(server) && !souls.isEmpty() ? roll(level, level.getRandom(), souls) : null;
+    }
+
+    /** Whether a look is made on this tick of the server's. */
+    public static boolean lookNow(int tickCount) {
+        return tickCount % LOOK_TICKS == 0;
+    }
+
+    /** Whether this server looks for him by itself: never a game test's, whose worlds he would rise in unasked. */
+    public static boolean looksBy(MinecraftServer server) {
+        return !(server instanceof GameTestServer);
     }
 
     /** One look: he rises near one of these souls that draws him if the world allows, he may come and is not resting. */

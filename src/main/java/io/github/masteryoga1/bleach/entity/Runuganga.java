@@ -1,5 +1,6 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModSounds;
@@ -39,13 +40,19 @@ import net.neoforged.neoforge.entity.PartEntity;
 
 /**
  * Runuganga, the guardian of the white sand before Las Noches: a giant of grey sand 12 blocks tall in two hit boxes, as
- * the Gillian is ({@link Part}). His health and blow are the config's; he is no sinner and never saved. A command brings
- * him: {@code /summon} standing at once, the boss command rising out of the ground ({@link RunugangaComing}).
+ * the Gillian is ({@link Part}). His health and blow are the config's; he is no sinner and never saved. He rises by
+ * himself out of Hueco Mundo's sand, or by command: {@code /summon} standing at once, the boss command rising out of the
+ * ground ({@link RunugangaComing}).
  *
- * <p>His white bar shows to the souls about him who see spirits. He fights intruders on his ground and whoever strikes
- * him, with a blow of both forearms after a second's wind-up ({@link FightGoal}). At his floor he slumps into sand that
- * nothing strikes, and re-forms after reform_seconds with reform_share of his health, so no blow ends him; {@code /kill}
- * and the void still do.
+ * <p>His bar shows to the souls about him who see spirits. He fights intruders on his ground and whoever strikes him,
+ * with a blow of both forearms after a second's wind-up ({@link FightGoal}). At his floor he slumps into sand that
+ * nothing strikes while he is dry, and re-forms after reform_seconds with reform_share of his health, so dry no blow
+ * ends him; {@code /kill} and the void still do.
+ *
+ * <p>Water is his weakness ({@link #soak}): for soak_seconds after it last reaches him his bar is blue, he has no floor
+ * and takes soaked_harm times a blow's harm, and as sand his head stays out of it to be struck and he does not re-form,
+ * so a blow ends him; the player who deals it has beaten him. Slain or purified, as a zanpakutō purifies any Hollow, he
+ * crumbles into the sand.
  *
  * <p>With no foe or intruder on his ground for {@link #LONELY_TICKS} he sinks into the sand and is gone, never by a tear:
  * no death, so the ledger keeps no wait, but he rests a minute ({@link RunugangaComing#REST_TICKS}). A body named or kept
@@ -65,17 +72,23 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     public static final float FLOOR = 1.0F;
     /** How long he takes to rise out of the sand and to sink into it, and how long alone before he sinks away. */
     public static final int RISE_TICKS = 60, SINK_TICKS = 20, LONELY_TICKS = 200;
+    /** How far under the sand he lies at most while soaked: his head stays out of it, to be seen and struck. */
+    public static final float WET_SUNK = 0.75F;
     /** Synced, so the client draws his forearms up while it is set ({@link #armsUp}). */
     private static final EntityDataAccessor<Boolean> DATA_ARMS_UP = SynchedEntityData.defineId(Runuganga.class,
             EntityDataSerializers.BOOLEAN);
+    /** Synced, so the client draws him wet and lets his head out of the sand while it is set ({@link #soaked}). */
+    private static final EntityDataAccessor<Boolean> DATA_SOAKED = SynchedEntityData.defineId(Runuganga.class,
+            EntityDataSerializers.BOOLEAN);
+    /** His bar's name: white while he is dry, blue while he is soaked. */
+    private static final String BAR = "bossbar.bleach.runuganga";
     /** How often sand is thrown up about him while he is not standing. */
     private static final int SAND_EVERY_TICKS = 4;
     /** The most his head turns toward his foe in a tick, in degrees. */
     private static final float TURN = 20.0F;
 
     private final Part[] parts;
-    private final BossBar bar = new BossBar(this, "bossbar.bleach.runuganga", BossEvent.BossBarColor.WHITE,
-            BossEvent.BossBarOverlay.PROGRESS);
+    private final BossBar bar = new BossBar(this, BAR, BossEvent.BossBarColor.WHITE, BossEvent.BossBarOverlay.PROGRESS);
     /** Where he first stood, the middle of his ground; never saved, as he is not. */
     private Vec3 home = Vec3.ZERO;
     /** Ticks left of his wind-up, -1 with none; and the game time from which he may wind up again. */
@@ -87,6 +100,9 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     /** Ticks since a foe or an intruder last kept him, and whether he is sinking away for good. */
     private int lonely;
     private boolean leaving;
+    /** Ticks left of his soak, 0 while he is dry; and how far under he was last tick and as he died, on both sides. */
+    private int soakTicks;
+    private float lastSunk, fallFrom;
 
     public Runuganga(EntityType<? extends Runuganga> type, Level level) {
         super(type, level);
@@ -124,6 +140,7 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_ARMS_UP, false);
+        builder.define(DATA_SOAKED, false);
     }
 
     /** Whether his forearms are raised for a blow, for the model. */
@@ -138,7 +155,10 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
                 BleachConfig.get(BleachConfig.RUNUGANGA_DAMAGE));
     }
 
-    /** Every tick, so with NoAI too: his pose's count; on the server his changes while he lives, then his bar. */
+    /**
+     * Every tick, so with NoAI too: his pose's count; on the server his changes while he lives, then his bar; on both,
+     * how far under he is now, for a death to crumble from.
+     */
     @Override
     public void tick() {
         super.tick();
@@ -149,6 +169,7 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
             }
             bar.tick();
         }
+        lastSunk = sunk(0.0F);
     }
 
     @Override
@@ -263,9 +284,15 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
         return pose != Pose.EMERGING && pose != Pose.DIGGING;
     }
 
+    /** Whether he lies as sand soaked, his head out of it to be aimed at and struck; rising, soaked or not, he is not. */
+    public boolean wetMound() {
+        return soaked() && getPose() == Pose.DIGGING;
+    }
+
+    /** None while he is soaked, so a blow may end him; else {@link #FLOOR}. */
     @Override
     public float floor() {
-        return FLOOR;
+        return soaked() ? 0.0F : FLOOR;
     }
 
     /** A blow has left him on his floor: he slumps on his next tick, once it has landed. */
@@ -274,7 +301,10 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
         slumping = true;
     }
 
-    /** He slumps where he stands into the sand, where nothing strikes him, until he re-forms ({@link #changes}). */
+    /**
+     * He slumps where he stands into the sand, where nothing strikes him while he is dry, until he re-forms
+     * ({@link #changes}); his bar hides unless he is soaked.
+     */
     public void slump() {
         if (!isAlive()) {
             return;
@@ -282,7 +312,9 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
         windUp = -1;
         entityData.set(DATA_ARMS_UP, false);
         setPose(Pose.DIGGING);
-        bar.setHidden(true);
+        if (!soaked()) {
+            bar.setHidden(true);
+        }
         playSound(ModSounds.RUNUGANGA_SLUMP.get(), 2.0F, 0.8F);
     }
 
@@ -305,8 +337,14 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
         playSound(ModSounds.RUNUGANGA_RISE.get(), 2.0F, 0.8F);
     }
 
-    /** A slump a blow asked for; as sand, his going once sunk if he sinks away, else his re-forming; risen, his standing. */
+    /**
+     * A soak counts down first; then a slump a blow asked for; as sand, his going once sunk if he sinks away, else his
+     * re-forming once dry; risen, his standing.
+     */
     private void changes(ServerLevel server) {
+        if (soakTicks > 0 && --soakTicks == 0) {
+            dry();
+        }
         Pose pose = getPose();
         if (slumping) {
             slumping = false;
@@ -315,7 +353,7 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
             RunugangaComing.rest(server.getServer(), RunugangaComing.REST_TICKS);
             discard();
             return;
-        } else if (pose == Pose.DIGGING && !leaving
+        } else if (pose == Pose.DIGGING && !leaving && !soaked()
                 && poseTicks >= BleachConfig.get(BleachConfig.RUNUGANGA_REFORM_SECONDS) * 20) {
             reform();
         } else if (pose == Pose.EMERGING && poseTicks >= RISE_TICKS) {
@@ -326,37 +364,103 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
                     ModBlocks.WHITE_SAND.get().defaultBlockState()), getX(), getY() + 0.5, getZ(), 12, WIDTH / 3.0, 0.5,
                     WIDTH / 3.0, 0.15);
         }
+        if (soaked() && tickCount % SAND_EVERY_TICKS == 0) {
+            float above = HEIGHT * (1.0F - sunk(0.0F));
+            SpiritSenses.particles(server, ParticleTypes.FALLING_WATER, getX(), getY() + above * 0.5, getZ(), 8,
+                    WIDTH / 3.0, above / 4.0, WIDTH / 3.0, 0.0);
+        }
     }
 
-    /** How far under the sand he is, for the model: 0 standing, 1 gone; up over RISE_TICKS, down over SINK_TICKS. */
+    /**
+     * How far under the sand he is, for the model: 0 standing, 1 gone; up over RISE_TICKS, down over SINK_TICKS but no
+     * further than WET_SUNK while he is soaked; dying, slain or purified, the rest of the way from where he was, over
+     * SINK_TICKS.
+     */
     public float sunk(float partialTick) {
         float ticks = poseTicks + partialTick;
         return switch (getPose()) {
             case EMERGING -> 1.0F - Mth.clamp(ticks / RISE_TICKS, 0.0F, 1.0F);
-            case DIGGING -> Mth.clamp(ticks / SINK_TICKS, 0.0F, 1.0F);
+            case DIGGING -> Math.min(Mth.clamp(ticks / SINK_TICKS, 0.0F, 1.0F), soaked() ? WET_SUNK : 1.0F);
+            case DYING -> Mth.lerp(Mth.clamp(ticks / SINK_TICKS, 0.0F, 1.0F), fallFrom, 1.0F);
             default -> 0.0F;
         };
     }
 
-    /** A new pose restarts his count, on both sides. */
+    /** A new pose restarts his count, on both sides; a death keeps how far under he was, to crumble from. */
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
         if (DATA_POSE.equals(key)) {
+            if (getPose() == Pose.DYING) {
+                fallFrom = lastSunk;
+            }
             poseTicks = 0;
         }
     }
 
-    /** Nothing aims at him while he is not standing: not the crosshair, not an arrow. */
+    /** Nothing aims at him while he is not standing, unless he lies soaked as sand: not the crosshair, not an arrow. */
     @Override
     public boolean isPickable() {
-        return standing() && super.isPickable();
+        return (standing() || wetMound()) && super.isPickable();
     }
 
-    /** As sand or rising, nothing harms him but what passes every guard ({@code /kill}, the void). */
+    /** Rising, or as sand and dry, nothing harms him but what passes every guard ({@code /kill}, the void). */
     @Override
     public boolean isInvulnerableTo(DamageSource source) {
-        return super.isInvulnerableTo(source) || !standing() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY);
+        return super.isInvulnerableTo(source)
+                || !standing() && !wetMound() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY);
+    }
+
+    /** Whether water soaks him now, on both sides. */
+    public boolean soaked() {
+        return entityData.get(DATA_SOAKED);
+    }
+
+    /**
+     * Water reaches him: he is soaked for soak_seconds from now, a soak already on lengthened to that. Never once dead
+     * or sinking away, and on the server only. A fresh soak turns his bar blue and shows it, on his sand too, and is heard.
+     */
+    public void soak() {
+        if (!isAlive() || leaving || level().isClientSide) {
+            return;
+        }
+        soakTicks = BleachConfig.get(BleachConfig.RUNUGANGA_SOAK_SECONDS) * 20;
+        if (!soaked()) {
+            entityData.set(DATA_SOAKED, true);
+            bar.restyle(BAR, BossEvent.BossBarColor.BLUE, BossEvent.BossBarOverlay.PROGRESS);
+            bar.setHidden(false);
+            playSound(ModSounds.RUNUGANGA_SOAK.get(), 2.0F, 0.8F);
+        }
+    }
+
+    /** His soak has run out: dry, with his floor and his white bar back, the bar hidden again on sand he will rise from. */
+    private void dry() {
+        entityData.set(DATA_SOAKED, false);
+        bar.restyle(BAR, BossEvent.BossBarColor.WHITE, BossEvent.BossBarOverlay.PROGRESS);
+        if (getPose() == Pose.DIGGING && !leaving) {
+            bar.setHidden(true);
+        }
+    }
+
+    /** Soaked, a blow harms him soaked_harm times over; what passes every guard comes as it is. */
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        boolean harder = soaked() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY);
+        return super.hurt(source, harder ? amount * (float) BleachConfig.get(BleachConfig.RUNUGANGA_SOAKED_HARM) : amount);
+    }
+
+    /**
+     * Ended by a blow, which only a soaked body can be: the player who dealt it has brought Runuganga down, whether it slew
+     * him or purified him (begun in the death event, before this).
+     */
+    @Override
+    public void die(DamageSource source) {
+        boolean wasDead = dead;
+        super.die(source);
+        // A cancelled death leaves him alive, and a second call does nothing: only a real first death counts.
+        if (!wasDead && dead && source.getEntity() instanceof ServerPlayer player) {
+            Milestones.grant(player, Milestones.RUNUGANGA);
+        }
     }
 
     /**
