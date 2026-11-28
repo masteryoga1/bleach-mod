@@ -82,6 +82,7 @@ public final class SoulEvents {
         HollowPlayerEvents.register(bus);
         GargantaEvents.register(bus);
         bus.addListener(GrandFisherComing::onServerTick);
+        bus.addListener(VastoLordeComing::onServerTick);
         PlusEvents.register(bus);
         ZanpakutoEvents.register(bus);
         ShikaiEvents.register(bus);

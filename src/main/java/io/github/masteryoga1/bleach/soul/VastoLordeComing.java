@@ -8,7 +8,11 @@ import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTestServer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
@@ -16,25 +20,72 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.neoforged.neoforge.event.EventHooks;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * Where a Vasto Lorde may come by itself, and how many may be about. Only in Hueco Mundo, on its dunes at least
  * {@code [bosses.vasto_lorde] min_radius} from the centre column and never in the Forest of Menos under them; with no
  * soul within {@link #NEAREST} and none that could see it stand up ({@link #unseen}); and while that world holds fewer
  * than {@code max_alive} alive, counted apart from the Menos and from the players who became Vasto Lorde. It reads only
- * chunks made now and stands only in those whose creatures tick; it loads or waits on none. Nothing brings one by chance
- * yet; commands keep none of these rules.
+ * chunks made now and stands only in those whose creatures tick; it loads or waits on none. Each {@code look_seconds}
+ * while any soul is there, on the {@code chance}, one comes up to {@link #FURTHEST} from a soul far out ({@link #roll});
+ * never on a game-test server, where tests roll. Commands keep none of these rules.
  */
 public final class VastoLordeComing {
     /** How near a soul one may stand up: as near as vanilla lets a monster spawn by a player. */
     public static final double NEAREST = 24.0;
+    /** How far from the soul it comes to: as far as it looks for prey, so the soul is in its mind as it stands. */
+    public static final double FURTHEST = 48.0;
+    /** The columns tried in a look, twice a resident's: the band is wide, and much of it may lie where nothing ticks. */
+    private static final int TRIES = 24;
     /** How far a soul is asked whether it would see one stand up: as far as a Vasto Lorde is ever sent to a client. */
     private static final double SIGHT = 160.0;
 
     private VastoLordeComing() {
+    }
+
+    /** Each {@code look_seconds}, never on a game-test server, while any soul is in Hueco Mundo, it takes a look. */
+    public static void onServerTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        ServerLevel level = server.getLevel(BleachWorlds.HUECO_MUNDO);
+        if (level != null && lookNow(server.getTickCount(), BleachConfig.get(BleachConfig.VASTO_LORDE_LOOK_SECONDS))
+                && !(server instanceof GameTestServer) && !level.players().isEmpty()) {
+            roll(level, level.getRandom(), false, level.players());
+        }
+    }
+
+    /** Whether a look falls on this server tick, when one comes every this many seconds. */
+    public static boolean lookNow(int tickCount, int seconds) {
+        return tickCount % (seconds * 20) == 0;
+    }
+
+    /**
+     * One look: one of these souls that draws one ({@link #draws}) is drawn, and on the {@code chance} a Vasto Lorde
+     * comes near it if one may come, unseen by all of them ({@link #comeNear}). Forced, the chance is not drawn, and
+     * every other rule holds. Only the soul and the chance are drawn with this random, the columns with the world's. The
+     * one that came, or null.
+     */
+    @Nullable
+    public static VastoLorde roll(ServerLevel level, RandomSource random, boolean forced, List<? extends Player> souls) {
+        List<? extends Player> far = souls.stream().filter(VastoLordeComing::draws).toList();
+        if (far.isEmpty() || !forced && random.nextDouble() >= BleachConfig.get(BleachConfig.VASTO_LORDE_CHANCE)) {
+            return null;
+        }
+        return comeNear(level, level.getRandom(), far.get(random.nextInt(far.size())).position(), souls);
+    }
+
+    /**
+     * Whether this soul draws one: alive, playing by survival's rules, seeing spirits, far enough out ({@link #farOut})
+     * and not down in the Forest of Menos. A Hollow or an Arrancar draws one too, though by default it leaves them be,
+     * so two near one still hold the count.
+     */
+    public static boolean draws(Player soul) {
+        return soul.isAlive() && HollowPlayerLogic.survivalRules(soul) && SoulLogic.seesSpirits(soul)
+                && soul.getY() >= HuecoMundoPlan.CAVERN_CEILING_Y && farOut(soul.getBlockX(), soul.getBlockZ());
     }
 
     /**
@@ -50,6 +101,30 @@ public final class VastoLordeComing {
     /** Whether this column lies far enough out on the dunes: at least {@code min_radius} from the centre column. */
     public static boolean farOut(int x, int z) {
         return HuecoMundoPlan.radius(x, z) >= BleachConfig.get(BleachConfig.VASTO_LORDE_MIN_RADIUS);
+    }
+
+    /**
+     * One look about this point, if one may come ({@link #mayCome}): up to {@link #TRIES} columns are drawn between
+     * {@link #NEAREST} and {@link #FURTHEST} across from it, each read only in a chunk made now whose creatures tick, and
+     * the first whose top fits, with these souls about ({@link #spawnAt}), gets one standing on it. The one that came,
+     * or null.
+     */
+    @Nullable
+    public static VastoLorde comeNear(ServerLevel level, RandomSource random, Vec3 about, List<? extends Player> souls) {
+        if (!mayCome(level)) {
+            return null;
+        }
+        for (int i = 0; i < TRIES; i++) {
+            double angle = random.nextDouble() * Math.PI * 2.0, out = Mth.nextDouble(random, NEAREST, FURTHEST);
+            int x = Mth.floor(about.x + Math.cos(angle) * out), z = Mth.floor(about.z + Math.sin(angle) * out);
+            LevelChunk chunk = ticking(level, x, z);
+            VastoLorde made = chunk == null ? null : place(level,
+                    new BlockPos(x, chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) + 1, z), souls);
+            if (made != null) {
+                return made;
+            }
+        }
+        return null;
     }
 
     /**

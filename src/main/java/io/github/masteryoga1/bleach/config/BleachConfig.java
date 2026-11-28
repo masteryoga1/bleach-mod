@@ -568,6 +568,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_DAMAGE;
     public static final ModConfigSpec.IntValue VASTO_LORDE_MIN_RADIUS;
     public static final ModConfigSpec.IntValue VASTO_LORDE_MAX_ALIVE;
+    public static final ModConfigSpec.IntValue VASTO_LORDE_LOOK_SECONDS;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_CHANCE;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2621,14 +2623,22 @@ public final class BleachConfig {
         VASTO_LORDE_MIN_RADIUS = builder
                 .comment("The least distance in blocks from Hueco Mundo's centre at which a Vasto Lorde comes by itself,"
                         + " out on the dunes and never in the Forest of Menos under them. At least 232, where the dunes"
-                        + " begin in full past Las Noches' grounds. Commands ignore it. None comes by itself yet.")
+                        + " begin in full past Las Noches' grounds. Commands ignore it.")
                 .defineInRange("min_radius", 1_000, 232, 100_000);
         VASTO_LORDE_MAX_ALIVE = builder
                 .comment("Another Vasto Lorde comes by itself only while fewer than this many, however they came, are"
                         + " alive in Hueco Mundo's loaded chunks, counted apart from the Menos and from the players who"
-                        + " became Vasto Lorde (vasto_max). 0 lets none come by itself. Commands ignore it. None comes by"
-                        + " itself yet.")
+                        + " became Vasto Lorde (vasto_max). 0 lets none come by itself. Commands ignore it.")
                 .defineInRange("max_alive", 2, 0, 16);
+        VASTO_LORDE_LOOK_SECONDS = builder
+                .comment("Seconds between Hueco Mundo's looks for a Vasto Lorde to come by itself, while any soul is there.")
+                .defineInRange("look_seconds", 60, 10, 3_600);
+        VASTO_LORDE_CHANCE = builder
+                .comment("The chance on each look that a Vasto Lorde comes by itself, 24 to 48 blocks from one of the souls"
+                        + " at least min_radius out on the dunes who see spirits and play by survival's rules, Hollows and"
+                        + " Arrancar too, while fewer than max_alive live there. Never on Peaceful or with mob spawning"
+                        + " off. 0 stops them coming by themselves.")
+                .defineInRange("chance", 0.1, 0.0, 1.0);
         builder.pop();
         builder.pop();
 
