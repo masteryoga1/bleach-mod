@@ -731,6 +731,26 @@
       }
     ]
   },
+  "entity.runuganga.rise": {
+    "subtitle": "subtitles.bleach.entity.runuganga.rise",
+    "sounds": [
+      {
+        "name": "minecraft:entity.warden.emerge",
+        "type": "event",
+        "pitch": 0.7
+      }
+    ]
+  },
+  "entity.runuganga.slump": {
+    "subtitle": "subtitles.bleach.entity.runuganga.slump",
+    "sounds": [
+      {
+        "name": "minecraft:entity.warden.dig",
+        "type": "event",
+        "pitch": 0.7
+      }
+    ]
+  },
   "entity.shrieker_leech.cling": {
     "subtitle": "subtitles.bleach.entity.shrieker_leech.cling",
     "sounds": [

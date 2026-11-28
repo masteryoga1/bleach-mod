@@ -18,6 +18,8 @@ import net.minecraft.util.Mth;
 public final class RunugangaModel extends HierarchicalModel<Runuganga> {
     /** A slow, heavy stride, how far his arms swing with it (radians), and how far his head looks up or down (degrees). */
     private static final float STRIDE = 0.25F, ARM_SWING = 0.2F, HEAD_PITCH_LIMIT = 20.0F;
+    /** How far his arms come up over his head for a blow, in radians; and how far he goes into the sand, in pixels. */
+    private static final float RAISE = 2.8F, DEPTH = 48.0F;
 
     private final ModelPart root;
     private final ModelPart head;
@@ -68,7 +70,7 @@ public final class RunugangaModel extends HierarchicalModel<Runuganga> {
         return root;
     }
 
-    /** His arms sway as he strides. */
+    /** His arms sway as he strides and rise over his head for a blow; all of him sinks as far as he is under. */
     @Override
     public void setupAnim(Runuganga giant, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw,
                           float headPitch) {
@@ -76,7 +78,15 @@ public final class RunugangaModel extends HierarchicalModel<Runuganga> {
         float stride = Mth.cos(limbSwing * STRIDE) * limbSwingAmount;
         rightArm.xRot = stride * ARM_SWING;
         leftArm.xRot = -stride * ARM_SWING;
+        if (giant.armsUp()) {
+            rightArm.xRot = -RAISE;
+            leftArm.xRot = -RAISE;
+        } else if (attackTime > 0.0F) {
+            rightArm.xRot = -RAISE * (1.0F - attackTime);
+            leftArm.xRot = rightArm.xRot;
+        }
         head.yRot = netHeadYaw * Mth.DEG_TO_RAD;
         head.xRot = Mth.clamp(headPitch, -HEAD_PITCH_LIMIT, HEAD_PITCH_LIMIT) * Mth.DEG_TO_RAD;
+        root.y += giant.sunk(ageInTicks - giant.tickCount) * DEPTH;
     }
 }
