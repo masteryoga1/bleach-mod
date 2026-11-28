@@ -581,6 +581,9 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue VASTO_LORDE_REGEN_DELAY_SECONDS;
     public static final ModConfigSpec.IntValue VASTO_LORDE_DEVOUR_COUNT;
     public static final ModConfigSpec.DoubleValue RUNUGANGA_HEALTH;
+    public static final ModConfigSpec.DoubleValue RUNUGANGA_DAMAGE;
+    public static final ModConfigSpec.IntValue RUNUGANGA_REFORM_SECONDS;
+    public static final ModConfigSpec.DoubleValue RUNUGANGA_REFORM_SHARE;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2699,6 +2702,16 @@ public final class BleachConfig {
         RUNUGANGA_HEALTH = builder
                 .comment("Runuganga's health on Normal, before the hollows health multiplier. Easy takes some away.")
                 .defineInRange("health", 300.0, 1.0, 10_000.0);
+        RUNUGANGA_DAMAGE = builder
+                .comment("Damage of Runuganga's blow on Normal, before the hollows damage multiplier.")
+                .defineInRange("damage", 12.0, 0.0, 200.0);
+        RUNUGANGA_REFORM_SECONDS = builder
+                .comment("Seconds Runuganga lies as sand once a blow has brought him to his last health, harmed only by"
+                        + " /kill and the void, before he rises again.")
+                .defineInRange("reform_seconds", 5, 1, 600);
+        RUNUGANGA_REFORM_SHARE = builder
+                .comment("The share of his health Runuganga rises out of the sand with, or what he has if that is more.")
+                .defineInRange("reform_share", 0.5, 0.05, 1.0);
         builder.pop();
         builder.pop();
 
