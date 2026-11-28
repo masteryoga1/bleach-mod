@@ -195,10 +195,11 @@ public final class HollowTests {
     public static void hollowsGetASoulOnTheirFirstTick(GameTestHelper helper) {
         List<Hollow> hollows = new ArrayList<>();
         int x = 1;
-        // Two blocks apart, so all eight that are no Menos fit the field's row, the human-sized Vasto Lorde at its end.
+        // Two blocks apart, so all eight that are no Menos and not Runuganga fit the field's row, the human-sized Vasto
+        // Lorde at its end.
         for (HollowKind kind : HollowKind.values()) {
-            if (kind.isMenos()) {
-                // Too big for this row; MenosTests checks a Gillian's soul.
+            if (kind.isMenos() || kind == HollowKind.RUNUGANGA) {
+                // Too big for this row; MenosTests checks a Gillian's soul, and RunugangaTests his.
                 continue;
             }
             hollows.add(helper.spawnWithNoFreeWill(ModEntities.hollowType(kind), x, 2, 8));

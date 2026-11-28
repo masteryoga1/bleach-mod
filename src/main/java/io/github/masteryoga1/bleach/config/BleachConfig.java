@@ -580,6 +580,7 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_REGEN_PER_SECOND;
     public static final ModConfigSpec.IntValue VASTO_LORDE_REGEN_DELAY_SECONDS;
     public static final ModConfigSpec.IntValue VASTO_LORDE_DEVOUR_COUNT;
+    public static final ModConfigSpec.DoubleValue RUNUGANGA_HEALTH;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2539,8 +2540,8 @@ public final class BleachConfig {
         builder.push("bosses");
         SINNER_SHARE = builder
                 .comment("Share of the lesser Hollows that were sinners in life, whom the Gate of Hell takes when"
-                        + " a zanpakutō cuts them down. Never a Menos, a Vasto Lorde, Fishbone D or Grand Fisher; every"
-                        + " Shrieker is one, whatever this says.")
+                        + " a zanpakutō cuts them down. Never a Menos, a Vasto Lorde, Runuganga, Fishbone D or Grand"
+                        + " Fisher; every Shrieker is one, whatever this says.")
                 .defineInRange("sinner_share", 0.0, 0.0, 1.0);
         builder.push("shrieker");
         SHRIEKER_HEALTH = builder
@@ -2693,6 +2694,11 @@ public final class BleachConfig {
                         + " that devours it, never as a Menos; a plain Hollow counts it once, as any meal. The soul still"
                         + " rises one form at a time, and only where the server has room.")
                 .defineInRange("devour_count", 10, 1, 40);
+        builder.pop();
+        builder.push("runuganga");
+        RUNUGANGA_HEALTH = builder
+                .comment("Runuganga's health on Normal, before the hollows health multiplier. Easy takes some away.")
+                .defineInRange("health", 300.0, 1.0, 10_000.0);
         builder.pop();
         builder.pop();
 
