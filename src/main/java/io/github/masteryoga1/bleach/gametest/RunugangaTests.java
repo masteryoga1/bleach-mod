@@ -25,17 +25,25 @@ import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageSources;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.damagesource.DamageTypes;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
@@ -45,12 +53,15 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ThrownPotion;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -59,9 +70,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * Tests for Runuganga: his body (T1), his fight (T2), his slump and re-forming (T3), his sinking away (T4), whom he
  * rises for and how often a look is made (T5), where and when, and never by a game test's server (T6), a bottle's splash
- * soaking him (T7), and his soaked sand kept from re-forming and a soaked body's death (T8). Every body is discarded as
- * its test ends; he stands past a field's top, so his tests in the field run in batches of their own, an awake body's
- * alone.
+ * soaking him (T7), his soaked sand kept from re-forming and a soaked body's death (T8), water he stands in (T9), his pit
+ * (T10) and water by hand (T11). Every body is discarded as its test ends; he stands past a field's top, so his tests in
+ * the field run in batches of their own, an awake body's alone, and his pit's with its joined souls alone.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -73,9 +84,9 @@ public final class RunugangaTests {
      */
     private static final ChunkPos WHERE = new ChunkPos(-12, 0);
     /**
-     * T7 and T8's batch, whose still bodies' sides lie 0.5 inside the 16-wide field: a bottle's splash reaches 4 past its
-     * own width of 0.25, so 1.6 past the box, and with 5 blocks between columns and 6 between rows (StructureGridSpawner)
-     * a neighbour's nearest body starts 5.5 past it.
+     * T7 to T9's batch, whose still bodies' sides lie 0.5 or more inside the 16-wide field: a bottle's splash reaches 4
+     * past its own width of 0.25, so 1.6 past the box, and with 5 blocks between columns and 6 between rows
+     * (StructureGridSpawner) a neighbour's nearest body starts 5.5 past it.
      */
     private static final String WATER = "runuganga_water";
 
@@ -667,6 +678,185 @@ public final class RunugangaTests {
                 .thenExecuteAfter(1, () -> helper.assertTrue(mound.sunk(0.0F) > Runuganga.WET_SUNK
                         && mound.sunk(0.0F) < 1.0F, "purified, he crumbled from " + mound.sunk(0.0F) + ", not where he lay"))
                 .thenSucceed();
+    }
+
+    /**
+     * Brought to his floor dry, he slumps, and a bucket of water a soul who sees him empties on his dry sand goes nowhere,
+     * as nothing can aim at it. Water at his feet soaks his sand: it can be aimed at, and it does not re-form past
+     * reform_seconds. Once the water is gone he dries soak_seconds later and in that tick rises with reform_share of his
+     * health; soaked as he rises, he still cannot be aimed at or struck.
+     */
+    @GameTest(template = "field", skyAccess = true, batch = WATER, timeoutTicks = 650)
+    public static void waterAtHisFeetKeepsHisSandFromReformingTillItIsGone(GameTestHelper helper) {
+        Runuganga giant = still(helper, 8.0, 8.0);
+        Player aware = soul(helper, SoulState.SHINIGAMI, GameType.SURVIVAL, 8.0, 2.0);
+        aware.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.WATER_BUCKET));
+        // A pool of one, walled in stone so that it never runs, put back to air as the test ends.
+        SekkisekiTests.Restore pool = SekkisekiTests.Restore.on(helper);
+        BlockPos feet = new BlockPos(8, 2, 8);
+        DamageSources damage = helper.getLevel().damageSources();
+        long[] gone = new long[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, giant.tickCount > 0, "he has not taken his first step"))
+                .thenExecute(() -> {
+                    for (int i = 0; i < 3; i++) {
+                        giant.invulnerableTime = 0;
+                        giant.hurt(damage.generic(), 1_000.0F);
+                    }
+                    helper.assertTrue(near(giant.getHealth(), Runuganga.FLOOR), "dry, three blows took him past his floor");
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, giant.getPose() == Pose.DIGGING, "he never slumped"))
+                .thenExecute(() -> {
+                    helper.assertTrue(!aware.interactOn(giant.head(), InteractionHand.MAIN_HAND).consumesAction()
+                                    && aware.getMainHandItem().is(Items.WATER_BUCKET) && !giant.soaked(),
+                            "a bucket of water emptied on his dry sand was taken or soaked him");
+                    pool.fill(7, 2, 7, 9, 2, 9, Blocks.STONE);
+                    pool.fill(feet.getX(), feet.getY(), feet.getZ(), feet.getX(), feet.getY(), feet.getZ(), Blocks.WATER);
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, giant.soaked(), "water at his feet never soaked him"))
+                .thenExecute(() -> helper.assertTrue(giant.isPickable() && giant.head().isPickable() && giant.floor() == 0.0F,
+                        "his soaked sand cannot be aimed at, or keeps his floor"))
+                .thenExecuteAfter(120, () -> {
+                    helper.assertTrue(giant.getPose() == Pose.DIGGING && giant.soaked(),
+                            "soaked, he re-formed past reform_seconds");
+                    gone[0] = helper.getTick();
+                    helper.setBlock(feet, Blocks.AIR);
+                })
+                .thenExecuteAfter(190, () -> helper.assertTrue(giant.soaked() && giant.getPose() == Pose.DIGGING,
+                        "he dried within 190 ticks of the water going"))
+                .thenWaitUntil(() -> GateTests.patiently(helper, !giant.soaked(), "he never dried"))
+                .thenExecute(() -> {
+                    // The water's last tick soaked him afresh; the 199 after count it down, and he rises as it ends.
+                    long waited = helper.getTick() - gone[0];
+                    helper.assertTrue(waited >= 198 && waited <= 203 && giant.getPose() == Pose.EMERGING
+                                    && near(giant.getHealth(), giant.getMaxHealth() * 0.5),
+                            "he dried " + waited + " ticks after the water went, " + giant.getPose() + " with "
+                                    + giant.getHealth() + " health");
+                    giant.soak();
+                    helper.assertTrue(giant.soaked() && !giant.isPickable() && !giant.head().isPickable()
+                            && giant.isInvulnerableTo(damage.generic()), "soaked as he rose, he could be aimed at or struck");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Set on an intruder out of his reach, he opens his pit, and 10 ticks on it draws that soul toward him and slows it;
+     * a Hollow and a soul in creative as near are let be. It closes pit_seconds after it opened. It takes no soul within
+     * his reach, past pit_radius or more than PIT_DEPTH above him. The slow wears off, no block of the test's box has
+     * changed, and with the intruder set back out of his reach it does not open again within its cooldown.
+     */
+    @GameTest(template = "field", skyAccess = true, batch = "runuganga_pit", timeoutTicks = 400)
+    public static void hisPitDrawsAnIntruderOutOfHisReachAndSlowsIt(GameTestHelper helper) {
+        helper.assertTrue(BleachConfig.RUNUGANGA_PIT_RADIUS.getDefault() == 12.0
+                        && BleachConfig.RUNUGANGA_PIT_SECONDS.getDefault() == 4
+                        && BleachConfig.RUNUGANGA_PIT_PULL.getDefault() == 0.3
+                        && BleachConfig.RUNUGANGA_PIT_COOLDOWN_SECONDS.getDefault() == 15,
+                "his pit's config defaults changed");
+        List<BlockState> before = blocks(helper);
+        Runuganga giant = still(helper, 8.0, 8.0);
+        ServerPlayer intruder = joined(helper, SoulState.SHINIGAMI, GameType.SURVIVAL, 8.0, 1.5);
+        ServerPlayer hollow = joined(helper, SoulState.HOLLOW, GameType.SURVIVAL, 1.5, 8.0);
+        ServerPlayer creative = joined(helper, SoulState.SHINIGAMI, GameType.CREATIVE, 14.5, 8.0);
+        giant.setTarget(intruder);
+        long[] opened = new long[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, giant.pitOpen(), "his pit never opened under the intruder"))
+                .thenExecute(() -> opened[0] = helper.getTick())
+                .thenWaitUntil(() -> GateTests.patiently(helper, intruder.hasEffect(MobEffects.MOVEMENT_SLOWDOWN),
+                        "his pit never drew the intruder"))
+                .thenExecute(() -> {
+                    // Drawn in his tick and sent at the start of the next, so the mark is still up; its own step has
+                    // worn the pull down, never turned it.
+                    long waited = helper.getTick() - opened[0];
+                    MobEffectInstance slow = intruder.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                    Vec3 drawn = intruder.getDeltaMovement().multiply(1.0, 0.0, 1.0);
+                    Vec3 in = giant.position().subtract(intruder.position()).multiply(1.0, 0.0, 1.0).normalize();
+                    helper.assertTrue(waited >= 9 && waited <= 11 && intruder.hurtMarked && slow.getAmplifier() == 1
+                                    && drawn.length() >= 0.3 / 4.0 && drawn.normalize().dot(in) >= 0.9,
+                            "the pit drew him " + waited + " ticks after it opened, at " + drawn + ", or slowed him "
+                                    + slow.getAmplifier());
+                    helper.assertFalse(hollow.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)
+                                    || creative.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)
+                                    || hollow.getDeltaMovement().horizontalDistance() >= 0.01
+                                    || creative.getDeltaMovement().horizontalDistance() >= 0.01,
+                            "his pit drew a Hollow or a soul in creative");
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, !giant.pitOpen(), "his pit never closed"))
+                .thenExecute(() -> {
+                    long open = helper.getTick() - opened[0];
+                    helper.assertTrue(open >= 78 && open <= 82, "his pit stayed open " + open + " ticks");
+                    // His pit's bounds, asked while it is shut: within his reach, past pit_radius, too far above him.
+                    Vec3 out = helper.absoluteVec(new Vec3(8.0, 2.0, 1.5));
+                    try {
+                        for (Vec3 spot : List.of(new Vec3(8.0, 2.0, 4.5), new Vec3(8.0, 2.0, -5.5),
+                                new Vec3(8.0, 2.0 + Runuganga.PIT_DEPTH + 1.0, 1.5))) {
+                            Vec3 at = helper.absoluteVec(spot);
+                            intruder.teleportTo(helper.getLevel(), at.x, at.y, at.z, 0.0F, 0.0F);
+                            helper.assertFalse(giant.inPit(intruder), "his pit takes a soul at " + spot);
+                        }
+                    } finally {
+                        intruder.teleportTo(helper.getLevel(), out.x, out.y, out.z, 0.0F, 0.0F);
+                    }
+                    helper.assertTrue(giant.inPit(intruder), "his pit does not take a soul 6.5 across at his feet");
+                })
+                .thenExecuteAfter(20, () -> helper.assertTrue(!intruder.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)
+                                && !giant.pitOpen() && blocks(helper).equals(before),
+                        "the slow outlasted the pit, it opened again within its cooldown, or a block of the box changed"))
+                .thenSucceed();
+    }
+
+    /** Every block of the test's box, in order. */
+    private static List<BlockState> blocks(GameTestHelper helper) {
+        return BlockPos.betweenClosedStream(helper.getBounds()).map(helper.getLevel()::getBlockState).toList();
+    }
+
+    /**
+     * A bucket of water a soul who sees him empties on his head soaks him and leaves it the empty bucket; an unaware
+     * soul's goes through him, its bucket still full. An awkward potion is no water and is kept; a bottle of water from
+     * the off hand soaks him and leaves the glass there. A bucket on a body that lies dying soaks nothing and is kept
+     * full. Damage of a type in the tag soaks him unless an unaware soul dealt it.
+     */
+    @GameTest(template = "field", skyAccess = true, batch = "runuganga")
+    public static void aBucketOrBottleOfWaterEmptiedOnHimSoaksHim(GameTestHelper helper) {
+        Runuganga first = still(helper, 2.5, 8.0), second = still(helper, 13.5, 8.0), dying = still(helper, 8.0, 8.0);
+        Player aware = soul(helper, SoulState.SHINIGAMI, GameType.SURVIVAL, 2.5, 3.0);
+        Player unaware = soul(helper, SoulState.HUMAN, GameType.SURVIVAL, 13.5, 3.0);
+        InteractionHand main = InteractionHand.MAIN_HAND, off = InteractionHand.OFF_HAND;
+        aware.setItemInHand(main, new ItemStack(Items.WATER_BUCKET));
+        unaware.setItemInHand(main, new ItemStack(Items.WATER_BUCKET));
+        helper.assertTrue(aware.interactOn(first.head(), main).consumesAction() && first.soaked()
+                        && aware.getMainHandItem().is(Items.BUCKET),
+                "a bucket of water emptied on his head did not soak him, or stayed full");
+        helper.assertTrue(!unaware.interactOn(second.head(), main).consumesAction() && !second.soaked()
+                        && unaware.getMainHandItem().is(Items.WATER_BUCKET), "an unaware soul's bucket soaked him");
+        aware.setItemInHand(off, PotionContents.createItemStack(Items.POTION, Potions.AWKWARD));
+        helper.assertTrue(!aware.interactOn(second.head(), off).consumesAction() && !second.soaked()
+                        && aware.getOffhandItem().is(Items.POTION), "an awkward potion soaked him, or was taken");
+        aware.setItemInHand(off, PotionContents.createItemStack(Items.POTION, Potions.WATER));
+        helper.assertTrue(aware.interactOn(second.head(), off).consumesAction() && second.soaked()
+                        && aware.getOffhandItem().is(Items.GLASS_BOTTLE) && aware.getMainHandItem().is(Items.BUCKET),
+                "a bottle of water from the off hand did not soak him, or left no glass there");
+        BossLedger ledger = BossLedger.get(helper.getLevel().getServer());
+        try {
+            dying.kill();
+        } finally {
+            ledger.reset(RunugangaComing.ID);
+        }
+        aware.setItemInHand(main, new ItemStack(Items.WATER_BUCKET));
+        helper.assertTrue(!dying.isAlive() && dying.getPose() == Pose.DYING
+                        && !aware.interactOn(dying.head(), main).consumesAction()
+                        && aware.getMainHandItem().is(Items.WATER_BUCKET) && !dying.soaked(),
+                "/kill left him " + dying.getPose() + ", or a bucket of water emptied on him dying was taken or soaked him");
+        // The tag's rule, asked of a vanilla tag, as #bleach:soaks stays empty until ice comes.
+        Holder<DamageType> freeze = helper.getLevel().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                .getHolderOrThrow(DamageTypes.FREEZE);
+        DamageSources damage = helper.getLevel().damageSources();
+        helper.assertTrue(first.soaksBy(damage.freeze(), DamageTypeTags.IS_FREEZING)
+                        && first.soaksBy(new DamageSource(freeze, aware), DamageTypeTags.IS_FREEZING)
+                        && !first.soaksBy(new DamageSource(freeze, unaware), DamageTypeTags.IS_FREEZING)
+                        && !first.soaksBy(damage.generic(), DamageTypeTags.IS_FREEZING),
+                "a freeze of no one's or of a soul who sees him did not soak him, or an unaware soul's or a plain blow did");
+        helper.succeed();
     }
 
     /** A roll for these souls, tried three times in case every column of a look missed; what rose, kept. */

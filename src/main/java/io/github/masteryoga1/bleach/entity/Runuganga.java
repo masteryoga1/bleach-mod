@@ -2,12 +2,14 @@ package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
+import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
 import io.github.masteryoga1.bleach.soul.RunugangaComing;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
+import io.github.masteryoga1.bleach.soul.SpiritEvents;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
 import io.github.masteryoga1.bleach.world.BleachWorlds;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
@@ -20,10 +22,14 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
@@ -54,6 +60,9 @@ import net.neoforged.neoforge.entity.PartEntity;
  * so a blow ends him; the player who deals it has beaten him. Slain or purified, as a zanpakutō purifies any Hollow, he
  * crumbles into the sand.
  *
+ * <p>Set on an intruder out of reach of his blow, he opens his antlion pit ({@link #pit}): for pit_seconds the sand about
+ * him draws every intruder near enough toward him and slows it, though no block of it moves.
+ *
  * <p>With no foe or intruder on his ground for {@link #LONELY_TICKS} he sinks into the sand and is gone, never by a tear:
  * no death, so the ledger keeps no wait, but he rests a minute ({@link RunugangaComing#REST_TICKS}). A body named or kept
  * for good stays.
@@ -74,6 +83,11 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     public static final int RISE_TICKS = 60, SINK_TICKS = 20, LONELY_TICKS = 200;
     /** How far under the sand he lies at most while soaked: his head stays out of it, to be seen and struck. */
     public static final float WET_SUNK = 0.75F;
+    /** How often his open pit draws the souls in it, and how far above or below his feet one may be and be drawn. */
+    public static final int PIT_TUG_TICKS = 10;
+    public static final double PIT_DEPTH = 4.0;
+    /** How many spots of thrown-up sand mark his pit at each draw, half of them at its rim and half halfway in. */
+    private static final int PIT_SPOTS = 16;
     /** Synced, so the client draws his forearms up while it is set ({@link #armsUp}). */
     private static final EntityDataAccessor<Boolean> DATA_ARMS_UP = SynchedEntityData.defineId(Runuganga.class,
             EntityDataSerializers.BOOLEAN);
@@ -103,6 +117,9 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     /** Ticks left of his soak, 0 while he is dry; and how far under he was last tick and as he died, on both sides. */
     private int soakTicks;
     private float lastSunk, fallFrom;
+    /** Ticks left of his open pit, 0 with none; and the game time from which he may open another. */
+    private int pitTicks;
+    private long pitReadyAt;
 
     public Runuganga(EntityType<? extends Runuganga> type, Level level) {
         super(type, level);
@@ -338,10 +355,13 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     }
 
     /**
-     * A soak counts down first; then a slump a blow asked for; as sand, his going once sunk if he sinks away, else his
-     * re-forming once dry; risen, his standing.
+     * Water or rain he stands in soaks him, and a soak counts down; then a slump a blow asked for; as sand, his going
+     * once sunk if he sinks away, else his re-forming once dry; risen, his standing; last, his pit.
      */
     private void changes(ServerLevel server) {
+        if (isInWaterRainOrBubble()) {
+            soak();
+        }
         if (soakTicks > 0 && --soakTicks == 0) {
             dry();
         }
@@ -369,6 +389,62 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
             SpiritSenses.particles(server, ParticleTypes.FALLING_WATER, getX(), getY() + above * 0.5, getZ(), 8,
                     WIDTH / 3.0, above / 4.0, WIDTH / 3.0, 0.0);
         }
+        pit(server);
+    }
+
+    /**
+     * His antlion pit. Standing, and set on an intruder the pit would take ({@link #inPit}), he opens it for pit_seconds,
+     * no sooner than pit_cooldown_seconds after he last did; each {@link #PIT_TUG_TICKS} of it the sand draws every soul it
+     * takes ({@link #tug}). A slump closes it. It moves no block.
+     */
+    private void pit(ServerLevel server) {
+        long now = server.getGameTime();
+        if (!standing()) {
+            pitTicks = 0;
+        } else if (pitTicks > 0) {
+            if (--pitTicks % PIT_TUG_TICKS == 0) {
+                tug(server);
+            }
+        } else if (now >= pitReadyAt && getTarget() instanceof Player soul && inPit(soul)) {
+            pitTicks = BleachConfig.get(BleachConfig.RUNUGANGA_PIT_SECONDS) * 20;
+            pitReadyAt = now + BleachConfig.get(BleachConfig.RUNUGANGA_PIT_COOLDOWN_SECONDS) * 20L;
+            playSound(ModSounds.RUNUGANGA_PIT.get(), 2.0F, 0.6F);
+        }
+    }
+
+    /** Whether his pit takes this soul: an intruder on his ground past his reach, within pit_radius across and PIT_DEPTH. */
+    public boolean inPit(Player soul) {
+        double across = Math.hypot(soul.getX() - getX(), soul.getZ() - getZ());
+        return across > WIDTH / 2.0 + REACH && across <= BleachConfig.get(BleachConfig.RUNUGANGA_PIT_RADIUS)
+                && Math.abs(soul.getY() - getY()) <= PIT_DEPTH && intrudes(soul) && onGround(soul.position());
+    }
+
+    /** One draw of his pit: each soul in it is pulled toward him at pit_pull and slowed till the next; sand marks it. */
+    private void tug(ServerLevel server) {
+        double pull = BleachConfig.get(BleachConfig.RUNUGANGA_PIT_PULL);
+        for (ServerPlayer soul : server.players()) {
+            if (inPit(soul)) {
+                Vec3 in = new Vec3(getX() - soul.getX(), 0.0, getZ() - soul.getZ()).normalize().scale(pull);
+                // The motion is sent to the soul's own client, which moves it; a fall is kept, a rise is not.
+                soul.setDeltaMovement(in.x, Math.min(soul.getDeltaMovement().y, 0.0), in.z);
+                soul.hurtMarked = true;
+                soul.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, PIT_TUG_TICKS + 5, 1, true, false, true),
+                        this);
+            }
+        }
+        double radius = BleachConfig.get(BleachConfig.RUNUGANGA_PIT_RADIUS);
+        BlockParticleOption sand = new BlockParticleOption(ParticleTypes.BLOCK,
+                ModBlocks.WHITE_SAND.get().defaultBlockState());
+        for (int i = 0; i < PIT_SPOTS; i++) {
+            double angle = Math.PI * 2.0 * i / PIT_SPOTS, out = i % 2 == 0 ? radius : radius / 2.0;
+            SpiritSenses.particles(server, sand, getX() + Math.cos(angle) * out, getY() + 0.1, getZ() + Math.sin(angle) * out,
+                    3, 0.4, 0.05, 0.4, 0.05);
+        }
+    }
+
+    /** Whether his pit is open now. */
+    public boolean pitOpen() {
+        return pitTicks > 0;
     }
 
     /**
@@ -417,11 +493,19 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     }
 
     /**
+     * Whether water can soak him now: he lives and is not sinking away. The client never sees him sinking away, so it may
+     * stop a use on him there that the server refuses, and then nothing is spent.
+     */
+    public boolean canSoak() {
+        return isAlive() && !leaving;
+    }
+
+    /**
      * Water reaches him: he is soaked for soak_seconds from now, a soak already on lengthened to that. Never once dead
      * or sinking away, and on the server only. A fresh soak turns his bar blue and shows it, on his sand too, and is heard.
      */
     public void soak() {
-        if (!isAlive() || leaving || level().isClientSide) {
+        if (!canSoak() || level().isClientSide) {
             return;
         }
         soakTicks = BleachConfig.get(BleachConfig.RUNUGANGA_SOAK_SECONDS) * 20;
@@ -442,11 +526,22 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
         }
     }
 
-    /** Soaked, a blow harms him soaked_harm times over; what passes every guard comes as it is. */
+    /**
+     * Damage in {@code #bleach:soaks} soaks him as it comes ({@link #soaksBy}). Soaked, a blow harms him soaked_harm times
+     * over; what passes every guard comes as it is.
+     */
     @Override
     public boolean hurt(DamageSource source, float amount) {
+        if (soaksBy(source, BleachTags.SOAKS)) {
+            soak();
+        }
         boolean harder = soaked() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY);
         return super.hurt(source, harder ? amount * (float) BleachConfig.get(BleachConfig.RUNUGANGA_SOAKED_HARM) : amount);
+    }
+
+    /** Whether this damage soaks him: of a type in this tag, and dealt by no soul whose blows pass through him. */
+    public boolean soaksBy(DamageSource source, TagKey<DamageType> tag) {
+        return source.is(tag) && !(source.getEntity() instanceof Player player && SpiritEvents.passesThrough(player, this));
     }
 
     /**

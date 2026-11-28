@@ -85,6 +85,7 @@ public final class SoulEvents {
         bus.addListener(VastoLordeComing::onServerTick);
         bus.addListener(RunugangaComing::onServerTick);
         bus.addListener(RunugangaComing::onServerStopped);
+        bus.addListener(RunugangaWater::onInteract);
         PlusEvents.register(bus);
         ZanpakutoEvents.register(bus);
         ShikaiEvents.register(bus);

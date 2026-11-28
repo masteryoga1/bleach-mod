@@ -148,7 +148,7 @@ public final class RegistrationTests {
                 "entity.shrieker_leech.burst", "entity.grand_fisher.ambient", "entity.grand_fisher.hurt",
                 "entity.grand_fisher.death", "entity.grand_fisher_lure.sob", "entity.grand_fisher_lure.cry",
                 "entity.vasto_lorde.dash", "entity.runuganga.rise", "entity.runuganga.slump",
-                "entity.runuganga.soak")) {
+                "entity.runuganga.soak", "entity.runuganga.pit")) {
             helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(BleachMod.id(name)), "bleach:" + name + " is not a sound event");
         }
         helper.assertTrue(helper.getLevel().getRecipeManager().byKey(BleachMod.id("denreishinki")).isPresent(),

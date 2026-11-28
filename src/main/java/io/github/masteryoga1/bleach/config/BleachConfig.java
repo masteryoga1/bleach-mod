@@ -588,6 +588,10 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue RUNUGANGA_LANDING_GRACE_SECONDS;
     public static final ModConfigSpec.IntValue RUNUGANGA_SOAK_SECONDS;
     public static final ModConfigSpec.DoubleValue RUNUGANGA_SOAKED_HARM;
+    public static final ModConfigSpec.DoubleValue RUNUGANGA_PIT_RADIUS;
+    public static final ModConfigSpec.IntValue RUNUGANGA_PIT_SECONDS;
+    public static final ModConfigSpec.DoubleValue RUNUGANGA_PIT_PULL;
+    public static final ModConfigSpec.IntValue RUNUGANGA_PIT_COOLDOWN_SECONDS;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2735,6 +2739,22 @@ public final class BleachConfig {
         RUNUGANGA_SOAKED_HARM = builder
                 .comment("How many times a blow's harm Runuganga takes while he is soaked.")
                 .defineInRange("soaked_harm", 2.0, 1.0, 10.0);
+        RUNUGANGA_PIT_RADIUS = builder
+                .comment("Blocks across Runuganga's antlion pit reaches: he opens it under an intruder he is set on, out"
+                        + " of reach of his blow and within this, and it draws every intruder on his ground past his reach"
+                        + " (5 blocks), within this and within 4 blocks of his height.")
+                .defineInRange("pit_radius", 12.0, 6.0, 48.0);
+        RUNUGANGA_PIT_SECONDS = builder
+                .comment("Seconds Runuganga's pit stays open; twice a second it draws the intruders in it toward him and"
+                        + " slows them.")
+                .defineInRange("pit_seconds", 4, 1, 30);
+        RUNUGANGA_PIT_PULL = builder
+                .comment("How hard each draw of Runuganga's pit pulls, in blocks a tick before the soul's own footing"
+                        + " slows it. 0 slows without pulling.")
+                .defineInRange("pit_pull", 0.3, 0.0, 1.0);
+        RUNUGANGA_PIT_COOLDOWN_SECONDS = builder
+                .comment("Seconds from one opening of Runuganga's pit to the next, at the soonest.")
+                .defineInRange("pit_cooldown_seconds", 15, 1, 600);
         builder.pop();
         builder.pop();
 

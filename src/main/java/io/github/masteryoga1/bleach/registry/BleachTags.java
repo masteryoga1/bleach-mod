@@ -58,6 +58,12 @@ public final class BleachTags {
      */
     public static final TagKey<DamageType> PASSES_WARDS = TagKey.create(Registries.DAMAGE_TYPE, BleachMod.id("passes_wards"));
 
+    /**
+     * Damage that soaks Runuganga as it lands, as water does. Empty for now: it is for the ice of Sode no Shirayuki and
+     * Hyōrinmaru when their presets come, as Rukia's ice brought him down.
+     */
+    public static final TagKey<DamageType> SOAKS = TagKey.create(Registries.DAMAGE_TYPE, BleachMod.id("soaks"));
+
     /** Biomes where reishi runs rich, so a Quincy gathers it faster: forests, taiga, meadows and the like. */
     public static final TagKey<Biome> REISHI_RICH = TagKey.create(Registries.BIOME, BleachMod.id("reishi_rich"));
     /** Biomes where reishi runs thin, so a Quincy gathers it more slowly: deserts, badlands and the deepest caves. */
