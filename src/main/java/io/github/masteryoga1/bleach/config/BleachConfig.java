@@ -566,6 +566,8 @@ public final class BleachConfig {
 
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_HEALTH;
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_DAMAGE;
+    public static final ModConfigSpec.IntValue VASTO_LORDE_MIN_RADIUS;
+    public static final ModConfigSpec.IntValue VASTO_LORDE_MAX_ALIVE;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2616,6 +2618,17 @@ public final class BleachConfig {
         VASTO_LORDE_DAMAGE = builder
                 .comment("Damage of a Vasto Lorde's blow on Normal, before the hollows damage multiplier.")
                 .defineInRange("damage", 16.0, 0.0, 200.0);
+        VASTO_LORDE_MIN_RADIUS = builder
+                .comment("The least distance in blocks from Hueco Mundo's centre at which a Vasto Lorde comes by itself,"
+                        + " out on the dunes and never in the Forest of Menos under them. At least 232, where the dunes"
+                        + " begin in full past Las Noches' grounds. Commands ignore it. None comes by itself yet.")
+                .defineInRange("min_radius", 1_000, 232, 100_000);
+        VASTO_LORDE_MAX_ALIVE = builder
+                .comment("Another Vasto Lorde comes by itself only while fewer than this many, however they came, are"
+                        + " alive in Hueco Mundo's loaded chunks, counted apart from the Menos and from the players who"
+                        + " became Vasto Lorde (vasto_max). 0 lets none come by itself. Commands ignore it. None comes by"
+                        + " itself yet.")
+                .defineInRange("max_alive", 2, 0, 16);
         builder.pop();
         builder.pop();
 
