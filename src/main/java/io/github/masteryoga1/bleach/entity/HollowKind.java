@@ -19,7 +19,8 @@ import net.minecraft.world.entity.monster.Monster;
  * The kinds of Hollow and everything that sets them apart, in one table so the balance lives in one
  * place: their Normal-difficulty stats, how hard they chase and bite, their reiatsu, how big they may
  * grow, where the mask sits, how they are drawn and how often they come through a Garganta. The
- * Menos Grande rows never come by the arrival pool: {@link Menos#arrivalKind} picks them. Nor does the Vasto Lorde's.
+ * Menos Grande rows never come by the arrival pool: {@link Menos#arrivalKind} picks them. Nor do the Vasto Lorde's and
+ * Runuganga's.
  */
 public enum HollowKind implements StringRepresentable {
     SPIDER("spider", new Stats(60.0, 5.0, 2.0, 0.30, 32.0, 0.0, 0.0, 0.6), 20, 1.0, 50.0F, 10,
@@ -70,7 +71,15 @@ public enum HollowKind implements StringRepresentable {
      */
     VASTO_LORDE("vasto_lorde", new Stats(400.0, 16.0, 14.0, 0.35, 48.0, 1.0, 1.0, 1.0), 20, 1.2, 2500.0F, 100,
             null, 1.0F, 1.0F,
-            new MaskSpot(0.25, 1.75, 0.5), new Look(1.0F, 0.0F, 0.1F, 0.5F), 0, Float.MAX_VALUE);
+            new MaskSpot(0.25, 1.75, 0.5), new Look(1.0F, 0.0F, 0.1F, 0.5F), 0, Float.MAX_VALUE),
+    /**
+     * Runuganga, the giant of sand before Las Noches and a boss (see {@link Runuganga}), drawn at four times a mob's size.
+     * His health here is only the config's default ([bosses.runuganga]); his reiatsu, between a Gillian's and an
+     * Adjuchas', cuts only a weak soul's blows.
+     */
+    RUNUGANGA("runuganga", new Stats(300.0, 12.0, 6.0, 0.22, 48.0, 1.0, 1.5, 1.5), 60, 1.0, 600.0F, 80,
+            null, 1.0F, 1.0F,
+            new MaskSpot(1.25, 9.9, 2.0), new Look(4.0F, 0.0F, 0.0F, 2.0F), 0, Float.MAX_VALUE);
 
     public static final Codec<HollowKind> CODEC = StringRepresentable.fromEnum(HollowKind::values);
 

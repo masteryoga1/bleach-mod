@@ -25,6 +25,8 @@ public final class BleachModelLayers {
     public static final ModelLayerLocation GRAND_FISHER = layer("grand_fisher");
     /** A Vasto Lorde: a person's shape with the bone of its look (see {@link VastoLordeModel}). */
     public static final ModelLayerLocation VASTO_LORDE = layer("vasto_lorde");
+    /** Runuganga: a giant of sand drawn at four times a mob's size (see {@link RunugangaModel}). */
+    public static final ModelLayerLocation RUNUGANGA = layer("runuganga");
     public static final ModelLayerLocation SANREI_GLOVE = layer("sanrei_glove");
     public static final ModelLayerLocation VOLLSTANDIG = layer("vollstandig");
     /** Blut Vene's veins over armour: the outer armour layer, a little larger, on the skin's layout. */
@@ -58,6 +60,7 @@ public final class BleachModelLayers {
         event.registerLayerDefinition(SHRIEKER_LEECH, ShriekerLeechModel::createLayer);
         event.registerLayerDefinition(GRAND_FISHER, GrandFisherModel::createBodyLayer);
         event.registerLayerDefinition(VASTO_LORDE, VastoLordeModel::createBodyLayer);
+        event.registerLayerDefinition(RUNUGANGA, RunugangaModel::createBodyLayer);
         event.registerLayerDefinition(SANREI_GLOVE, SanreiGloveModel::createLayer);
         event.registerLayerDefinition(VOLLSTANDIG, VollstandigModel::createLayer);
         event.registerLayerDefinition(VEIN_SHELL,

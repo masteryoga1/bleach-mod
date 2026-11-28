@@ -231,7 +231,7 @@ public final class HollowLogic {
 
     /**
      * How many Hollows of this kind come through one rift: a Hound pack, or one Hollow with a chance
-     * of a second (never for Fishbone D, a Shrieker or a Vasto Lorde, which come alone), and never more than
+     * of a second (never for Fishbone D, a Shrieker, a Vasto Lorde or Runuganga, who come alone), and never more than
      * {@code room}, though always at least one.
      *
      * @param roll a random number from 0 to 1, against {@link #secondHollowChance}
@@ -240,7 +240,8 @@ public final class HollowLogic {
         int wanted;
         if (kind == HollowKind.HOUND) {
             wanted = packSize(reiatsu);
-        } else if (kind == HollowKind.FISHBONE_D || kind == HollowKind.SHRIEKER || kind.isVasto()) {
+        } else if (kind == HollowKind.FISHBONE_D || kind == HollowKind.SHRIEKER || kind.isVasto()
+                || kind == HollowKind.RUNUGANGA) {
             wanted = 1;
         } else {
             wanted = roll < secondHollowChance(reiatsu) ? 2 : 1;

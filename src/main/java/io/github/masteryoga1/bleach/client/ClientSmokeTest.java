@@ -27,6 +27,7 @@ import io.github.masteryoga1.bleach.entity.NpcAction;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
+import io.github.masteryoga1.bleach.entity.Runuganga;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.Shrieker;
@@ -418,8 +419,10 @@ public final class ClientSmokeTest {
     private static final int TENSHINTAI_AT = BLADES_AT + 120;
     /** How many times a Tenshintai had been drawn as its beat began. */
     private static int dollsDrawn;
-    /** A Vasto Lorde's beat, as the Tenshintai's ends, and the run ends after it. */
+    /** A Vasto Lorde's beat, as the Tenshintai's ends. */
     private static final int VASTO_LORDE_AT = TENSHINTAI_AT + 120;
+    /** Runuganga's beat, as the Vasto Lorde's ends, and the run ends after it. */
+    private static final int RUNUGANGA_AT = VASTO_LORDE_AT + 120;
     /** How far Zabimaru's snake may trail its place at a turning baboon's back on the client, in blocks. */
     private static final double SNAKE_TRAIL = 0.75;
     /** How far before the soul's eyes the golem its serpent lashes at is hung, and the tag it is killed by. */
@@ -700,6 +703,7 @@ public final class ClientSmokeTest {
         checkBlades(minecraft);
         checkDoll(minecraft);
         checkVastoLorde(minecraft);
+        checkRunuganga(minecraft);
         if (finished) {
             return;
         }
@@ -2045,7 +2049,14 @@ public final class ClientSmokeTest {
             }
             case VASTO_LORDE_AT + 40 -> shot(minecraft, "vasto_lorde");
             case VASTO_LORDE_AT + 42 -> command(minecraft, "kill @e[type=bleach:vasto_lorde]");
-            case VASTO_LORDE_AT + 120 -> {
+            // Runuganga, summoned still 12 blocks before the soul and facing it, in air cleared to his height.
+            case RUNUGANGA_AT -> {
+                command(minecraft, "fill ~-4 ~ ~-16 ~4 ~13 ~-1 air");
+                command(minecraft, "summon bleach:runuganga ~ ~ ~-12 " + STILL);
+            }
+            case RUNUGANGA_AT + 40 -> shot(minecraft, "runuganga");
+            case RUNUGANGA_AT + 42 -> command(minecraft, "kill @e[type=bleach:runuganga]");
+            case RUNUGANGA_AT + 120 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
                 finished = true;
@@ -3135,6 +3146,24 @@ public final class ClientSmokeTest {
         return looks.equals(Set.of(VastoLorde.PLATED, VastoLorde.HORNED, VastoLorde.CRESTED));
     }
 
+    /** Runuganga's beat: he reaches the client unhidden with both parts and his mask in his head, and is looked at. */
+    private static void checkRunuganga(Minecraft minecraft) {
+        if (expectWithin(minecraft, RUNUGANGA_AT + 2, RUNUGANGA_AT + 35, () -> runugangaSeen(minecraft),
+                "the summoned Runuganga never reached the client unhidden, or his parts were not on his body")) {
+            Runuganga giant = nearest(minecraft, Runuganga.class, SUMMONED_RANGE, Runuganga::isAlive);
+            if (giant != null) {
+                look(minecraft, giant.position().add(0.0, giant.getBbHeight() * 0.5, 0.0));
+            }
+        }
+    }
+
+    private static boolean runugangaSeen(Minecraft minecraft) {
+        Runuganga giant = nearest(minecraft, Runuganga.class, SUMMONED_RANGE,
+                body -> body.isAlive() && !ClientSouls.isHiddenFromViewer(body));
+        return giant != null && minecraft.level.getPartEntities().containsAll(Arrays.asList(giant.getParts()))
+                && giant.head().getBoundingBox().inflate(0.01).contains(HollowMask.maskCenter(giant));
+    }
+
     /** Whether Zangetsu stands near, drawn since he came out, in a texture the client has, with his cleaver in hand. */
     private static boolean zangetsuOut(Minecraft minecraft) {
         ZangetsuSpirit zangetsu = nearest(minecraft, ZangetsuSpirit.class, 16.0, spirit -> true);
@@ -3424,7 +3453,9 @@ public final class ClientSmokeTest {
                 || ticksInWorld == VASTO_LORDE_AT + 34 && !windowsPassed.contains(VASTO_LORDE_AT + 2)
                 && !vastoLordeSeen(minecraft)
                 || ticksInWorld == VASTO_LORDE_AT + 99 && !windowsPassed.contains(VASTO_LORDE_AT + 44)
-                && nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive) != null;
+                && nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive) != null
+                || ticksInWorld == RUNUGANGA_AT + 34 && !windowsPassed.contains(RUNUGANGA_AT + 2)
+                && !runugangaSeen(minecraft);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

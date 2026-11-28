@@ -18,6 +18,7 @@ import io.github.masteryoga1.bleach.entity.KisukeUrahara;
 import io.github.masteryoga1.bleach.entity.LetztPfeil;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
+import io.github.masteryoga1.bleach.entity.Runuganga;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
 import io.github.masteryoga1.bleach.entity.Shrieker;
@@ -284,6 +285,11 @@ public final class BleachClient {
                 context -> new HollowRenderer<VastoLorde, VastoLordeModel>(context,
                         new VastoLordeModel(context.bakeLayer(BleachModelLayers.VASTO_LORDE)),
                         HollowKind.VASTO_LORDE, 90.0F));
+        // A dying giant of sand does not fall over, as a Gillian does not.
+        event.registerEntityRenderer(ModEntities.RUNUGANGA.get(),
+                context -> new HollowRenderer<Runuganga, RunugangaModel>(context,
+                        new RunugangaModel(context.bakeLayer(BleachModelLayers.RUNUGANGA)),
+                        HollowKind.RUNUGANGA, 0.0F));
         event.registerEntityRenderer(ModEntities.HELL_GATE.get(), HellGateRenderer::new);
         event.registerEntityRenderer(ModEntities.CERO_BEAM.get(), CeroBeamRenderer::new);
         event.registerEntityRenderer(ModEntities.NEGACION.get(), NegacionLightRenderer::new);

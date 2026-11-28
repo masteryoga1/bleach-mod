@@ -1174,6 +1174,50 @@ def vasto_lorde_mask():
     return c
 
 
+# Runuganga's boxes (RunugangaModel) as (u, v, w, h, d), and his colours: grey sand grained darker, a brown cloth,
+# darker bands, and the paler packed sand of his face.
+RUNU_BASE = (0, 0, 16, 14, 12)
+RUNU_WAIST = (56, 0, 17, 4, 13)
+RUNU_TURRET = (116, 0, 3, 3, 3)
+RUNU_ARM = (116, 6, 3, 9, 3)
+RUNU_TORSO = (0, 26, 14, 18, 10)
+RUNU_HEAD = (48, 26, 10, 11, 10)
+RUNU_FOREARM = (88, 26, 7, 12, 7)
+RUNU_BAND = (48, 47, 8, 2, 8)
+RUNU_SAND = rgb(176, 172, 160)
+RUNU_GRAIN = rgb(150, 146, 134)
+RUNU_CLOTH = rgb(112, 92, 70)
+RUNU_CLOTH_FOLD = rgb(88, 72, 56)
+RUNU_BAND_GREY = rgb(96, 92, 84)
+RUNU_FACE = rgb(214, 210, 198)
+
+
+def runuganga():
+    """Grained grey sand, a folded brown cloth at the waist, darker wrist bands, and the hole through the chest."""
+    c = Canvas(128, 64)
+    for part in (RUNU_BASE, RUNU_TURRET, RUNU_ARM, RUNU_TORSO, RUNU_HEAD, RUNU_FOREARM):
+        box(c, *part, RUNU_SAND)
+    mottle(c, 0, 0, 128, 64, RUNU_GRAIN, 5, seed=3)
+    box(c, *RUNU_WAIST, RUNU_CLOTH)
+    paint_where(c, faces(*RUNU_WAIST)[2:], RUNU_CLOTH_FOLD, lambda x, y: x % 4 == 0)
+    box(c, *RUNU_BAND, RUNU_BAND_GREY)
+    for x0, y0, x1, y1 in (faces(*RUNU_TORSO)[3], faces(*RUNU_TORSO)[5]):   # the chest's front and its back
+        c.rect(x0 + 4, y0 + 5, x1 - 4, y0 + 11, VOID)
+    return c
+
+
+def runuganga_mask():
+    """His face, the mask a Hollow is struck in: pale packed sand under a shaded brow, dark eyes and mouth."""
+    c = Canvas(128, 64)
+    x0, y0, x1, y1 = faces(*RUNU_HEAD)[3]   # the front: (58, 36) to (68, 47)
+    c.rect(x0, y0, x1, y1, RUNU_FACE)
+    c.rect(x0 + 1, y0 + 1, x1 - 1, y0 + 2, RUNU_GRAIN)
+    c.rect(x0 + 2, y0 + 3, x0 + 4, y0 + 5, VOID)
+    c.rect(x1 - 4, y0 + 3, x1 - 2, y0 + 5, VOID)
+    c.rect(x0 + 3, y0 + 7, x1 - 3, y0 + 9, VOID)
+    return c
+
+
 # Grand Fisher's lure: a small girl, on the slim player skin's layout, and the stalk she hangs from.
 LURE_SKIN = rgb(238, 206, 186)
 LURE_HAIR = rgb(58, 40, 34)
@@ -2714,6 +2758,9 @@ TEXTURES = {
     "entity/hollow/vasto_lorde.png": vasto_lorde,
     "entity/hollow/vasto_lorde_mask.png": vasto_lorde_mask,
     "entity/hollow/vasto_lorde_mask_cracked.png": cracked(vasto_lorde_mask, [(10, 9), (11, 11), (10, 13), (12, 15)]),
+    "entity/hollow/runuganga.png": runuganga,
+    "entity/hollow/runuganga_mask.png": runuganga_mask,
+    "entity/hollow/runuganga_mask_cracked.png": cracked(runuganga_mask, [(62, 36), (61, 38), (59, 41), (60, 44)]),
     "entity/grand_fisher_lure.png": grand_fisher_lure,
     "entity/grand_fisher_stalk.png": grand_fisher_stalk,
     "entity/garganta.png": garganta,

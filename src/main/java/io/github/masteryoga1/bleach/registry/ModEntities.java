@@ -32,6 +32,7 @@ import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.QuincyElder;
 import io.github.masteryoga1.bleach.entity.QuincyHunter;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
+import io.github.masteryoga1.bleach.entity.Runuganga;
 import io.github.masteryoga1.bleach.entity.SeeleSchneiderPfeil;
 import io.github.masteryoga1.bleach.entity.Senkaimon;
 import io.github.masteryoga1.bleach.entity.SerpentHollow;
@@ -260,6 +261,17 @@ public final class ModEntities {
                     .noSave()
                     .clientTrackingRange(10)
                     .build(BleachMod.id("vasto_lorde").toString()));
+
+    /** Runuganga, 12 blocks tall in two hit boxes (see {@link Runuganga}): never saved, and sent as far as a Gillian. */
+    public static final DeferredHolder<EntityType<?>, EntityType<Runuganga>> RUNUGANGA =
+            ENTITY_TYPES.register("runuganga", () -> EntityType.Builder
+                    .<Runuganga>of(Runuganga::new, MobCategory.MONSTER)
+                    .sized(Runuganga.WIDTH, Runuganga.HEIGHT)
+                    .eyeHeight(Runuganga.EYE_HEIGHT)
+                    .fireImmune()
+                    .noSave()
+                    .clientTrackingRange(16)
+                    .build(BleachMod.id("runuganga").toString()));
 
     /**
      * Grand Fisher's lure, a small girl on a stalk from its brow. Never saved and never summoned: it comes only from its
@@ -609,6 +621,7 @@ public final class ModEntities {
             case SHRIEKER -> SHRIEKER.get();
             case GRAND_FISHER -> GRAND_FISHER.get();
             case VASTO_LORDE -> VASTO_LORDE.get();
+            case RUNUGANGA -> RUNUGANGA.get();
         };
     }
 
@@ -631,6 +644,7 @@ public final class ModEntities {
         event.put(GRAND_FISHER.get(), GrandFisher.createAttributes().build());
         event.put(GRAND_FISHER_LURE.get(), GrandFisherLure.createAttributes().build());
         event.put(VASTO_LORDE.get(), VastoLorde.createAttributes().build());
+        event.put(RUNUGANGA.get(), Runuganga.createAttributes().build());
         event.put(ARRANCAR.get(), ArrancarNpc.createAttributes().build());
         event.put(GATE_KEEPER.get(), GateKeeper.createAttributes().build());
         event.put(INNER_HOLLOW.get(), InnerHollow.createAttributes().build());
