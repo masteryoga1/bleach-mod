@@ -584,6 +584,8 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue RUNUGANGA_DAMAGE;
     public static final ModConfigSpec.IntValue RUNUGANGA_REFORM_SECONDS;
     public static final ModConfigSpec.DoubleValue RUNUGANGA_REFORM_SHARE;
+    public static final ModConfigSpec.IntValue RUNUGANGA_RETURN_DAYS;
+    public static final ModConfigSpec.IntValue RUNUGANGA_LANDING_GRACE_SECONDS;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2712,6 +2714,16 @@ public final class BleachConfig {
         RUNUGANGA_REFORM_SHARE = builder
                 .comment("The share of his health Runuganga rises out of the sand with, or what he has if that is more.")
                 .defineInRange("reform_share", 0.5, 0.05, 1.0);
+        RUNUGANGA_RETURN_DAYS = builder
+                .comment("Game days, of twenty minutes whether anyone sleeps or not, before Runuganga may rise again after"
+                        + " he dies; sinking back into the sand when no one is left on his ground keeps him away only a"
+                        + " minute. 0 lets him rise again at once.")
+                .defineInRange("return_days", 3, 0, 365);
+        RUNUGANGA_LANDING_GRACE_SECONDS = builder
+                .comment("Seconds after a Garganta sets a soul down in Hueco Mundo in which Runuganga neither rises for it"
+                        + " nor sets out against it unless it strikes him, so a newcomer may find its feet. Landing again"
+                        + " in that time does not lengthen it. 0 gives none.")
+                .defineInRange("landing_grace_seconds", 30, 0, 600);
         builder.pop();
         builder.pop();
 

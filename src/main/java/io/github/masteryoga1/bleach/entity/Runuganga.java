@@ -4,6 +4,7 @@ import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModBlocks;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.HollowPlayerLogic;
+import io.github.masteryoga1.bleach.soul.RunugangaComing;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SpiritSenses;
@@ -39,12 +40,16 @@ import net.neoforged.neoforge.entity.PartEntity;
 /**
  * Runuganga, the guardian of the white sand before Las Noches: a giant of grey sand 12 blocks tall in two hit boxes, as
  * the Gillian is ({@link Part}). His health and blow are the config's; he is no sinner and never saved. A command brings
- * him, standing at once.
+ * him: {@code /summon} standing at once, the boss command rising out of the ground ({@link RunugangaComing}).
  *
  * <p>His white bar shows to the souls about him who see spirits. He fights intruders on his ground and whoever strikes
  * him, with a blow of both forearms after a second's wind-up ({@link FightGoal}). At his floor he slumps into sand that
  * nothing strikes, and re-forms after reform_seconds with reform_share of his health, so no blow ends him; {@code /kill}
  * and the void still do.
+ *
+ * <p>With no foe or intruder on his ground for {@link #LONELY_TICKS} he sinks into the sand and is gone, never by a tear:
+ * no death, so the ledger keeps no wait, but he rests a minute ({@link RunugangaComing#REST_TICKS}). A body named or kept
+ * for good stays.
  */
 public class Runuganga extends Hollow implements BossFloor.Floored {
     public static final float WIDTH = 4.0F, HEIGHT = 12.0F, EYE_HEIGHT = 10.5F;
@@ -58,8 +63,8 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     public static final int WIND_UP_TICKS = 20, COOLDOWN_TICKS = 40;
     /** The health no blow takes him below: there, he slumps. */
     public static final float FLOOR = 1.0F;
-    /** How long he takes to rise out of the sand, and to sink into it. */
-    public static final int RISE_TICKS = 60, SINK_TICKS = 20;
+    /** How long he takes to rise out of the sand and to sink into it, and how long alone before he sinks away. */
+    public static final int RISE_TICKS = 60, SINK_TICKS = 20, LONELY_TICKS = 200;
     /** Synced, so the client draws his forearms up while it is set ({@link #armsUp}). */
     private static final EntityDataAccessor<Boolean> DATA_ARMS_UP = SynchedEntityData.defineId(Runuganga.class,
             EntityDataSerializers.BOOLEAN);
@@ -79,6 +84,9 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     /** Ticks since his pose changed, on both sides; and a slump a blow asked for, on his next tick. */
     private int poseTicks;
     private boolean slumping;
+    /** Ticks since a foe or an intruder last kept him, and whether he is sinking away for good. */
+    private int lonely;
+    private boolean leaving;
 
     public Runuganga(EntityType<? extends Runuganga> type, Level level) {
         super(type, level);
@@ -207,13 +215,17 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
                 && (target == getLastHurtByMob() || target instanceof Player player && intrudes(player));
     }
 
-    /** Whether this soul is an intruder: alive, by survival's rules, aware, and neither Hollow nor Arrancar. */
+    /**
+     * Whether this soul is an intruder: alive, by survival's rules, aware, neither Hollow nor Arrancar, and out of the
+     * grace a Garganta's landing gives it ({@link RunugangaComing#inLandingGrace}).
+     */
     public static boolean intrudes(Player soul) {
         if (!soul.isAlive() || !HollowPlayerLogic.survivalRules(soul) || !SoulLogic.hasSoul(soul)) {
             return false;
         }
         SoulData data = SoulLogic.get(soul);
-        return SoulLogic.isAware(data) && !HollowPlayerLogic.isHollowOrArrancar(data);
+        return SoulLogic.isAware(data) && !HollowPlayerLogic.isHollowOrArrancar(data)
+                && !RunugangaComing.inLandingGrace(soul, soul.level().getGameTime());
     }
 
     /** His ground: within {@link #GROUND_RANGE} across of his home and, in Hueco Mundo, on his sand above its caverns. */
@@ -293,13 +305,18 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
         playSound(ModSounds.RUNUGANGA_RISE.get(), 2.0F, 0.8F);
     }
 
-    /** A slump a blow asked for; as sand, his re-forming once reform_seconds have passed; risen, his standing. */
+    /** A slump a blow asked for; as sand, his going once sunk if he sinks away, else his re-forming; risen, his standing. */
     private void changes(ServerLevel server) {
         Pose pose = getPose();
         if (slumping) {
             slumping = false;
             slump();
-        } else if (pose == Pose.DIGGING && poseTicks >= BleachConfig.get(BleachConfig.RUNUGANGA_REFORM_SECONDS) * 20) {
+        } else if (pose == Pose.DIGGING && leaving && poseTicks >= SINK_TICKS) {
+            RunugangaComing.rest(server.getServer(), RunugangaComing.REST_TICKS);
+            discard();
+            return;
+        } else if (pose == Pose.DIGGING && !leaving
+                && poseTicks >= BleachConfig.get(BleachConfig.RUNUGANGA_REFORM_SECONDS) * 20) {
             reform();
         } else if (pose == Pose.EMERGING && poseTicks >= RISE_TICKS) {
             setPose(Pose.STANDING);
@@ -340,6 +357,32 @@ public class Runuganga extends Hollow implements BossFloor.Floored {
     @Override
     public boolean isInvulnerableTo(DamageSource source) {
         return super.isInvulnerableTo(source) || !standing() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY);
+    }
+
+    /**
+     * Each second he stands, a foe he may fight or an intruder on his ground keeps him; with neither for LONELY_TICKS he
+     * sinks away. Not with NoAI, nor for a body named or kept for good.
+     */
+    @Override
+    protected void customServerAiStep() {
+        super.customServerAiStep();
+        if (!standing() || tickCount % 20 != 0 || isPersistenceRequired() || hasCustomName()) {
+            return;
+        }
+        LivingEntity target = getTarget();
+        boolean kept = target != null && target.isAlive() && canAttack(target)
+                || level().players().stream().anyMatch(soul -> intrudes(soul) && onGround(soul.position()));
+        lonely = kept ? 0 : lonely + 20;
+        if (lonely >= LONELY_TICKS) {
+            leave();
+        }
+    }
+
+    /** He sinks into the sand where he stands and is gone once sunk ({@link #changes}), never by a tear. */
+    @Override
+    protected void leave() {
+        leaving = true;
+        slump();
     }
 
     /** A soul that stops seeing him loses his bar at once. */

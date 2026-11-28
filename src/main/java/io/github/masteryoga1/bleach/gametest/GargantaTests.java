@@ -12,6 +12,7 @@ import io.github.masteryoga1.bleach.soul.HomeWorldRespawn;
 import io.github.masteryoga1.bleach.soul.Negacion;
 import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.RukongaiEvents;
+import io.github.masteryoga1.bleach.soul.RunugangaComing;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
 import io.github.masteryoga1.bleach.soul.SoulData;
 import io.github.masteryoga1.bleach.soul.SoulLogic;
@@ -442,6 +443,9 @@ public final class GargantaTests {
             AdvancementHolder into = level.getServer().getAdvancements().get(BleachMod.id("hueco_mundo"));
             helper.assertTrue(into != null && player.getAdvancements().getOrStartProgress(into).isDone(),
                     "the Arrancar was not given Into Hueco Mundo");
+            long landed = player.getData(SoulAttachments.HUECO_LANDING), now = hueco.getGameTime();
+            helper.assertTrue(landed <= now && now - landed < 100 && RunugangaComing.inLandingGrace(player, now),
+                    "the landing in Hueco Mundo was noted at " + landed + ", " + now + " now, for Runuganga's grace");
             // The tear home, torn from the middle of the held chunk so that it stands in that chunk.
             ChunkPos held = cleanup.held()[0];
             Vec3 middle = RukongaiEvents.groundAt(player, hueco, held.getMiddleBlockX(), held.getMiddleBlockZ());

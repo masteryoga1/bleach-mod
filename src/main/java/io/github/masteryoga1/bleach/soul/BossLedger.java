@@ -57,6 +57,7 @@ public final class BossLedger extends SavedData {
         // One line per boss. A boss's own class holds its Boss; it must not read this table while it is made.
         add(ShriekerComing.BOSS);
         add(GrandFisherComing.BOSS);
+        add(RunugangaComing.BOSS);
     }
 
     // In the order the bosses were first noted, which is the order they are saved in.

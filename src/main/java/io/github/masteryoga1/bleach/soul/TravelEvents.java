@@ -429,11 +429,12 @@ public final class TravelEvents {
     }
 
     /**
-     * After a Garganta: a soul that left the Human World remembers the block it left from, and the tear is heard behind
-     * it on the far side.
+     * After a Garganta: a soul that left the Human World remembers the block it left from, one set down in Hueco Mundo
+     * has its landing noted ({@link RunugangaComing#landed}), and the tear is heard behind it on the far side.
      */
     static void tornThrough(Entity entity, GlobalPos left) {
         rememberLeaving(entity, left);
+        RunugangaComing.landed(entity);
         SpiritSenses.play(entity, ModSounds.GARGANTA_OPEN.get(), SoundSource.PLAYERS, TORN_VOLUME, TORN_PITCH, false);
     }
 
