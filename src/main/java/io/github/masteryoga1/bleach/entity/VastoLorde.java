@@ -2,7 +2,12 @@ package io.github.masteryoga1.bleach.entity;
 
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.soul.HollowCero;
+import io.github.masteryoga1.bleach.soul.HollowTier;
+import io.github.masteryoga1.bleach.soul.ShinigamiProgress;
+import java.util.EnumSet;
 import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -10,22 +15,26 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * A Vasto Lorde: the highest class of Menos Grande, as small as a person and stronger than a captain. It is no
  * {@link Menos}, so none of their cap, bait or lifetime rules is its, and no Menos count, arrival or meal takes it (see
- * {@link HollowKind#isVasto}). It hunts and strikes as any Hollow does, with its wits about it, and released reiatsu
- * never frightens it off. Its health and blow are the server's to set; its armour is the heaviest of any Hollow's,
+ * {@link HollowKind#isVasto}). It hunts as any Hollow does, with its wits about it, and released reiatsu never
+ * frightens it off. Its health and blow are the server's to set; its armour is the heaviest of any Hollow's,
  * toughened against heavy blows. It is no sinner and never saved, so it goes with its chunk, or, out of Hueco Mundo,
  * through a tear for lack of prey. It comes by itself only far out on Hueco Mundo's dunes, a few at a time
  * ({@code VastoLordeComing}); otherwise a command brings it: {@code /summon}, or {@code /bleach garganta}, whose tear
@@ -35,8 +44,12 @@ import net.minecraft.world.level.ServerLevelAccessor;
  * it spawns ({@link #look}): bone plates over its shoulders and chest, a horned mask, or a crested one. The look is sent
  * to every client, so each draws the same, and is never saved, as the body is never saved; a summon's data may name it
  * ({@code Look}).
+ *
+ * <p>It fights as no lesser Hollow does. It gathers a Cero at its brow, between the horns, for three quarters of a
+ * second, standing and facing its prey, and its aim holds still for the last quarter ({@link #startCero}). None of it
+ * is saved, as the body is not.
  */
-public class VastoLorde extends Hollow {
+public class VastoLorde extends Hollow implements CeroBeam.Caster {
     /** How much of a heavy blow its armour still turns, on top of the armour itself. */
     public static final double TOUGHNESS = 2.0;
     /** Its three looks, and how many there are. */
@@ -46,11 +59,35 @@ public class VastoLorde extends Hollow {
     public static final int LOOKS = 3;
     /** The tag of a summon's data that names its look. Read, never written. */
     public static final String LOOK_TAG = "Look";
+    /** How long its aim holds still before the Cero fires: a step aside in this last quarter second dodges it. */
+    public static final int CERO_AIM_LOCK_TICKS = 5;
+    /** The nearest across the ground its prey may be for a Cero: nearer, it strikes instead. */
+    public static final double CERO_MIN_RANGE = 4.0;
     private static final EntityDataAccessor<Integer> DATA_LOOK = SynchedEntityData.defineId(VastoLorde.class,
             EntityDataSerializers.INT);
+    private static final long NEVER = ShinigamiProgress.NEVER;
+    /** One just come waits this long after its first step before its first Cero, and a broken gather this long again. */
+    private static final int CERO_FIRST_DELAY_TICKS = 40;
+    private static final int CERO_RETRY_TICKS = 40;
+    /** Up to this many ticks are added at random to the Cero's cooldown. */
+    private static final int CERO_COOLDOWN_JITTER = 20;
+    /**
+     * After a refusal its goal asks again no sooner than this many ticks on. The engine asks goals every second tick, so
+     * prey behind a wall costs one look in six ticks rather than one in two.
+     */
+    private static final int CERO_ASK_TICKS = 5;
+    /** How far above the middle of its mask the Cero gathers, as a share of the mask: at the brow, between the horns. */
+    private static final double BROW_RISE = 0.3;
+    private static final float LOOK_TURN = 30.0F;
+    /** How far ahead the head looks along a locked aim. */
+    private static final double LOCKED_LOOK_DISTANCE = 8.0;
 
     private final BossBar bar = new BossBar(this, "bossbar.bleach.vasto_lorde", BossEvent.BossBarColor.WHITE,
             BossEvent.BossBarOverlay.PROGRESS);
+    // Server side and never saved. NEVER until its first step; a still body is ready at once, so tests may call it.
+    private long ceroReadyAt = NEVER;
+    @Nullable
+    private CeroBeam charging;
 
     public VastoLorde(EntityType<? extends VastoLorde> type, Level level) {
         super(type, level);
@@ -71,6 +108,13 @@ public class VastoLorde extends Hollow {
     @Override
     public HollowKind kind() {
         return HollowKind.VASTO_LORDE;
+    }
+
+    /** Every Hollow's goals, and its Cero before its blow. */
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        goalSelector.addGoal(1, new CeroGoal(this));
     }
 
     @Override
@@ -132,6 +176,125 @@ public class VastoLorde extends Hollow {
         }
     }
 
+    /** Its first step starts the wait for a first Cero, after its goals have had their turn ({@link #mayCero}). */
+    @Override
+    protected void customServerAiStep() {
+        super.customServerAiStep();
+        if (ceroReadyAt == NEVER && level() instanceof ServerLevel server) {
+            ceroReadyAt = server.getGameTime() + CERO_FIRST_DELAY_TICKS;
+        }
+    }
+
+    // ---- Its Cero ----
+
+    /**
+     * Its Cero: a Vasto Lorde player's width, blast, blocks, knockback, reach and gather (0.75 seconds), with its own damage
+     * ([bosses.vasto_lorde] cero_damage, times the hollows damage multiplier) and an aim that holds for the last quarter
+     * second. It breaks soft blocks only where [menos] cero_breaks_blocks and mob griefing allow.
+     */
+    public CeroBeam.Spec ceroSpec() {
+        CeroBeam.Spec form = HollowCero.spec(soul(), HollowTier.VASTO_LORDE);
+        float damage = (float) (BleachConfig.get(BleachConfig.VASTO_LORDE_CERO_DAMAGE)
+                * BleachConfig.get(BleachConfig.HOLLOW_DAMAGE_MULTIPLIER));
+        return new CeroBeam.Spec(damage, form.range(), form.radius(), form.blastRadius(), form.blastShare(), form.maxBlocks(),
+                form.knockback(), form.colour(), form.chargeTicks(), CERO_AIM_LOCK_TICKS, form.breaksBlocks());
+    }
+
+    /**
+     * Whether it may gather a Cero at this prey now: live prey its beam would strike, at least {@link #CERO_MIN_RANGE}
+     * off across the ground and within the beam's reach, in sight, with its waits over, none gathering, nothing keeping
+     * it from gathering and nothing solid at its brow. With its wits about it, not until its first step has begun the
+     * first wait (its goals ask before that in the step), so prey given as it comes is not shot at once; a still body may
+     * at once. The cheap checks first, as its goal asks often.
+     */
+    public boolean mayCero(@Nullable LivingEntity target) {
+        if (target == null || !target.isAlive() || charging != null || ceroReadyAt == NEVER && !isNoAi()
+                || level().getGameTime() < ceroReadyAt || !keepsCharging() || !canAttack(target)
+                || !CeroBeam.mayStrike(this, target)) {
+            return false;
+        }
+        double dx = target.getX() - getX();
+        double dz = target.getZ() - getZ();
+        Vec3 muzzle = ceroMuzzle(1.0F);
+        double range = BleachConfig.get(BleachConfig.CERO_RANGE);
+        BlockPos brow = BlockPos.containing(muzzle);
+        return dx * dx + dz * dz >= CERO_MIN_RANGE * CERO_MIN_RANGE
+                && muzzle.distanceToSqr(target.getBoundingBox().getCenter()) <= range * range && hasLineOfSight(target)
+                && level().getBlockState(brow).getCollisionShape(level(), brow).isEmpty();
+    }
+
+    /** Starts a Cero gathering at its prey where it stands, if it may ({@link #mayCero}). Returns the beam, or null. */
+    @Nullable
+    public CeroBeam startCero() {
+        if (!(level() instanceof ServerLevel server) || !mayCero(getTarget())) {
+            return null;
+        }
+        charging = CeroBeam.charge(server, this, ceroSpec());
+        if (charging == null) {
+            onCeroCancelled();
+        } else {
+            getNavigation().stop();
+        }
+        return charging;
+    }
+
+    /** The Cero gathering at its brow, if one is. Known on the server only. */
+    @Nullable
+    public CeroBeam chargingBeam() {
+        return charging;
+    }
+
+    /** At its brow, between the horns: just before its mask's face and a little above its middle, along where it looks. */
+    @Override
+    public Vec3 ceroMuzzle(float partialTick) {
+        HollowKind.MaskSpot mask = kind().mask;
+        double scale = getScale();
+        Vec3 forward = Vec3.directionFromRotation(0.0F, Mth.rotLerp(partialTick, yHeadRotO, yHeadRot));
+        return getPosition(partialTick).add(forward.scale((mask.forward() + mask.size() / 2.0 + Menos.MUZZLE_AHEAD) * scale))
+                .add(0.0, (mask.up() + mask.size() * BROW_RISE) * scale, 0.0);
+    }
+
+    /** From its brow to the middle of its prey, or null without live prey in sight, asked afresh each time. */
+    @Override
+    @Nullable
+    public Vec3 ceroAim() {
+        LivingEntity target = getTarget();
+        if (target == null || !target.isAlive() || !hasLineOfSight(target)) {
+            return null;
+        }
+        Vec3 toward = target.getBoundingBox().getCenter().subtract(ceroMuzzle(1.0F));
+        return toward.lengthSqr() < 1.0E-6 ? null : toward.normalize();
+    }
+
+    /** A gather holds while it stands free: alive, not held, leaving, masking or dissolving, nor reeling from its mask. */
+    @Override
+    public boolean keepsCharging() {
+        return isAlive() && !isImmobile() && !isPurifying() && level().getGameTime() - lastReelAt >= REEL_TICKS;
+    }
+
+    @Override
+    public void onCeroFired(CeroBeam.Shot shot) {
+        long cooldown = BleachConfig.get(BleachConfig.VASTO_LORDE_CERO_COOLDOWN_SECONDS) * 20L;
+        ceroReadyAt = level().getGameTime() + cooldown + random.nextInt(CERO_COOLDOWN_JITTER + 1);
+        charging = null;
+    }
+
+    @Override
+    public void onCeroCancelled() {
+        ceroReadyAt = level().getGameTime() + CERO_RETRY_TICKS;
+        charging = null;
+    }
+
+    /** A fresh crack in its mask also breaks a gathering Cero. */
+    @Override
+    public boolean onMaskStruck(long now) {
+        boolean fresh = super.onMaskStruck(now);
+        if (fresh && charging != null && charging.isCharging()) {
+            charging.cancel();
+        }
+        return fresh;
+    }
+
     /** A soul that stops seeing it loses its bar at once. */
     @Override
     public void stopSeenByPlayer(ServerPlayer player) {
@@ -158,5 +321,84 @@ public class VastoLorde extends Hollow {
     @Override
     public boolean canBeLeashed() {
         return false;
+    }
+
+    /**
+     * Its Cero as a goal, so it stands and faces its prey while the Cero gathers: it starts when {@link #mayCero} allows,
+     * asking again only a few ticks after a refusal, and nothing breaks it off but the gather breaking. The head follows
+     * the prey until the aim locks, then holds.
+     */
+    public static final class CeroGoal extends Goal {
+        private final VastoLorde lorde;
+        private long nextAskAt;
+        private int lockAt;
+        @Nullable
+        private Vec3 lockedLook;
+
+        CeroGoal(VastoLorde lorde) {
+            this.lorde = lorde;
+            setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        }
+
+        @Override
+        public boolean canUse() {
+            long now = lorde.level().getGameTime();
+            if (now < nextAskAt) {
+                return false;
+            }
+            boolean may = lorde.mayCero(lorde.getTarget());
+            nextAskAt = may ? now : now + CERO_ASK_TICKS;
+            return may;
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return lorde.charging != null && lorde.charging.isCharging();
+        }
+
+        @Override
+        public void start() {
+            CeroBeam.Spec spec = lorde.ceroSpec();
+            lockAt = spec.chargeTicks() - spec.aimLockTicks();
+            lockedLook = null;
+            lorde.startCero();
+        }
+
+        @Override
+        public void tick() {
+            CeroBeam beam = lorde.charging;
+            LivingEntity target = lorde.getTarget();
+            if (beam == null) {
+                return;
+            }
+            if (lockedLook == null && beam.tickCount >= lockAt) {
+                Vec3 aim = lorde.ceroAim();
+                lockedLook = aim == null ? null : lorde.ceroMuzzle(1.0F).add(aim.scale(LOCKED_LOOK_DISTANCE));
+            }
+            if (lockedLook != null) {
+                lorde.getLookControl().setLookAt(lockedLook.x, lockedLook.y, lockedLook.z, LOOK_TURN, LOOK_TURN);
+            } else if (target != null) {
+                lorde.getLookControl().setLookAt(target, LOOK_TURN, LOOK_TURN);
+            }
+        }
+
+        @Override
+        public void stop() {
+            if (lorde.charging != null && lorde.charging.isCharging()) {
+                lorde.charging.cancel();
+            }
+            lorde.charging = null;
+            lockedLook = null;
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public boolean isInterruptable() {
+            return false;
+        }
     }
 }
