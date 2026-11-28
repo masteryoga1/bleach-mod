@@ -1,0 +1,23 @@
+{
+  "parent": "bleach:grand_fisher",
+  "display": {
+    "icon": {
+      "id": "minecraft:nether_star"
+    },
+    "title": {
+      "translate": "advancements.bleach.vasto_lorde_fallen.title"
+    },
+    "description": {
+      "translate": "advancements.bleach.vasto_lorde_fallen.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "vasto_lorde_fallen": {
+      "trigger": "bleach:soul_milestone",
+      "conditions": {
+        "milestone": "vasto_lorde_fallen"
+      }
+    }
+  }
+}

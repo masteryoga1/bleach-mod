@@ -1,14 +1,26 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.Adjuchas;
 import io.github.masteryoga1.bleach.entity.CeroBeam;
+import io.github.masteryoga1.bleach.entity.HollowKind;
 import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.SpiderHollow;
 import io.github.masteryoga1.bleach.entity.VastoLorde;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.registry.ModItems;
+import io.github.masteryoga1.bleach.soul.DevourEvents;
+import io.github.masteryoga1.bleach.soul.DevourLogic;
+import io.github.masteryoga1.bleach.soul.HollowBody;
+import io.github.masteryoga1.bleach.soul.HollowProgress;
+import io.github.masteryoga1.bleach.soul.HollowTier;
+import io.github.masteryoga1.bleach.soul.MenosEvolution;
+import io.github.masteryoga1.bleach.soul.PowerPath;
 import io.github.masteryoga1.bleach.soul.SoulAttachments;
+import io.github.masteryoga1.bleach.soul.SoulData;
+import io.github.masteryoga1.bleach.soul.SoulLogic;
 import io.github.masteryoga1.bleach.soul.SoulState;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -19,13 +31,18 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.damagesource.CombatRules;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageSources;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
 import net.minecraft.world.entity.monster.Husk;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -33,9 +50,11 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Tests for a Vasto Lorde's kit: its Cero gathered at the brow, its rush along the ground and its presence. Each test asks
- * only about its own bodies, by object, and discards them, pass or fail. A body with its wits about it gathers, rushes and
- * weighs on others by itself, and its presence reaches past the box, so each test with one has a batch of its own.
+ * Tests for a Vasto Lorde's kit and its fall: its Cero gathered at the brow, its rush along the ground, its presence, its
+ * hide and its fast healing, what devouring one counts for, and whom bringing one down earns the advancement. Each test
+ * asks only about its own bodies and players, by object, and discards the bodies, pass or fail. A body with its wits about
+ * it gathers, rushes and weighs on others by itself, and its presence reaches past the box, so each test with one has a
+ * batch of its own.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -57,6 +76,20 @@ public final class VastoLordeKitTests {
     private static final float STRONG = 500.0F;
     /** Under an eighth of it: a Menos its presence weighs on hardest, as on a small Hollow, so only its kind spares it. */
     private static final float WEAK_MENOS = 200.0F;
+    /** Two fifths of it: a soul whose blows the reiatsu difference leaves whole, so its hide holds against them in full. */
+    private static final float UNCUT = 1_000.0F;
+    /** A soul so much weaker that the reiatsu difference cuts its blows by more than the hide would. */
+    private static final float WEAK = 300.0F;
+    /** A blow the armour turns more of than the hide would, and one the hide turns more of. */
+    private static final float LIGHT_BLOW = 6.0F;
+    private static final float HEAVY_BLOW = 30.0F;
+    /** A Hollow player's reiatsu: more than a third of a Vasto Lorde's, as a devourer of one needs. */
+    private static final float DEVOURER = 900.0F;
+    private static final float FED = 60.0F;
+    private static final float FATAL = 1_000.0F;
+    /** The healing's and the fall's tests give up here, within their timeouts of 120 and 60. */
+    private static final int HEAL_GIVE_UP_TICK = 110;
+    private static final int FALL_GIVE_UP_TICK = 50;
 
     private VastoLordeKitTests() {
     }
@@ -90,6 +123,38 @@ public final class VastoLordeKitTests {
     /** A mock Shinigami who sees spirits, standing at this spot as a hunter's prey; never in the world, so never left. */
     private static LivingEntity prey(GameTestHelper helper, double x, double z) {
         return HollowPlayerTests.soulPlayer(helper, GameType.SURVIVAL, SoulState.SHINIGAMI, AWARE, new Vec3(x, 2.0, z));
+    }
+
+    /** A mock Shinigami of this reiatsu behind a body at (8, 8) facing east, looking at its feet, so no blow finds a mask. */
+    private static Player striker(GameTestHelper helper, float reiatsu) {
+        Player striker = HollowPlayerTests.soulPlayer(helper, GameType.SURVIVAL, SoulState.SHINIGAMI, reiatsu,
+                new Vec3(6.5, 2.0, 8.5));
+        striker.setXRot(90.0F);
+        return striker;
+    }
+
+    /** What a blow of this much lands as on a body made whole and open to blows again. */
+    private static float landed(VastoLorde lorde, DamageSource source, float dealt) {
+        lorde.setHealth(lorde.getMaxHealth());
+        lorde.invulnerableTime = 0;
+        lorde.hurt(source, dealt);
+        return lorde.getMaxHealth() - lorde.getHealth();
+    }
+
+    /** What its armour alone leaves of a blow of this much. */
+    private static float armoured(VastoLorde lorde, DamageSource source, float dealt) {
+        return CombatRules.getDamageAfterAbsorb(lorde, dealt, source, lorde.getArmorValue(),
+                (float) lorde.getAttributeValue(Attributes.ARMOR_TOUGHNESS));
+    }
+
+    /** A mock Hollow player of this form here, fed, its road begun at that form. */
+    private static Player devourer(GameTestHelper helper, HollowTier form, Vec3 at) {
+        Player player = HollowPlayerTests.soulPlayer(helper, GameType.SURVIVAL, SoulState.HOLLOW, DEVOURER, at);
+        SoulData data = SoulLogic.get(player);
+        data.setTier(PowerPath.HOLLOW, form.tier());
+        data.setHollow(data.hollow().withEvolution(data.hollow().evolution().startedAt(form.tier())));
+        HollowBody.setSatiety(data, FED);
+        return player;
     }
 
     // ---- Its Cero ----
@@ -394,6 +459,231 @@ public final class VastoLordeKitTests {
                 .thenExecute(HollowBaitTests.orClear(() -> {
                     helper.assertTrue(small.getHealth() == small.getMaxHealth(),
                             "a still Vasto Lorde's presence beat by itself");
+                    clear.run();
+                }, clear))
+                .thenSucceed();
+    }
+
+    // ---- Its hide ----
+
+    /**
+     * Its hide, as an Arrancar's Hierro: at the default pierce_ratio of 2 it turns hide_share of a blow from a soul of two
+     * fifths or all of its reiatsu, half that from one of one and a half times it and none from one of twice it, and at
+     * a pierce_ratio of 3 half from one of twice it; none of a blow armour lets through, of one on another, or of its own.
+     * From the soul of two fifths a real blow lands as its armour or its hide leaves it, whichever takes more, never both:
+     * 6 as the armour leaves it, 30 as the hide does, and 30 as half with hide_share 0.5. From a soul of 300 the reiatsu
+     * difference cuts more than the hide would, so its blows land as the cut and the armour leave them, the hide never on
+     * top. Still, and struck from behind by souls looking at its feet, so no blow finds its mask.
+     */
+    @GameTest(template = "field")
+    public static void itsHideWeighsAgainstItsArmour(GameTestHelper helper) {
+        List<Entity> bodies = new ArrayList<>();
+        try {
+            VastoLorde lorde = HollowPlayerTests.placed(helper, ModEntities.VASTO_LORDE.get(), 8, 8);
+            bodies.add(lorde);
+            Husk husk = MenosTests.husk(helper, 12, 12);
+            bodies.add(husk);
+            MenosTests.face(lorde, EAST);
+            lorde.soul();
+            float vic = SoulLogic.reiatsu(lorde);
+            DamageSources damage = helper.getLevel().damageSources();
+            Player striker = striker(helper, UNCUT);
+            DamageSource blow = damage.playerAttack(striker);
+            float kept = 1.0F - (float) BleachConfig.get(BleachConfig.VASTO_LORDE_HIDE_SHARE);
+            QuincyTests.assertNear(helper, VastoLorde.hide(lorde, blow, vic * 0.4F, vic), kept,
+                    "its hide against a weaker soul");
+            QuincyTests.assertNear(helper, VastoLorde.hide(lorde, blow, vic, vic), kept, "its hide against an equal");
+            QuincyTests.assertNear(helper, VastoLorde.hide(lorde, blow, vic * 1.5F, vic), (1.0F + kept) / 2.0F,
+                    "its hide against a soul of one and a half times its reiatsu");
+            QuincyTests.assertNear(helper, VastoLorde.hide(lorde, blow, vic * 2.0F, vic), 1.0, "its hide against twice it");
+            KidoTests.withConfig(BleachConfig.HIERRO_PIERCE_RATIO, 3.0, () -> QuincyTests.assertNear(helper,
+                    VastoLorde.hide(lorde, blow, vic * 2.0F, vic), (1.0F + kept) / 2.0F,
+                    "its hide against twice it at a pierce_ratio of 3"));
+            QuincyTests.assertNear(helper, VastoLorde.hide(husk, blow, vic * 0.4F, vic), 1.0, "a husk's hide");
+            QuincyTests.assertNear(helper, VastoLorde.hide(lorde, damage.indirectMagic(striker, striker), vic * 0.4F, vic),
+                    1.0, "its hide against magic");
+            QuincyTests.assertNear(helper, VastoLorde.hide(lorde, damage.mobAttack(lorde), vic * 0.4F, vic), 1.0,
+                    "its hide against its own blow");
+            // No reiatsu cut from the soul of two fifths: the armour takes more of the light blow, the hide of the heavy.
+            float light = armoured(lorde, blow, LIGHT_BLOW);
+            float heavy = armoured(lorde, blow, HEAVY_BLOW);
+            helper.assertTrue(SoulLogic.reiatsuDamageMultiplier(UNCUT, vic) == 1.0F && light < LIGHT_BLOW * kept
+                    && heavy > HEAVY_BLOW * kept, "the armour leaves " + light + " and " + heavy + " of blows of 6 and 30");
+            QuincyTests.assertNear(helper, landed(lorde, blow, LIGHT_BLOW), light, "a blow of 6 on a Vasto Lorde");
+            QuincyTests.assertNear(helper, landed(lorde, blow, HEAVY_BLOW), HEAVY_BLOW * kept, "a blow of 30");
+            KidoTests.withConfig(BleachConfig.VASTO_LORDE_HIDE_SHARE, 0.5, () -> QuincyTests.assertNear(helper,
+                    landed(lorde, blow, HEAVY_BLOW), HEAVY_BLOW * 0.5F, "a blow of 30 with hide_share 0.5"));
+            // The soul of 300: the reiatsu difference cuts more than the hide, which then adds nothing to it.
+            DamageSource weak = damage.playerAttack(striker(helper, WEAK));
+            float gap = SoulLogic.reiatsuDamageMultiplier(WEAK, vic);
+            helper.assertTrue(gap < VastoLorde.hide(lorde, weak, WEAK, vic), "the reiatsu difference keeps " + gap);
+            for (float dealt : new float[] {LIGHT_BLOW, HEAVY_BLOW}) {
+                QuincyTests.assertNear(helper, landed(lorde, weak, dealt), armoured(lorde, weak, dealt * gap),
+                        "a blow of " + dealt + " from a soul of 300");
+            }
+        } finally {
+            QuincyArtsTests.discardAll(bodies);
+        }
+        helper.succeed();
+    }
+
+    // ---- Its healing ----
+
+    /**
+     * Its healing, on top of every Hollow's: none for regen_delay_seconds after a blow, then regen_per_second, half of it
+     * each half second; none while a fresh crack in its mask holds healing back, none with the key at 0, and never past
+     * its health. Still (NoAI), as its healing runs in its tick; it waits for its first tick, so its config bases are set.
+     */
+    @GameTest(template = "field", timeoutTicks = 120)
+    public static void itHealsFastOnlyUnstruck(GameTestHelper helper) {
+        VastoLorde lorde = HollowPlayerTests.placed(helper, ModEntities.VASTO_LORDE.get(), 8, 8);
+        Runnable clear = () -> discard(helper, lorde);
+        helper.runAtTickTime(HEAL_GIVE_UP_TICK, () -> {
+            clear.run();
+            helper.fail("the Vasto Lorde never took its first tick");
+        });
+        float[] struck = new float[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, lorde.tickCount > 0,
+                        "the Vasto Lorde has not taken its first tick"))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    lorde.setHealth(lorde.getMaxHealth() / 2.0F);
+                    helper.assertTrue(lorde.hurt(helper.getLevel().damageSources().generic(), 1.0F),
+                            "a blow did not land on a Vasto Lorde");
+                    struck[0] = lorde.getHealth();
+                }, clear))
+                .thenExecuteAfter(55, HollowBaitTests.orClear(() -> helper.assertTrue(lorde.getHealth() == struck[0],
+                        "a Vasto Lorde healed to " + lorde.getHealth() + " within 55 ticks of a blow"), clear))
+                .thenExecuteAfter(20, HollowBaitTests.orClear(() -> {
+                    // One or two half-second heals since its wait of 60 ended, and none yet of every Hollow's at 100.
+                    float healed = lorde.getHealth() - struck[0];
+                    helper.assertTrue(healed >= 2.0F - EPSILON && healed <= 4.0F + EPSILON,
+                            "a Vasto Lorde healed " + healed + " in the 15 ticks after its wait");
+                    long now = helper.getLevel().getGameTime();
+                    long pause = BleachConfig.get(BleachConfig.MASK_REGEN_PAUSE_SECONDS) * 20L;
+                    QuincyTests.assertNear(helper, lorde.regenerate(now), 2.0, "a half second's healing");
+                    lorde.onMaskStruck(now);
+                    QuincyTests.assertNear(helper, lorde.regenerate(now + pause - 1), 0.0,
+                            "the healing just before a fresh crack's pause ends");
+                    QuincyTests.assertNear(helper, lorde.regenerate(now + pause), 2.0, "the healing as the pause ends");
+                    KidoTests.withConfig(BleachConfig.VASTO_LORDE_REGEN_PER_SECOND, 0.0, () -> QuincyTests.assertNear(helper,
+                            lorde.regenerate(now + pause), 0.0, "the healing with regen_per_second at 0"));
+                    lorde.setHealth(lorde.getMaxHealth() - 0.5F);
+                    QuincyTests.assertNear(helper, lorde.regenerate(now + pause), 0.5, "the healing half a point short");
+                    helper.assertTrue(lorde.getHealth() == lorde.getMaxHealth(), "a Vasto Lorde healed past its health");
+                    clear.run();
+                }, clear))
+                .thenSucceed();
+    }
+
+    // ---- Its fall ----
+
+    /**
+     * A Vasto Lorde mob devoured counts as devour_count Hollows toward a Gillian's or an Adjuchas's next form, and never as
+     * a Menos. A Gillian it leaves one Hollow short of an Adjuchas, its Menos met, is still a Gillian and would rise with
+     * one Hollow more; an Adjuchas it would lift to a Vasto Lorde while the server is full is held there, still an
+     * Adjuchas. Mock players, none of whom reaches a new form, so the server's record of its Vasto Lordes is never written.
+     */
+    @GameTest(template = "field")
+    public static void aVastoLordeDevouredCountsAsManyHollows(GameTestHelper helper) {
+        List<Entity> bodies = new ArrayList<>();
+        try {
+            VastoLorde lorde = HollowPlayerTests.placed(helper, ModEntities.VASTO_LORDE.get(), 8, 12);
+            bodies.add(lorde);
+            int worth = BleachConfig.get(BleachConfig.VASTO_LORDE_DEVOUR_COUNT);
+            long now = helper.getLevel().getGameTime();
+            Vec3 spot = new Vec3(8.5, 2.0, 10.5);
+            Player gillian = devourer(helper, HollowTier.GILLIAN, spot);
+            SoulData data = SoulLogic.get(gillian);
+            int hollows = BleachConfig.get(BleachConfig.ADJUCHAS_HOLLOWS) - worth - 1;
+            int menos = BleachConfig.get(BleachConfig.ADJUCHAS_MENOS);
+            data.setHollow(data.hollow().withEvolution(data.hollow().evolution().withTierHollows(hollows)
+                    .withTierMenos(menos)));
+            DevourLogic.Meal meal = DevourLogic.meal(gillian, lorde);
+            helper.assertTrue(meal.kind() == HollowKind.VASTO_LORDE && meal.hollowLike(),
+                    "a Vasto Lorde mob is the meal " + meal);
+            MenosEvolution.afterMeal(gillian, data, meal, now);
+            HollowProgress.Evolution after = data.hollow().evolution();
+            helper.assertTrue(HollowTier.of(data) == HollowTier.GILLIAN && after.tierHollows() == hollows + worth
+                            && after.tierMenos() == menos && MenosEvolution.nextTier(data) == null,
+                    "a Gillian that devoured a Vasto Lorde is a " + HollowTier.of(data) + " with the record " + after);
+            data.setHollow(data.hollow().withEvolution(after.withTierHollows(hollows + worth + 1)));
+            helper.assertTrue(MenosEvolution.nextTier(data) == HollowTier.ADJUCHAS,
+                    "a Gillian one Hollow further on would not rise");
+
+            Player full = devourer(helper, HollowTier.ADJUCHAS, spot);
+            SoulData fullData = SoulLogic.get(full);
+            int toVasto = BleachConfig.get(BleachConfig.VASTO_HOLLOWS) - 1;
+            int adjuchas = BleachConfig.get(BleachConfig.VASTO_ADJUCHAS);
+            fullData.setHollow(fullData.hollow().withEvolution(fullData.hollow().evolution().withTierHollows(toVasto)
+                    .withTierMenos(adjuchas)));
+            KidoTests.withConfig(BleachConfig.VASTO_DESTINED_SHARE, 1.0, () -> KidoTests.withConfig(BleachConfig.VASTO_MAX, 0,
+                    () -> MenosEvolution.afterMeal(full, fullData, DevourLogic.meal(full, lorde), now)));
+            after = fullData.hollow().evolution();
+            helper.assertTrue(HollowTier.of(fullData) == HollowTier.ADJUCHAS
+                            && after.stall() == HollowProgress.Evolution.STALL_FULL
+                            && after.tierHollows() == toVasto + worth && after.tierMenos() == adjuchas,
+                    "an Adjuchas that devoured a Vasto Lorde with the server full is a " + HollowTier.of(fullData)
+                            + " with the record " + after);
+        } finally {
+            QuincyArtsTests.discardAll(bodies);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Its fall: a death no player dealt earns no one the advancement, though a Shinigami struck it first and has the kill
+     * credit; that Shinigami's Asauchi purifies another, which counts and earns it; a Hollow's jaws devour a third and earn
+     * it, the meal counted as devour_count Hollows on its road and once among the Hollows of its life. Still bodies a blow
+     * from death and joined players, as an advancement is a server player's; it waits until the first body's bar shows.
+     */
+    @GameTest(template = "field", timeoutTicks = 60)
+    public static void bringingOneDownEarnsTheAdvancement(GameTestHelper helper) {
+        ServerPlayer purifier = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(4.5, 2.0, 3.5));
+        purifier.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.SHINIGAMI, AWARE));
+        HollowTests.arm(purifier, ModItems.ASAUCHI.get());
+        ServerPlayer jaws = TestPlayers.join(helper, GameType.SURVIVAL, new Vec3(12.5, 2.0, 3.5));
+        jaws.setData(SoulAttachments.SOUL, ShinigamiTests.soul(SoulState.HOLLOW, DEVOURER));
+        VastoLorde unclaimed = HollowPlayerTests.placed(helper, ModEntities.VASTO_LORDE.get(), 8, 8);
+        VastoLorde purified = HollowPlayerTests.placed(helper, ModEntities.VASTO_LORDE.get(), 4, 8);
+        VastoLorde devoured = HollowPlayerTests.placed(helper, ModEntities.VASTO_LORDE.get(), 12, 8);
+        Runnable clear = () -> {
+            discard(helper, unclaimed, purified, devoured);
+            QuincyArtsTests.clearItems(helper);
+        };
+        helper.runAtTickTime(FALL_GIVE_UP_TICK, () -> {
+            clear.run();
+            helper.fail("the Shinigami was never shown a Vasto Lorde's bar");
+        });
+        String fallen = Milestones.VASTO_LORDE_FALLEN;
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, ShriekerTests.holds(unclaimed.bossBar(), purifier),
+                        "the Shinigami was not shown the Vasto Lorde's bar"))
+                .thenExecute(HollowBaitTests.orClear(() -> {
+                    DamageSources damage = helper.getLevel().damageSources();
+                    unclaimed.hurt(damage.playerAttack(purifier), 1.0F);
+                    helper.assertTrue(unclaimed.isAlive() && unclaimed.getKillCredit() == purifier,
+                            "the Shinigami's first blow left the kill credit with " + unclaimed.getKillCredit());
+                    unclaimed.setHealth(1.0F);
+                    unclaimed.invulnerableTime = 0;
+                    unclaimed.hurt(damage.generic(), FATAL);
+                    helper.assertTrue(unclaimed.isDeadOrDying(), "a fatal blow left a Vasto Lorde alive");
+                    helper.assertFalse(DangaiTests.earned(purifier, fallen) || DangaiTests.earned(jaws, fallen),
+                            "a death no player dealt brought a Vasto Lorde down");
+                    purified.setHealth(1.0F);
+                    purified.hurt(damage.playerAttack(purifier), FATAL);
+                    helper.assertTrue(purified.isPurifying() && SoulLogic.get(purifier).hunt().purified() == 1,
+                            "the Asauchi did not purify a Vasto Lorde, or the purifier's count did not grow");
+                    helper.assertTrue(DangaiTests.earned(purifier, fallen),
+                            "its purifier has not brought a Vasto Lorde down");
+                    devoured.setHealth(1.0F);
+                    helper.assertTrue(DevourEvents.complete(jaws, devoured, helper.getLevel().getGameTime())
+                            && DangaiTests.earned(jaws, fallen), "its devourer has not brought a Vasto Lorde down");
+                    HollowProgress meals = SoulLogic.get(jaws).hollow();
+                    int worth = BleachConfig.get(BleachConfig.VASTO_LORDE_DEVOUR_COUNT);
+                    helper.assertTrue(meals.evolution().tierHollows() == worth && meals.totalHollows() == 1,
+                            "a Hollow that devoured a Vasto Lorde has the record " + meals.evolution() + " and "
+                                    + meals.totalHollows() + " Hollows in its life");
                     clear.run();
                 }, clear))
                 .thenSucceed();

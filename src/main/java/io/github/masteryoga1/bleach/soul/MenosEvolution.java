@@ -57,15 +57,20 @@ public final class MenosEvolution {
     /**
      * What a meal does for the road as a Menos, at the end of {@link DevourEvents#reward}: a Hollow of any
      * sort counts for the form and resets the regression clock, a Menos of the devourer's own class or above
-     * counts as one, and the next form is then tried.
+     * counts as one, and the next form is then tried. A Vasto Lorde mob counts as {@code devour_count} Hollows toward a
+     * Gillian's or an Adjuchas's next form, and never as a Menos; a plain Hollow's rise counts the Hollows it has devoured
+     * in its life, one a meal, so there it counts once. The soul still rises one form at a time, and only where there is
+     * room.
      */
     public static void afterMeal(Player devourer, SoulData data, DevourLogic.Meal meal, long now) {
         if (!HollowPlayerLogic.isHollow(data)) {
             return;
         }
+        // A Vasto Lorde player is devoured as an Adjuchas (HollowTier.menosKind): only the mob is this kind.
+        int worth = meal.kind() == HollowKind.VASTO_LORDE ? BleachConfig.get(BleachConfig.VASTO_LORDE_DEVOUR_COUNT) : 1;
         HollowProgress.Evolution evolution = data.hollow().evolution();
         if (meal.hollowLike()) {
-            evolution = evolution.withTierHollows(evolution.tierHollows() + 1).withHungerMinutes(0);
+            evolution = evolution.withTierHollows(evolution.tierHollows() + worth).withHungerMinutes(0);
             data.menosHungerTicks = 0;
         }
         if (countsAsMenos(HollowTier.of(data), meal.kind())) {

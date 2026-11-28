@@ -1,10 +1,12 @@
 package io.github.masteryoga1.bleach.entity;
 
+import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.registry.ModEffects;
 import io.github.masteryoga1.bleach.registry.ModEntities;
 import io.github.masteryoga1.bleach.registry.ModSounds;
 import io.github.masteryoga1.bleach.soul.FlashStep;
+import io.github.masteryoga1.bleach.soul.Hierro;
 import io.github.masteryoga1.bleach.soul.HollowCero;
 import io.github.masteryoga1.bleach.soul.HollowTier;
 import io.github.masteryoga1.bleach.soul.ReiatsuEvents;
@@ -22,9 +24,11 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -57,6 +61,11 @@ import net.minecraft.world.phys.Vec3;
  * along the ground at prey too far for its blow ({@link #dash}), never into a wall, off a ledge or into the void, and its
  * presence weighs on everything about it as released reiatsu would, withering the small Hollows and the Pluses it dwarfs
  * ({@link #pulsePresence}). None of it is saved, as the body is not.
+ *
+ * <p>Its hide is hard as an Arrancar's Hierro against souls no stronger than it ({@link #hide}), and it heals fast once
+ * nothing has hurt it for a few seconds ({@link #regenerate}). Brought down by a player's own blow, killed, purified or
+ * devoured, it earns them an advancement; it has no loot but the fragment a fresh crack knocks off its mask. A Gillian or
+ * an Adjuchas that devours it counts it as many Hollows toward its next form, never as a Menos ({@code MenosEvolution}).
  */
 public class VastoLorde extends Hollow implements CeroBeam.Caster {
     /** How much of a heavy blow its armour still turns, on top of the armour itself. */
@@ -77,6 +86,8 @@ public class VastoLorde extends Hollow implements CeroBeam.Caster {
     public static final double DASH_SHORT = 2.0;
     /** How often its presence beats, in ticks. */
     public static final int PRESENCE_INTERVAL_TICKS = 20;
+    /** How often its own healing comes, in ticks. */
+    public static final int REGEN_INTERVAL_TICKS = 10;
     private static final EntityDataAccessor<Integer> DATA_LOOK = SynchedEntityData.defineId(VastoLorde.class,
             EntityDataSerializers.INT);
     private static final long NEVER = ShinigamiProgress.NEVER;
@@ -188,13 +199,35 @@ public class VastoLorde extends Hollow implements CeroBeam.Caster {
                 BleachConfig.get(BleachConfig.VASTO_LORDE_DAMAGE));
     }
 
-    /** Server side, every tick, so it runs with NoAI too: its bar, last, so the bar shows the health this tick left. */
+    /**
+     * Server side, every tick, so it runs with NoAI too: its own healing each half second, then its bar, last, so the
+     * bar shows the health this tick left.
+     */
     @Override
     public void tick() {
         super.tick();
-        if (level() instanceof ServerLevel) {
+        if (level() instanceof ServerLevel server) {
+            if (tickCount % REGEN_INTERVAL_TICKS == 0) {
+                regenerate(server.getGameTime());
+            }
             bar.tick();
         }
+    }
+
+    /**
+     * Its own healing, on top of every Hollow's: [bosses.vasto_lorde] regen_per_second, half of it each half second,
+     * once nothing has hurt it for regen_delay_seconds, never while a fresh crack in its mask or a devourer's jaws hold
+     * its healing back, and never past its health. Returns what it healed.
+     */
+    public float regenerate(long now) {
+        float rate = (float) BleachConfig.get(BleachConfig.VASTO_LORDE_REGEN_PER_SECOND);
+        long delay = BleachConfig.get(BleachConfig.VASTO_LORDE_REGEN_DELAY_SECONDS) * 20L;
+        float before = getHealth();
+        if (rate <= 0.0F || !isAlive() || before >= getMaxHealth() || now - lastHurtAt < delay || now < regenPausedUntil) {
+            return 0.0F;
+        }
+        heal(rate * REGEN_INTERVAL_TICKS / 20.0F);
+        return getHealth() - before;
     }
 
     /**
@@ -396,6 +429,36 @@ public class VastoLorde extends Hollow implements CeroBeam.Caster {
         double radius = BleachConfig.get(BleachConfig.VASTO_LORDE_PRESENCE_RADIUS);
         return radius <= 0.0 ? 0 : ReiatsuEvents.presence(this, SoulLogic.reiatsu(this), radius,
                 (float) BleachConfig.get(BleachConfig.VASTO_LORDE_PRESENCE_HARM));
+    }
+
+    // ---- Its hide ----
+
+    /**
+     * What a blow is multiplied by through its hide, as through an Arrancar's Hierro ({@link Hierro#multiplier}): all of
+     * [bosses.vasto_lorde] hide_share holds against an attacker no stronger than it, none at [arrancar.hierro]
+     * pierce_ratio times its reiatsu, and evenly between. 1 for another victim, for a blow armour lets through, and for one
+     * with no living attacker but itself. It is weighed against its armour, never on top of it ({@code ReiatsuEvents}).
+     */
+    public static float hide(LivingEntity victim, DamageSource source, float attackerReiatsu, float victimReiatsu) {
+        if (!(victim instanceof VastoLorde) || source.is(DamageTypeTags.BYPASSES_ARMOR)
+                || !(source.getEntity() instanceof LivingEntity attacker) || attacker == victim) {
+            return 1.0F;
+        }
+        float share = (float) BleachConfig.get(BleachConfig.VASTO_LORDE_HIDE_SHARE);
+        return Hierro.multiplier(share, attackerReiatsu, victimReiatsu);
+    }
+
+    // ---- Its fall ----
+
+    /** Killed, purified or devoured by a player's own blow: that player has brought a Vasto Lorde down. */
+    @Override
+    public void die(DamageSource source) {
+        boolean wasDead = dead;
+        super.die(source);
+        // A cancelled death leaves it alive, and a second call does nothing: only a real first death counts.
+        if (!wasDead && dead && source.getEntity() instanceof ServerPlayer player) {
+            Milestones.grant(player, Milestones.VASTO_LORDE_FALLEN);
+        }
     }
 
     /** A soul that stops seeing it loses its bar at once. */
