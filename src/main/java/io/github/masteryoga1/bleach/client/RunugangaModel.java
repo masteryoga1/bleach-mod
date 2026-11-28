@@ -1,5 +1,7 @@
 package io.github.masteryoga1.bleach.client;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.masteryoga1.bleach.entity.Runuganga;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -8,6 +10,7 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.util.FastColor;
 import net.minecraft.util.Mth;
 
 /**
@@ -20,11 +23,15 @@ public final class RunugangaModel extends HierarchicalModel<Runuganga> {
     private static final float STRIDE = 0.25F, ARM_SWING = 0.2F, HEAD_PITCH_LIMIT = 20.0F;
     /** How far his arms come up over his head for a blow, in radians; and how far he goes into the sand, in pixels. */
     private static final float RAISE = 2.8F, DEPTH = 48.0F;
+    /** Soaked, each channel of his sand and his mask is drawn times this: darker, as wet sand is. */
+    private static final int WET = 0xFF8C8076;
 
     private final ModelPart root;
     private final ModelPart head;
     private final ModelPart rightArm;
     private final ModelPart leftArm;
+    /** Whether the body being drawn is soaked, as its pose was set. */
+    private boolean wet;
 
     public RunugangaModel(ModelPart root) {
         this.root = root;
@@ -88,5 +95,12 @@ public final class RunugangaModel extends HierarchicalModel<Runuganga> {
         head.yRot = netHeadYaw * Mth.DEG_TO_RAD;
         head.xRot = Mth.clamp(headPitch, -HEAD_PITCH_LIMIT, HEAD_PITCH_LIMIT) * Mth.DEG_TO_RAD;
         root.y += giant.sunk(ageInTicks - giant.tickCount) * DEPTH;
+        wet = giant.soaked();
+    }
+
+    /** Soaked, he and his mask are drawn as darker, wet sand. */
+    @Override
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int light, int overlay, int color) {
+        super.renderToBuffer(poseStack, buffer, light, overlay, wet ? FastColor.ARGB32.multiply(color, WET) : color);
     }
 }

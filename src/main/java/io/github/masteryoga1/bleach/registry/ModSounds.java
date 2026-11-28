@@ -133,6 +133,8 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> RUNUGANGA_SLUMP = variable("entity.runuganga.slump");
     /** Water soaking Runuganga's sand. */
     public static final DeferredHolder<SoundEvent, SoundEvent> RUNUGANGA_SOAK = variable("entity.runuganga.soak");
+    /** The sand about Runuganga sinking into his pit. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> RUNUGANGA_PIT = variable("entity.runuganga.pit");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */

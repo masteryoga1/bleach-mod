@@ -355,6 +355,9 @@ public final class ClientSmokeTest {
     private static final double TEAR_FROM_Z = HUECO_MUNDO_Z - RIFT_AHEAD;
     /** Summoned creatures stand still, facing south, towards a player who faces north. */
     private static final String STILL = "{NoAI:1b,Rotation:[0f,0f]}";
+    /** A splash bottle of water, falling, for {@code /summon minecraft:potion}. */
+    private static final String WATER_BOTTLE = "{Item:{id:\"minecraft:splash_potion\",count:1,components:"
+            + "{\"minecraft:potion_contents\":{potion:\"minecraft:water\"}}},Motion:[0.0,-0.5,0.0]}";
     /** The first tick of Grand Fisher's beat; its steps and checks count from here. */
     private static final int GRAND_FISHER_AT = 9180;
     /**
@@ -2049,13 +2052,16 @@ public final class ClientSmokeTest {
             }
             case VASTO_LORDE_AT + 40 -> shot(minecraft, "vasto_lorde");
             case VASTO_LORDE_AT + 42 -> command(minecraft, "kill @e[type=bleach:vasto_lorde]");
-            // Runuganga, summoned still 12 blocks before the soul and facing it, in air cleared to his height.
+            // Runuganga, summoned still 12 blocks before the soul and facing it, in air cleared to his height; then a
+            // bottle of water bursts on his head, and he is looked at again soaked.
             case RUNUGANGA_AT -> {
                 command(minecraft, "fill ~-4 ~ ~-16 ~4 ~13 ~-1 air");
                 command(minecraft, "summon bleach:runuganga ~ ~ ~-12 " + STILL);
             }
             case RUNUGANGA_AT + 40 -> shot(minecraft, "runuganga");
-            case RUNUGANGA_AT + 42 -> command(minecraft, "kill @e[type=bleach:runuganga]");
+            case RUNUGANGA_AT + 41 -> command(minecraft, "summon minecraft:potion ~ ~13 ~-12 " + WATER_BOTTLE);
+            case RUNUGANGA_AT + 72 -> shot(minecraft, "runuganga_wet");
+            case RUNUGANGA_AT + 74 -> command(minecraft, "kill @e[type=bleach:runuganga]");
             case RUNUGANGA_AT + 120 -> {
                 holdHuecoMundo(minecraft, false);
                 holdCentre(minecraft, false);
@@ -3146,7 +3152,10 @@ public final class ClientSmokeTest {
         return looks.equals(Set.of(VastoLorde.PLATED, VastoLorde.HORNED, VastoLorde.CRESTED));
     }
 
-    /** Runuganga's beat: he reaches the client unhidden with both parts and his mask in his head, and is looked at. */
+    /**
+     * Runuganga's beat: he reaches the client unhidden with both parts and his mask in his head, and is looked at; then
+     * the bottle burst on his head reaches the client as his soak.
+     */
     private static void checkRunuganga(Minecraft minecraft) {
         if (expectWithin(minecraft, RUNUGANGA_AT + 2, RUNUGANGA_AT + 35, () -> runugangaSeen(minecraft),
                 "the summoned Runuganga never reached the client unhidden, or his parts were not on his body")) {
@@ -3155,6 +3164,13 @@ public final class ClientSmokeTest {
                 look(minecraft, giant.position().add(0.0, giant.getBbHeight() * 0.5, 0.0));
             }
         }
+        expectWithin(minecraft, RUNUGANGA_AT + 44, RUNUGANGA_AT + 70, () -> runugangaSoaked(minecraft),
+                "a bottle of water burst on Runuganga's head, but the client never had him soaked");
+    }
+
+    private static boolean runugangaSoaked(Minecraft minecraft) {
+        Runuganga giant = nearest(minecraft, Runuganga.class, SUMMONED_RANGE, Runuganga::isAlive);
+        return giant != null && giant.soaked();
     }
 
     private static boolean runugangaSeen(Minecraft minecraft) {
@@ -3455,7 +3471,9 @@ public final class ClientSmokeTest {
                 || ticksInWorld == VASTO_LORDE_AT + 99 && !windowsPassed.contains(VASTO_LORDE_AT + 44)
                 && nearest(minecraft, VastoLorde.class, SUMMONED_RANGE, VastoLorde::isAlive) != null
                 || ticksInWorld == RUNUGANGA_AT + 34 && !windowsPassed.contains(RUNUGANGA_AT + 2)
-                && !runugangaSeen(minecraft);
+                && !runugangaSeen(minecraft)
+                || ticksInWorld == RUNUGANGA_AT + 69 && !windowsPassed.contains(RUNUGANGA_AT + 44)
+                && !runugangaSoaked(minecraft);
         return late && ++serverWaitTicks <= SERVER_WAIT_TICKS;
     }
 

@@ -761,6 +761,16 @@
       }
     ]
   },
+  "entity.runuganga.pit": {
+    "subtitle": "subtitles.bleach.entity.runuganga.pit",
+    "sounds": [
+      {
+        "name": "minecraft:block.sand.break",
+        "type": "event",
+        "pitch": 0.5
+      }
+    ]
+  },
   "entity.shrieker_leech.cling": {
     "subtitle": "subtitles.bleach.entity.shrieker_leech.cling",
     "sounds": [
