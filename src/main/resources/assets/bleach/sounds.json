@@ -721,6 +721,16 @@
       }
     ]
   },
+  "entity.vasto_lorde.dash": {
+    "subtitle": "subtitles.bleach.entity.vasto_lorde.dash",
+    "sounds": [
+      {
+        "name": "minecraft:entity.breeze.slide",
+        "type": "event",
+        "pitch": 0.5
+      }
+    ]
+  },
   "entity.shrieker_leech.cling": {
     "subtitle": "subtitles.bleach.entity.shrieker_leech.cling",
     "sounds": [

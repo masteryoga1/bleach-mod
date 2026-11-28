@@ -572,6 +572,10 @@ public final class BleachConfig {
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_CHANCE;
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_CERO_DAMAGE;
     public static final ModConfigSpec.IntValue VASTO_LORDE_CERO_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_DASH_BLOCKS;
+    public static final ModConfigSpec.IntValue VASTO_LORDE_DASH_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_PRESENCE_RADIUS;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_PRESENCE_HARM;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2650,6 +2654,22 @@ public final class BleachConfig {
         VASTO_LORDE_CERO_COOLDOWN_SECONDS = builder
                 .comment("Seconds between a Vasto Lorde's Cero and its next, and up to a second more at random.")
                 .defineInRange("cero_cooldown_seconds", 5, 1, 120);
+        VASTO_LORDE_DASH_BLOCKS = builder
+                .comment("The furthest a Vasto Lorde rushes along the ground at prey in sight too far for its blow, landing"
+                        + " two blocks short of it; never into a wall, off a ledge or into the void.")
+                .defineInRange("dash_blocks", 12.0, 2.0, 16.0);
+        VASTO_LORDE_DASH_COOLDOWN_SECONDS = builder
+                .comment("Seconds between a Vasto Lorde's rush and its next.")
+                .defineInRange("dash_cooldown_seconds", 3, 1, 60);
+        VASTO_LORDE_PRESENCE_RADIUS = builder
+                .comment("Blocks out to which a Vasto Lorde's presence weighs on every creature each second, as a released"
+                        + " soul of its reiatsu would, Menos and bosses too. 0 turns it off.")
+                .defineInRange("presence_radius", 12.0, 0.0, 24.0);
+        VASTO_LORDE_PRESENCE_HARM = builder
+                .comment("Health its presence withers each second from the small Hollows and the Pluses it weighs on"
+                        + " hardest, never a named or tamed one, a Menos, a boss or a player, and never in Peaceful. At 0 it"
+                        + " only weighs.")
+                .defineInRange("presence_harm", 2.0, 0.0, 20.0);
         builder.pop();
         builder.pop();
 

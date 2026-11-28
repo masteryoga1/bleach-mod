@@ -126,6 +126,8 @@ public final class ModSounds {
             variable("entity.grand_fisher_lure.sob");
     public static final DeferredHolder<SoundEvent, SoundEvent> GRAND_FISHER_LURE_CRY =
             variable("entity.grand_fisher_lure.cry");
+    /** A Vasto Lorde's rush along the ground. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> VASTO_LORDE_DASH = variable("entity.vasto_lorde.dash");
     /** Reiatsu gathering at a Menos's mouth for a Cero. */
     public static final DeferredHolder<SoundEvent, SoundEvent> CERO_CHARGE = fixed("entity.cero.charge", 48.0F);
     /** A Cero let go. */
