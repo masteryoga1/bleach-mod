@@ -576,6 +576,10 @@ public final class BleachConfig {
     public static final ModConfigSpec.IntValue VASTO_LORDE_DASH_COOLDOWN_SECONDS;
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_PRESENCE_RADIUS;
     public static final ModConfigSpec.DoubleValue VASTO_LORDE_PRESENCE_HARM;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_HIDE_SHARE;
+    public static final ModConfigSpec.DoubleValue VASTO_LORDE_REGEN_PER_SECOND;
+    public static final ModConfigSpec.IntValue VASTO_LORDE_REGEN_DELAY_SECONDS;
+    public static final ModConfigSpec.IntValue VASTO_LORDE_DEVOUR_COUNT;
 
     public static final ModConfigSpec.BooleanValue NATURAL_ARRANCAR;
     public static final ModConfigSpec.DoubleValue ADJUCHAS_TEAR_CHANCE;
@@ -2670,6 +2674,25 @@ public final class BleachConfig {
                         + " hardest, never a named or tamed one, a Menos, a boss or a player, and never in Peaceful. At 0 it"
                         + " only weighs.")
                 .defineInRange("presence_harm", 2.0, 0.0, 20.0);
+        VASTO_LORDE_HIDE_SHARE = builder
+                .comment("Most of a blow a Vasto Lorde's hard hide turns aside, as an Arrancar's Hierro does: all of it"
+                        + " against an attacker no stronger than it, none against one [arrancar.hierro] pierce_ratio times as"
+                        + " strong. It is weighed against its armour and the reiatsu difference, never on top of them: a blow"
+                        + " lands as the hide leaves it, or as they do when they take more. 0 turns it off.")
+                .defineInRange("hide_share", 0.35, 0.0, 0.95);
+        VASTO_LORDE_REGEN_PER_SECOND = builder
+                .comment("Health a Vasto Lorde heals each second, on top of every Hollow's, once nothing has hurt it for"
+                        + " regen_delay_seconds. A fresh crack in its mask holds it back as it holds back every Hollow's. 0"
+                        + " stops it.")
+                .defineInRange("regen_per_second", 4.0, 0.0, 50.0);
+        VASTO_LORDE_REGEN_DELAY_SECONDS = builder
+                .comment("Seconds nothing must hurt a Vasto Lorde before its own healing starts.")
+                .defineInRange("regen_delay_seconds", 3, 0, 60);
+        VASTO_LORDE_DEVOUR_COUNT = builder
+                .comment("How many Hollows a Vasto Lorde counts for toward the next form of a Gillian or an Adjuchas player"
+                        + " that devours it, never as a Menos; a plain Hollow counts it once, as any meal. The soul still"
+                        + " rises one form at a time, and only where the server has room.")
+                .defineInRange("devour_count", 10, 1, 40);
         builder.pop();
         builder.pop();
 

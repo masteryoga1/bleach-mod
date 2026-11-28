@@ -34,6 +34,7 @@ import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
@@ -96,7 +97,9 @@ public final class ReiatsuEvents {
      * Reiatsu difference: a soul whose reiatsu dwarfs its attacker's shrugs off most of the hit. Blut
      * Arterie makes the attacker's reiatsu count for more (see {@link QuincyLogic#reiatsuFactor}). An
      * Arrancar's Hierro is weighed here too, and only the larger of the two cuts is made, as both are the
-     * same gap in reiatsu (see {@link Hierro}); the Hierro rings when it is the one that held.
+     * same gap in reiatsu (see {@link Hierro}); the Hierro rings when it is the one that held. A Vasto Lorde's hide
+     * ({@link VastoLorde#hide}) is weighed against that cut and its armour, never on top of them: the blow lands as the
+     * hide leaves it, or as the cut and the armour do when together they take more.
      */
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {
         LivingEntity victim = event.getEntity();
@@ -110,6 +113,13 @@ public final class ReiatsuEvents {
         float difference = SoulLogic.reiatsuDamageMultiplier(attackerReiatsu, victimReiatsu);
         float hierro = Hierro.multiplier(victim, source, attackerReiatsu, victimReiatsu);
         float multiplier = Math.min(difference, hierro);
+        float hide = VastoLorde.hide(victim, source, attackerReiatsu, victimReiatsu);
+        if (hide < multiplier) {
+            // The armour meets the blow the cut left: of that, the hide lets through only this share.
+            float kept = hide / multiplier;
+            event.addReductionModifier(DamageContainer.Reduction.ARMOR,
+                    (container, reduction) -> Math.max(reduction, container.getNewDamage() * (1.0F - kept)));
+        }
         if (multiplier < 1.0F) {
             float before = event.getAmount();
             event.setAmount(before * multiplier);

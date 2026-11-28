@@ -231,9 +231,10 @@ public final class VastoLordeTests {
                                     + ", named " + event.getName().getString());
                     came[0].setHealth(came[0].getMaxHealth() / 2.0F);
                 }, clear))
-                // A Hollow left alone heals half a point a second, which may come in the same tick: so within a hundredth.
+                // Left alone a Vasto Lorde heals 2 every half second, with every Hollow's half point under it, and the bar
+                // may be read some ticks late: so within three hundredths, about six of its heals.
                 .thenWaitUntil(() -> GateTests.patiently(helper,
-                        Math.abs(came[0].bossBar().event().getProgress() - 0.5F) < 0.01F,
+                        Math.abs(came[0].bossBar().event().getProgress() - 0.5F) < 0.03F,
                         "at half its health the bar is at " + came[0].bossBar().event().getProgress()))
                 .thenExecute(HollowBaitTests.orClear(() -> {
                     BossBar bar = came[0].bossBar();
