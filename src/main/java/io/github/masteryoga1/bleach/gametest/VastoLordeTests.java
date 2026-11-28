@@ -320,25 +320,31 @@ public final class VastoLordeTests {
     }
 
     /**
-     * Its looks: each spawn rolls one of the three, and sixty spawns roll them all; one that skipped spawning is plated. A
-     * summon's data names the look, any number taken round the three, and no save writes it; a copy moved to another world
-     * keeps it. None of these bodies is ever in the world.
+     * Its looks: each spawn rolls one of the three for whatever reason it spawns, its own coming's among them, and twenty
+     * for each reason roll more than one and all of them the three; one that skipped spawning is plated. A summon's data
+     * names the look, any number taken round the three, and no save writes it; a copy moved to another world keeps it.
+     * None of these bodies is ever in the world.
      */
     @GameTest(template = "empty")
     public static void aVastoLordeHasOneOfThreeLooksThatNoSaveWrites(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         EntityType<VastoLorde> type = ModEntities.VASTO_LORDE.get();
         Set<Integer> rolled = new HashSet<>();
-        for (int i = 0; i < 60; i++) {
-            VastoLorde spawned = type.create(level);
-            helper.assertTrue(spawned != null && spawned.look() == VastoLorde.PLATED,
-                    "a body that skipped spawning is not plated");
-            EventHooks.finalizeMobSpawn(spawned, level, level.getCurrentDifficultyAt(helper.absolutePos(BlockPos.ZERO)),
-                    MobSpawnType.COMMAND, null);
-            rolled.add(spawned.look());
+        for (MobSpawnType reason : MobSpawnType.values()) {
+            Set<Integer> these = new HashSet<>();
+            for (int i = 0; i < 20; i++) {
+                VastoLorde spawned = type.create(level);
+                helper.assertTrue(spawned != null && spawned.look() == VastoLorde.PLATED,
+                        "a body that skipped spawning is not plated");
+                EventHooks.finalizeMobSpawn(spawned, level, level.getCurrentDifficultyAt(helper.absolutePos(BlockPos.ZERO)),
+                        reason, null);
+                these.add(spawned.look());
+            }
+            helper.assertTrue(these.size() > 1, "twenty spawns for " + reason + " rolled only the looks " + these);
+            rolled.addAll(these);
         }
         helper.assertTrue(rolled.equals(Set.of(VastoLorde.PLATED, VastoLorde.HORNED, VastoLorde.CRESTED)),
-                "sixty spawns rolled the looks " + rolled);
+                "the spawns rolled the looks " + rolled);
 
         CompoundTag summon = new CompoundTag();
         summon.putInt(VastoLorde.LOOK_TAG, VastoLorde.CRESTED + VastoLorde.LOOKS * 2);

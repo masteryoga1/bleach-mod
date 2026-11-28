@@ -26,8 +26,10 @@ import net.minecraft.world.level.ServerLevelAccessor;
  * {@link Menos}, so none of their cap, bait or lifetime rules is its, and no Menos count, arrival or meal takes it (see
  * {@link HollowKind#isVasto}). It hunts and strikes as any Hollow does, with its wits about it, and released reiatsu
  * never frightens it off. Its health and blow are the server's to set; its armour is the heaviest of any Hollow's,
- * toughened against heavy blows. It is no sinner and never saved, so it goes with its chunk, or through a tear for lack
- * of prey. Only a command brings one yet: {@code /summon}, or {@code /bleach garganta}, whose tear brings it alone.
+ * toughened against heavy blows. It is no sinner and never saved, so it goes with its chunk, or, out of Hueco Mundo,
+ * through a tear for lack of prey. It comes by itself only far out on Hueco Mundo's dunes, a few at a time
+ * ({@code VastoLordeComing}); otherwise a command brings it: {@code /summon}, or {@code /bleach garganta}, whose tear
+ * brings it alone.
  *
  * <p>Its white bar shows to the souls about it who see spirits. Each has one of three looks of the mod's own, rolled as
  * it spawns ({@link #look}): bone plates over its shoulders and chest, a horned mask, or a crested one. The look is sent

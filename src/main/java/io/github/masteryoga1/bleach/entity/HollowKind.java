@@ -63,9 +63,10 @@ public enum HollowKind implements StringRepresentable {
             null, 1.0F, 1.0F,
             new MaskSpot(1.15, 3.1, 1.2), new Look(2.0F, 0.25F, 0.4F, 1.6F), 0, Float.MAX_VALUE),
     /**
-     * A Vasto Lorde, the highest class of Menos Grande, human-sized, and a boss: it comes alone and never by chance, and
-     * it is no Menos here ({@link #isVasto}). Its health and attack here are only the config's defaults
-     * ([bosses.vasto_lorde]), which set them as it spawns; its armour is the heaviest of any Hollow's.
+     * A Vasto Lorde, the highest class of Menos Grande, human-sized, and a boss: it comes alone, by itself only far out
+     * on Hueco Mundo's dunes and never by a tear's chance or a spawner, and it is no Menos here ({@link #isVasto}). Its
+     * health and attack here are only the config's defaults ([bosses.vasto_lorde]), which set them as it spawns; its
+     * armour is the heaviest of any Hollow's.
      */
     VASTO_LORDE("vasto_lorde", new Stats(400.0, 16.0, 14.0, 0.35, 48.0, 1.0, 1.0, 1.0), 20, 1.2, 2500.0F, 100,
             null, 1.0F, 1.0F,
