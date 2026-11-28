@@ -104,6 +104,15 @@ public final class SoulAttachments {
     public static final Supplier<AttachmentType<FootingState>> FOOTING = ATTACHMENT_TYPES.register("footing",
             () -> AttachmentType.builder(() -> new FootingState()).build());
 
+    /**
+     * The game time a Garganta last set this soul down in Hueco Mundo, for Runuganga's grace
+     * ({@link RunugangaComing#landed}). Saved once set; not kept through death, as a soul that respawns has not landed;
+     * never sent.
+     */
+    public static final Supplier<AttachmentType<Long>> HUECO_LANDING = ATTACHMENT_TYPES.register("hueco_landing",
+            () -> AttachmentType.builder(() -> ShinigamiProgress.NEVER)
+                    .serialize(Codec.LONG, at -> at != ShinigamiProgress.NEVER).build());
+
     private SoulAttachments() {
     }
 }
