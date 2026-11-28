@@ -1,6 +1,7 @@
 package io.github.masteryoga1.bleach.gametest;
 
 import io.github.masteryoga1.bleach.BleachMod;
+import io.github.masteryoga1.bleach.advancement.Milestones;
 import io.github.masteryoga1.bleach.config.BleachConfig;
 import io.github.masteryoga1.bleach.entity.GargantaRift;
 import io.github.masteryoga1.bleach.entity.Hollow;
@@ -10,6 +11,7 @@ import io.github.masteryoga1.bleach.entity.Runuganga;
 import io.github.masteryoga1.bleach.entity.SpiritProjectiles;
 import io.github.masteryoga1.bleach.registry.BleachTags;
 import io.github.masteryoga1.bleach.registry.ModEntities;
+import io.github.masteryoga1.bleach.registry.ModItems;
 import io.github.masteryoga1.bleach.soul.BossLedger;
 import io.github.masteryoga1.bleach.soul.HollowLogic;
 import io.github.masteryoga1.bleach.soul.HuecoMundoSpawns;
@@ -20,6 +22,7 @@ import io.github.masteryoga1.bleach.soul.SoulState;
 import io.github.masteryoga1.bleach.world.HuecoMundoPlan;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -27,7 +30,9 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.EntityTypeTags;
+import net.minecraft.world.BossEvent;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageSources;
@@ -38,6 +43,11 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ThrownPotion;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
@@ -48,8 +58,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Tests for Runuganga: his body (T1), his fight (T2), his slump and re-forming (T3), his sinking away (T4), whom he
- * rises for (T5), and where and when (T6). Every body is discarded as its test ends; he stands past a field's top, so
- * his tests in the field run in batches of their own, an awake body's alone.
+ * rises for and how often a look is made (T5), where and when, and never by a game test's server (T6), a bottle's splash
+ * soaking him (T7), and his soaked sand kept from re-forming and a soaked body's death (T8). Every body is discarded as
+ * its test ends; he stands past a field's top, so his tests in the field run in batches of their own, an awake body's
+ * alone.
  */
 @GameTestHolder(BleachMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -60,6 +72,12 @@ public final class RunugangaTests {
      * in x -208 to -161 and z -16 to 31: his sand, and past r 200 the open dunes.
      */
     private static final ChunkPos WHERE = new ChunkPos(-12, 0);
+    /**
+     * T7 and T8's batch, whose still bodies' sides lie 0.5 inside the 16-wide field: a bottle's splash reaches 4 past its
+     * own width of 0.25, so 1.6 past the box, and with 5 blocks between columns and 6 between rows (StructureGridSpawner)
+     * a neighbour's nearest body starts 5.5 past it.
+     */
+    private static final String WATER = "runuganga_water";
 
     private RunugangaTests() {
     }
@@ -69,10 +87,32 @@ public final class RunugangaTests {
         return kept(helper, QuincyTests.still(helper.spawn(ModEntities.RUNUGANGA.get(), new Vec3(x, 2.0, z))));
     }
 
-    /** He is discarded as the test ends, passed or failed: a hold of no chunks keeps him for that. */
-    private static Runuganga kept(GameTestHelper helper, Runuganga giant) {
-        LasNochesHallsTests.Hold.hold(helper, helper.getLevel(), List.of(), 0, List.of()).placed().add(giant);
-        return giant;
+    /**
+     * He, or a bottle thrown at him, is discarded as the test ends, passed or failed: a hold of no chunks keeps it. One
+     * added mid-test is safe, as a test's listeners run only as it passes or fails.
+     */
+    private static <T extends Entity> T kept(GameTestHelper helper, T made) {
+        LasNochesHallsTests.Hold.hold(helper, helper.getLevel(), List.of(), 0, List.of()).placed().add(made);
+        return made;
+    }
+
+    /** A bottle of water of this kind, thrown by this soul or by none, falling from this spot of the field. */
+    private static ThrownPotion splash(GameTestHelper helper, @Nullable Player owner, Item kind, double x, double y,
+                                       double z) {
+        Vec3 at = helper.absoluteVec(new Vec3(x, y, z));
+        ThrownPotion bottle = new ThrownPotion(helper.getLevel(), at.x, at.y, at.z);
+        bottle.setItem(PotionContents.createItemStack(kind, Potions.WATER));
+        bottle.setOwner(owner);
+        bottle.setDeltaMovement(0.0, -0.5, 0.0);
+        helper.getLevel().addFreshEntity(bottle);
+        return kept(helper, bottle);
+    }
+
+    /** A joined soul in this state and mode, as strong as he is, here in the field: it ticks, and leaves at the end. */
+    private static ServerPlayer joined(GameTestHelper helper, SoulState state, GameType mode, double x, double z) {
+        ServerPlayer soul = TestPlayers.join(helper, mode, new Vec3(x, 2.0, z));
+        soul.setData(SoulAttachments.SOUL, ShinigamiTests.soul(state, HollowKind.RUNUGANGA.reiatsu));
+        return soul;
     }
 
     /** An awake body of his, not kept for good as the helper's spawn keeps one, at this spot of the field. */
@@ -203,9 +243,10 @@ public final class RunugangaTests {
     }
 
     /**
-     * Three blows past his floor leave him on it, standing; next he slumps into sand that nothing aims at or harms, his bar
-     * hidden. After reform_seconds he rises with reform_share of his health and his bar, unhurt till he stands three
-     * seconds on. {@code /kill} ends him rising or as sand, and a body killed before its slump stays dead, never sand.
+     * Three blows past his floor leave him on it, standing; next he slumps into sand that nothing aims at or harms
+     * while he is dry, his bar hidden. After reform_seconds he rises with reform_share of his health and his bar,
+     * unhurt till he stands three seconds on. {@code /kill} ends him rising or as sand, and a body killed before its
+     * slump stays dead, never sand.
      */
     @GameTest(template = "field", skyAccess = true, batch = "runuganga", timeoutTicks = 300)
     public static void atHisFloorHeSlumpsAndReformsAndOnlyKillEndsHim(GameTestHelper helper) {
@@ -380,6 +421,11 @@ public final class RunugangaTests {
         helper.assertTrue(first == now - 100 && landed.getData(SoulAttachments.HUECO_LANDING) == now,
                 "a landing within the grace lengthened it, or one after it was not noted");
 
+        int every = RunugangaComing.LOOK_TICKS;
+        helper.assertTrue(every == 100 && RunugangaComing.lookNow(0) && RunugangaComing.lookNow(every)
+                        && !RunugangaComing.lookNow(every - 1) && !RunugangaComing.lookNow(every + 1)
+                        && !RunugangaComing.looksBy(hueco.getServer()),
+                "a look for him is not made every five seconds, or a game test's server makes one");
         helper.assertTrue(BossLedger.boss(RunugangaComing.ID) == RunugangaComing.BOSS
                         && RunugangaComing.BOSS.returnDays() == BleachConfig.get(BleachConfig.RUNUGANGA_RETURN_DAYS),
                 "his row is not the ledger's");
@@ -441,6 +487,10 @@ public final class RunugangaTests {
                 "he rose " + across + " across at " + made.position() + ", or otherwise than rising at the soul");
         helper.assertTrue(noneRose(hold, hueco, List.of(soul)), "a second rose while he was about");
         made.discard();
+        // A look on a tick one falls on, for a soul a roll has just brought him to: a game test's server makes none.
+        Runuganga looked = kept(hold, RunugangaComing.look(server, hueco, List.of(soul), 0));
+        TravelTests.discard(looked);
+        helper.assertTrue(looked == null, "a game test's server looked for him");
         ledger.markAway(RunugangaComing.ID, BossLedger.now(server), 1, List.of());
         boolean away = noneRose(hold, hueco, List.of(soul));
         ledger.reset(RunugangaComing.ID);
@@ -481,6 +531,142 @@ public final class RunugangaTests {
         helper.assertTrue(!placed.onGround(new Vec3(-123.5, y, 0.5)) && placed.onGround(new Vec3(-125.5, y, 0.5))
                         && !placed.onGround(new Vec3(-125.5, HuecoMundoPlan.CAVERN_CEILING_Y - 0.5, 0.5)),
                 "his ground in Hueco Mundo reaches inside the wall or under the sand, or not to the wall");
+    }
+
+    /**
+     * A bottle of water a soul who sees him throws bursts on his head and soaks him: his bar blue, no floor, a blow's harm
+     * twice over. An unaware soul's goes through him, and a blow leaves him as dry as it found him; a lingering one
+     * bursting on the sand 2.5 blocks off his side soaks him. The soak runs soak_seconds from the splash, then he is dry,
+     * white and floored again.
+     */
+    @GameTest(template = "field", skyAccess = true, batch = WATER, timeoutTicks = 500)
+    public static void waterSplashedOnHimSoaksHimUnlessAnUnawareSoulThrewIt(GameTestHelper helper) {
+        helper.assertTrue(BleachConfig.RUNUGANGA_SOAK_SECONDS.getDefault() == 10
+                && BleachConfig.RUNUGANGA_SOAKED_HARM.getDefault() == 2.0, "his soak's config defaults changed");
+        Runuganga wet = still(helper, 2.5, 8.0), dry = still(helper, 13.5, 8.0);
+        Player aware = soul(helper, SoulState.SHINIGAMI, GameType.SURVIVAL, 2.5, 1.5);
+        Player unaware = soul(helper, SoulState.HUMAN, GameType.SURVIVAL, 13.5, 1.5);
+        ThrownPotion[] bottles = new ThrownPotion[2];
+        long[] burst = new long[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, wet.tickCount > 0 && dry.tickCount > 0,
+                        "his bodies have not taken their first steps"))
+                .thenExecute(() -> {
+                    // A foot above each head, which is 14 up: both burst on it in the same tick, the second or third.
+                    bottles[0] = splash(helper, aware, Items.SPLASH_POTION, 2.5, 15.0, 8.0);
+                    bottles[1] = splash(helper, unaware, Items.SPLASH_POTION, 13.5, 15.0, 8.0);
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, bottles[0].isRemoved() && bottles[1].isRemoved(),
+                        "a bottle never burst on his head"))
+                .thenExecute(() -> {
+                    burst[0] = helper.getTick();
+                    helper.assertTrue(wet.soaked() && wet.floor() == 0.0F
+                                    && wet.bossBar().event().getColor() == BossEvent.BossBarColor.BLUE,
+                            "a bottle of water burst on his head left him dry, with his floor or his white bar");
+                    helper.assertTrue(!dry.soaked() && dry.floor() == Runuganga.FLOOR
+                                    && dry.bossBar().event().getColor() == BossEvent.BossBarColor.WHITE,
+                            "an unaware soul's bottle soaked him");
+                    DamageSources damage = helper.getLevel().damageSources();
+                    wet.hurt(damage.generic(), 10.0F);
+                    dry.hurt(damage.generic(), 10.0F);
+                    float wetLost = wet.getMaxHealth() - wet.getHealth(), dryLost = dry.getMaxHealth() - dry.getHealth();
+                    helper.assertTrue(near(wetLost, 20.0) && near(dryLost, 10.0),
+                            "a blow of 10 took " + wetLost + " soaked and " + dryLost + " dry");
+                    helper.assertTrue(!dry.soaked() && dry.floor() == Runuganga.FLOOR
+                                    && dry.bossBar().event().getColor() == BossEvent.BossBarColor.WHITE,
+                            "a dry blow soaked him");
+                    splash(helper, null, Items.LINGERING_POTION, 13.5, 3.0, 3.5);
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, dry.soaked(),
+                        "a lingering bottle bursting by him never soaked him"))
+                .thenWaitUntil(() -> GateTests.patiently(helper, !wet.soaked(), "his soak never ran out"))
+                .thenExecute(() -> {
+                    // He is soaked in the bottle's tick and counts down in his own, so he dries 200 ticks on.
+                    long waited = helper.getTick() - burst[0];
+                    helper.assertTrue(waited >= 198 && waited <= 202 && wet.floor() == Runuganga.FLOOR
+                                    && wet.bossBar().event().getColor() == BossEvent.BossBarColor.WHITE,
+                            "he dried " + waited + " ticks after the splash, or without his floor or his white bar");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Soaked, a blow ends him outright where he stands, never slumping, and a blow of no one's earns no one anything.
+     * Brought to his floor dry by one soul, he slumps; another's bottle of water falls through his sand, bursts on the
+     * ground and soaks it, his head out of it and his bar shown, and past reform_seconds it has not re-formed. That soul's
+     * Asauchi on his head purifies him, as it would any Hollow: it alone earns the advancement and is the ledger's victor,
+     * and he crumbles from where he lay. His ledger row is reset after each death.
+     */
+    @GameTest(template = "field", skyAccess = true, batch = WATER, timeoutTicks = 400)
+    public static void soakedABlowEndsHimAndEarnsItsDealerTheAdvancement(GameTestHelper helper) {
+        MinecraftServer server = helper.getLevel().getServer();
+        BossLedger ledger = BossLedger.get(server);
+        ledger.reset(RunugangaComing.ID);
+        ServerPlayer striker = joined(helper, SoulState.SHINIGAMI, GameType.SURVIVAL, 8.0, 2.5);
+        ServerPlayer finisher = joined(helper, SoulState.SHINIGAMI, GameType.SURVIVAL, 8.0, 13.5);
+        HollowTests.arm(finisher, ModItems.ASAUCHI.get());
+        Runuganga standing = still(helper, 2.5, 8.0), mound = still(helper, 13.5, 8.0);
+        String fallen = Milestones.RUNUGANGA;
+        helper.startSequence()
+                .thenWaitUntil(() -> GateTests.patiently(helper, standing.tickCount > 0 && mound.tickCount > 0
+                        && striker.tickCount > 0 && finisher.tickCount > 0, "his bodies or the souls have not ticked"))
+                .thenExecute(() -> {
+                    DamageSources damage = helper.getLevel().damageSources();
+                    try {
+                        standing.soak();
+                        standing.hurt(damage.generic(), 1_000.0F);
+                        helper.assertTrue(standing.isDeadOrDying() && standing.getPose() == Pose.DYING,
+                                "soaked, a blow left him " + standing.getPose() + " with " + standing.getHealth());
+                        helper.assertFalse(DangaiTests.earned(striker, fallen) || DangaiTests.earned(finisher, fallen),
+                                "a death no soul dealt earned the advancement");
+                    } finally {
+                        ledger.reset(RunugangaComing.ID);
+                    }
+                    for (int i = 0; i < 3; i++) {
+                        mound.invulnerableTime = 0;
+                        mound.hurt(damage.playerAttack(striker), 1_000.0F);
+                    }
+                    helper.assertTrue(near(mound.getHealth(), Runuganga.FLOOR), "dry, three blows took him past his floor");
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, mound.getPose() == Pose.DIGGING
+                        && mound.sunk(0.0F) >= 0.99F, "he never slumped and sank into his sand"))
+                .thenExecute(() -> {
+                    helper.assertFalse(mound.isPickable(), "dry, his sand can be aimed at");
+                    splash(helper, finisher, Items.SPLASH_POTION, 13.5, 8.0, 8.0);
+                })
+                .thenWaitUntil(() -> GateTests.patiently(helper, mound.soaked(),
+                        "a bottle that fell through his sand never soaked it"))
+                .thenExecute(() -> helper.assertTrue(near(mound.sunk(0.0F), Runuganga.WET_SUNK) && mound.head().isPickable()
+                                && mound.floor() == 0.0F && !mound.bossBar().hidden(),
+                        "soaked, his head stayed under the sand, he kept a floor or his bar stayed hidden"))
+                // Soaked some 30 ticks after he slumped: 80 more pass his 100 ticks of reform_seconds.
+                .thenExecuteAfter(80, () -> helper.assertTrue(mound.getPose() == Pose.DIGGING && mound.soaked(),
+                        "soaked, his sand re-formed past reform_seconds"))
+                .thenExecute(() -> {
+                    try {
+                        int purified = SoulLogic.get(finisher).hunt().purified();
+                        DamageSource blow = helper.getLevel().damageSources().playerAttack(finisher);
+                        mound.invulnerableTime = 0;
+                        helper.assertTrue(mound.head().hurt(blow, 10.0F) && mound.isDeadOrDying(),
+                                "soaked, a blow on his head did not end him");
+                        helper.assertTrue(mound.isPurifying() && SoulLogic.get(finisher).hunt().purified() == purified + 1,
+                                "the Asauchi did not purify him, or its soul's count did not grow");
+                        helper.assertTrue(DangaiTests.earned(finisher, fallen) && !DangaiTests.earned(striker, fallen),
+                                "the advancement went to the soul that struck him dry, or not to the one that ended him");
+                        long now = BossLedger.now(server);
+                        List<UUID> victors = List.copyOf(ledger.beatenBy(RunugangaComing.ID));
+                        helper.assertTrue(ledger.waitLeft(RunugangaComing.ID, now) == 3 * BossLedger.TICKS_PER_DAY
+                                        && victors.equals(List.of(finisher.getUUID())),
+                                "the ledger did not keep him away 3 days, beaten by the soul that ended him: " + victors);
+                    } finally {
+                        ledger.reset(RunugangaComing.ID);
+                        // His deaths drop nothing; should one ever, none of it is left lying in the field.
+                        QuincyArtsTests.clearItems(helper);
+                    }
+                })
+                .thenExecuteAfter(1, () -> helper.assertTrue(mound.sunk(0.0F) > Runuganga.WET_SUNK
+                        && mound.sunk(0.0F) < 1.0F, "purified, he crumbled from " + mound.sunk(0.0F) + ", not where he lay"))
+                .thenSucceed();
     }
 
     /** A roll for these souls, tried three times in case every column of a look missed; what rose, kept. */

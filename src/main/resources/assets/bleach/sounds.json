@@ -751,6 +751,16 @@
       }
     ]
   },
+  "entity.runuganga.soak": {
+    "subtitle": "subtitles.bleach.entity.runuganga.soak",
+    "sounds": [
+      {
+        "name": "minecraft:block.mud.place",
+        "type": "event",
+        "pitch": 0.7
+      }
+    ]
+  },
   "entity.shrieker_leech.cling": {
     "subtitle": "subtitles.bleach.entity.shrieker_leech.cling",
     "sounds": [
