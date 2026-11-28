@@ -6,8 +6,10 @@ import io.github.masteryoga1.bleach.entity.ArrancarNpc;
 import io.github.masteryoga1.bleach.entity.FishboneD;
 import io.github.masteryoga1.bleach.entity.GateKeeper;
 import io.github.masteryoga1.bleach.entity.GrandFisher;
+import io.github.masteryoga1.bleach.entity.Hollow;
 import io.github.masteryoga1.bleach.entity.InnerHollow;
 import io.github.masteryoga1.bleach.entity.MaterialisedSpirit;
+import io.github.masteryoga1.bleach.entity.PlusSpirit;
 import io.github.masteryoga1.bleach.entity.QuincyNpc;
 import io.github.masteryoga1.bleach.entity.ShinigamiNpc;
 import io.github.masteryoga1.bleach.entity.Shrieker;
@@ -21,8 +23,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
@@ -170,6 +174,46 @@ public final class ReiatsuEvents {
         }
         player.serverLevel().sendParticles(REIATSU_PARTICLE, player.getX(), player.getY() + 1.0, player.getZ(),
                 12, 0.6, 0.9, 0.6, 0.02);
+    }
+
+    /**
+     * One beat of a creature's presence, which it never chooses to release: within {@code radius} blocks it weighs on
+     * every creature weak enough as a released soul of this reiatsu would, Menos and bosses too, and the weakest run.
+     * The small Hollows and the Pluses it weighs on hardest also wither by {@code harm}, with no one to blame, unless
+     * named, tamed or a student's practice Hollow, or the world is Peaceful. It never reaches itself, another of its own
+     * kind, what cannot be hurt, a training dummy or a player in creative or spectator mode, and withers no player. One
+     * search a beat. Returns how many withered.
+     */
+    public static int presence(Mob source, float reiatsu, double radius, float harm) {
+        double radiusSqr = radius * radius;
+        List<LivingEntity> nearby = source.level().getEntitiesOfClass(LivingEntity.class,
+                source.getBoundingBox().inflate(radius), entity -> entity != source && entity.getType() != source.getType()
+                        && entity.isAlive() && entity.distanceToSqr(source) <= radiusSqr && !entity.isInvulnerable()
+                        && !(entity instanceof TrainingDummy)
+                        && !(entity instanceof Player player && (player.isCreative() || player.isSpectator())));
+        long until = source.level().getGameTime() + FRIGHT_TICKS;
+        boolean harms = harm > 0.0F && source.level().getDifficulty() != Difficulty.PEACEFUL;
+        int withered = 0;
+        for (LivingEntity target : nearby) {
+            int weight = SoulLogic.applyPressure(target, reiatsu);
+            if (weight >= 2 && target instanceof PathfinderMob mob && !(mob instanceof GateKeeper)) {
+                frighten(mob, source, until);
+            }
+            if (harms && weight >= 3 && withers(target) && target.hurt(source.damageSources().wither(), harm)) {
+                withered++;
+            }
+        }
+        return withered;
+    }
+
+    /**
+     * Whether a presence may wither this creature: a small Hollow of the kinds that come by chance, or a Plus spirit,
+     * neither named nor tamed, nor a student's practice Hollow.
+     */
+    private static boolean withers(LivingEntity target) {
+        boolean small = target instanceof Hollow hollow ? hollow.kind().arrivalWeight > 0 && !hollow.isPractice()
+                : target instanceof PlusSpirit;
+        return small && !target.hasCustomName() && !(target instanceof OwnableEntity pet && pet.getOwnerUUID() != null);
     }
 
     /**
